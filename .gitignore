@@ -1,0 +1,12 @@
+build/
+build-wasm/
+out/
+.vs/
+.vscode/
+/assets/
+
+.idea/
+*.log
+.cxx/
+.gradle/
+/android/app/src/main/assets/
