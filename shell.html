@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>PortalGame</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100%;
+            background: black;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
+    <script>
+        var Module = {
+            preRun: [],
+            postRun: [],
+            canvas: (function() {
+            return document.getElementById('canvas');
+            })()
+        };
+
+        // Resize canvas to fit the window and inform SDL (via Emscripten)
+        function resizeCanvas() {
+            const canvas = document.getElementById('canvas');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            // // Notify Emscripten SDL2
+            // if (typeof Module !== 'undefined' && Module.canvas) {
+            //     const evt = new CustomEvent('resize');
+            //     window.dispatchEvent(evt);
+            // }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('load', resizeCanvas);
+    </script>
+
+    {{{ SCRIPT }}}
+</body>
+
+</html>

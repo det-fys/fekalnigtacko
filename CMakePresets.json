@@ -1,0 +1,62 @@
+{
+  "version": 4,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "vs",
+      "displayName": "Visual Studio 18 2026",
+      "description": "Build with VS compiler using Multi-Config generator",
+      "generator": "Visual Studio 18 2026",
+      "toolset": "host=x64",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/vs",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+        "CMAKE_C_COMPILER": "cl.exe",
+        "CMAKE_CXX_COMPILER": "cl.exe"
+      }
+    },
+    {
+      "name": "emscripten",
+      "displayName": "Emscripten Multi-Config Build",
+      "description": "Build with Emscripten toolchain using Multi-Config generator",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build/wasm",
+      "toolchainFile": "c:/dev/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "vs-release",
+      "displayName": "VS Release",
+      "configurePreset": "vs",
+      "configuration": "Release"
+    },
+    {
+      "name": "vs-debug",
+      "displayName": "VS Debug",
+      "configurePreset": "vs",
+      "configuration": "Debug"
+    },
+    {
+      "name": "emscripten-release",
+      "displayName": "Emscripten Release",
+      "configurePreset": "emscripten",
+      "configuration": "Release"
+    },
+    {
+      "name": "emscripten-debug",
+      "displayName": "Emscripten Debug",
+      "configurePreset": "emscripten",
+      "configuration": "Debug"
+    }
+  ]
+}
