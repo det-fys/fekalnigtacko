@@ -14,6 +14,7 @@ class World : public collision::DynamicsWorld
 {
 public:
     World(std::string mapname);
+    DELETE_COPY_MOVE(World)
 
     // spawn entity of type T
     template <std::derived_from<Entity> T, typename... TArgs>
@@ -30,9 +31,17 @@ public:
 
     void Update(int64_t delta_time);
 
+    // events
+    virtual void PlayerJoined(Player& player) {}
+    virtual void PlayerLeft(Player& player) {}
+    
+    Entity* GetEntity(net::EntNum entnum);
+
     const std::string& GetMapName() const { return mapname_; }
     const std::map<net::EntNum, std::unique_ptr<Entity>>& GetEntities() const { return ents_; }
     int64_t GetTime() const { return time_ms_; }
+
+    virtual ~World() = default;
 
 private:
     std::string mapname_;

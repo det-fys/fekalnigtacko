@@ -5,32 +5,56 @@ project(FekalniGtacko)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(SOURCES 
-    "src/client/main.cpp"
-    "src/client/app.hpp"
-    "src/client/app.cpp"
-    "src/client/gl.hpp"
-    "src/client/utils.hpp"
+set(COMMON_SOURCES
     "src/assets/animation.hpp"
     "src/assets/animation.cpp"
     "src/assets/cache.hpp"
     "src/assets/cache.cpp"
     "src/assets/cmdfile.hpp"
     "src/assets/cmdfile.cpp"
-    "src/assets/model.hpp"
-    "src/assets/model.cpp"
-    "src/assets/mesh_builder.hpp"
-    "src/assets/mesh_builder.cpp"
     "src/assets/map.hpp"
     "src/assets/map.cpp"
+    "src/assets/model.hpp"
+    "src/assets/model.cpp"
     "src/assets/skeleton.hpp"
     "src/assets/skeleton.cpp"
+    "src/assets/vehiclemdl.hpp"
+    "src/assets/vehiclemdl.cpp"
+    "src/collision/aabb.hpp"
+    "src/collision/dynamicsworld.hpp"
+    "src/collision/dynamicsworld.cpp"
+    "src/collision/motionstate.hpp"
+    "src/collision/trianglemesh.hpp"
     "src/collision/trianglemesh.cpp"
     "src/game/player_input.hpp"
     "src/game/transform_node.hpp"
+    "src/net/defs.hpp"
+    "src/net/fixed_str.hpp"
+    "src/net/inmessage.hpp"
+    "src/net/msg_producer.hpp"
+    "src/net/msg_producer.cpp"
+    "src/net/outmessage.hpp"
+    "src/net/quantized.hpp"
+    "src/utils/allocnum.hpp"
+    "src/utils/defs.hpp"
+    "src/utils/files.hpp"
+    "src/utils/transform.hpp"
+    "src/utils/validate.hpp"
+)
+
+set(CLIENT_ONLY_SOURCES
+    "src/assets/mesh_builder.hpp"
+    "src/assets/mesh_builder.cpp"
+    "src/client/app.hpp"
+    "src/client/app.cpp"
+    "src/client/gl.hpp"
+    "src/client/main.cpp"
+    "src/client/utils.hpp"
     "src/gameview/client_session.hpp"
     "src/gameview/client_session.cpp"
     "src/gameview/entityview.hpp"
+    "src/gameview/vehicleview.hpp"
+    "src/gameview/vehicleview.cpp"
     "src/gameview/worldview.hpp"
     "src/gameview/worldview.cpp"
     "src/gfx/buffer_object.cpp"
@@ -49,29 +73,43 @@ set(SOURCES
     "src/gfx/uniform_buffer.hpp"
     "src/gfx/vertex_array.cpp"
     "src/gfx/vertex_array.hpp"
-    "src/net/defs.hpp"
-    "src/net/fixed_str.hpp"
-    "src/net/inmessage.hpp"
-    "src/net/msg_producer.hpp"
-    "src/net/msg_producer.cpp"
-    "src/net/outmessage.hpp"
-    "src/net/quantized.hpp"
-    "src/utils/defs.hpp"
-    "src/utils/files.hpp"
     "src/utils/files.cpp"
-    "src/utils/transform.hpp"
 )
 
+set(SERVER_ONLY_SOURCES
+    "src/game/controllable.cpp"
+    "src/game/controllable.hpp"
+    "src/game/entity.hpp"
+    "src/game/entity.cpp"
+    "src/game/game.hpp"
+    "src/game/game.cpp"
+    "src/game/openworld.hpp"
+    "src/game/openworld.cpp"
+    "src/game/player.hpp"
+    "src/game/player.cpp"
+    "src/game/vehicle.hpp"
+    "src/game/vehicle.cpp"
+    "src/game/world.hpp"
+    "src/game/world.cpp"
+    "src/server/client.hpp"
+    "src/server/client.cpp"
+    "src/server/main.cpp"
+    "src/server/server.hpp"
+    "src/server/server.cpp"
+    "src/server/wsserver.hpp"
+    "src/server/wsserver.cpp"
+    "src/utils/files_server.cpp"
+)
 
 if(ANDROID)
     # Android-specific setup
     set(MAIN_NAME "main")
-    add_library(${MAIN_NAME} SHARED ${SOURCES})
+    add_library(${MAIN_NAME} SHARED ${COMMON_SOURCES} ${CLIENT_ONLY_SOURCES})
     target_link_libraries(${MAIN_NAME} PRIVATE GLESv3 log android)
 else()
     # Desktop build
     set(MAIN_NAME "FekalniGtacko")
-    add_executable(${MAIN_NAME} ${SOURCES})
+    add_executable(${MAIN_NAME} ${COMMON_SOURCES} ${CLIENT_ONLY_SOURCES})
 endif()
 
 
@@ -162,56 +200,11 @@ endif()
 
     add_subdirectory(external/Crow)
     set(SERVER_SOURCES
-        "src/assets/animation.hpp"
-        "src/assets/animation.cpp"
-        "src/assets/cache.hpp"
-        "src/assets/cache.cpp"
-        "src/assets/cmdfile.hpp"
-        "src/assets/cmdfile.cpp"
-        "src/assets/map.hpp"
-        "src/assets/map.cpp"
-        "src/assets/model.hpp"
-        "src/assets/model.cpp"
-        "src/assets/mesh_builder.cpp"
-        "src/assets/skeleton.hpp"
-        "src/assets/skeleton.cpp"
-        "src/collision/aabb.hpp"
-        "src/collision/dynamicsworld.hpp"
-        "src/collision/dynamicsworld.cpp"
-        "src/collision/trianglemesh.hpp"
-        "src/collision/trianglemesh.cpp"
-        "src/game/entity.hpp"
-        "src/game/entity.cpp"
-        "src/game/game.hpp"
-        "src/game/game.cpp"
-        "src/game/player_input.hpp"
-        "src/game/player.hpp"
-        "src/game/player.cpp"
-        "src/game/transform_node.hpp"
-        "src/game/world.hpp"
-        "src/game/world.cpp"
-        "src/net/defs.hpp"
-        "src/net/fixed_str.hpp"
-        "src/net/inmessage.hpp"
-        "src/net/msg_producer.hpp"
-        "src/net/msg_producer.cpp"
-        "src/net/outmessage.hpp"
-        "src/net/quantized.hpp"
-        "src/server/client.hpp"
-        "src/server/client.cpp"
-        "src/server/main.cpp"
-        "src/server/server.hpp"
-        "src/server/server.cpp"
-        "src/server/wsserver.hpp"
-        "src/server/wsserver.cpp"
-        "src/utils/defs.hpp"
-        "src/utils/files.hpp"
-        "src/utils/files.cpp"
-        "src/utils/transform.hpp"
+
     )
 
     set(SERVER_NAME server)
-    add_executable(${SERVER_NAME} ${SERVER_SOURCES})
+    add_executable(${SERVER_NAME} ${COMMON_SOURCES} ${SERVER_ONLY_SOURCES})
     target_link_libraries(${SERVER_NAME} PRIVATE Crow glm BulletCollision BulletDynamics LinearMath Bullet3Common)
     target_include_directories(${SERVER_NAME} PRIVATE "src" "external/bullet3/src")
     target_compile_definitions(${SERVER_NAME} PRIVATE SERVER)

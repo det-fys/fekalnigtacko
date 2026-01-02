@@ -21,6 +21,7 @@ struct Quantized
 public:
     T value;
 
+    Quantized() = default;
     Quantized(T value) : value(value) {}
     Quantized(float fvalue) { Encode(value); }
 
@@ -35,6 +36,16 @@ public:
     float Decode() const noexcept { return Min + static_cast<float>(value) * inv_scale; }
 
     static constexpr float MaxError() noexcept { return inv_scale * 0.5f; }
+};
+
+template <typename T>
+concept AnyQuantized = requires(T t, float f)
+{
+    { T(f) };
+    { t.Encode(f) };
+    { t.Decode() } -> std::convertible_to<float>;
+    // { t.value } -> std::unsigned_integral;
+    { t.value };
 };
 
 } // namespace net

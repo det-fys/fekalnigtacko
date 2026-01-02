@@ -10,6 +10,12 @@
 #include <easywsclient.hpp>
 #endif // EMSCRIPTEN
 
+#ifdef _WIN32
+#define NOMINMAX
+#pragma comment(lib, "ws2_32")
+#include <WinSock2.h>
+#endif
+
 #include "app.hpp"
 #include "gl.hpp"
 
@@ -47,7 +53,9 @@ static void InitSDL()
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
 	std::cout << "Creating SDL window..." << std::endl;
-    s_window = SDL_CreateWindow("PortalGame", 100, 100, 640, 480, SDL_WINDOW_SHOWN | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    s_window =
+        SDL_CreateWindow("PortalGame", 100, 100, 640, 480,
+                         SDL_WINDOW_SHOWN /* | SDL_WINDOW_MAXIMIZED */| SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (!s_window)
     {
         ThrowSDLError("SDL_CreateWindow");
@@ -219,15 +227,29 @@ static void Main() {
 #ifdef EMSCRIPTEN
     emscripten_set_main_loop(Frame, 0, true);
 #else
+
+#ifdef _WIN32
+    INT rc;
+    WSADATA wsaData;
+
+    rc = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (rc)
+    {
+        printf("WSAStartup Failed.\n");
+        return;
+    }
+#endif
+
     {
         using namespace easywsclient;
 
-        auto ws = std::unique_ptr<WebSocket>(WebSocket::from_url("ws://127.0.0.1:8080/ws"));
+        auto ws = std::unique_ptr<WebSocket>(WebSocket::from_url("ws://127.0.0.1:11200/ws"));
         bool connected = false;
+
         
         std::vector<uint8_t> data;
 
-        while (!s_quit)
+        while (ws && !s_quit)
         {
             ws->poll();
 
@@ -237,7 +259,7 @@ static void Main() {
                 connected = true;
                 s_app->Connected();
             }
-            else if (ws_state != WebSocket::CLOSED && connected)
+            else if (ws_state != WebSocket::OPEN && connected)
             {
                 connected = false;
                 s_app->Disconnected("WS closed");
@@ -270,6 +292,11 @@ static void Main() {
 
     ShutdownGL();
     ShutdownSDL();
+
+#ifdef _WIN32
+    WSACleanup();
+#endif
+
 #endif // EMSCRIPTEN
 }
 

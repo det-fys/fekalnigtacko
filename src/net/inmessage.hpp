@@ -57,7 +57,7 @@ public:
         if (!Read(und))
             return false;
         
-        value = und;
+        value = static_cast<T>(und);
         return true;
     }
 
@@ -73,14 +73,27 @@ public:
         return true;
     }
 
-    template <typename T, long long MinL, long long MaxL>
-    bool Read(Quantized<T, MinL, MaxL>& quant)
+    template <AnyQuantized T>
+    bool Read(T& quant)
     {
-        T value;
-        if (!Read(value))
+        return Read(quant.value);
+
+        //T value;
+        //if (!Read(value))
+        //    return false;
+
+        //quant.value = value;
+        //return true;
+    }
+
+    template <AnyQuantized T>
+    bool Read(float& f)
+    {
+        T q;
+        if (!Read(q))
             return false;
 
-        quant.value = value;
+        f = q.Decode();
         return true;
     }
 

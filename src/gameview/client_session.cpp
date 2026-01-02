@@ -1,5 +1,7 @@
 #include "client_session.hpp"
 
+#include <iostream>
+
 game::view::ClientSession::ClientSession(App& app) : app_(app) {}
 
 bool game::view::ClientSession::ProcessMessage(net::InMessage& msg)
@@ -19,6 +21,8 @@ bool game::view::ClientSession::ProcessMessage(net::InMessage& msg)
 
 bool game::view::ClientSession::ProcessSingleMessage(net::MessageType type, net::InMessage& msg)
 {
+    MSGDEBUG(std::cout << "[MSG] received " << (uint32_t)type << std::endl;)
+
     switch (type)
     {
     case net::MSG_CHWORLD:

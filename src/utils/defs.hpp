@@ -11,3 +11,13 @@
 #else
 #define CLIENT_ONLY(...)
 #endif
+
+//#define MSGDEBUG(...) __VA_ARGS__
+#define MSGDEBUG(...)
+
+#define DELETE_COPY_MOVE(classname) \
+    classname(const classname& other) = delete; \
+    classname(classname&& other) = delete; \
+    classname& operator=(const classname& other) = delete; \
+    classname& operator=(classname&& other) = delete;
+

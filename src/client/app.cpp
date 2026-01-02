@@ -45,13 +45,22 @@ void App::Frame()
 	{
 		world->Draw(dlist_);
 	
-		glm::mat4 view = glm::lookAt(glm::vec3(80.0f, 0.0f, 10.0f), glm::vec3(40.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 		glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 3000.0f);
 	
 		gfx::DrawListParams params;
 		params.view_proj = proj * view;
 	
 		renderer_.DrawList(dlist_, params);
+	}
+
+	if (time_ - last_send_time_ > 0.040f)
+	{
+        auto msg = BeginMsg(net::MSG_IN);
+        msg.Write(input_);
+
+		last_send_time_ = time_;
+
 	}
 }
 
@@ -60,7 +69,7 @@ void App::Connected()
 	std::cout << "WS connected" << std::endl;
 
 	// init session
-	session_ = std::make_unique<game::view::ClientSession>();
+	session_ = std::make_unique<game::view::ClientSession>(*this);
 
 	// send login
 	auto msg = BeginMsg(net::MSG_ID);

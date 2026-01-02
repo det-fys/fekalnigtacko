@@ -38,6 +38,7 @@ enum MessageType : uint8_t
 
 using PlayerName = FixedStr<24>;
 using MapName = FixedStr<32>;
+using ModelName = FixedStr<64>;
 
 // pi approx fraction
 constexpr long long PI_N = 245850922;
@@ -64,5 +65,8 @@ enum EntMsgType : uint8_t
 
     EMSG_UPDATE,
 };
+
+using PositionQ = Quantized<uint32_t, -10000, 10000, 1>;
+using AngleQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
 
 } // namespace net

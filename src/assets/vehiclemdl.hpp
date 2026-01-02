@@ -32,8 +32,8 @@ public:
 
     static std::shared_ptr<const VehicleModel> LoadFromFile(const std::string& filename);
 
-    const std::shared_ptr<const Model>& GetModel() { return basemodel_; } 
-    const std::vector<VehicleWheel>& GetWheels() { return wheels_; }
+    const std::shared_ptr<const Model>& GetModel() const { return basemodel_; } 
+    const std::vector<VehicleWheel>& GetWheels() const { return wheels_; }
 
 private:
     std::shared_ptr<const Model> basemodel_;

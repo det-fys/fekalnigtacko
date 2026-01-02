@@ -23,6 +23,8 @@ public:
 
     game::Game& GetGame() { return game_; }
 
+    int64_t GetTime() const { return time_; }
+
 private:
     void PollWSEvents();
     void HandleWSConnect(WSConnId conn);
@@ -38,6 +40,7 @@ private:
     game::Game game_;
     std::unordered_map<WSConnId, std::unique_ptr<Client>> clients_;
 
+    int64_t time_ = 0;
     
 };
 

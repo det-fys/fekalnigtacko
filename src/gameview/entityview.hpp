@@ -8,24 +8,27 @@
 #include "net/defs.hpp"
 #include "net/inmessage.hpp"
 
-class World;
+#include "utils/defs.hpp"
 
 namespace game::view
 {
 
+class WorldView;
+
 class EntityView
 {
 public:
-    EntityView(World& world) : world_(world) {}
+    EntityView(WorldView& world) : world_(world) {}
+    DELETE_COPY_MOVE(EntityView)
 
-    virtual bool ProcessMsg( net::InMessage& msg) { return false; }
-
+    virtual bool ProcessMsg(net::EntMsgType type, net::InMessage& msg) { return false; }
     virtual void Update() {}
-
     virtual void Draw(gfx::DrawList& dlist) {}
 
+    virtual ~EntityView() = default;
+
 protected:
-    World& world_;
+    WorldView& world_;
     TransformNode root_;
     bool visible_ = false;
 

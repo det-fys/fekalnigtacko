@@ -4,10 +4,11 @@
 
 #include "worldview.hpp"
 
-#include "client/app.hpp"
 #include "gfx/draw_list.hpp"
 #include "net/defs.hpp"
 #include "net/inmessage.hpp"
+
+class App;
 
 namespace game::view
 {

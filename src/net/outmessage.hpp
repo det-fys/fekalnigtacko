@@ -13,7 +13,7 @@ namespace net
 class OutMessage
 {
 public:
-    OutMessage(std::vector<char>& buffer) : buffer_(buffer) { buffer.clear(); }
+    OutMessage(std::vector<char>& buffer) : buffer_(buffer) { }
 
     template <std::integral T>
     size_t Reserve()
@@ -43,6 +43,9 @@ public:
 
     void Write(const char* str, size_t n)
     {
+        if (n == 0)
+            return;
+
         size_t pos = buffer_.size();
         buffer_.resize(pos + n);
         memcpy(&buffer_[pos], str, n);
@@ -60,10 +63,18 @@ public:
         Write(str.str, str.len);
     }
 
-    template <typename T, long long MinL, long long MaxL>
-    void Write(Quantized<T, MinL, MaxL> quant)
+    // template <typename T, long long MinL, long long MaxL>
+    // void Write(Quantized<T, MinL, MaxL> quant)
+    // {
+    //     Write(quant.value);
+    // }
+
+    template <AnyQuantized T>
+    void Write(float f)
     {
-        Write(quant.value);
+        T q;
+        q.Encode(f);
+        Write(q.value);
     }
 
     void WriteVarInt(int64_t value)

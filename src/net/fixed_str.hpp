@@ -26,6 +26,8 @@ struct FixedStr
         size_t putsize = std::min(N, stdstr.size());
         len = putsize;
         memcpy(str, stdstr.data(), putsize);
+
+        return *this;
     }
 
     size_t MaxLen() const { return N; }

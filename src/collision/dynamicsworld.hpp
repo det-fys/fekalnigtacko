@@ -9,6 +9,15 @@
 namespace collision
 {
 
+// struct StaticObjectInstance
+// {
+//     std::unique_ptr<btCollisionShape> shape;
+//     btRigidBody body;
+
+//     StaticObjectInstance(std::unique_ptr<btCollisionShape> shape) : body() 
+
+// }
+
 class DynamicsWorld
 {
 public:

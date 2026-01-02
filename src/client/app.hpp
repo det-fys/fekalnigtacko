@@ -33,6 +33,7 @@ private:
 
 private:
     float time_ = 0.0f;
+    float last_send_time_ = 0.0f;
     glm::ivec2 viewport_size_ = {800, 600};
     game::PlayerInputFlags input_ = 0;
     game::PlayerInputFlags prev_input_ = 0;

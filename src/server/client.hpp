@@ -1,6 +1,7 @@
 #pragma once
 
 #include "wsserver.hpp"
+#include "net/defs.hpp"
 #include "net/inmessage.hpp"
 #include "game/player.hpp"
 

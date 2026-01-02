@@ -5,7 +5,7 @@
 
 std::shared_ptr<const assets::VehicleModel> assets::VehicleModel::LoadFromFile(const std::string& filename)
 {
-    auto veh = std::shared_ptr<VehicleModel>();
+    auto veh = std::make_shared<VehicleModel>();
 
     LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
         if (command == "basemodel")
@@ -40,4 +40,6 @@ std::shared_ptr<const assets::VehicleModel> assets::VehicleModel::LoadFromFile(c
             veh->wheels_.emplace_back(wheel);
         }
     });
+
+    return veh;
 }

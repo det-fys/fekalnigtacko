@@ -2,7 +2,12 @@
 
 #include "world.hpp"
 
-game::Player::Player(Game& game, std::string name) : game_(game), name_(std::move(name)) {}
+#include <iostream>
+
+game::Player::Player(Game& game, std::string name) : game_(game), name_(std::move(name))
+{
+    game_.PlayerJoined(*this);
+}
 
 bool game::Player::ProcessMsg(net::MessageType type, net::InMessage& msg)
 {
@@ -28,8 +33,45 @@ void game::Player::Update()
         SyncEntities();
 }
 
+void game::Player::SetWorld(World* world)
+{
+    if (world == world_)
+        return;
+
+    Control(nullptr);
+
+    if (world_)
+        world_->PlayerLeft(*this);
+
+    world_ = world;
+
+    if (world_)
+        world_->PlayerJoined(*this);
+}
+
+void game::Player::Control(Controllable* ctl)
+{
+    if (ctl == ctl_)
+        return;
+
+    if (ctl_)
+        ctl_->controller_ = nullptr; // clear old
+        
+    ctl_ = ctl;
+    
+    if (ctl_)
+        ctl_->controller_ = this;
+}
+
+game::Player::~Player()
+{
+    SetWorld(nullptr);
+    game_.PlayerLeft(*this);
+}
+
 void game::Player::SendWorldMsg()
 {
+    MSGDEBUG(std::cout << "seding CHWORLD" << std::endl;)
     auto msg = BeginMsg(net::MSG_CHWORLD);
     msg.Write(net::MapName(world_->GetMapName()));
 }
@@ -87,6 +129,7 @@ bool game::Player::ShouldSeeEntity(const Entity& entity) const
 
 void game::Player::SendInitEntity(const Entity& entity)
 {
+    MSGDEBUG(std::cout << "seding ENTSPAWN " << entity.GetEntNum() << std::endl;)
     auto msg = BeginMsg(net::MSG_ENTSPAWN);
     msg.Write(entity.GetEntNum());
     msg.Write(entity.GetViewType());
@@ -95,12 +138,14 @@ void game::Player::SendInitEntity(const Entity& entity)
 
 void game::Player::SendUpdateEntity(const Entity& entity)
 {
+    MSGDEBUG(std::cout << "seding update ent " << entity.GetEntNum() << std::endl;)
     auto msg = BeginMsg(); // no CMD here, these are already included in entity message payload!
     msg.Write(entity.GetMsg());
 }
 
 void game::Player::SendDestroyEntity(net::EntNum entnum)
 {
+    MSGDEBUG(std::cout << "seding ENTDESTROY " << entnum << std::endl;)
     auto msg = BeginMsg(net::MSG_ENTDESTROY);
     msg.Write(entnum);
 }

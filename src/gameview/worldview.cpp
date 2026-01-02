@@ -2,6 +2,8 @@
 
 #include "assets/cache.hpp"
 
+#include "vehicleview.hpp"
+
 game::view::WorldView::WorldView()
 {
     map_ = assets::CacheManager::GetMap("data/openworld.map");
@@ -29,6 +31,11 @@ void game::view::WorldView::Draw(gfx::DrawList& dlist) const
 {
     if (map_)
         map_->Draw(dlist);
+
+    for (const auto& [entnum, ent] : ents_)
+    {
+        ent->Draw(dlist);
+    }
 }
 
 bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)
@@ -45,8 +52,17 @@ bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)
 
     switch (type)
     {
+    case net::ET_VEHICLE:
+        entslot = VehicleView::InitFromMsg(*this, msg);
+        break;
 
     default:
+        return false;
+    }
+
+    if (!entslot) // init failed
+    {
+        ents_.erase(entnum);
         return false;
     }
 
@@ -55,7 +71,18 @@ bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)
 
 bool game::view::WorldView::ProcessEntMsgMsg(net::InMessage& msg)
 {
-    return false;
+    net::EntNum entnum;
+    net::EntMsgType type;
+
+    if (!msg.Read(entnum) || !msg.Read(type))
+        return false;
+
+    auto ent_it = ents_.find(entnum);
+
+    if (ent_it == ents_.end())
+        return false;
+
+    return ent_it->second->ProcessMsg(type, msg);
 }
 
 bool game::view::WorldView::ProcessEntDestroyMsg(net::InMessage& msg)
