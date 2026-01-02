@@ -6,32 +6,53 @@
 std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::string& filename)
 {
     auto model = std::make_shared<Model>();
-
-    MeshBuilder mb(gfx::MF_NONE);
+    std::vector<glm::vec3> vert_pos; // rember for collision trimesh
+    
+    CLIENT_ONLY(MeshBuilder mb(gfx::MF_NONE);)
 
     LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
         if (command == "v")
         {
-            MeshVertex v;
-            iss >> v.pos.x >> v.pos.y >> v.pos.z;
-            iss >> v.normal.x >> v.normal.y >> v.normal.z;
-            iss >> v.uv.x >> v.uv.y;
+            glm::vec3 pos;
+            iss >> pos.x >> pos.y >> pos.z;
 
-            // TODO: LUV & bone data
+            CLIENT_ONLY(
+                MeshVertex v;
+                v.pos = pos;
+                iss >> v.normal.x >> v.normal.y >> v.normal.z;
+                iss >> v.uv.x >> v.uv.y;
+    
+                // TODO: LUV & bone data
+    
+                mb.AddVertex(v);
+            )
 
-            mb.AddVertex(v);
+            if (model->cmesh_)
+                vert_pos.emplace_back(pos);
         }
         else if (command == "f")
         {
-            MeshTriangle t;
-            iss >> t.vert[0] >> t.vert[1] >> t.vert[2];
+            uint32_t indices[3];
+            iss >> indices[0] >> indices[1] >> indices[2];
+            
+            CLIENT_ONLY(
+                MeshTriangle t;
+                t.vert[0] = indices[0];
+                t.vert[1] = indices[1];
+                t.vert[2] = indices[2];
+                mb.AddTriangle(t);
+            )
 
-            mb.AddTriangle(t);
+            if (model->cmesh_)
+            {
+                // FIXME: possible index segfault
+                model->cmesh_->AddTriangle(vert_pos[indices[0]], vert_pos[indices[1]], vert_pos[indices[2]]);
+            }
         }
         else if (command == "surface")
         {
             std::string surface_name, texture_name;
-            gfx::SurfaceFlags sflags = gfx::SF_NONE;
+            CLIENT_ONLY(gfx::SurfaceFlags sflags = gfx::SF_NONE;)
 
             iss >> surface_name;
 
@@ -40,22 +61,36 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
             while (iss >> flag)
             {
                 if (flag == "+texture")
+                {
                     iss >> texture_name;
+                }
                 else if (flag == "+doublesided")
-                    sflags |= gfx::SF_DOUBLE_SIDED;
+                {
+                    CLIENT_ONLY(sflags |= gfx::SF_DOUBLE_SIDED;)
+                }
                 else if (flag == "+transparent")
-                    sflags |= gfx::SF_TRANSPARENT;
+                {   
+                    CLIENT_ONLY(sflags |= gfx::SF_TRANSPARENT;)
+                }
                 else if (flag == "+ocolor")
-                    sflags |= gfx::SF_OBJECT_COLOR;
+                {
+                    CLIENT_ONLY(sflags |= gfx::SF_OBJECT_COLOR;)
+                }
             }
 
-            std::shared_ptr<const gfx::Texture> texture;
-            if (!texture_name.empty())
-            {
-                texture = CacheManager::GetTexture("data/" + surface_name + ".png");
-            }
-
-            mb.BeginSurface(sflags, surface_name, texture);
+            CLIENT_ONLY(
+                std::shared_ptr<const gfx::Texture> texture;
+                if (!texture_name.empty())
+                {
+                    texture = CacheManager::GetTexture("data/" + surface_name + ".png");
+                }
+    
+                mb.BeginSurface(sflags, surface_name, texture);
+            )
+        }
+        else if (command == "makecoltrimesh")
+        {
+            model->cmesh_ = std::make_unique<collision::TriangleMesh>();
         }
         else
         {
@@ -65,7 +100,13 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
         // TODO: skeleton
     });
     
+    CLIENT_ONLY(
+        mb.Build();
+        model->mesh_ = mb.GetMesh();
+    )
 
+    if (model->cmesh_)
+        model->cmesh_->Build();
 
     return model;
 }

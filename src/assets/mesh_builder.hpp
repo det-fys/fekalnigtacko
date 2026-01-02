@@ -50,7 +50,7 @@ public:
     void SetMeshFlag(gfx::MeshFlags flag) { mflags_ |= flag; }
 
     std::shared_ptr<const Mesh> GetMesh() const { return mesh_; }
-
+    
 private:
     void FinalizeSurface();
 

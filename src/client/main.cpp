@@ -1,13 +1,16 @@
 #include <SDL.h>
 #include <iostream>
 #include <memory>
-#include "app.hpp"
+#include <vector>
 
 #ifdef EMSCRIPTEN
 #include <emscripten.h>
 #include <emscripten/html5_webgl.h>
-#endif
+#else
+#include <easywsclient.hpp>
+#endif // EMSCRIPTEN
 
+#include "app.hpp"
 #include "gl.hpp"
 
 static SDL_Window *s_window = nullptr;
@@ -155,39 +158,39 @@ static void Frame()
 	const uint8_t* kbd_state = SDL_GetKeyboardState(nullptr);
     
     if (kbd_state[SDL_GetScancodeFromKey(SDLK_w)])
-		input |= game::PI_FORWARD;
+		input |= game::IN_FORWARD;
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_s)])
-		input |= game::PI_BACKWARD;
+		input |= game::IN_BACKWARD;
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_a)])
-		input |= game::PI_LEFT;
+		input |= game::IN_LEFT;
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_d)])
-		input |= game::PI_RIGHT;
+		input |= game::IN_RIGHT;
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_SPACE)])
-		input |= game::PI_JUMP;
+		input |= game::IN_JUMP;
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_LCTRL)])
-		input |= game::PI_CROUCH;
+		input |= game::IN_CROUCH;
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_e)])
-		input |= game::PI_USE;
+		input |= game::IN_USE;
 
     if (kbd_state[SDL_GetScancodeFromKey(SDLK_F3)])
-		input |= game::PI_DEBUG1;
+		input |= game::IN_DEBUG1;
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_F4)])
-		input |= game::PI_DEBUG2;
+		input |= game::IN_DEBUG2;
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_F5)])
-		input |= game::PI_DEBUG3;
+		input |= game::IN_DEBUG3;
 
 	int mouse_state = SDL_GetMouseState(nullptr, nullptr);
 
 	if (mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT))
-		input |= game::PI_ATTACK;
+		input |= game::IN_ATTACK;
 
 
 	s_app->SetInput(input);
@@ -216,16 +219,58 @@ static void Main() {
 #ifdef EMSCRIPTEN
     emscripten_set_main_loop(Frame, 0, true);
 #else
-    while (!s_quit)
     {
-        Frame();
+        using namespace easywsclient;
+
+        auto ws = std::unique_ptr<WebSocket>(WebSocket::from_url("ws://127.0.0.1:8080/ws"));
+        bool connected = false;
+        
+        std::vector<uint8_t> data;
+
+        while (!s_quit)
+        {
+            ws->poll();
+
+            auto ws_state = ws->getReadyState();
+            if (ws_state == WebSocket::OPEN && !connected)
+            {
+                connected = true;
+                s_app->Connected();
+            }
+            else if (ws_state != WebSocket::CLOSED && connected)
+            {
+                connected = false;
+                s_app->Disconnected("WS closed");
+            }
+
+            ws->dispatchBinary([&](const std::vector<uint8_t>& data) {
+                net::InMessage msg(reinterpret_cast<const char*>(data.data()), data.size());
+                s_app->ProcessMessage(msg);
+            });
+
+            Frame();
+
+            if (connected)
+            {
+                auto msg = s_app->GetMsg();
+                if (!msg.empty())
+                {
+                    data.resize(msg.size_bytes());
+                    memcpy(data.data(), msg.data(), msg.size_bytes());
+                    ws->sendBinary(data);
+                }
+            }
+
+            s_app->ResetMsg();
+        }
+        
     }
 
     s_app.reset();
 
     ShutdownGL();
     ShutdownSDL();
-#endif
+#endif // EMSCRIPTEN
 }
 
 int main(int argc, char *argv[])

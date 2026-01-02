@@ -96,6 +96,8 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 
 		if (auto cmp = sa->va.get() <=> sb->va.get(); cmp != 0)
 			return cmp < 0;
+
+		return false;
 	});
 
 	glEnable(GL_DEPTH_TEST);
@@ -140,7 +142,15 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		SetupMeshShader(mshader, params);
 
 		// set model matrix
-		glUniformMatrix4fv(mshader.shader->U(gfx::SU_MODEL), 1, GL_FALSE, &cmd.matrices[0][0][0]);
+		if (cmd.matrices)
+		{
+			glUniformMatrix4fv(mshader.shader->U(gfx::SU_MODEL), 1, GL_FALSE, &cmd.matrices[0][0][0]);
+		}
+		else
+		{ // use identity if no matrix provided
+			static const glm::mat4 identity(1.0f);
+			glUniformMatrix4fv(mshader.shader->U(gfx::SU_MODEL), 1, GL_FALSE, &identity[0][0]);
+		}
 
 		// set color
 		glm::vec4 color = (object_color_flag && cmd.color) ? glm::vec4(*cmd.color) : glm::vec4(1.0f);

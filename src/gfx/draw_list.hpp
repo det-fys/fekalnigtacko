@@ -2,7 +2,6 @@
 
 #include <vector>
 
-#include "assets/map.hpp"
 #include "assets/skeleton.hpp"
 #include "surface.hpp"
 
@@ -11,12 +10,12 @@ namespace gfx
 
 struct DrawSurfaceCmd
 {
-    const Surface* surface;
-    const glm::mat4* matrices; // model matrix, continues in array of matrices for skeletal meshes
-    const glm::vec4* color;    // optional tint
-    uint32_t first;            // first triangle index
-    uint32_t count;            // num triangles
-    float dist;                // distance to camera - for transparnt sorting
+    const Surface* surface = nullptr;
+    const glm::mat4* matrices = nullptr; // model matrix, continues in array of matrices for skeletal meshes
+    const glm::vec4* color = nullptr;    // optional tint
+    uint32_t first = 0;                  // first triangle index
+    uint32_t count = 0;                  // num triangles
+    float dist = 0.0f;                   // distance to camera - for transparnt sorting
 };
 
 struct DrawList

@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include <btBulletCollisionCommon.h>
+
 struct Transform
 {
 	glm::vec3 position = glm::vec3(0.0f);
@@ -41,11 +43,26 @@ struct Transform
 		);
 	}
 
+    btTransform ToBtTransform() const 
+    {
+        btQuaternion bt_rotation(rotation.x, rotation.y, rotation.z, rotation.w);
+		btVector3 bt_position(position.x, position.y, position.z);
+		return btTransform(bt_rotation, bt_position);    
+    }
+
 	void SetAngles(const glm::vec3& angles_deg)
 	{
 		glm::vec3 angles_rad = glm::radians(angles_deg);
 		rotation = glm::quat(angles_rad);
 	}
+
+    void SetBtTransform(const btTransform& bt_trans)
+    {
+        btVector3 bt_position = bt_trans.getOrigin();
+        btQuaternion bt_rotation = bt_trans.getRotation();
+        position = glm::vec3(bt_position.x(), bt_position.y(), bt_position.z());
+        rotation = glm::quat(bt_rotation.w(), bt_rotation.x(), bt_rotation.y(), bt_rotation.z());
+    }
 
 	static Transform Lerp(const Transform& a, const Transform& b, float t)
 	{

@@ -24,6 +24,11 @@ public:
         return ptr_ + n <= end_;
     }
 
+    bool Eof() const
+    {
+        return ptr_ < end_;
+    }
+
     bool Read(char* dest, size_t n)
     {
         if (!CheckAvail(n))
@@ -42,6 +47,17 @@ public:
 
         value = *(reinterpret_cast<const T*>(ptr_));
         ptr_ += sizeof(T);
+        return true;
+    }
+
+    template <typename T> requires (std::is_enum_v<T> && std::integral<std::underlying_type_t<T>>)
+    bool Read(T& value)
+    {
+        std::underlying_type_t<T> und;
+        if (!Read(und))
+            return false;
+        
+        value = und;
         return true;
     }
 

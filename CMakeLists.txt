@@ -26,19 +26,13 @@ set(SOURCES
     "src/assets/skeleton.hpp"
     "src/assets/skeleton.cpp"
     "src/collision/trianglemesh.cpp"
-    # "src/game/entity.hpp"
-    # "src/game/entity.cpp"
-    # "src/game/meshinstance.hpp"
-    # "src/game/meshinstance.cpp"
     "src/game/player_input.hpp"
-    # "src/game/player.hpp"
-    # "src/game/player.cpp"
     "src/game/transform_node.hpp"
-    # "src/game/world.hpp"
-    # "src/game/world.cpp"
     "src/gameview/client_session.hpp"
+    "src/gameview/client_session.cpp"
     "src/gameview/entityview.hpp"
     "src/gameview/worldview.hpp"
+    "src/gameview/worldview.cpp"
     "src/gfx/buffer_object.cpp"
     "src/gfx/buffer_object.hpp"
     "src/gfx/draw_list.hpp"
@@ -58,8 +52,11 @@ set(SOURCES
     "src/net/defs.hpp"
     "src/net/fixed_str.hpp"
     "src/net/inmessage.hpp"
+    "src/net/msg_producer.hpp"
+    "src/net/msg_producer.cpp"
     "src/net/outmessage.hpp"
     "src/net/quantized.hpp"
+    "src/utils/defs.hpp"
     "src/utils/files.hpp"
     "src/utils/files.cpp"
     "src/utils/transform.hpp"
@@ -79,9 +76,23 @@ endif()
 
 
 # Include directories
-target_include_directories(${MAIN_NAME} PRIVATE 
-    "src"
-)
+target_include_directories(${MAIN_NAME} PRIVATE "src")
+
+add_subdirectory(external/glm)
+target_link_libraries(${MAIN_NAME} PRIVATE glm)
+target_include_directories(${MAIN_NAME} PRIVATE "external/stb")
+
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_BULLET2_DEMOS OFF CACHE BOOL "" FORCE)
+set(BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_PYBULLET OFF CACHE BOOL "" FORCE)
+set(BUILD_OPENGL3_DEMOS OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(external/bullet3)
+target_link_libraries(${MAIN_NAME} PRIVATE BulletCollision BulletDynamics LinearMath Bullet3Common)
+target_include_directories(${MAIN_NAME} PRIVATE "external/bullet3/src")
+
+target_compile_definitions(${MAIN_NAME} PRIVATE CLIENT)
 
 # Platform-specific SDL2 handling
 if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
@@ -134,18 +145,75 @@ endif()
     add_subdirectory(external/glad)
     target_link_libraries(${MAIN_NAME} PRIVATE glad)
 
+    # add easywsclient
+    set(EASYWSCLIENT_PATH "external/easywsclient")
+
+    add_library(easywsclient STATIC 
+        ${EASYWSCLIENT_PATH}/easywsclient.cpp
+    )
+
+    target_include_directories(easywsclient PUBLIC ${EASYWSCLIENT_PATH})
+    
+    target_link_libraries(${MAIN_NAME} PRIVATE easywsclient)
+
+    # build server
+    set(ASIO_INCLUDE_DIR "external/asio/include")
+    include_directories(${ASIO_INCLUDE_DIR})
+
+    add_subdirectory(external/Crow)
+    set(SERVER_SOURCES
+        "src/assets/animation.hpp"
+        "src/assets/animation.cpp"
+        "src/assets/cache.hpp"
+        "src/assets/cache.cpp"
+        "src/assets/cmdfile.hpp"
+        "src/assets/cmdfile.cpp"
+        "src/assets/map.hpp"
+        "src/assets/map.cpp"
+        "src/assets/model.hpp"
+        "src/assets/model.cpp"
+        "src/assets/mesh_builder.cpp"
+        "src/assets/skeleton.hpp"
+        "src/assets/skeleton.cpp"
+        "src/collision/aabb.hpp"
+        "src/collision/dynamicsworld.hpp"
+        "src/collision/dynamicsworld.cpp"
+        "src/collision/trianglemesh.hpp"
+        "src/collision/trianglemesh.cpp"
+        "src/game/entity.hpp"
+        "src/game/entity.cpp"
+        "src/game/game.hpp"
+        "src/game/game.cpp"
+        "src/game/player_input.hpp"
+        "src/game/player.hpp"
+        "src/game/player.cpp"
+        "src/game/transform_node.hpp"
+        "src/game/world.hpp"
+        "src/game/world.cpp"
+        "src/net/defs.hpp"
+        "src/net/fixed_str.hpp"
+        "src/net/inmessage.hpp"
+        "src/net/msg_producer.hpp"
+        "src/net/msg_producer.cpp"
+        "src/net/outmessage.hpp"
+        "src/net/quantized.hpp"
+        "src/server/client.hpp"
+        "src/server/client.cpp"
+        "src/server/main.cpp"
+        "src/server/server.hpp"
+        "src/server/server.cpp"
+        "src/server/wsserver.hpp"
+        "src/server/wsserver.cpp"
+        "src/utils/defs.hpp"
+        "src/utils/files.hpp"
+        "src/utils/files.cpp"
+        "src/utils/transform.hpp"
+    )
+
+    set(SERVER_NAME server)
+    add_executable(${SERVER_NAME} ${SERVER_SOURCES})
+    target_link_libraries(${SERVER_NAME} PRIVATE Crow glm BulletCollision BulletDynamics LinearMath Bullet3Common)
+    target_include_directories(${SERVER_NAME} PRIVATE "src" "external/bullet3/src")
+    target_compile_definitions(${SERVER_NAME} PRIVATE SERVER)
+
 endif()
-
-add_subdirectory(external/glm)
-target_link_libraries(${MAIN_NAME} PRIVATE glm)
-target_include_directories(${MAIN_NAME} PRIVATE "external/stb")
-
-set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(BUILD_BULLET2_DEMOS OFF CACHE BOOL "" FORCE)
-set(BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
-set(BUILD_PYBULLET OFF CACHE BOOL "" FORCE)
-set(BUILD_OPENGL3_DEMOS OFF CACHE BOOL "" FORCE)
-
-add_subdirectory(external/bullet3)
-target_link_libraries(${MAIN_NAME} PRIVATE BulletCollision LinearMath Bullet3Common)
-target_include_directories(${MAIN_NAME} PRIVATE "external/bullet3/src")

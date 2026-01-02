@@ -85,7 +85,8 @@ void main() {
     gl_Position = u_view_proj * world_pos;
 
     v_uv = vec2(a_uv.x, 1.0 - a_uv.y);
-    v_color = ComputeLights(world_pos.xyz, world_normal) * a_color;
+    // v_color = ComputeLights(world_pos.xyz, world_normal) * a_color;
+    v_color = a_color;
 }	
 )GLSL",
 

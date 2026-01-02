@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include <vector>
+#include <span>
 
 #include "fixed_str.hpp"
 #include "quantized.hpp"
@@ -34,11 +35,22 @@ public:
         WriteAt(Reserve<T>(), value);
     }
 
+    template <typename T> requires (std::is_enum_v<T> && std::integral<std::underlying_type_t<T>>)
+    void Write(T value)
+    {
+        Write(static_cast<std::underlying_type_t<T>>(value));
+    }
+
     void Write(const char* str, size_t n)
     {
         size_t pos = buffer_.size();
         buffer_.resize(pos + n);
         memcpy(&buffer_[pos], str, n);
+    }
+
+    void Write(std::span<const char> data)
+    {
+        Write(data.data(), data.size());
     }
 
     template <size_t N>

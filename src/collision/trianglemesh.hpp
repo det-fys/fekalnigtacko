@@ -22,6 +22,6 @@ namespace collision
 		void AddTriangle(const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2);
 		void Build();
 
-		btBvhTriangleMeshShape* GetShape() { return bt_shape_.get(); }
+		btBvhTriangleMeshShape* GetShape() const { return bt_shape_.get(); }
 	};
 }

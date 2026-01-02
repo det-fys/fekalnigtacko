@@ -1,8 +1,15 @@
 #pragma once
 
+#include "map.hpp"
 #include "model.hpp"
 #include "skeleton.hpp"
+#include "vehiclemdl.hpp"
+
+#include "utils/defs.hpp"
+
+#ifdef CLIENT
 #include "gfx/texture.hpp"
+#endif
 
 namespace assets
 {
@@ -36,11 +43,13 @@ private:
     std::map<std::string, std::weak_ptr<const T>> cache_;
 };
 
+#ifdef CLIENT
 class TextureCache final : public Cache<gfx::Texture>
 {
 protected:
     PtrType Load(const std::string& key) override { return gfx::Texture::LoadFromFile(key); }
 };
+#endif // CLIENT
 
 class SkeletonCache final : public Cache<Skeleton>
 {
@@ -54,26 +63,45 @@ protected:
     PtrType Load(const std::string& key) override { return Model::LoadFromFile(key); }
 };
 
+class MapCache final : public Cache<Map>
+{
+protected:
+    PtrType Load(const std::string& key) override { return Map::LoadFromFile(key); }
+};
+
+class VehicleCache final : public Cache<VehicleModel>
+{
+protected:
+    PtrType Load(const std::string& key) override { return VehicleModel::LoadFromFile(key); }
+};
+
 class CacheManager
 {
 public:
-    static std::shared_ptr<const gfx::Texture> GetTexture(const std::string& filename) {
-        return texture_cache_.Get(filename);
-    }
-
-    static std::shared_ptr<const Skeleton> GetSkeleton(const std::string& filename) {
+    static std::shared_ptr<const Skeleton> GetSkeleton(const std::string& filename)
+    {
         return skeleton_cache_.Get(filename);
     }
 
-    static std::shared_ptr<const Model> GetModel(const std::string& filename) {
-        return model_cache_.Get(filename);
+    static std::shared_ptr<const Model> GetModel(const std::string& filename) { return model_cache_.Get(filename); }
+
+    static std::shared_ptr<const Map> GetMap(const std::string& filename) { return map_cache_.Get(filename); }
+    
+    static std::shared_ptr<const VehicleModel> GetVehicleModel(const std::string& filename) { return vehicle_cache_.Get(filename); }
+
+#ifdef CLIENT
+    static std::shared_ptr<const gfx::Texture> GetTexture(const std::string& filename)
+    {
+        return texture_cache_.Get(filename);
     }
+#endif
 
 private:
-    static TextureCache texture_cache_;
     static SkeletonCache skeleton_cache_;
     static ModelCache model_cache_;
-
+    static MapCache map_cache_;
+    static VehicleCache vehicle_cache_;
+    CLIENT_ONLY(static TextureCache texture_cache_;)
 };
 
 } // namespace assets

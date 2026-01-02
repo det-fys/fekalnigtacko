@@ -8,16 +8,16 @@ namespace game
 
 	enum PlayerInputFlag : PlayerInputFlags
 	{
-		PI_FORWARD		= 1 << 0,
-		PI_BACKWARD		= 1 << 1,
-		PI_LEFT			= 1 << 2,
-		PI_RIGHT		= 1 << 3,
-		PI_JUMP			= 1 << 4,
-		PI_CROUCH		= 1 << 5,
-		PI_USE			= 1 << 6,
-		PI_ATTACK		= 1 << 7,
-		PI_DEBUG1		= 1 << 8,
-		PI_DEBUG2		= 1 << 9,
-		PI_DEBUG3		= 1 << 10,
+		IN_FORWARD		= 1 << 0,
+		IN_BACKWARD		= 1 << 1,
+		IN_LEFT			= 1 << 2,
+		IN_RIGHT		= 1 << 3,
+		IN_JUMP			= 1 << 4,
+		IN_CROUCH		= 1 << 5,
+		IN_USE			= 1 << 6,
+		IN_ATTACK		= 1 << 7,
+		IN_DEBUG1		= 1 << 8,
+		IN_DEBUG2		= 1 << 9,
+		IN_DEBUG3		= 1 << 10,
 	};
 }

@@ -14,7 +14,10 @@ enum MessageType : uint8_t
     MSG_NONE,
 
     /*~~~~~~~~ Client->Server ~~~~~~~~*/
-    // IN <PlayerInputFlags> <ViewYaw> <ViewPitch>
+    // ID <PlayerName>
+    MSG_ID,
+
+    // IN <PlayerInputFlags> <ViewYawQ> <ViewPitchQ>
     MSG_IN,
 
     /*~~~~~~~~ World ~~~~~~~~*/
@@ -26,17 +29,22 @@ enum MessageType : uint8_t
     MSG_ENTSPAWN,
     // ENTMSG <EntNum> data...
     MSG_ENTMSG,
-    // ENTRM <EntNum>
-    MSG_ENTRM,
+    // ENTDESTROY <EntNum>
+    MSG_ENTDESTROY,
 
     /*~~~~~~~~~~~~~~~~*/
     MSG_COUNT,
 };
 
+using PlayerName = FixedStr<24>;
 using MapName = FixedStr<32>;
 
-using ViewYaw = Quantized<uint16_t, 0, 360>;
-using ViewPitch = Quantized<uint16_t, -180, 180>;
+// pi approx fraction
+constexpr long long PI_N = 245850922;
+constexpr long long PI_D = 78256779;
+
+using ViewYawQ = Quantized<uint16_t, 0, 2 * PI_N, PI_D>;
+using ViewPitchQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
 
 using EntNum = uint16_t;
 
@@ -44,10 +52,17 @@ enum EntType : uint8_t
 {
     ET_NONE,
 
-    ET_PAWN,
-    ET_CAR,
+    ET_CHARACTER,
+    ET_VEHICLE,
 
     ET_COUNT,
+};
+
+enum EntMsgType : uint8_t 
+{
+    EMSG_NONE,
+
+    EMSG_UPDATE,
 };
 
 } // namespace net

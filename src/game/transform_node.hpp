@@ -7,7 +7,7 @@ namespace game
 	struct TransformNode
 	{
 		const TransformNode* parent = nullptr;
-		Transform local_transform;
+		Transform local;
 		glm::mat4 matrix = glm::mat4(1.0f); // Global
 
 		TransformNode()
@@ -17,7 +17,7 @@ namespace game
 
 		void UpdateMatrix()
 		{
-			matrix = local_transform.ToMatrix();
+			matrix = local.ToMatrix();
 			
 			if (parent)
 			{

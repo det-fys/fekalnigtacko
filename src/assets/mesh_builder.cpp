@@ -13,7 +13,7 @@ void assets::MeshBuilder::BeginSurface(gfx::SurfaceFlags sflags, const std::stri
 
     gfx::Surface surface;
     surface.sflags = sflags;
-    surface.texture = texture;
+    surface.texture = std::move(texture);
     surface.first = tris_.size();
     mesh_->surfaces.push_back(surface);
 

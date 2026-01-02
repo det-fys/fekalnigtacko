@@ -47,3 +47,20 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
 
     return map;
 }
+
+#ifdef CLIENT
+void assets::Map::Draw(gfx::DrawList& dlist) const
+{
+    if (!basemodel_ || !basemodel_->GetMesh())
+        return;
+
+    const auto& surfaces = basemodel_->GetMesh()->surfaces;
+
+    for (const auto& surface : surfaces)
+    {
+        gfx::DrawSurfaceCmd cmd;
+        cmd.surface = &surface;
+        dlist.AddSurface(cmd);
+    }
+}
+#endif // CLIENT
