@@ -35,6 +35,7 @@ set(COMMON_SOURCES
     "src/net/msg_producer.cpp"
     "src/net/outmessage.hpp"
     "src/net/quantized.hpp"
+    "src/net/utils.hpp"
     "src/utils/allocnum.hpp"
     "src/utils/defs.hpp"
     "src/utils/files.hpp"

@@ -43,10 +43,10 @@ void sv::Server::Run()
             t_now = std::chrono::steady_clock::now();
         }
 
-        auto t_diff = t_now - t_prev;
-        t_prev = t_now;
+        // auto t_diff = t_now - t_prev;
+        // t_prev = t_now;
 
-        std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(t_diff).count() <<std::endl;
+        // std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(t_diff).count() <<std::endl;
     }
 }
 

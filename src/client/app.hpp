@@ -26,6 +26,9 @@ public:
     void SetInput(game::PlayerInputFlags input) { input_ = input; }
     void MouseMove(const glm::vec2& delta);
 
+    float GetTime() const { return delta_time_; }
+    float GetDeltaTime() const { return delta_time_; }
+
     ~App();
 
 private:
@@ -39,6 +42,7 @@ private:
     game::PlayerInputFlags prev_input_ = 0;
 
     float prev_time_ = 0.0f;
+    float delta_time_ = 0.0f;
 
     gfx::Renderer renderer_;
     gfx::DrawList dlist_;

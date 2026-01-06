@@ -10,14 +10,21 @@
 namespace game::view
 {
 
+class ClientSession;
+
 class WorldView
 {
 public:
-    WorldView();
+    WorldView(ClientSession& session);
 
     bool ProcessMsg(net::MessageType type, net::InMessage& msg);
 
+    void Update(const UpdateInfo& info);
     void Draw(gfx::DrawList& dlist) const;
+
+    EntityView* GetEntity(net::EntNum entnum);
+    
+    float GetTime() const { return time_; }
 
 private:
     // msg handlers
@@ -26,9 +33,12 @@ private:
     bool ProcessEntDestroyMsg(net::InMessage& msg);
 
 private:
-    std::shared_ptr<const assets::Map> map_;
+    ClientSession& session_;
 
+    std::shared_ptr<const assets::Map> map_;
     std::map<net::EntNum, std::unique_ptr<EntityView>> ents_;
+
+    float time_ = 0.0f;
     
 };
 

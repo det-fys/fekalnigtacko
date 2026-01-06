@@ -240,6 +240,8 @@ static void Main() {
     }
 #endif
 
+    SDL_GL_SetSwapInterval(0);
+
     {
         using namespace easywsclient;
 

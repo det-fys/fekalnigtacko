@@ -13,9 +13,9 @@ sv::WSServer::WSServer(uint16_t port)
         CROW_WEBSOCKET_ROUTE(app, "/ws")
         .onopen([&](crow::websocket::connection& conn) {
             CROW_LOG_INFO << "new websocket connection from " << conn.get_remote_ip();
-
-            std::lock_guard<std::mutex> lock(mtx_);
             
+            std::lock_guard<std::mutex> lock(mtx_);
+
             WSConnId conn_id = utils::AllocNum(id2conn_, last_id_);
 
             // register connection

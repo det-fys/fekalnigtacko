@@ -18,6 +18,9 @@ namespace collision
 
 // }
 
+
+
+
 class DynamicsWorld
 {
 public:
@@ -36,7 +39,7 @@ private:
 private:
     // this is BEFORE bt_world_!!!
     std::shared_ptr<const assets::Map> map_;
-    std::vector<std::unique_ptr<btCollisionObject>> static_objs_;
+    std::vector<std::unique_ptr<btRigidBody>> static_objs_;
     // ^-----
 
     btDefaultCollisionConfiguration bt_cfg_;

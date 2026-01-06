@@ -31,6 +31,9 @@ enum MessageType : uint8_t
     MSG_ENTMSG,
     // ENTDESTROY <EntNum>
     MSG_ENTDESTROY,
+    
+    // CONTROL <EntNum>
+    MSG_CONTROL,
 
     /*~~~~~~~~~~~~~~~~*/
     MSG_COUNT,
@@ -68,5 +71,9 @@ enum EntMsgType : uint8_t
 
 using PositionQ = Quantized<uint32_t, -10000, 10000, 1>;
 using AngleQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
+using QuatQ = Quantized<uint16_t, -1, 1, 1>;
+
+using WheelZOffsetQ = Quantized<uint8_t, -1, 1, 1>;
+using RotationSpeedQ = Quantized<uint16_t, -300, 300, 1>;
 
 } // namespace net

@@ -3,8 +3,9 @@
 #include "assets/cache.hpp"
 
 #include "vehicleview.hpp"
+#include "client_session.hpp"
 
-game::view::WorldView::WorldView()
+game::view::WorldView::WorldView(ClientSession& session) : session_(session)
 {
     map_ = assets::CacheManager::GetMap("data/openworld.map");
 }
@@ -27,6 +28,16 @@ bool game::view::WorldView::ProcessMsg(net::MessageType type, net::InMessage& ms
     }
 }
 
+void game::view::WorldView::Update(const UpdateInfo& info)
+{
+    time_ = info.time;
+
+    for (const auto& [entnum, ent] : ents_)
+    {
+        ent->Update(info);
+    }
+}
+
 void game::view::WorldView::Draw(gfx::DrawList& dlist) const
 {
     if (map_)
@@ -36,6 +47,15 @@ void game::view::WorldView::Draw(gfx::DrawList& dlist) const
     {
         ent->Draw(dlist);
     }
+}
+
+game::view::EntityView* game::view::WorldView::GetEntity(net::EntNum entnum)
+{
+    auto it = ents_.find(entnum);
+    if (it != ents_.end())
+        return it->second.get();
+
+    return nullptr;
 }
 
 bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)

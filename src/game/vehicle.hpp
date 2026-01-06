@@ -1,13 +1,25 @@
 #pragma once
 
-#include "entity.hpp"
-#include "world.hpp"
-#include "controllable.hpp"
+#include <array>
+#include <cstddef>
+
 #include "assets/vehiclemdl.hpp"
 #include "collision/motionstate.hpp"
+#include "controllable.hpp"
+#include "entity.hpp"
+#include "world.hpp"
 
 namespace game
 {
+
+static constexpr size_t MAX_WHEELS = 4;
+
+struct VehicleWheelState
+{
+    float rotation = 0.0f; // [rad]
+    float speed = 0.0f;    // [rad/s]
+    float z_offset = 0.0f; // [m] against model definition
+};
 
 class Vehicle : public Entity, public Controllable
 {
@@ -26,6 +38,7 @@ public:
 
 private:
     void ProcessInput();
+    void UpdateWheels();
     void SendUpdateMsg();
 
 private:
@@ -37,6 +50,10 @@ private:
     std::unique_ptr<btRaycastVehicle> vehicle_;
 
     float steering_ = 0.0f;
+    float wheel_z_offset_ = 0.0f;
+
+    size_t num_wheels_ = 0;
+    std::array<VehicleWheelState, MAX_WHEELS> wheels_;
 };
 
-}
+} // namespace game

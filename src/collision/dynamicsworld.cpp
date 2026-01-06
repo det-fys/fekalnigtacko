@@ -47,14 +47,14 @@ void collision::DynamicsWorld::AddModelInstance(const assets::Model& model, cons
     if (auto cmesh = model.GetColMesh(); cmesh)
     {
         // create trimesh object
-        auto obj = std::make_unique<btCollisionObject>();
-        obj->setCollisionShape(cmesh->GetShape());
+        btRigidBody::btRigidBodyConstructionInfo rbInfo(0.0f, nullptr, cmesh->GetShape(), btVector3(0,0,0));
+        auto obj = std::make_unique<btRigidBody>(rbInfo);
 
         // set transform
         obj->setWorldTransform(trans.ToBtTransform());
 
         // add to world
-        bt_world_.addCollisionObject(obj.get());
+        bt_world_.addRigidBody(obj.get());
         static_objs_.emplace_back(std::move(obj));
     }
 

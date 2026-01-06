@@ -61,6 +61,8 @@ void game::Player::Control(Controllable* ctl)
     
     if (ctl_)
         ctl_->controller_ = this;
+
+    SendControl();
 }
 
 game::Player::~Player()
@@ -74,6 +76,13 @@ void game::Player::SendWorldMsg()
     MSGDEBUG(std::cout << "seding CHWORLD" << std::endl;)
     auto msg = BeginMsg(net::MSG_CHWORLD);
     msg.Write(net::MapName(world_->GetMapName()));
+}
+
+void game::Player::SendControl()
+{
+    auto msg = BeginMsg(net::MSG_CONTROL);
+    net::EntNum entnum = ctl_ ? ctl_->GetEntity().GetEntNum() : 0;
+    msg.Write(entnum);
 }
 
 void game::Player::SyncEntities()

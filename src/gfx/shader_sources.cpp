@@ -38,25 +38,37 @@
 )GLSL"
 
 #define COMPUTE_LIGHTS_GLSL R"GLSL(
-    vec3 ComputeLights(in vec3 sector_pos, in vec3 sector_normal)
-    {
-        vec3 color = u_ambient_light;
-        for (int i = 0; i < u_num_lights; ++i) {
-            vec3 light_pos = u_light_positions[i];
-            vec3 light_color = u_light_colors_rs[i].rgb;
-            float light_radius = u_light_colors_rs[i].a;
-            
-            vec3 to_light = light_pos - sector_pos.xyz;
-            float dist2 = dot(to_light, to_light);
-            if (dist2 < light_radius * light_radius) {
-                float dist = sqrt(dist2);
-                float attenuation = 1.0 - (dist / light_radius);
-                float dot = max(dot(sector_normal, normalize(to_light)), 0.0);
-                color += light_color * dot * attenuation;
-            }
+// Example sun values (can later be uniforms)
+vec3 u_sun_direction = normalize(vec3(0.3, 0.5, -0.8)); // direction from which sunlight comes
+vec3 u_sun_color = vec3(1.0, 0.95, 0.7);              // warm sunlight color
+
+vec3 ComputeLights(in vec3 sector_pos, in vec3 sector_normal)
+{
+    // Base ambient
+    vec3 color = vec3(0.5, 0.5, 0.5); // u_ambient_light
+
+    // Sunlight contribution
+    float sun_dot = max(dot(sector_normal, -u_sun_direction), 0.0);
+    color += u_sun_color * sun_dot;
+
+    // Point lights
+    for (int i = 0; i < u_num_lights; ++i) {
+        vec3 light_pos = u_light_positions[i];
+        vec3 light_color = u_light_colors_rs[i].rgb;
+        float light_radius = u_light_colors_rs[i].a;
+        
+        vec3 to_light = light_pos - sector_pos;
+        float dist2 = dot(to_light, to_light);
+        if (dist2 < light_radius * light_radius) {
+            float dist = sqrt(dist2);
+            float attenuation = 1.0 - (dist / light_radius);
+            float dot_term = max(dot(sector_normal, normalize(to_light)), 0.0);
+            color += light_color * dot_term * attenuation;
         }
-        return color;
     }
+
+    return color;
+}
 )GLSL"
 
 // Zdrojove kody shaderu
@@ -85,8 +97,7 @@ void main() {
     gl_Position = u_view_proj * world_pos;
 
     v_uv = vec2(a_uv.x, 1.0 - a_uv.y);
-    // v_color = ComputeLights(world_pos.xyz, world_normal) * a_color;
-    v_color = a_color;
+    v_color = ComputeLights(world_pos.xyz, world_normal) * a_color;
 }	
 )GLSL",
 

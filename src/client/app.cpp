@@ -16,21 +16,29 @@ App::App()
 
 void App::Frame()
 {
-	float delta_time = time_ - prev_time_;
+	delta_time_ = time_ - prev_time_;
 	prev_time_ = time_;
 
-	if (delta_time < 0.0f)
+	if (delta_time_ < 0.0f)
 	{
-		delta_time = 0.0f; // Prevent negative delta time
+		delta_time_ = 0.0f; // Prevent negative delta time
 	}
-	else if (delta_time > 0.1f)
+	else if (delta_time_ > 0.1f)
 	{
-		delta_time = 0.1f; // Cap delta time to avoid large jumps
+		delta_time_ = 0.1f; // Cap delta time to avoid large jumps
 	}
 
 	// detect inputs originating in this frame
 	game::PlayerInputFlags new_input = input_ & ~prev_input_;
 	prev_input_ = input_;
+
+	if (session_)
+	{
+		game::view::UpdateInfo updinfo;
+		updinfo.time = time_;
+		updinfo.delta_time = delta_time_;
+		session_->Update(updinfo);
+	}
 
 	float aspect = static_cast<float>(viewport_size_.x) / static_cast<float>(viewport_size_.y);
 
@@ -45,11 +53,11 @@ void App::Frame()
 	{
 		world->Draw(dlist_);
 	
-		glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		// glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 		glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 3000.0f);
 	
 		gfx::DrawListParams params;
-		params.view_proj = proj * view;
+		params.view_proj = proj * session_->GetViewMatrix();
 	
 		renderer_.DrawList(dlist_, params);
 	}
@@ -100,7 +108,8 @@ void App::MouseMove(const glm::vec2& delta)
 	float delta_yaw = delta.x * sensitivity;
 	float delta_pitch = -delta.y * sensitivity;
 
-	// TODO: rotate
+	if (session_)
+		session_->ProcessMouseMove(delta_yaw, delta_pitch);
 }
 
 App::~App()

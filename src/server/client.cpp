@@ -47,12 +47,14 @@ void sv::Client::Update()
 {
     if (player_)
     {
-        player_->ResetMsg();
         player_->Update();
-
+        
         auto msg = player_->GetMsg();
         if (!msg.empty())
+        {
             Send(std::string(msg.data(), msg.size()));
+            player_->ResetMsg();
+        }
     }
 }
 

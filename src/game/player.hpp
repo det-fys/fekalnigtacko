@@ -42,6 +42,7 @@ public:
 
 private:
     void SendWorldMsg();
+    void SendControl();
 
     // entities sync
     void SyncEntities();

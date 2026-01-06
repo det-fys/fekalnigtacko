@@ -9,6 +9,15 @@
 namespace game::view
 {
 
+struct VehicleWheelViewInfo
+{
+    TransformNode node;
+    float steering = 0.0f;
+    float z_offset = 0.0f;
+    float speed = 0.0f;
+    float rotation = 0.0f;
+};
+
 class VehicleView : public EntityView
 {
 public:
@@ -16,7 +25,7 @@ public:
     static std::unique_ptr<VehicleView> InitFromMsg(WorldView& world, net::InMessage& msg);
 
     virtual bool ProcessMsg(net::EntMsgType type, net::InMessage& msg) override;
-    virtual void Update() override;
+    virtual void Update(const UpdateInfo& info) override;
     virtual void Draw(gfx::DrawList& dlist) override;
 
 private:
@@ -25,7 +34,10 @@ private:
 private:
     std::shared_ptr<const assets::VehicleModel> model_;
 
-    TransformNode wheels_[4];
+    std::vector<VehicleWheelViewInfo> wheels_;
+
+    float update_time_ = 0.0f;
+    Transform root_trans_[2];
 
 };
 

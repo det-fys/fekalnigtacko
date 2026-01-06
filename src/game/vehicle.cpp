@@ -1,8 +1,11 @@
 #include "vehicle.hpp"
 
 #include "assets/cache.hpp"
+#include "net/utils.hpp"
 #include "player.hpp"
 #include "player_input.hpp"
+
+#include <iostream>
 
 static std::shared_ptr<const assets::VehicleModel> LoadVehicleModelByName(const std::string& model_name)
 {
@@ -14,7 +17,7 @@ struct Shape
     btBoxShape box;
     btCompoundShape compound;
 
-    Shape() : box(btVector3(1, 1, 1))
+    Shape() : box(btVector3(1, 1, 0.1))
     {
         btTransform t(btQuaternion(0, 0, 0), btVector3(0, 0, 2));
         compound.addChildShape(t, &box);
@@ -28,7 +31,7 @@ game::Vehicle::Vehicle(World& world, std::string model_name)
     root_.local.position.z = 10.0f;
 
     // setup chassis rigidbody
-    float mass = 300.0f;
+    float mass = 1300.0f;
     static Shape shape;
 
     btVector3 local_inertia(0, 0, 0);
@@ -49,16 +52,23 @@ game::Vehicle::Vehicle(World& world, std::string model_name)
     btVector3 wheelDirectionCS0(0, 0, -1);
     btVector3 wheelAxleCS(1, 0, 0);
 
-    for (const auto& wheels = model_->GetWheels(); const auto& wheeldef : wheels)
-    {
-        float suspension_rest_length = 0.6f;
+    wheel_z_offset_ = 0.4f;
 
+    const auto& wheels = model_->GetWheels();
+
+    if (wheels.size() > MAX_WHEELS)
+        throw std::runtime_error("Max wheels exceeded");
+
+    num_wheels_ = wheels.size();
+
+    for (const auto& wheeldef : wheels)
+    {
         float wheelRadius = .35f;
 
         float friction = 5.0f;
         float suspensionStiffness = 60.0f;
-        //float suspensionDamping = 2.3f;
-        //float suspensionCompression = 4.4f;
+        // float suspensionDamping = 2.3f;
+        // float suspensionCompression = 4.4f;
         float suspensionRestLength = 0.6f;
         float rollInfluence = 0.01f;
 
@@ -69,18 +79,18 @@ game::Vehicle::Vehicle(World& world, std::string model_name)
 
         const bool is_front = !(wheeldef.type & assets::WHEEL_REAR);
 
-        btVector3 wheel_pos(wheeldef.position.x, wheeldef.position.y, wheeldef.position.z);
-        auto& wi = vehicle_->addWheel(wheel_pos, wheelDirectionCS0, wheelAxleCS, suspension_rest_length,
-                                         wheelRadius, tuning, is_front);
+        btVector3 wheel_pos(wheeldef.position.x, wheeldef.position.y, wheeldef.position.z + wheel_z_offset_);
+        auto& wi = vehicle_->addWheel(wheel_pos, wheelDirectionCS0, wheelAxleCS, suspensionRestLength, wheelRadius,
+                                      tuning, is_front);
 
         wi.m_suspensionStiffness = suspensionStiffness;
 
-        wi.m_wheelsDampingCompression = k * 2.0 * btSqrt(suspensionStiffness); //vehicleTuning.suspensionCompression;
-        wi.m_wheelsDampingRelaxation = k * 3.3 * btSqrt(suspensionStiffness);//vehicleTuning.suspensionDamping;
-        
+        wi.m_wheelsDampingCompression = k * 2.0 * btSqrt(suspensionStiffness); // vehicleTuning.suspensionCompression;
+        wi.m_wheelsDampingRelaxation = k * 3.3 * btSqrt(suspensionStiffness);  // vehicleTuning.suspensionDamping;
+
         wi.m_frictionSlip = friction;
-        //if (wi.m_bIsFrontWheel) wi.m_frictionSlip = vehicleTuning.friction * 1.4f;
-        
+        // if (wi.m_bIsFrontWheel) wi.m_frictionSlip = vehicleTuning.friction * 1.4f;
+
         wi.m_rollInfluence = rollInfluence;
         wi.m_maxSuspensionForce = maxSuspensionForce;
         wi.m_maxSuspensionTravelCm = maxSuspensionTravelCm;
@@ -89,7 +99,6 @@ game::Vehicle::Vehicle(World& world, std::string model_name)
     auto& bt_world = world_.GetBtWorld();
     bt_world.addRigidBody(body_.get());
     bt_world.addAction(vehicle_.get());
-
 }
 
 void game::Vehicle::Update()
@@ -97,13 +106,7 @@ void game::Vehicle::Update()
     Super::Update();
 
     ProcessInput();
-
-    for (int j = 0; j < vehicle_->getNumWheels(); j++)
-    {
-        auto& wheel = vehicle_->getWheelInfo(j);
-        float sus_length = wheel.m_raycastInfo.m_suspensionLength;
-        // TODO: sync wheels
-    }
+    UpdateWheels();
 
     SendUpdateMsg();
 }
@@ -139,7 +142,7 @@ void game::Vehicle::ProcessInput()
     if (in & IN_DEBUG1)
     {
         auto t = body_->getWorldTransform();
-        t.setOrigin(btVector3(0, 0, 5));
+        t.setOrigin(btVector3(100, 100, 5));
         body_->setWorldTransform(t);
     }
 
@@ -170,10 +173,10 @@ void game::Vehicle::ProcessInput()
     }
 
     // idle breaking
-    // if (in & (IN_FORWARD | IN_BACKWARD) == 0)
-    // {
-    //     breakingForce = maxBreakingForce * 0.5f;
-    // }
+    if (!(in & IN_FORWARD) && !(in & IN_BACKWARD))
+    {
+        breakingForce = maxBreakingForce * 0.05f;
+    }
 
     if (in & IN_LEFT)
     {
@@ -215,42 +218,50 @@ void game::Vehicle::ProcessInput()
     vehicle_->setSteeringValue(steering_, 1);
 }
 
+void game::Vehicle::UpdateWheels()
+{
+    for (size_t i = 0; i < num_wheels_; ++i)
+    {
+        auto& bt_wheel = vehicle_->getWheelInfo(i);
+        wheels_[i].speed = -(bt_wheel.m_rotation - wheels_[i].rotation) * 25.0f;
+        wheels_[i].rotation = bt_wheel.m_rotation;
+        wheels_[i].z_offset = wheel_z_offset_ - bt_wheel.m_raycastInfo.m_suspensionLength;
+    }
+}
+
 void game::Vehicle::SendUpdateMsg()
 {
-    const auto& trans = root_.local;
+    auto msg = BeginEntMsg(net::EMSG_UPDATE);
+    net::WriteTransform(msg, root_.local);
 
-    auto umsg = BeginEntMsg(net::EMSG_UPDATE);
+    // send wheel info
+    // msg.Write<uint8_t>(static_cast<uint8_t>(numwheels));
+    msg.Write<net::AngleQ>(steering_);
 
-    // write position
-    umsg.Write<net::PositionQ>(trans.position.x);
-    umsg.Write<net::PositionQ>(trans.position.y);
-    umsg.Write<net::PositionQ>(trans.position.z);
-
-    // write angles
-    glm::vec3 angles = glm::eulerAngles(trans.rotation);
-    umsg.Write<net::AngleQ>(angles.x);
-    umsg.Write<net::AngleQ>(angles.y);
-    umsg.Write<net::AngleQ>(angles.z);
+    for (size_t i = 0; i < num_wheels_; ++i)
+    {
+        auto& wheel = wheels_[i];
+        msg.Write<net::WheelZOffsetQ>(wheel.z_offset);
+        msg.Write<net::RotationSpeedQ>(wheel.speed);
+    }
 
     // TEMP wheels
     // TODO: REMOVE
-    for (size_t i =0; i < vehicle_->getNumWheels(); ++i)
-    {
-        auto& wheel = vehicle_->getWheelInfo(i);
-        vehicle_->updateWheelTransformsWS(wheel);
+    // for (size_t i =0; i < vehicle_->getNumWheels(); ++i)
+    // {
+    //     vehicle_->updateWheelTransform(i, true);
+    //     btTransform tr = vehicle_->getWheelTransformWS(i);
 
-        Transform trans;
-        trans.SetBtTransform(wheel.m_worldTransform);
+    //     Transform trans;
+    //     trans.SetBtTransform(tr);
 
-        // write position
-        umsg.Write<net::PositionQ>(trans.position.x);
-        umsg.Write<net::PositionQ>(trans.position.y);
-        umsg.Write<net::PositionQ>(trans.position.z);
+    //     net::WriteTransform(msg, trans);
 
-        // write angles
-        glm::vec3 angles = glm::eulerAngles(trans.rotation);
-        umsg.Write<net::AngleQ>(angles.x);
-        umsg.Write<net::AngleQ>(angles.y);
-        umsg.Write<net::AngleQ>(angles.z);
-    }
+    //     // static glm::vec3 min_angles(1000.0f);
+    //     // static glm::vec3 max_angles(-1000.0f);
+    //     // min_angles = glm::min(min_angles, angles);
+    //     // max_angles= glm::max(max_angles, angles);
+
+    //     // std::cout << angles.x << " " << angles.y << " " << angles.z << " | " <<std::endl;
+    // }
 }
