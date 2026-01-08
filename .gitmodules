@@ -13,3 +13,6 @@
 [submodule "external/easywsclient"]
 	path = external/easywsclient
 	url = https://github.com/dhbaird/easywsclient.git
+[submodule "external/Crow"]
+	path = external/Crow
+	url = https://github.com/det-fys/Crow
