@@ -15,6 +15,7 @@ sv::WSServer::WSServer(uint16_t port)
             CROW_LOG_INFO << "new websocket connection from " << conn.get_remote_ip();
             
             std::lock_guard<std::mutex> lock(mtx_);
+            conn.set_nodelay();
 
             WSConnId conn_id = utils::AllocNum(id2conn_, last_id_);
 
