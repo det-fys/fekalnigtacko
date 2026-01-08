@@ -1,10 +1,15 @@
 #include "files.hpp"
 
 #include <fstream>
+#include <format>
 
 std::string fs::ReadFileAsString(const std::string& path)
 {
     std::ifstream t(path, std::ios::binary);
+
+    if (!t)
+        throw std::runtime_error(std::format("File not found: {}", path));
+
     t.seekg(0, std::ios::end);
     size_t size = t.tellg();
     std::string buffer(size, ' ');
