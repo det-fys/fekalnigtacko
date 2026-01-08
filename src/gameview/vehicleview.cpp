@@ -122,4 +122,5 @@ bool game::view::VehicleView::ProcessUpdateMsg(net::InMessage& msg)
         wheel.steering = i < 2 ? steering : 0.0f;
     }
 
+    return true;
 }

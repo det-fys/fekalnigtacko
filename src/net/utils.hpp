@@ -45,6 +45,8 @@ inline bool ReadRotation(InMessage& msg, glm::quat& q)
 
     float w = glm::sqrt(glm::max(0.0f, 1.0f - glm::dot(v, v)));
     q = glm::quat(w, v.x, v.y, v.z);
+
+    return true;
 }
 
 inline bool ReadTransform(InMessage& msg, Transform& trans)
