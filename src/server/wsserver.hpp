@@ -7,6 +7,7 @@
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
+#include <thread>
 
 namespace crow::websocket
 {

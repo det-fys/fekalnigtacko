@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include "wsserver.hpp"
 #include "net/defs.hpp"
 #include "net/inmessage.hpp"

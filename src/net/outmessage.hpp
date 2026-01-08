@@ -3,6 +3,7 @@
 #include <concepts>
 #include <vector>
 #include <span>
+#include <cstring>
 
 #include "fixed_str.hpp"
 #include "quantized.hpp"

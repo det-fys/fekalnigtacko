@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <concepts>
 #include <stdexcept>
+#include <cstring>
 
 #include "fixed_str.hpp"
 #include "quantized.hpp"

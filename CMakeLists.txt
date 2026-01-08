@@ -128,7 +128,7 @@ set(BUILD_PYBULLET OFF CACHE BOOL "" FORCE)
 set(BUILD_OPENGL3_DEMOS OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(external/bullet3)
-target_link_libraries(${MAIN_NAME} PRIVATE BulletCollision BulletDynamics LinearMath Bullet3Common)
+target_link_libraries(${MAIN_NAME} PRIVATE BulletDynamics BulletCollision LinearMath Bullet3Common)
 target_include_directories(${MAIN_NAME} PRIVATE "external/bullet3/src")
 
 target_compile_definitions(${MAIN_NAME} PRIVATE CLIENT)
@@ -200,13 +200,10 @@ endif()
     include_directories(${ASIO_INCLUDE_DIR})
 
     add_subdirectory(external/Crow)
-    set(SERVER_SOURCES
-
-    )
 
     set(SERVER_NAME server)
     add_executable(${SERVER_NAME} ${COMMON_SOURCES} ${SERVER_ONLY_SOURCES})
-    target_link_libraries(${SERVER_NAME} PRIVATE Crow glm BulletCollision BulletDynamics LinearMath Bullet3Common)
+    target_link_libraries(${SERVER_NAME} PRIVATE Crow glm BulletDynamics BulletCollision LinearMath Bullet3Common)
     target_include_directories(${SERVER_NAME} PRIVATE "src" "external/bullet3/src")
     target_compile_definitions(${SERVER_NAME} PRIVATE SERVER)
 

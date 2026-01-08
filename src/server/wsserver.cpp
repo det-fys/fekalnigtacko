@@ -6,7 +6,7 @@
 
 sv::WSServer::WSServer(uint16_t port)
 {
-    ws_thread_ = std::make_unique<std::thread>([=]() {
+    ws_thread_ = std::make_unique<std::thread>([this, port]() {
         crow::SimpleApp app;
         app_ptr_ = (void*)&app;
 
@@ -21,7 +21,7 @@ sv::WSServer::WSServer(uint16_t port)
 
             // register connection
             id2conn_[conn_id] = &conn;
-            conn.userdata((void*)conn_id);
+	    conn.userdata(reinterpret_cast<void*>(static_cast<uintptr_t>(conn_id)));
             // push connection event
             events_.emplace_back(WSE_CONNECTED, conn_id);
         })
@@ -30,7 +30,7 @@ sv::WSServer::WSServer(uint16_t port)
 
             std::lock_guard<std::mutex> lock(mtx_);
 
-            WSConnId conn_id = (WSConnId)conn.userdata();
+	    WSConnId conn_id = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(conn.userdata()));
 
             // push disonnected event
             events_.emplace_back(WSE_DISCONNECTED, conn_id);
@@ -43,7 +43,7 @@ sv::WSServer::WSServer(uint16_t port)
 
             std::lock_guard<std::mutex> lock(mtx_);
 
-            WSConnId conn_id = (WSConnId)conn.userdata();
+	    WSConnId conn_id = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(conn.userdata()));
             events_.emplace_back(WSE_MESSAGE, conn_id, data);
 
         });
