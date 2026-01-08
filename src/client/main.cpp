@@ -252,12 +252,12 @@ static bool WSInit()
     return true;
 }
 
-static void WSSend(std::span<const char> data)
+static void WSSend(std::span<const char> msg)
 {
     static std::vector<uint8_t> data;
     data.resize(msg.size_bytes());
     memcpy(data.data(), msg.data(), msg.size_bytes());
-    ws->sendBinary(data);
+    s_ws->sendBinary(data);
 }
 
 static void WSPoll()
@@ -265,14 +265,14 @@ static void WSPoll()
     s_ws->poll();
 
     auto ws_state = s_ws->getReadyState();
-    if (ws_state == WebSocket::OPEN && !connected)
+    if (ws_state == WebSocket::OPEN && !s_ws_connected)
     {
-        connected = true;
+        s_ws_connected = true;
         s_app->Connected();
     }
-    else if (ws_state != WebSocket::OPEN && connected)
+    else if (ws_state != WebSocket::OPEN && s_ws_connected)
     {
-        connected = false;
+        s_ws_connected = false;
         s_app->Disconnected("WS closed");
     }
 
