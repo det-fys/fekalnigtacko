@@ -46,6 +46,19 @@ set(COMMON_SOURCES
 set(CLIENT_ONLY_SOURCES
     "src/assets/mesh_builder.hpp"
     "src/assets/mesh_builder.cpp"
+    "src/audio/defs.hpp"
+    "src/audio/master.hpp"
+    "src/audio/master.cpp"
+    "src/audio/ogg.hpp"
+    "src/audio/ogg.cpp"
+    "src/audio/player.hpp"
+    "src/audio/player.cpp"
+    "src/audio/sound_source.hpp"
+    "src/audio/sound_source.cpp"
+    "src/audio/sound.hpp"
+    "src/audio/sound.cpp"
+    "src/audio/source.hpp"
+    "src/audio/source.cpp"
     "src/client/app.hpp"
     "src/client/app.cpp"
     "src/client/gl.hpp"
@@ -117,10 +130,14 @@ endif()
 # Include directories
 target_include_directories(${MAIN_NAME} PRIVATE "src")
 
+target_compile_definitions(${MAIN_NAME} PRIVATE CLIENT)
+
+# add glm
 add_subdirectory(external/glm)
 target_link_libraries(${MAIN_NAME} PRIVATE glm)
 target_include_directories(${MAIN_NAME} PRIVATE "external/stb")
 
+# add bullet3
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_BULLET2_DEMOS OFF CACHE BOOL "" FORCE)
 set(BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
@@ -131,7 +148,12 @@ add_subdirectory(external/bullet3)
 target_link_libraries(${MAIN_NAME} PRIVATE BulletDynamics BulletCollision LinearMath Bullet3Common)
 target_include_directories(${MAIN_NAME} PRIVATE "external/bullet3/src")
 
-target_compile_definitions(${MAIN_NAME} PRIVATE CLIENT)
+# add ogg
+add_subdirectory(external/ogg)
+
+# add vorbis
+add_subdirectory(external/vorbis)
+target_link_libraries(${MAIN_NAME} PRIVATE vorbisfile vorbis)
 
 # Platform-specific SDL2 handling
 if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
@@ -195,6 +217,11 @@ endif()
     target_include_directories(easywsclient PUBLIC ${EASYWSCLIENT_PATH})
     
     target_link_libraries(${MAIN_NAME} PRIVATE easywsclient)
+
+    # add openal
+    set(ALSOFT_EXAMPLES OFF)
+    add_subdirectory(external/openal-soft)
+    target_link_libraries(${MAIN_NAME} PRIVATE OpenAL)
 
     # build server
     set(ASIO_INCLUDE_DIR "external/asio/include")

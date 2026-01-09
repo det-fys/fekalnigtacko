@@ -6,3 +6,4 @@ assets::MapCache assets::CacheManager::map_cache_;
 assets::VehicleCache assets::CacheManager::vehicle_cache_;
 
 CLIENT_ONLY(assets::TextureCache assets::CacheManager::texture_cache_;)
+CLIENT_ONLY(assets::SoundCache assets::CacheManager::sound_cache_;)

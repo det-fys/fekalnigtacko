@@ -8,6 +8,7 @@
 #include "utils/defs.hpp"
 
 #ifdef CLIENT
+#include "audio/sound.hpp"
 #include "gfx/texture.hpp"
 #endif
 
@@ -49,6 +50,12 @@ class TextureCache final : public Cache<gfx::Texture>
 protected:
     PtrType Load(const std::string& key) override { return gfx::Texture::LoadFromFile(key); }
 };
+
+class SoundCache final : public Cache<audio::Sound>
+{
+protected:
+    PtrType Load(const std::string& key) override { return audio::Sound::LoadFromFile(key); }
+};
 #endif // CLIENT
 
 class SkeletonCache final : public Cache<Skeleton>
@@ -86,13 +93,21 @@ public:
     static std::shared_ptr<const Model> GetModel(const std::string& filename) { return model_cache_.Get(filename); }
 
     static std::shared_ptr<const Map> GetMap(const std::string& filename) { return map_cache_.Get(filename); }
-    
-    static std::shared_ptr<const VehicleModel> GetVehicleModel(const std::string& filename) { return vehicle_cache_.Get(filename); }
+
+    static std::shared_ptr<const VehicleModel> GetVehicleModel(const std::string& filename)
+    {
+        return vehicle_cache_.Get(filename);
+    }
 
 #ifdef CLIENT
     static std::shared_ptr<const gfx::Texture> GetTexture(const std::string& filename)
     {
         return texture_cache_.Get(filename);
+    }
+
+    static std::shared_ptr<const audio::Sound> GetSound(const std::string& filename)
+    {
+        return sound_cache_.Get(filename);
     }
 #endif
 
@@ -102,6 +117,7 @@ private:
     static MapCache map_cache_;
     static VehicleCache vehicle_cache_;
     CLIENT_ONLY(static TextureCache texture_cache_;)
+    CLIENT_ONLY(static SoundCache sound_cache_;)
 };
 
 } // namespace assets
