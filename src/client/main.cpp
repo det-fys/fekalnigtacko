@@ -153,7 +153,12 @@ static void PollEvents()
     }
 }
 
+#ifdef NDEBUG
 #define WS_URL "ws://deadfish.cz:11200/ws"
+#else
+#define WS_URL "ws://127.0.0.1:11200/ws"
+#endif
+
 
 static bool s_ws_connected = false;
 

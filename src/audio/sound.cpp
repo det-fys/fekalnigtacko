@@ -31,12 +31,12 @@ std::shared_ptr<const audio::Sound> audio::Sound::LoadFromFile(const std::string
 {
     auto sound = std::make_shared<Sound>();
 
-    std::string ogg_path;
+    std::string ogg_name;
 
     assets::LoadCMDFile(path, [&](const std::string& cmd, std::istringstream& iss) {
         if (cmd == "ogg")
         {
-            iss >> ogg_path;
+            iss >> ogg_name;
         }
         else if (cmd == "category")
         {
@@ -55,7 +55,8 @@ std::shared_ptr<const audio::Sound> audio::Sound::LoadFromFile(const std::string
     if (sound->category_name_.empty())
         sound->category_name_ = "default";
 
-    LoadBufferOGG(sound->GetBufferId(), ogg_path.c_str());
+    ogg_name = "data/" + ogg_name + ".ogg";
+    LoadBufferOGG(sound->GetBufferId(), ogg_name.c_str());
 
     return sound;
 }

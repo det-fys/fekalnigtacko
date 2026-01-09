@@ -29,6 +29,8 @@ public:
 
     glm::mat4 GetViewMatrix() const;
 
+    audio::Master& GetAudioMaster() const;
+
 private:
     // msg handlers
     bool ProcessWorldMsg(net::InMessage& msg);

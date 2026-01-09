@@ -5,7 +5,9 @@
 #include "vehicleview.hpp"
 #include "client_session.hpp"
 
-game::view::WorldView::WorldView(ClientSession& session) : session_(session)
+game::view::WorldView::WorldView(ClientSession& session) : 
+    session_(session),
+    audiomaster_(session_.GetAudioMaster())
 {
     map_ = assets::CacheManager::GetMap("data/openworld.map");
 }

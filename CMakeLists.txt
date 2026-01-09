@@ -67,6 +67,7 @@ set(CLIENT_ONLY_SOURCES
     "src/gameview/client_session.hpp"
     "src/gameview/client_session.cpp"
     "src/gameview/entityview.hpp"
+    "src/gameview/entityview.cpp"
     "src/gameview/vehicleview.hpp"
     "src/gameview/vehicleview.cpp"
     "src/gameview/worldview.hpp"
@@ -219,9 +220,15 @@ endif()
     target_link_libraries(${MAIN_NAME} PRIVATE easywsclient)
 
     # add openal
-    set(ALSOFT_EXAMPLES OFF)
+    set(ALSOFT_EXAMPLES OFF CACHE BOOL "" FORCE)
     add_subdirectory(external/openal-soft)
-    target_link_libraries(${MAIN_NAME} PRIVATE OpenAL)
+    target_link_libraries(${MAIN_NAME} PRIVATE OpenAL::OpenAL)
+
+    add_custom_command(TARGET ${MAIN_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:OpenAL>
+            $<TARGET_FILE_DIR:${MAIN_NAME}>
+    )
 
     # build server
     set(ASIO_INCLUDE_DIR "external/asio/include")

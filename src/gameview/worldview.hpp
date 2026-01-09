@@ -26,6 +26,8 @@ public:
     
     float GetTime() const { return time_; }
 
+    audio::Master& GetAudioMaster() const { return audiomaster_; }
+
 private:
     // msg handlers
     bool ProcessEntSpawnMsg(net::InMessage& msg);
@@ -34,12 +36,13 @@ private:
 
 private:
     ClientSession& session_;
-
+    
     std::shared_ptr<const assets::Map> map_;
     std::map<net::EntNum, std::unique_ptr<EntityView>> ents_;
-
+    
     float time_ = 0.0f;
     
+    audio::Master& audiomaster_;
 };
 
 } // namespace game::view

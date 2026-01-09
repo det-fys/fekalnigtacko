@@ -4,6 +4,7 @@
 
 #include "game/player_input.hpp"
 #include "gfx/renderer.hpp"
+#include "audio/master.hpp"
 #include "net/msg_producer.hpp"
 #include "net/inmessage.hpp"
 
@@ -29,6 +30,8 @@ public:
     float GetTime() const { return delta_time_; }
     float GetDeltaTime() const { return delta_time_; }
 
+    audio::Master& GetAudioMaster() { return audiomaster_; }
+
     ~App();
 
 private:
@@ -46,6 +49,8 @@ private:
 
     gfx::Renderer renderer_;
     gfx::DrawList dlist_;
+
+    audio::Master audiomaster_;
 
     std::unique_ptr<game::view::ClientSession> session_;
 };

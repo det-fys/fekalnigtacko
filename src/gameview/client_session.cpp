@@ -86,6 +86,11 @@ glm::mat4 game::view::ClientSession::GetViewMatrix() const
     return glm::lookAt(eye, center, glm::vec3(0, 0, 1));
 }
 
+audio::Master& game::view::ClientSession::GetAudioMaster() const
+{
+    return app_.GetAudioMaster();
+}
+
 bool game::view::ClientSession::ProcessWorldMsg(net::InMessage& msg)
 {
     net::MapName mapname;

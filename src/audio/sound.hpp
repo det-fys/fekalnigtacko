@@ -9,11 +9,8 @@ namespace audio
 
 class Sound
 {
-private:
-    Sound();
-    friend std::shared_ptr<Sound> std::make_shared<Sound>();
-
 public:
+    Sound();
     static std::shared_ptr<const Sound> LoadFromFile(const std::string& path);
 
     unsigned int GetBufferId() const { return buffer_; }

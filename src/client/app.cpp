@@ -11,7 +11,7 @@ App::App()
 {
 	std::cout << "Initializing App..." << std::endl;
 
-
+	audiomaster_.SetMasterVolume(0.2f);
 }
 
 void App::Frame()
@@ -55,11 +55,15 @@ void App::Frame()
 	
 		// glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 		glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 3000.0f);
-	
+		glm::mat4 view = session_->GetViewMatrix();
+
 		gfx::DrawListParams params;
-		params.view_proj = proj * session_->GetViewMatrix();
+		params.view_proj = proj * view;
 	
 		renderer_.DrawList(dlist_, params);
+
+		glm::mat4 camera_world = glm::inverse(view);
+		audiomaster_.SetListenerOrientation(camera_world);
 	}
 
 	if (time_ - last_send_time_ > 0.040f)

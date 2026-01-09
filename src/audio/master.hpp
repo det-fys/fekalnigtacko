@@ -19,7 +19,7 @@ class Category
 {
 public:
     Category(const std::string& name);
-    DELETE_COPY_MOVE(Category)
+    // DELETE_COPY_MOVE(Category) // HACK: make it possible to push into reserved vector
 
     const std::string& GetName() const { return name_; }
 

@@ -9,7 +9,7 @@ audio::SoundSource::SoundSource(Player* player, std::shared_ptr<const Sound> sou
     SetVolume(1.0f);
     SetPitch(1.0f);
 
-    alSourcei(source_, AL_BUFFER, sound->GetBufferId());
+    alSourcei(source_, AL_BUFFER, sound_->GetBufferId());
 }
 
 void audio::SoundSource::SetLooping(bool looping)

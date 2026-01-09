@@ -8,6 +8,7 @@
 #include "controllable.hpp"
 #include "entity.hpp"
 #include "world.hpp"
+#include "vehicleflags.hpp"
 
 namespace game
 {
@@ -54,6 +55,8 @@ private:
 
     size_t num_wheels_ = 0;
     std::array<VehicleWheelState, MAX_WHEELS> wheels_;
+
+    VehicleFlags flags_;
 };
 
 } // namespace game

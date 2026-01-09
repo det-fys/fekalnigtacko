@@ -105,6 +105,7 @@ void game::Vehicle::Update()
 {
     Super::Update();
 
+    flags_ = 0;
     ProcessInput();
     UpdateWheels();
 
@@ -216,6 +217,12 @@ void game::Vehicle::ProcessInput()
 
     vehicle_->setSteeringValue(steering_, 0);
     vehicle_->setSteeringValue(steering_, 1);
+
+    if (glm::abs(engineForce) > 0)
+        flags_ |= VF_ACCELERATING;
+
+    if (glm::abs(breakingForce) > 0)
+        flags_ |= VF_BREAKING;
 }
 
 void game::Vehicle::UpdateWheels()
@@ -232,6 +239,7 @@ void game::Vehicle::UpdateWheels()
 void game::Vehicle::SendUpdateMsg()
 {
     auto msg = BeginEntMsg(net::EMSG_UPDATE);
+    msg.Write(flags_);
     net::WriteTransform(msg, root_.local);
 
     // send wheel info

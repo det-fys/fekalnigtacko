@@ -3,6 +3,7 @@
 #include "entityview.hpp"
 
 #include "assets/vehiclemdl.hpp"
+#include "game/vehicleflags.hpp"
 
 #include <chrono>
 
@@ -20,6 +21,7 @@ struct VehicleWheelViewInfo
 
 class VehicleView : public EntityView
 {
+    using Super = EntityView;
 public:
     VehicleView(WorldView& world, std::shared_ptr<const assets::VehicleModel> model);
     static std::unique_ptr<VehicleView> InitFromMsg(WorldView& world, net::InMessage& msg);
@@ -39,6 +41,10 @@ private:
     float update_time_ = 0.0f;
     Transform root_trans_[2];
 
+    VehicleFlags flags_ = 0;
+
+    std::shared_ptr<const audio::Sound> snd_accel_;
+    audio::SoundSource* snd_accel_src_ = nullptr;
 };
 
 }

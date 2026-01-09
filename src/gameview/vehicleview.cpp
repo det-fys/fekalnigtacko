@@ -16,6 +16,8 @@ game::view::VehicleView::VehicleView(WorldView& world, std::shared_ptr<const ass
     {
         wheels_[i].node.parent = &root_;
     }
+
+    snd_accel_ = assets::CacheManager::GetSound("data/auto.snd");
 }
 
 std::unique_ptr<game::view::VehicleView> game::view::VehicleView::InitFromMsg(WorldView& world, net::InMessage& msg)
@@ -43,6 +45,8 @@ bool game::view::VehicleView::ProcessMsg(net::EntMsgType type, net::InMessage& m
 
 void game::view::VehicleView::Update(const UpdateInfo& info)
 {
+    Super::Update(info);
+
     float tps = 25.0f;
     float t = (info.time - update_time_) * tps * 0.8f; // assume some jitter, interpolate for longer
     t = glm::clamp(t, 0.0f, 2.0f);
@@ -67,6 +71,20 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
         wheeltrans.rotation = glm::rotate(wheeltrans.rotation, wheelstate.rotation, glm::vec3(1, 0, 0));
 
         wheels_[i].node.UpdateMatrix();
+    }
+
+    // update snds
+    bool accel = flags_ & VF_ACCELERATING;
+
+    if (accel && !snd_accel_src_)
+    {
+        snd_accel_src_ = audioplayer_.PlaySound(snd_accel_, &root_.local.position);
+        snd_accel_src_->SetLooping(true);
+    }
+    else if (!accel && snd_accel_src_)
+    {
+        snd_accel_src_->Delete();
+        snd_accel_src_ = nullptr;
     }
 }
 
@@ -104,6 +122,9 @@ bool game::view::VehicleView::ProcessUpdateMsg(net::InMessage& msg)
     root_trans_[0] = root_.local;
     auto& root_trans = root_trans_[1];
     update_time_ = world_.GetTime();
+
+    if (!msg.Read(flags_))
+        return false;
 
     if (!net::ReadTransform(msg, root_trans))
         return false;
