@@ -4,11 +4,12 @@
 #include <string>
 #include <vector>
 
-#include "utils/defs.hpp"
+#include <AL/al.h>
+#include <AL/alc.h>
+
 #include <glm/glm.hpp>
 
-class ALCdevice;
-class ALCcontext;
+#include "utils/defs.hpp"
 
 namespace audio
 {

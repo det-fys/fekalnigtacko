@@ -11,7 +11,11 @@ App::App()
 {
 	std::cout << "Initializing App..." << std::endl;
 
+#ifndef EMSCRIPTEN
 	audiomaster_.SetMasterVolume(0.2f);
+#else
+	audiomaster_.SetMasterVolume(2.0f);
+#endif
 }
 
 void App::Frame()

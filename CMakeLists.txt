@@ -170,6 +170,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
 
     target_link_options(${MAIN_NAME} PRIVATE 
         "-lwebsocket.js"
+        "-lopenal"
         "-sUSE_SDL=2"
         "-sASYNCIFY"
         "-sUSE_WEBGL2=1"
