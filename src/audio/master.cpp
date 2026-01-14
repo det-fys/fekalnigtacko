@@ -2,9 +2,6 @@
 
 #include <iostream>
 
-#include <AL/al.h>
-#include <AL/alc.h>
-
 #include "defs.hpp"
 #include "sound_source.hpp"
 #include "source.hpp"
