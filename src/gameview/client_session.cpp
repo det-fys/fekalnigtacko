@@ -12,7 +12,7 @@ bool game::view::ClientSession::ProcessMessage(net::InMessage& msg)
     {
         net::MessageType type = net::MSG_NONE;
         if (!msg.Read(type))
-            break;
+            return true;
 
         if (type == net::MSG_NONE || type >= net::MSG_COUNT)
             return false;
