@@ -4,6 +4,7 @@
 
 #include "assets/skeleton.hpp"
 #include "surface.hpp"
+#include "hud.hpp"
 
 namespace gfx
 {
@@ -18,13 +19,27 @@ struct DrawSurfaceCmd
     float dist = 0.0f;                   // distance to camera - for transparnt sorting
 };
 
+struct DrawHudCmd
+{
+    const VertexArray* va = nullptr;
+    const Texture* texture = nullptr;
+    const HudPosition* pos = nullptr;
+    const glm::vec4* color = nullptr;
+};
+
 struct DrawList
 {
     std::vector<DrawSurfaceCmd> surfaces;
+    std::vector<DrawHudCmd> huds;
 
     void AddSurface(const DrawSurfaceCmd& cmd) { surfaces.emplace_back(cmd); }
+    void AddHUD(const DrawHudCmd& cmd) { huds.emplace_back(cmd); }
 
-    void Clear() { surfaces.clear(); }
+    void Clear()
+    {
+        surfaces.clear();
+        huds.clear();
+    }
 };
 
 } // namespace gfx

@@ -10,6 +10,7 @@
 #ifdef CLIENT
 #include "audio/sound.hpp"
 #include "gfx/texture.hpp"
+#include "gfx/font.hpp"
 #endif
 
 namespace assets
@@ -55,6 +56,12 @@ class SoundCache final : public Cache<audio::Sound>
 {
 protected:
     PtrType Load(const std::string& key) override { return audio::Sound::LoadFromFile(key); }
+};
+
+class FontCache final : public Cache<gfx::Font>
+{
+protected:
+    PtrType Load(const std::string& key) override { return gfx::Font::LoadFromFile(key); }
 };
 #endif // CLIENT
 
@@ -109,6 +116,11 @@ public:
     {
         return sound_cache_.Get(filename);
     }
+
+    static std::shared_ptr<const gfx::Font> GetFont(const std::string& filename)
+    {
+        return font_cache_.Get(filename);
+    }
 #endif
 
 private:
@@ -118,6 +130,7 @@ private:
     static VehicleCache vehicle_cache_;
     CLIENT_ONLY(static TextureCache texture_cache_;)
     CLIENT_ONLY(static SoundCache sound_cache_;)
+    CLIENT_ONLY(static FontCache font_cache_;)
 };
 
 } // namespace assets

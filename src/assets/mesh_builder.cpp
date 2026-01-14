@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 
+#include "utils/bufferput.hpp"
+
 assets::MeshBuilder::MeshBuilder(gfx::MeshFlags mflags) : mflags_(mflags) {}
 
 void assets::MeshBuilder::BeginSurface(gfx::SurfaceFlags sflags, const std::string& name, std::shared_ptr<const gfx::Texture> texture)
@@ -33,13 +35,6 @@ void assets::MeshBuilder::AddTriangle(const MeshTriangle& t)
     }
 
     tris_.push_back(t);
-}
-
-template <class T>
-static void BufferPut(std::vector<char>& buffer, const T& val)
-{
-    const char* data = reinterpret_cast<const char*>(&val);
-    buffer.insert(buffer.end(), data, data + sizeof(T));
 }
 
 static int GetVertexAttrFlags(gfx::MeshFlags mflags)

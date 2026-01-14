@@ -198,7 +198,7 @@ static EM_BOOL OnWSError(int type, const EmscriptenWebSocketErrorEvent *ev, void
     return EM_TRUE;
 }
 
-static bool WSInit()
+static bool WSInit(const char* url)
 {
     if (!emscripten_websocket_is_supported())
     {
@@ -206,7 +206,7 @@ static bool WSInit()
         return false;
     }
     EmscriptenWebSocketCreateAttributes ws_attrs = {
-        WS_URL,
+        url,
         NULL,
         EM_TRUE
     };
@@ -234,7 +234,7 @@ using namespace easywsclient;
 
 static std::unique_ptr<WebSocket> s_ws;
 
-static bool WSInit()
+static bool WSInit(const char* url)
 {
 
 #ifdef _WIN32
@@ -249,7 +249,7 @@ static bool WSInit()
     }
 #endif
 
-    s_ws = std::unique_ptr<WebSocket>(WebSocket::from_url(WS_URL));
+    s_ws = std::unique_ptr<WebSocket>(WebSocket::from_url(url));
 
     if (!s_ws)
         return false;
@@ -368,7 +368,7 @@ static void Frame()
 }
 
 static void Main() {
-    if (!WSInit())
+    if (!WSInit(WS_URL))
         return;
 
     InitSDL();
@@ -386,6 +386,7 @@ static void Main() {
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
     s_app = std::make_unique<App>();
+    s_app->AddChatMessagePrefix("WebSocket", "připojování na " + std::string(WS_URL));
 
 #ifdef EMSCRIPTEN
     emscripten_set_main_loop(Frame, 0, true);

@@ -8,12 +8,12 @@ namespace assets
 
 enum VehicleWheelType
 {
-    WHEEL_REAR = 1,
-    WHEEL_RIGHT = 2,
+    WHEEL_RIGHT = 1,
+    WHEEL_REAR = 2,
 
     WHEEL_FL = 0,
     WHEEL_FR = WHEEL_RIGHT,
-    WHEEL_RL = WHEEL_REAR | WHEEL_RIGHT,
+    WHEEL_RL = WHEEL_REAR,
     WHEEL_RR = WHEEL_REAR | WHEEL_RIGHT,
 };
 

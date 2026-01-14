@@ -8,7 +8,8 @@ static const char* const s_uni_names[] = {
 	"u_model",              // SU_MODEL
 	"u_view_proj",          // SU_VIEW_PROJ
     "u_tex",                // SU_TEX
-	"u_color"               // SU_COLOR
+	"u_color",              // SU_COLOR
+	"u_cull_alpha",         // SU_COLOR
 };
 
 // Vytvori shader z daneho zdroje

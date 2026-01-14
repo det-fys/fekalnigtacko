@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <ranges>
+#include <stdexcept>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -15,10 +16,12 @@ gfx::Renderer::Renderer()
     ShaderSources::MakeShader(mesh_shader_.shader, SS_MESH_VERT, SS_MESH_FRAG);
     ShaderSources::MakeShader(skel_mesh_shader_.shader, SS_SKEL_MESH_VERT, SS_SKEL_MESH_FRAG);
     ShaderSources::MakeShader(solid_shader_, SS_SOLID_VERT, SS_SOLID_FRAG);
+    ShaderSources::MakeShader(hud_shader_, SS_HUD_VERT, SS_HUD_FRAG);
 }
 
 void gfx::Renderer::Begin(size_t width, size_t height)
 {
+	current_shader_ = nullptr;
     glViewport(0, 0, width, height);
 }
 
@@ -36,6 +39,7 @@ void gfx::Renderer::ClearDepth()
 void gfx::Renderer::DrawList(gfx::DrawList& list, const DrawListParams& params)
 {
 	DrawSurfaceList(list.surfaces, params);
+    DrawHudList(list.huds, params);
 }
 
 void gfx::Renderer::InvalidateShaders()
@@ -106,12 +110,14 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
+	glDisable(GL_BLEND);
+
 	InvalidateShaders();
 
 	// cache to eliminate fake state changes
 	const gfx::Texture* last_texture = nullptr;
 	const gfx::VertexArray* last_vao = nullptr;
-	bool last_double_sided = false;
+	bool last_twosided = false;
 
 	glActiveTexture(GL_TEXTURE0); // for all future bindings
 
@@ -122,19 +128,19 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		// mesh flags
 		const bool skeletal_flag = surface->mflags & MF_SKELETAL;
 		// surface flags
-		const bool double_sided_flag = surface->sflags & SF_DOUBLE_SIDED;
+		const bool twosided_flag = surface->sflags & SF_2SIDED;
 		const bool transparent_flag = surface->sflags & SF_TRANSPARENT;
 		const bool object_color_flag = surface->sflags & SF_OBJECT_COLOR;
 
-		// adjust state
-		if (last_double_sided != double_sided_flag)
+		// sync 2sided
+		if (last_twosided != twosided_flag)
 		{
-			if (double_sided_flag)
+			if (twosided_flag)
 				glDisable(GL_CULL_FACE);
 			else
 				glEnable(GL_CULL_FACE);
 
-			last_double_sided = double_sided_flag;
+			last_twosided = twosided_flag;
 		}
 
 		// select shader
@@ -144,19 +150,36 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		// set model matrix
 		if (cmd.matrices)
 		{
-			glUniformMatrix4fv(mshader.shader->U(gfx::SU_MODEL), 1, GL_FALSE, &cmd.matrices[0][0][0]);
+			glUniformMatrix4fv(mshader.shader->U(SU_MODEL), 1, GL_FALSE, &cmd.matrices[0][0][0]);
 		}
 		else
 		{ // use identity if no matrix provided
 			static const glm::mat4 identity(1.0f);
-			glUniformMatrix4fv(mshader.shader->U(gfx::SU_MODEL), 1, GL_FALSE, &identity[0][0]);
+			glUniformMatrix4fv(mshader.shader->U(SU_MODEL), 1, GL_FALSE, &identity[0][0]);
 		}
 
 		// set color
-		glm::vec4 color = (object_color_flag && cmd.color) ? glm::vec4(*cmd.color) : glm::vec4(1.0f);
+		bool cull_alpha = true;
+		glm::vec4 color = glm::vec4(1.0f);
+
+		if (object_color_flag && cmd.color)
+		{
+			// use object color and disable alpha cull
+			cull_alpha = false;
+			color = glm::vec4(*cmd.color);
+		}
+		
+		// sync cull_alpha
+		if (mshader.cull_alpha != cull_alpha)
+		{
+			glUniform1i(mshader.shader->U(SU_CULL_ALPHA), cull_alpha ? 1 : 0);
+			mshader.cull_alpha = cull_alpha;
+		}
+
+		// sync color
 		if (mshader.color != color)
 		{
-			glUniform4fv(mshader.shader->U(gfx::SU_COLOR), 1, &color[0]);
+			glUniform4fv(mshader.shader->U(SU_COLOR), 1, &color[0]);
 			mshader.color = color;
 		}
 
@@ -185,4 +208,76 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 
 
 
+}
+
+void gfx::Renderer::DrawHudList(std::span<DrawHudCmd> queue, const DrawListParams& params)
+{
+	// cannot sort anything here, must be drawn in FIFO order for correct overlay
+
+	Shader* shader = hud_shader_.get();
+	current_shader_ = shader;
+	glUseProgram(shader->GetId());
+
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_DEPTH_TEST);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	float w = static_cast<float>(params.screen_width);
+	float h = static_cast<float>(params.screen_height);
+	glm::vec2 screen_size_px(w, h);
+    glm::vec2 ndc_scale(2.0f / screen_size_px.x, -2.0f / screen_size_px.y);
+	constexpr glm::vec2 ndc_offset(-1.0f, 1.0f);
+
+	const gfx::Texture* last_texture = nullptr;
+	const gfx::VertexArray* last_vao = nullptr;
+	glm::vec4 last_color = glm::vec4(-1.0f);
+
+	for (const auto& cmd : queue)
+	{
+		if (!cmd.va || !cmd.texture || !cmd.pos)
+		{
+            throw std::runtime_error("invalid hud draw");
+		}
+
+		// calculate transform
+		const auto& hp = *cmd.pos;
+		
+		glm::vec2 pos_px = hp.anchor * screen_size_px + hp.pos;
+		glm::vec2 trans_ndc = ndc_offset + pos_px * ndc_scale;
+
+		glm::mat3 matrix(1.0f);
+		matrix[0][0] = hp.scale.x * ndc_scale.x;
+		matrix[1][1] = hp.scale.y * ndc_scale.y;
+		matrix[2][0] = trans_ndc.x;
+		matrix[2][1] = trans_ndc.y;
+
+		glUniformMatrix3fv(shader->U(SU_MODEL), 1, GL_FALSE, &matrix[0][0]);
+
+		//sync color
+		glm::vec4 color = cmd.color ? *cmd.color : glm::vec4(1.0f);
+		if (last_color != color)
+		{
+			glUniform4fv(shader->U(SU_COLOR), 1, &color[0]);
+			last_color = color;
+		}
+
+		// bind texture
+		if (last_texture != cmd.texture)
+		{
+			GLuint tex_id = cmd.texture ? cmd.texture->GetId() : 0;
+			glBindTexture(GL_TEXTURE_2D, tex_id);
+			last_texture = cmd.texture;
+		}
+
+		// bind vao
+		if (last_vao = cmd.va)
+		{
+			glBindVertexArray(cmd.va->GetVAOId());
+			last_vao = cmd.va;
+		}
+
+		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(cmd.va->GetNumIndices()), GL_UNSIGNED_INT, NULL);
+	}
 }

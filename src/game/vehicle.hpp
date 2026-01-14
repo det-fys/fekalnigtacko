@@ -27,7 +27,7 @@ class Vehicle : public Entity, public Controllable
 public:
     using Super = Entity;
 
-    Vehicle(World& world, std::string model_name);
+    Vehicle(World& world, std::string model_name, const glm::vec3& color);
 
     virtual void Update() override;
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
@@ -45,6 +45,7 @@ private:
 private:
     std::string model_name_;
     std::shared_ptr<const assets::VehicleModel> model_;
+    glm::vec3 color_;
 
     collision::MotionState motion_;
     std::unique_ptr<btRigidBody> body_;

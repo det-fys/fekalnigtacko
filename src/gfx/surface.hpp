@@ -20,7 +20,7 @@ using SurfaceFlags = uint8_t;
 enum SurfaceFlag : SurfaceFlags
 {
     SF_NONE = 0x00,
-    SF_DOUBLE_SIDED = 0x01,
+    SF_2SIDED = 0x01,
     SF_TRANSPARENT = 0x02,
     SF_OBJECT_COLOR = 0x08, // use object level tint
 };

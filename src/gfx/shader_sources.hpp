@@ -16,6 +16,9 @@ namespace gfx
 		SS_SOLID_VERT,
 		SS_SOLID_FRAG,
 
+		SS_HUD_VERT,
+		SS_HUD_FRAG,
+
 	};
 
 	class ShaderSources

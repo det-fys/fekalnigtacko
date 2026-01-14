@@ -25,7 +25,7 @@ static void GetGLFilterModes(bool linear, bool mipmaps, GLenum& filter_min, GLen
 		if (mipmaps)
 		{
 			// Mipmaps always linear
-			filter_min = GL_NEAREST_MIPMAP_LINEAR;
+			filter_min = GL_LINEAR_MIPMAP_LINEAR;
 		}
 	}
 }

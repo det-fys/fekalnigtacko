@@ -76,4 +76,6 @@ using QuatQ = Quantized<uint16_t, -1, 1, 1>;
 using WheelZOffsetQ = Quantized<uint8_t, -1, 1, 1>;
 using RotationSpeedQ = Quantized<uint16_t, -300, 300, 1>;
 
+using ColorQ = Quantized<uint8_t, 0, 1>;
+
 } // namespace net

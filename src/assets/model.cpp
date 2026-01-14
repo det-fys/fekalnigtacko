@@ -25,6 +25,8 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                 iss >> v.normal.x >> v.normal.y >> v.normal.z;
                 iss >> v.uv.x >> v.uv.y;
     
+                v.uv.y = 1.0f - v.uv.y; // FLIP FOR GL
+                
                 // TODO: LUV & bone data
     
                 mb.AddVertex(v);
@@ -70,9 +72,9 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                 {
                     iss >> texture_name;
                 }
-                else if (flag == "+doublesided")
+                else if (flag == "+2sided")
                 {
-                    CLIENT_ONLY(sflags |= gfx::SF_DOUBLE_SIDED;)
+                    CLIENT_ONLY(sflags |= gfx::SF_2SIDED;)
                 }
                 else if (flag == "+transparent")
                 {   

@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-game::view::VehicleView::VehicleView(WorldView& world, std::shared_ptr<const assets::VehicleModel> model)
+game::view::VehicleView::VehicleView(WorldView& world, std::shared_ptr<const assets::VehicleModel> model, const glm::vec3& color)
     : EntityView(world), model_(std::move(model))
 {
     auto& modelwheels = model_->GetWheels();
@@ -17,18 +17,21 @@ game::view::VehicleView::VehicleView(WorldView& world, std::shared_ptr<const ass
         wheels_[i].node.parent = &root_;
     }
 
+    color_ = glm::vec4(color, 1.0f);
+
     snd_accel_ = assets::CacheManager::GetSound("data/auto.snd");
 }
 
 std::unique_ptr<game::view::VehicleView> game::view::VehicleView::InitFromMsg(WorldView& world, net::InMessage& msg)
 {
     net::ModelName modelname;
-    if (!msg.Read(modelname))
+    glm::vec3 color;
+    if (!msg.Read(modelname) || !net::ReadRGB(msg, color))
         return nullptr;
 
     auto model = assets::CacheManager::GetVehicleModel("data/" + std::string(modelname) + ".veh");
 
-    return std::make_unique<VehicleView>(world, std::move(model));
+    return std::make_unique<VehicleView>(world, std::move(model), color);
 }
 
 bool game::view::VehicleView::ProcessMsg(net::EntMsgType type, net::InMessage& msg)
@@ -66,10 +69,14 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
         // rotate
         wheelstate.rotation += info.delta_time * wheelstate.speed;
 
-        wheeltrans.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        wheeltrans.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);        
         wheeltrans.rotation = glm::rotate(wheeltrans.rotation, wheelstate.steering, glm::vec3(0, 0, 1));
         wheeltrans.rotation = glm::rotate(wheeltrans.rotation, wheelstate.rotation, glm::vec3(1, 0, 0));
-
+        
+        const auto& type = wheels[i].type;
+        if (type == assets::WHEEL_FL || type == assets::WHEEL_RL)
+            wheeltrans.rotation = glm::rotate(wheeltrans.rotation, glm::radians(180.0f), glm::vec3(0, 1, 0));
+        
         wheels_[i].node.UpdateMatrix();
     }
 
@@ -99,6 +106,7 @@ void game::view::VehicleView::Draw(gfx::DrawList& dlist)
         gfx::DrawSurfaceCmd cmd;
         cmd.surface = &surface;
         cmd.matrices = &root_.matrix;
+        cmd.color = &color_;
         dlist.AddSurface(cmd);
     }
 

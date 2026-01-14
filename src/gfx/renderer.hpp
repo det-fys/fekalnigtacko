@@ -11,6 +11,8 @@ namespace gfx
 	struct DrawListParams
 	{
 		glm::mat4 view_proj;
+		size_t screen_width = 0;
+		size_t screen_height = 0;
 	};
 
 	struct MeshShader
@@ -20,6 +22,7 @@ namespace gfx
 		// cached state to avoid redundant uniform updates which are expensive especially on WebGL
 		bool global_setup = false;
 		glm::vec4 color = glm::vec4(-1.0f); // invalid to force initial setup
+		bool cull_alpha = false;
 	};
 
 	class Renderer
@@ -38,6 +41,7 @@ namespace gfx
 		MeshShader mesh_shader_;
 		MeshShader skel_mesh_shader_;
 		std::unique_ptr<Shader> solid_shader_;
+		std::unique_ptr<Shader> hud_shader_;
 
 		const Shader* current_shader_ = nullptr;
 
@@ -46,6 +50,7 @@ namespace gfx
 		void SetupMeshShader(MeshShader& mshader, const DrawListParams& params);
 
 		void DrawSurfaceList(std::span<DrawSurfaceCmd> queue, const DrawListParams& params);
+		void DrawHudList(std::span<DrawHudCmd> queue, const DrawListParams& params);
 
 	};
 

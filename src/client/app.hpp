@@ -1,14 +1,23 @@
 #pragma once
 
 #include <functional>
+#include <deque>
 
 #include "game/player_input.hpp"
 #include "gfx/renderer.hpp"
+#include "gfx/text.hpp"
 #include "audio/master.hpp"
 #include "net/msg_producer.hpp"
 #include "net/inmessage.hpp"
 
 #include "gameview/client_session.hpp"
+
+struct ChatMessage
+{
+    std::unique_ptr<gfx::Text> text;
+    float timeout = 0.0f;
+    glm::vec4 color = glm::vec4(1.0f);
+};
 
 class App : public net::MsgProducer
 {
@@ -32,10 +41,17 @@ public:
 
     audio::Master& GetAudioMaster() { return audiomaster_; }
 
+    void AddChatMessage(const std::string& text);
+    void AddChatMessagePrefix(const std::string& prefix, const std::string& text);
+
     ~App();
 
 private:
     void Send(std::vector<char> data);
+
+    void InitChat();
+    void UpdateChat();
+    void DrawChat(gfx::DrawList& dlist);
 
 private:
     float time_ = 0.0f;
@@ -53,4 +69,9 @@ private:
     audio::Master audiomaster_;
 
     std::unique_ptr<game::view::ClientSession> session_;
+
+    std::shared_ptr<const gfx::Font> font_;
+
+    std::deque<ChatMessage> chat_;
+    std::vector<gfx::HudPosition> chatpos_;
 };

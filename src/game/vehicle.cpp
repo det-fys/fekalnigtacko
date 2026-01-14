@@ -12,32 +12,24 @@ static std::shared_ptr<const assets::VehicleModel> LoadVehicleModelByName(const 
     return assets::CacheManager::GetVehicleModel("data/" + model_name + ".veh");
 }
 
-struct Shape
-{
-    btBoxShape box;
-    btCompoundShape compound;
-
-    Shape() : box(btVector3(1, 1, 0.1))
-    {
-        btTransform t(btQuaternion(0, 0, 0), btVector3(0, 0, 2));
-        compound.addChildShape(t, &box);
-    }
-};
-
-game::Vehicle::Vehicle(World& world, std::string model_name)
+game::Vehicle::Vehicle(World& world, std::string model_name, const glm::vec3& color)
     : Entity(world, net::ET_VEHICLE), model_name_(model_name), model_(LoadVehicleModelByName(model_name)),
-      motion_(root_.local)
+      motion_(root_.local),
+      color_(color)
 {
     root_.local.position.z = 10.0f;
 
     // setup chassis rigidbody
     float mass = 1300.0f;
-    static Shape shape;
+
+    btCollisionShape* shape = model_->GetModel()->GetColShape();
+    if (!shape)
+        throw std::runtime_error("Making vehicle with no shape");
 
     btVector3 local_inertia(0, 0, 0);
-    shape.compound.calculateLocalInertia(mass, local_inertia);
+    shape->calculateLocalInertia(mass, local_inertia);
 
-    btRigidBody::btRigidBodyConstructionInfo rb_info(mass, &motion_, &shape.compound, local_inertia);
+    btRigidBody::btRigidBodyConstructionInfo rb_info(mass, &motion_, shape, local_inertia);
     body_ = std::make_unique<btRigidBody>(rb_info);
     body_->setActivationState(DISABLE_DEACTIVATION);
 
@@ -52,7 +44,7 @@ game::Vehicle::Vehicle(World& world, std::string model_name)
     btVector3 wheelDirectionCS0(0, 0, -1);
     btVector3 wheelAxleCS(1, 0, 0);
 
-    wheel_z_offset_ = 0.4f;
+    wheel_z_offset_ = 0.5f;
 
     const auto& wheels = model_->GetWheels();
 
@@ -63,10 +55,10 @@ game::Vehicle::Vehicle(World& world, std::string model_name)
 
     for (const auto& wheeldef : wheels)
     {
-        float wheelRadius = .35f;
+        float wheelRadius = wheeldef.radius;
 
-        float friction = 5.0f;
-        float suspensionStiffness = 60.0f;
+        float friction = 2.0f; // 5.0f;
+        float suspensionStiffness = 50.0f;
         // float suspensionDamping = 2.3f;
         // float suspensionCompression = 4.4f;
         float suspensionRestLength = 0.6f;
@@ -116,6 +108,7 @@ void game::Vehicle::SendInitData(Player& player, net::OutMessage& msg) const
 {
     net::ModelName name(model_name_);
     msg.Write(name);
+    net::WriteRGB(msg, color_); // primary color
 }
 
 game::Vehicle::~Vehicle()

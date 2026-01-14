@@ -23,7 +23,7 @@ class VehicleView : public EntityView
 {
     using Super = EntityView;
 public:
-    VehicleView(WorldView& world, std::shared_ptr<const assets::VehicleModel> model);
+    VehicleView(WorldView& world, std::shared_ptr<const assets::VehicleModel> model, const glm::vec3& color);
     static std::unique_ptr<VehicleView> InitFromMsg(WorldView& world, net::InMessage& msg);
 
     virtual bool ProcessMsg(net::EntMsgType type, net::InMessage& msg) override;
@@ -35,6 +35,7 @@ private:
 
 private:
     std::shared_ptr<const assets::VehicleModel> model_;
+    glm::vec4 color_;
 
     std::vector<VehicleWheelViewInfo> wheels_;
 

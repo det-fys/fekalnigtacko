@@ -79,7 +79,7 @@ SHADER_HEADER
 R"GLSL(
 layout (location = 0) in vec3 a_pos;
 layout (location = 1) in vec3 a_normal;
-layout (location = 2) in vec3 a_color;
+layout (location = 2) in vec4 a_color;
 layout (location = 3) in vec2 a_uv;
 
 )GLSL"
@@ -96,8 +96,8 @@ void main() {
     vec3 world_normal = normalize(mat3(u_model) * a_normal);
     gl_Position = u_view_proj * world_pos;
 
-    v_uv = vec2(a_uv.x, 1.0 - a_uv.y);
-    v_color = ComputeLights(world_pos.xyz, world_normal) * a_color;
+    v_uv = a_uv;
+    v_color = ComputeLights(world_pos.xyz, world_normal) * a_color.rgb;
 }	
 )GLSL",
 
@@ -108,11 +108,25 @@ in vec2 v_uv;
 in vec3 v_color;
 
 uniform sampler2D u_tex;
+uniform vec4 u_color;
+uniform bool u_cull_alpha;
 
 layout (location = 0) out vec4 o_color;
 
 void main() {
     o_color = vec4(texture(u_tex, v_uv));
+    
+    if (u_cull_alpha)
+    {
+        if (o_color.a < 0.5)
+        discard;
+    }
+    else
+    {
+        // blend with bg
+        o_color = mix(u_color, o_color, o_color.a);
+    }
+    
     o_color.rgb *= v_color; // Apply vertex color
     //o_color = vec4(1.0, 0.0, 0.0, 1.0);
 }	
@@ -155,7 +169,7 @@ void main() {
     vec3 world_normal = normalize(mat3(u_model) * mat3(bone_transform) * a_normal);
     gl_Position = u_view_proj * world_pos;
 
-    v_uv = vec2(a_uv.x, 1.0 - a_uv.y);
+    v_uv = a_uv;
 
     v_color = ComputeLights(world_pos.xyz, world_normal);
 }	
@@ -209,6 +223,44 @@ void main() {
 
 )GLSL",
 
+// SS_HUD_VERT
+SHADER_HEADER
+R"GLSL(
+layout (location = 0) in vec3 a_pos;
+layout (location = 2) in vec4 a_color;
+layout (location = 3) in vec2 a_uv;
+
+uniform mat3 u_model;
+uniform vec4 u_color;
+
+out vec4 v_color;
+out vec2 v_uv;
+
+void main() {
+    vec3 pos2d = u_model * vec3(a_pos.xy, 1.0);
+    gl_Position = vec4(pos2d.xy, 0.0, 1.0);
+    v_color = a_color * u_color;
+    v_uv = a_uv;
+}	
+)GLSL",
+
+// SS_HUD_FRAG
+SHADER_HEADER
+R"GLSL(
+
+in vec4 v_color;
+in vec2 v_uv;
+
+uniform sampler2D u_tex;
+
+layout (location = 0) out vec4 o_color;
+
+void main() {
+    o_color = texture(u_tex, v_uv);
+    o_color *= v_color;
+}	
+
+)GLSL",
 
 };
 

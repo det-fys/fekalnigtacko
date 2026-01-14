@@ -8,6 +8,8 @@
 namespace net
 {
 
+/// TRANSFORMS
+
 inline void WritePosition(OutMessage& msg, const glm::vec3& pos)
 {
     msg.Write<PositionQ>(pos.x);
@@ -52,6 +54,20 @@ inline bool ReadRotation(InMessage& msg, glm::quat& q)
 inline bool ReadTransform(InMessage& msg, Transform& trans)
 {
     return ReadPosition(msg, trans.position) && ReadRotation(msg, trans.rotation);
+}
+
+/// COLOR
+
+inline void WriteRGB(OutMessage& msg, const glm::vec3& color)
+{
+    msg.Write<ColorQ>(color.r);
+    msg.Write<ColorQ>(color.g);
+    msg.Write<ColorQ>(color.b);
+}
+
+inline bool ReadRGB(InMessage& msg, glm::vec3& color)
+{
+    return msg.Read<ColorQ>(color.r) && msg.Read<ColorQ>(color.g) && msg.Read<ColorQ>(color.b);
 }
 
 }
