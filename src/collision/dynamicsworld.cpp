@@ -58,8 +58,5 @@ void collision::DynamicsWorld::AddModelInstance(const assets::Model& model, cons
         static_objs_.emplace_back(std::move(obj));
     }
 
-    for (const auto& shapes = model.GetColShapes(); const auto& shape : shapes)
-    {
-        // TODO: add basic shapes
-    }
+    // TODO: add shape
 }

@@ -3,12 +3,15 @@
 #include "cmdfile.hpp"
 #include "cache.hpp"
 
+#include <BulletCollision/CollisionShapes/btShapeHull.h>
+
 std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::string& filename)
 {
     auto model = std::make_shared<Model>();
     std::vector<glm::vec3> vert_pos; // rember for collision trimesh
     
     CLIENT_ONLY(MeshBuilder mb(gfx::MF_NONE);)
+    std::unique_ptr<btConvexHullShape> temp_hull;
 
     LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
         if (command == "v")
@@ -29,6 +32,9 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
 
             if (model->cmesh_)
                 vert_pos.emplace_back(pos);
+
+            if (temp_hull)
+                temp_hull->addPoint(btVector3(pos.x, pos.y, pos.z), false);
         }
         else if (command == "f")
         {
@@ -92,6 +98,10 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
         {
             model->cmesh_ = std::make_unique<collision::TriangleMesh>();
         }
+        else if (command == "makeconvexhull")
+        {
+            temp_hull = std::make_unique<btConvexHullShape>();
+        }
         else
         {
             throw std::runtime_error("Unknown command in model file: " + command);
@@ -105,8 +115,21 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
         model->mesh_ = mb.GetMesh();
     )
 
+    // tri mesh
     if (model->cmesh_)
         model->cmesh_->Build();
+
+    // convex hull
+    if (temp_hull)
+    {
+        temp_hull->recalcLocalAabb();
+
+        // Optional but recommended
+        auto shape_hull = std::make_unique<btShapeHull>(temp_hull.get());
+        shape_hull->buildHull(temp_hull->getMargin());
+
+        model->cshape_ = std::make_unique<btConvexHullShape>((btScalar*)shape_hull->getVertexPointer(), shape_hull->numVertices(), sizeof(btVector3));
+    }
 
     return model;
 }

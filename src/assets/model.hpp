@@ -14,24 +14,25 @@
 namespace assets
 {
 
-enum ModelCollisionShapeType
-{
-    MCS_NONE,
+// enum ModelCollisionShapeType
+// {
+//     MCS_NONE,
     
-    MCS_BOX,
-    MCS_SPHERE,
-};
+//     MCS_BOX,
+//     MCS_SPHERE,
+// };
 
-struct ModelCollisionShape
-{
-    ModelCollisionShapeType type = MCS_NONE;
-    glm::vec3 origin = glm::vec3(0.0f);
-    union
-    {
-        float radius;
-        glm::vec3 half_extents;
-    };
-};
+// struct ModelCollisionShape
+// {
+//     ModelCollisionShapeType type = MCS_NONE;
+//     glm::vec3 origin = glm::vec3(0.0f);
+//     union
+//     {
+//         float radius;
+//         glm::vec3 half_extents;
+//     };
+// };
+
 
 class Model
 {
@@ -40,13 +41,14 @@ public:
     static std::shared_ptr<const Model> LoadFromFile(const std::string& filename);
 
     const collision::TriangleMesh* GetColMesh() const { return cmesh_.get(); }
-    const std::vector<ModelCollisionShape>& GetColShapes() const { return cshapes_; }
+    btCollisionShape* GetColShape() const { return cshape_.get(); }
 
     CLIENT_ONLY(const std::shared_ptr<const Mesh>& GetMesh() const { return mesh_; })
 
 private:
     std::unique_ptr<collision::TriangleMesh> cmesh_;
-    std::vector<ModelCollisionShape> cshapes_;
+    // std::vector<ModelCollisionShape> cshapes_;
+    std::unique_ptr<btCollisionShape> cshape_;
 
     CLIENT_ONLY(std::shared_ptr<const Mesh> mesh_;)
 
