@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <thread>
+#include <condition_variable>
 
 namespace crow::websocket
 {
@@ -55,9 +56,14 @@ public:
 
     ~WSServer();
 
+public:
+    void PushEvent(std::unique_lock<std::mutex>& lock, const WSEvent& event);
+
 private:
+    static constexpr size_t MAX_QUEUE_SIZE = 64;
     std::deque<WSEvent> events_;
     std::mutex mtx_;
+    std::condition_variable not_full_;
 
     std::unique_ptr<std::thread> ws_thread_;
     void* app_ptr_ = nullptr;
