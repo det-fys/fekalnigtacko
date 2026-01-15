@@ -38,7 +38,24 @@ void App::Frame()
 	}
 
 	// detect inputs originating in this frame
-	game::PlayerInputFlags new_input = input_ & ~prev_input_;
+	//game::PlayerInputFlags new_input = input_ & ~prev_input_;
+
+	// detect input changes
+	for (size_t i = 0; i < game::IN__COUNT; ++i)
+	{
+		auto in_old = prev_input_ & (1 << i);
+		auto in_new = input_ & (1 << i);
+
+		if (in_old > in_new) // released
+		{
+			SendInput(static_cast<game::PlayerInputType>(i), false);
+		}
+		else if (in_new > in_old) // pressed
+		{
+			SendInput(static_cast<game::PlayerInputType>(i), true);
+		}
+	}
+
 	prev_input_ = input_;
 
 	if (session_)
@@ -81,14 +98,14 @@ void App::Frame()
 
 	renderer_.DrawList(dlist_, params);
 
-	if (time_ - last_send_time_ > 0.040f)
-	{
-        auto msg = BeginMsg(net::MSG_IN);
-        msg.Write(input_);
+	// if (time_ - last_send_time_ > 0.040f)
+	// {
+    //     auto msg = BeginMsg(net::MSG_IN);
+    //     msg.Write(input_);
 
-		last_send_time_ = time_;
+	// 	last_send_time_ = time_;
 
-	}
+	// }
 }
 
 void App::Connected()
@@ -153,9 +170,13 @@ void App::AddChatMessagePrefix(const std::string& prefix, const std::string& tex
 
 App::~App() {}
 
-void App::Send(std::vector<char> data)
+void App::SendInput(game::PlayerInputType type, bool enable)
 {
-
+	auto msg = BeginMsg(net::MSG_IN);
+	uint8_t val = type;
+	if (enable)
+		val |= 128;
+	msg.Write(val);
 }
 
 void App::InitChat()

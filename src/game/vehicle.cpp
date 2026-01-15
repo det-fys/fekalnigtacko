@@ -109,6 +109,22 @@ void game::Vehicle::SendInitData(Player& player, net::OutMessage& msg) const
     net::ModelName name(model_name_);
     msg.Write(name);
     net::WriteRGB(msg, color_); // primary color
+    WriteState(msg);
+}
+
+void game::Vehicle::SetInput(VehicleInputType type, bool enable)
+{
+    if (enable)
+        in_ |= (1 << type);
+    else
+        in_ &= ~(1 << type);
+}
+
+void game::Vehicle::SetPosition(const glm::vec3& pos)
+{
+    auto t = body_->getWorldTransform();
+    t.setOrigin(btVector3(pos.x, pos.y, pos.z));
+    body_->setWorldTransform(t);
 }
 
 game::Vehicle::~Vehicle()
@@ -130,16 +146,6 @@ void game::Vehicle::ProcessInput()
     float engineForce = 0;
     float breakingForce = 0;
 
-    // process input
-    PlayerInputFlags in = GetController() ? GetController()->GetInput() : 0;
-
-    if (in & IN_DEBUG1)
-    {
-        auto t = body_->getWorldTransform();
-        t.setOrigin(btVector3(100, 100, 5));
-        body_->setWorldTransform(t);
-    }
-
     float speed = vehicle_->getCurrentSpeedKmHour();
 
     float maxsc = .5f;
@@ -151,14 +157,19 @@ void game::Vehicle::ProcessInput()
 
     float t_delta = 1.0f / 25.0f;
 
-    if (in & IN_FORWARD)
+    const bool in_forward = in_ & (1 << VIN_FORWARD);
+    const bool in_backward = in_ & (1 << VIN_BACKWARD);
+    const bool in_left = in_ & (1 << VIN_LEFT);
+    const bool in_right  = in_ & (1 << VIN_RIGHT);
+
+    if (in_forward)
     {
         if (speed < -1)
             breakingForce = maxBreakingForce;
         else
             engineForce = maxEngineForce;
     }
-    if (in & IN_BACKWARD)
+    if (in_backward)
     {
         if (speed > 1)
             breakingForce = maxBreakingForce;
@@ -167,19 +178,19 @@ void game::Vehicle::ProcessInput()
     }
 
     // idle breaking
-    if (!(in & IN_FORWARD) && !(in & IN_BACKWARD))
+    if (!in_forward && !in_backward)
     {
         breakingForce = maxBreakingForce * 0.05f;
     }
 
-    if (in & IN_LEFT)
+    if (in_left)
     {
         if (steering_ < steeringClamp)
             steering_ += steeringIncrement * t_delta;
     }
     else
     {
-        if (in & IN_RIGHT)
+        if (in_right)
         {
             if (steering_ > -steeringClamp)
                 steering_ -= steeringIncrement * t_delta;
@@ -229,9 +240,8 @@ void game::Vehicle::UpdateWheels()
     }
 }
 
-void game::Vehicle::SendUpdateMsg()
+void game::Vehicle::WriteState(net::OutMessage& msg) const
 {
-    auto msg = BeginEntMsg(net::EMSG_UPDATE);
     msg.Write(flags_);
     net::WriteTransform(msg, root_.local);
 
@@ -245,24 +255,10 @@ void game::Vehicle::SendUpdateMsg()
         msg.Write<net::WheelZOffsetQ>(wheel.z_offset);
         msg.Write<net::RotationSpeedQ>(wheel.speed);
     }
+}
 
-    // TEMP wheels
-    // TODO: REMOVE
-    // for (size_t i =0; i < vehicle_->getNumWheels(); ++i)
-    // {
-    //     vehicle_->updateWheelTransform(i, true);
-    //     btTransform tr = vehicle_->getWheelTransformWS(i);
-
-    //     Transform trans;
-    //     trans.SetBtTransform(tr);
-
-    //     net::WriteTransform(msg, trans);
-
-    //     // static glm::vec3 min_angles(1000.0f);
-    //     // static glm::vec3 max_angles(-1000.0f);
-    //     // min_angles = glm::min(min_angles, angles);
-    //     // max_angles= glm::max(max_angles, angles);
-
-    //     // std::cout << angles.x << " " << angles.y << " " << angles.z << " | " <<std::endl;
-    // }
+void game::Vehicle::SendUpdateMsg()
+{
+    auto msg = BeginEntMsg(net::EMSG_UPDATE);
+    WriteState(msg);
 }

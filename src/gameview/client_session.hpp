@@ -34,7 +34,8 @@ public:
 private:
     // msg handlers
     bool ProcessWorldMsg(net::InMessage& msg);
-    bool ProcessControlMsg(net::InMessage& msg);
+    bool ProcessCameraMsg(net::InMessage& msg);
+    bool ProcessChatMsg(net::InMessage& msg);
 
 private:
     App& app_;
@@ -42,7 +43,7 @@ private:
     std::unique_ptr<WorldView> world_;
 
     float yaw_ = 0.0f, pitch_ = 0.0f;
-    net::EntNum ctl_ = 0;
+    net::EntNum follow_ent_ = 0;
 
 };
 

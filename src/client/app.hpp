@@ -47,7 +47,7 @@ public:
     ~App();
 
 private:
-    void Send(std::vector<char> data);
+    void SendInput(game::PlayerInputType type, bool enable);
 
     void InitChat();
     void UpdateChat();

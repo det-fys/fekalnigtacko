@@ -97,8 +97,6 @@ set(CLIENT_ONLY_SOURCES
 )
 
 set(SERVER_ONLY_SOURCES
-    "src/game/controllable.cpp"
-    "src/game/controllable.hpp"
     "src/game/entity.hpp"
     "src/game/entity.cpp"
     "src/game/game.hpp"

@@ -20,6 +20,10 @@ enum MessageType : uint8_t
     // IN <PlayerInputFlags> <ViewYawQ> <ViewPitchQ>
     MSG_IN,
 
+    /*~~~~~~~~ Session ~~~~~~~~*/
+    // CHAT <ChatMessage>
+    MSG_CHAT,
+
     /*~~~~~~~~ World ~~~~~~~~*/
     // CHWORLD <MapName>
     MSG_CHWORLD,
@@ -32,8 +36,8 @@ enum MessageType : uint8_t
     // ENTDESTROY <EntNum>
     MSG_ENTDESTROY,
     
-    // CONTROL <EntNum>
-    MSG_CONTROL,
+    // CAM <EntNum>
+    MSG_CAM,
 
     /*~~~~~~~~~~~~~~~~*/
     MSG_COUNT,
@@ -42,6 +46,7 @@ enum MessageType : uint8_t
 using PlayerName = FixedStr<24>;
 using MapName = FixedStr<32>;
 using ModelName = FixedStr<64>;
+using ChatMessage = FixedStr<1024>;
 
 // pi approx fraction
 constexpr long long PI_N = 245850922;

@@ -6,6 +6,7 @@
 #include "collision/dynamicsworld.hpp"
 #include "entity.hpp"
 #include "net/defs.hpp"
+#include "player_input.hpp"
 
 namespace game
 {
@@ -33,8 +34,9 @@ public:
 
     // events
     virtual void PlayerJoined(Player& player) {}
+    virtual void PlayerInput(Player& player, PlayerInputType type, bool enabled) {}
     virtual void PlayerLeft(Player& player) {}
-    
+
     Entity* GetEntity(net::EntNum entnum);
 
     const std::string& GetMapName() const { return mapname_; }

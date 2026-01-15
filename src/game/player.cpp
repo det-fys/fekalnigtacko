@@ -22,10 +22,10 @@ bool game::Player::ProcessMsg(net::MessageType type, net::InMessage& msg)
 
 void game::Player::Update()
 {
-    if (world_ != known_world_)
+    if (world_.get() != known_world_)
     {
         SendWorldMsg();
-        known_world_ = world_;
+        known_world_ = world_.get();
         known_ents_.clear();
     }
 
@@ -33,36 +33,31 @@ void game::Player::Update()
         SyncEntities();
 }
 
-void game::Player::SetWorld(World* world)
+void game::Player::SetWorld(std::shared_ptr<World> world)
 {
     if (world == world_)
         return;
 
-    Control(nullptr);
-
     if (world_)
         world_->PlayerLeft(*this);
 
-    world_ = world;
+    world_ = std::move(world);
 
     if (world_)
         world_->PlayerJoined(*this);
 }
 
-void game::Player::Control(Controllable* ctl)
+void game::Player::SetCamera(net::EntNum entnum)
 {
-    if (ctl == ctl_)
-        return;
+    auto msg = BeginMsg(net::MSG_CAM);
+    msg.Write(entnum);
+}
 
-    if (ctl_)
-        ctl_->controller_ = nullptr; // clear old
-        
-    ctl_ = ctl;
-    
-    if (ctl_)
-        ctl_->controller_ = this;
-
-    SendControl();
+void game::Player::SendChat(const std::string text)
+{
+    auto msg = BeginMsg(net::MSG_CHAT);
+    net::ChatMessage chatm = text;
+    msg.Write(chatm);
 }
 
 game::Player::~Player()
@@ -76,13 +71,6 @@ void game::Player::SendWorldMsg()
     MSGDEBUG(std::cout << "seding CHWORLD" << std::endl;)
     auto msg = BeginMsg(net::MSG_CHWORLD);
     msg.Write(net::MapName(world_->GetMapName()));
-}
-
-void game::Player::SendControl()
-{
-    auto msg = BeginMsg(net::MSG_CONTROL);
-    net::EntNum entnum = ctl_ ? ctl_->GetEntity().GetEntNum() : 0;
-    msg.Write(entnum);
 }
 
 void game::Player::SyncEntities()
@@ -161,8 +149,31 @@ void game::Player::SendDestroyEntity(net::EntNum entnum)
 
 bool game::Player::ProcessInputMsg(net::InMessage& msg)
 {
-    if (!msg.Read(in_))
+    uint8_t val;
+    if (!msg.Read(val))
         return false;
 
+    bool enabled = false;
+    if (val & 128)
+    {
+        enabled = true;
+        val &= ~128;
+    }
+
+    Input(static_cast<PlayerInputType>(val), enabled);
     return true;
+}
+
+void game::Player::Input(PlayerInputType type, bool enabled)
+{
+    if (enabled)
+        in_ |= (1 << type);
+    else
+        in_ &= ~(1 << type);
+
+    if (!game_.PlayerInput(*this, type, enabled))
+    {
+        if (world_)
+            world_->PlayerInput(*this, type, enabled);
+    }
 }

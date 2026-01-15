@@ -16,10 +16,15 @@ void game::Game::Update()
 
 void game::Game::PlayerJoined(Player& player)
 {
-    player.SetWorld(default_world_.get());
+    player.SetWorld(default_world_);
 }
 
 void game::Game::PlayerLeft(Player& player)
 {
     
+}
+
+bool game::Game::PlayerInput(Player& player, PlayerInputType type, bool enabled)
+{
+    return false; // not handled here
 }

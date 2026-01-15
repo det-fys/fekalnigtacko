@@ -31,7 +31,11 @@ std::unique_ptr<game::view::VehicleView> game::view::VehicleView::InitFromMsg(Wo
 
     auto model = assets::CacheManager::GetVehicleModel("data/" + std::string(modelname) + ".veh");
 
-    return std::make_unique<VehicleView>(world, std::move(model), color);
+    auto vehicle = std::make_unique<VehicleView>(world, std::move(model), color);
+    vehicle->ReadState(msg);
+    vehicle->root_trans_[0] = vehicle->root_trans_[1];
+
+    return vehicle;
 }
 
 bool game::view::VehicleView::ProcessMsg(net::EntMsgType type, net::InMessage& msg)
@@ -125,7 +129,7 @@ void game::view::VehicleView::Draw(gfx::DrawList& dlist)
     }
 }
 
-bool game::view::VehicleView::ProcessUpdateMsg(net::InMessage& msg)
+bool game::view::VehicleView::ReadState(net::InMessage& msg)
 {
     root_trans_[0] = root_.local;
     auto& root_trans = root_trans_[1];
@@ -151,5 +155,9 @@ bool game::view::VehicleView::ProcessUpdateMsg(net::InMessage& msg)
         wheel.steering = i < 2 ? steering : 0.0f;
     }
 
-    return true;
+    return true;}
+
+bool game::view::VehicleView::ProcessUpdateMsg(net::InMessage& msg)
+{
+    return ReadState(msg);
 }

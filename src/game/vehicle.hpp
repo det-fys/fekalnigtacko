@@ -5,7 +5,6 @@
 
 #include "assets/vehiclemdl.hpp"
 #include "collision/motionstate.hpp"
-#include "controllable.hpp"
 #include "entity.hpp"
 #include "world.hpp"
 #include "vehicleflags.hpp"
@@ -22,7 +21,18 @@ struct VehicleWheelState
     float z_offset = 0.0f; // [m] against model definition
 };
 
-class Vehicle : public Entity, public Controllable
+using VehicleInputFlags = uint8_t;
+
+enum VehicleInputType
+{
+    VIN_FORWARD,
+    VIN_BACKWARD,
+    VIN_LEFT,
+    VIN_RIGHT,
+    VIN_HANDBRAKE,
+};
+
+class Vehicle : public Entity
 {
 public:
     using Super = Entity;
@@ -32,14 +42,16 @@ public:
     virtual void Update() override;
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
 
-    // Controllable
-    Entity& GetEntity() override { return *this; };
+    void SetInput(VehicleInputType type, bool enable);
+
+    void SetPosition(const glm::vec3& pos);
 
     virtual ~Vehicle();
 
 private:
     void ProcessInput();
     void UpdateWheels();
+    void WriteState(net::OutMessage& msg) const;
     void SendUpdateMsg();
 
 private:
@@ -58,6 +70,8 @@ private:
     std::array<VehicleWheelState, MAX_WHEELS> wheels_;
 
     VehicleFlags flags_;
+
+    VehicleInputFlags in_ = 0;
 };
 
 } // namespace game

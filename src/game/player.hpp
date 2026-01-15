@@ -8,7 +8,6 @@
 
 #include "player_input.hpp"
 #include "game.hpp"
-#include "controllable.hpp"
 
 namespace game
 {
@@ -16,13 +15,6 @@ namespace game
 class World;
 class Entity;
 class Vehicle;
-
-enum PlayerState
-{
-    PS_NONE,
-    PS_CHARACTER,
-    PS_VEHICLE,
-};
 
 class Player : public net::MsgProducer
 {
@@ -33,8 +25,10 @@ public:
     bool ProcessMsg(net::MessageType type, net::InMessage& msg);
     void Update();
 
-    void SetWorld(World* world);
-    void Control(Controllable* ctl);
+    void SetWorld(std::shared_ptr<World> world);
+
+    void SetCamera(net::EntNum entnum);
+    void SendChat(const std::string text);
 
     PlayerInputFlags GetInput() const { return in_; }
 
@@ -42,7 +36,6 @@ public:
 
 private:
     void SendWorldMsg();
-    void SendControl();
 
     // entities sync
     void SyncEntities();
@@ -54,19 +47,18 @@ private:
     // msg handlers
     bool ProcessInputMsg(net::InMessage& msg);
 
+    // events
+    void Input(PlayerInputType type, bool enabled);
+
 private:
     Game& game_;
     std::string name_;
 
-    World* world_ = nullptr;
+    std::shared_ptr<World> world_ = nullptr;
     World* known_world_ = nullptr;
     std::set<net::EntNum> known_ents_;
 
     PlayerInputFlags in_ = 0;
-
-    PlayerState state_ = PS_NONE;
-    Controllable* ctl_ = nullptr;
-
 };
 
 }

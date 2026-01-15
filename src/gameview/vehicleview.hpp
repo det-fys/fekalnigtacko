@@ -31,6 +31,7 @@ public:
     virtual void Draw(gfx::DrawList& dlist) override;
 
 private:
+    bool ReadState(net::InMessage& msg);
     bool ProcessUpdateMsg(net::InMessage& msg);
 
 private:

@@ -30,8 +30,11 @@ bool game::view::ClientSession::ProcessSingleMessage(net::MessageType type, net:
     case net::MSG_CHWORLD:
         return ProcessWorldMsg(msg);
 
-    case net::MSG_CONTROL:
-        return ProcessControlMsg(msg);
+    case net::MSG_CAM:
+        return ProcessCameraMsg(msg);
+    
+    case net::MSG_CHAT:
+        return ProcessChatMsg(msg);
 
     default:
         // try pass the msg to world
@@ -66,9 +69,9 @@ glm::mat4 game::view::ClientSession::GetViewMatrix() const
 {
     glm::vec3 center(0, 0, 3);
 
-    if (world_ && ctl_)
+    if (world_ && follow_ent_)
     {
-        auto ent = world_->GetEntity(ctl_);
+        auto ent = world_->GetEntity(follow_ent_);
         if (ent)
             center += ent->GetRoot().local.position;
     }
@@ -103,10 +106,20 @@ bool game::view::ClientSession::ProcessWorldMsg(net::InMessage& msg)
     return true;
 }
 
-bool game::view::ClientSession::ProcessControlMsg(net::InMessage& msg)
+bool game::view::ClientSession::ProcessCameraMsg(net::InMessage& msg)
 {
-    if (!msg.Read(ctl_))
+    if (!msg.Read(follow_ent_))
         return false;
 
+    return true;
+}
+
+bool game::view::ClientSession::ProcessChatMsg(net::InMessage& msg)
+{
+    net::ChatMessage chatm;
+    if (!msg.Read(chatm))
+        return false;
+
+    app_.AddChatMessagePrefix("Server", chatm);
     return true;
 }

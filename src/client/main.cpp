@@ -314,40 +314,39 @@ static void Frame()
 	const uint8_t* kbd_state = SDL_GetKeyboardState(nullptr);
     
     if (kbd_state[SDL_GetScancodeFromKey(SDLK_w)])
-		input |= game::IN_FORWARD;
+		input |= (1 << game::IN_FORWARD);
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_s)])
-		input |= game::IN_BACKWARD;
+		input |= (1 << game::IN_BACKWARD);
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_a)])
-		input |= game::IN_LEFT;
+		input |= (1 << game::IN_LEFT);
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_d)])
-		input |= game::IN_RIGHT;
+		input |= (1 << game::IN_RIGHT);
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_SPACE)])
-		input |= game::IN_JUMP;
+		input |= (1 << game::IN_JUMP);
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_LCTRL)])
-		input |= game::IN_CROUCH;
+		input |= (1 << game::IN_CROUCH);
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_e)])
-		input |= game::IN_USE;
+		input |= (1 << game::IN_USE);
 
     if (kbd_state[SDL_GetScancodeFromKey(SDLK_F3)])
-		input |= game::IN_DEBUG1;
+		input |= (1 << game::IN_DEBUG1);
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_F4)])
-		input |= game::IN_DEBUG2;
+		input |= (1 << game::IN_DEBUG2);
 
 	if (kbd_state[SDL_GetScancodeFromKey(SDLK_F5)])
-		input |= game::IN_DEBUG3;
+		input |= (1 << game::IN_DEBUG3);
 
 	int mouse_state = SDL_GetMouseState(nullptr, nullptr);
 
 	if (mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT))
 		input |= game::IN_ATTACK;
-
 
 	s_app->SetInput(input);
 
