@@ -4,7 +4,7 @@
 #include <string>
 
 #include "model.hpp"
-#include "utils/transform.hpp"
+#include "game/transform_node.hpp"
 
 #ifdef CLIENT
 #include "gfx/draw_list.hpp"
@@ -15,7 +15,7 @@ namespace assets
 
 struct MapStaticObject
 {
-    Transform transform;
+    game::TransformNode node;
     std::shared_ptr<const Model> model;
     glm::vec3 color = glm::vec3(1.0f);
 };

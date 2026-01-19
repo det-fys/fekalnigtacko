@@ -38,7 +38,7 @@ void collision::DynamicsWorld::AddMapCollision()
     // add static objects
     for (const auto& sobjs = map_->GetStaticObjects(); const auto& sobj : sobjs)
     {
-        AddModelInstance(*sobj.model, sobj.transform);
+        AddModelInstance(*sobj.model, sobj.node.local);
     }
 }
 

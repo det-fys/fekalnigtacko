@@ -20,9 +20,10 @@ using SurfaceFlags = uint8_t;
 enum SurfaceFlag : SurfaceFlags
 {
     SF_NONE = 0x00,
-    SF_2SIDED = 0x01,
-    SF_TRANSPARENT = 0x02,
-    SF_OBJECT_COLOR = 0x08, // use object level tint
+    SF_2SIDED = 0x01,         // disable backface culling
+    SF_BLEND = 0x02,          // enable blending, disable depth write
+    SF_BLEND_ADDITIVE = 0x04, // use additive blending instead of opacity
+    SF_OBJECT_COLOR = 0x08,   // use object color for background instead of alpha culling
 };
 
 struct Surface

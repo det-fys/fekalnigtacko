@@ -76,13 +76,20 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                 {
                     CLIENT_ONLY(sflags |= gfx::SF_2SIDED;)
                 }
-                else if (flag == "+transparent")
-                {   
-                    CLIENT_ONLY(sflags |= gfx::SF_TRANSPARENT;)
-                }
                 else if (flag == "+ocolor")
                 {
                     CLIENT_ONLY(sflags |= gfx::SF_OBJECT_COLOR;)
+                }
+                else if (flag == "+blend")
+                {
+                    std::string blend_str;
+                    iss >> blend_str;
+
+                    CLIENT_ONLY(
+                        sflags |= gfx::SF_BLEND;
+                        if (blend_str == "additive")
+                            sflags |= gfx::SF_BLEND_ADDITIVE;
+                    )
                 }
             }
 
@@ -128,7 +135,8 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
 
         // Optional but recommended
         auto shape_hull = std::make_unique<btShapeHull>(temp_hull.get());
-        shape_hull->buildHull(temp_hull->getMargin());
+        // shape_hull->buildHull(temp_hull->getMargin());
+        shape_hull->buildHull(0.01f);
 
         model->cshape_ = std::make_unique<btConvexHullShape>((btScalar*)shape_hull->getVertexPointer(), shape_hull->numVertices(), sizeof(btVector3));
     }

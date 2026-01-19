@@ -14,7 +14,7 @@ namespace gfx
 		SU_VIEW_PROJ,
 		SU_TEX,
 		SU_COLOR,
-		SU_CULL_ALPHA,
+		SU_FLAGS,
 	
 		SU_COUNT
 	};

@@ -67,7 +67,7 @@ void game::view::ClientSession::Update(const UpdateInfo& info)
 
 glm::mat4 game::view::ClientSession::GetViewMatrix() const
 {
-    glm::vec3 center(0, 0, 3);
+    glm::vec3 center(0.0f, 0.0f, 2.5f);
 
     if (world_ && follow_ent_)
     {
@@ -82,7 +82,7 @@ glm::mat4 game::view::ClientSession::GetViewMatrix() const
 	float pitch_sin = glm::sin(pitch_);
     glm::vec3 dir(yaw_sin * pitch_cos, yaw_cos * pitch_cos, pitch_sin);
 
-    float distance = 10.0f;
+    float distance = 8.0f;
 
     auto eye = center - dir * distance;
 

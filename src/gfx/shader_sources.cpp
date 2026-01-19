@@ -27,7 +27,7 @@
 
 #define MESH_MATRICES_GLSL R"GLSL(
     uniform mat4 u_view_proj;
-    uniform mat4 u_model; // Transform matrix 
+    uniform mat4 u_model; // Transform matrix
 )GLSL"
 
 #define LIGHT_MATRICES_GLSL R"GLSL(
@@ -40,12 +40,12 @@
 #define COMPUTE_LIGHTS_GLSL R"GLSL(
 // Example sun values (can later be uniforms)
 vec3 u_sun_direction = normalize(vec3(0.3, 0.5, -0.8)); // direction from which sunlight comes
-vec3 u_sun_color = vec3(1.0, 0.95, 0.7);              // warm sunlight color
+vec3 u_sun_color = vec3(1.0, 0.95, 0.7) * 0.9;              // warm sunlight color
 
 vec3 ComputeLights(in vec3 sector_pos, in vec3 sector_normal)
 {
     // Base ambient
-    vec3 color = vec3(0.5, 0.5, 0.5); // u_ambient_light
+    vec3 color = vec3(0.5, 0.5, 0.5) * 0.9; // u_ambient_light
 
     // Sunlight contribution
     float sun_dot = max(dot(sector_normal, -u_sun_direction), 0.0);
@@ -107,21 +107,24 @@ R"GLSL(
 in vec2 v_uv;
 in vec3 v_color;
 
+#define SHF_CULL_ALPHA 1
+#define SHF_BACKGROUND 2
+
 uniform sampler2D u_tex;
 uniform vec4 u_color;
-uniform bool u_cull_alpha;
+uniform int u_flags;
 
 layout (location = 0) out vec4 o_color;
 
 void main() {
     o_color = vec4(texture(u_tex, v_uv));
     
-    if (u_cull_alpha)
+    if ((u_flags & SHF_CULL_ALPHA) > 0)
     {
         if (o_color.a < 0.5)
-        discard;
+            discard;
     }
-    else
+    else if ((u_flags & SHF_BACKGROUND) > 0)
     {
         // blend with bg
         o_color = mix(u_color, o_color, o_color.a);

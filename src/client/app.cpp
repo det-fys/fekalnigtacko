@@ -69,7 +69,7 @@ void App::Frame()
 	float aspect = static_cast<float>(viewport_size_.x) / static_cast<float>(viewport_size_.y);
 
 	renderer_.Begin(viewport_size_.x, viewport_size_.y);
-	renderer_.ClearColor(glm::vec3(0.3f, 0.9f, 1.0f));
+	renderer_.ClearColor(glm::vec3(0.5f, 0.7f, 1.0f));
 	renderer_.ClearDepth();
 
 	dlist_.Clear();

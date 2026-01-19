@@ -22,7 +22,7 @@ namespace gfx
 		// cached state to avoid redundant uniform updates which are expensive especially on WebGL
 		bool global_setup = false;
 		glm::vec4 color = glm::vec4(-1.0f); // invalid to force initial setup
-		bool cull_alpha = false;
+		int flags = 0;
 	};
 
 	class Renderer

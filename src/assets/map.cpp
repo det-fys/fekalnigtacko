@@ -26,10 +26,14 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
 
             glm::vec3 angles;
 
-            iss >> obj.transform.position.x >> obj.transform.position.y >> obj.transform.position.z;
+            auto trans = &obj.node.local;
+
+            iss >> trans->position.x >> trans->position.y >> trans->position.z;
             iss >> angles.x >> angles.y >> angles.z;
-            obj.transform.SetAngles(angles);
-            iss >> obj.transform.scale;
+            trans->SetAngles(angles);
+            iss >> trans->scale;
+
+            obj.node.UpdateMatrix();
 
             std::string flag;
             while (iss >> flag)
@@ -61,6 +65,23 @@ void assets::Map::Draw(gfx::DrawList& dlist) const
         gfx::DrawSurfaceCmd cmd;
         cmd.surface = &surface;
         dlist.AddSurface(cmd);
+    }
+
+    for (const auto& obj : static_objects_)
+    {
+        if (!obj.model || !obj.model->GetMesh())
+            continue;
+
+        const auto& surfaces = obj.model->GetMesh()->surfaces;
+
+        for (const auto& surface : surfaces)
+        {
+            gfx::DrawSurfaceCmd cmd;
+            cmd.surface = &surface;
+            cmd.matrices = &obj.node.matrix;
+            // cmd.color_mod = glm::vec4(obj.color, 1.0f);
+            dlist.AddSurface(cmd);
+        }
     }
 }
 #endif // CLIENT

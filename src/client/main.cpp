@@ -15,7 +15,11 @@
 #ifdef _WIN32
 #define NOMINMAX
 #pragma comment(lib, "ws2_32")
+#pragma comment(lib, "winmm.lib")
 #include <WinSock2.h>
+#include <windows.h>
+#include <chrono>
+#include <thread>
 #endif
 
 #include "app.hpp"
@@ -391,11 +395,26 @@ static void Main() {
     emscripten_set_main_loop(Frame, 0, true);
 #else
 
+#ifdef _WIN32
+    timeBeginPeriod(1);
+#endif
     SDL_GL_SetSwapInterval(0);
 
+    auto frame_dur = std::chrono::milliseconds(5);
+    
     while (!s_quit)
     {
+        auto t_start = std::chrono::steady_clock::now();
+        
         Frame();
+    
+        auto t_next = t_start + frame_dur;
+        auto t_now = std::chrono::steady_clock::now();
+        
+        if (t_now < t_next)
+        {
+            std::this_thread::sleep_for(t_next - t_now);
+        }
     }
         
     s_app.reset();

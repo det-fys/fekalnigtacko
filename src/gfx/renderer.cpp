@@ -9,7 +9,8 @@
 
 #include "client/gl.hpp"
 
-#include "gfx/shader_sources.hpp"
+#include "shader_sources.hpp"
+#include "shader_defs.hpp"
 
 gfx::Renderer::Renderer()
 {
@@ -81,15 +82,15 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		const Surface* sa = a.surface;
 		const Surface* sb = b.surface;
 
-		const bool trans_a = sa->sflags & SF_TRANSPARENT;
-		const bool trans_b = sb->sflags & SF_TRANSPARENT;
+		const bool blend_a = sa->sflags & SF_BLEND;
+		const bool blend_b = sb->sflags & SF_BLEND;
 		
-		if (trans_a != trans_b)
-			return trans_b; // opaque first
+		if (blend_a != blend_b)
+			return blend_b; // opaque first
 
-		if (trans_a) // both transparent
+		if (blend_a) // both blended
 		{
-			return a.dist > b.dist; // do not optimize transparent, sort by distance instead
+			return a.dist > b.dist; // do not optimize blended, sort by distance instead
 		}
 
 		if (auto cmp = sa <=> sb; cmp != 0)
@@ -103,24 +104,30 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 
 		return false;
 	});
-
-	glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-
-	glDisable(GL_BLEND);
-
-	InvalidateShaders();
+	
+	glActiveTexture(GL_TEXTURE0); // for all future bindings
 
 	// cache to eliminate fake state changes
 	const gfx::Texture* last_texture = nullptr;
 	const gfx::VertexArray* last_vao = nullptr;
+	InvalidateShaders();
+	
+	// enable depth test
+	glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+	
+	// reset face culling
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 	bool last_twosided = false;
 
-	glActiveTexture(GL_TEXTURE0); // for all future bindings
-
+	// reset blending
+	glDisable(GL_BLEND);
+	glDepthMask(GL_TRUE);
+	bool last_blend = false;
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // set to opacity blending default
+	bool last_blend_additive = false;
+	
 	for (const DrawSurfaceCmd& cmd : list)
 	{
 		const Surface* surface = cmd.surface;
@@ -129,7 +136,7 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		const bool skeletal_flag = surface->mflags & MF_SKELETAL;
 		// surface flags
 		const bool twosided_flag = surface->sflags & SF_2SIDED;
-		const bool transparent_flag = surface->sflags & SF_TRANSPARENT;
+		const bool blend_flag = surface->sflags & SF_BLEND;
 		const bool object_color_flag = surface->sflags & SF_OBJECT_COLOR;
 
 		// sync 2sided
@@ -159,21 +166,56 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		}
 
 		// set color
-		bool cull_alpha = true;
-		glm::vec4 color = glm::vec4(1.0f);
+		int shflags = SHF_CULL_ALPHA;
 
+		glm::vec4 color = glm::vec4(1.0f);
 		if (object_color_flag && cmd.color)
 		{
 			// use object color and disable alpha cull
-			cull_alpha = false;
+			shflags &= ~SHF_CULL_ALPHA;
+			shflags |= SHF_BACKGROUND;
 			color = glm::vec4(*cmd.color);
+		}
+
+		// sync blending
+		if (blend_flag != last_blend)
+		{
+			if (blend_flag)
+			{
+				glEnable(GL_BLEND);
+				glDepthMask(GL_FALSE);
+			}
+			else
+			{
+				glDisable(GL_BLEND);
+				glDepthMask(GL_TRUE);
+			}
+
+			last_blend = blend_flag;
+		}
+
+		// sync blending type
+		if (blend_flag)
+		{
+			shflags &= ~SHF_CULL_ALPHA;
+
+			const bool blend_additive = surface->sflags & SF_BLEND_ADDITIVE;
+			if (blend_additive != last_blend_additive)
+			{
+				if (blend_additive)
+					glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+				else
+					glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			}
+
+			last_blend_additive = blend_additive;
 		}
 		
 		// sync cull_alpha
-		if (mshader.cull_alpha != cull_alpha)
+		if (mshader.flags != shflags)
 		{
-			glUniform1i(mshader.shader->U(SU_CULL_ALPHA), cull_alpha ? 1 : 0);
-			mshader.cull_alpha = cull_alpha;
+			glUniform1i(mshader.shader->U(SU_FLAGS), shflags);
+			mshader.flags = shflags;
 		}
 
 		// sync color
@@ -206,7 +248,8 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 			(void*)(first_tri * 3U * sizeof(GLuint)));
 	}
 
-
+	// reset this as it is rare and other stuff might not reset this
+	glDepthMask(GL_TRUE);
 
 }
 

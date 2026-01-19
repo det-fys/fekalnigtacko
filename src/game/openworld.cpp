@@ -3,7 +3,10 @@
 #include "player.hpp"
 #include "vehicle.hpp"
 
-game::OpenWorld::OpenWorld() : World("openworld") {}
+game::OpenWorld::OpenWorld() : World("openworld")
+{
+    srand(time(NULL));
+}
 
 void game::OpenWorld::PlayerJoined(Player& player)
 {
@@ -69,7 +72,7 @@ void game::OpenWorld::SpawnVehicle(Player& player)
 
     // spawn him car
     // random model
-    const char* vehicles[] = {"pickup", "passat"};
+    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat"};
     auto vehicle_name = vehicles[rand() % (sizeof(vehicles) / sizeof(vehicles[0]))];
 
     // ranodm color
