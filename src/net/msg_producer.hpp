@@ -15,10 +15,12 @@ public:
 
     void ResetMsg();
     OutMessage BeginMsg(MessageType type = MSG_NONE);
+    void DiscardMsg();
     std::span<const char> GetMsg() const { return message_buf_; };
 
 private:
     std::vector<char> message_buf_;
+    size_t msg_start_ = 0;
 };
 
 }

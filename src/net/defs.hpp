@@ -74,9 +74,19 @@ enum EntMsgType : uint8_t
     EMSG_UPDATE,
 };
 
-using PositionQ = Quantized<uint32_t, -10000, 10000, 1>;
+using PositionElemQ = Quantized<uint32_t, -10000, 10000, 1>;
+struct PositionQ
+{
+    PositionElemQ x, y, z;
+};
+
 using AngleQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
-using QuatQ = Quantized<uint16_t, -1, 1, 1>;
+
+using QuatElemQ = Quantized<uint16_t, -1, 1, 1>;
+struct QuatQ
+{
+    QuatElemQ x, y, z;
+};
 
 using WheelZOffsetQ = Quantized<uint8_t, -1, 1, 1>;
 using RotationSpeedQ = Quantized<uint16_t, -300, 300, 1>;

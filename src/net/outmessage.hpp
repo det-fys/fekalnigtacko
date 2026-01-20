@@ -78,6 +78,12 @@ public:
         Write(q.value);
     }
 
+    // template <AnyQuantized T>
+    // void Write(T quant)
+    // {
+    //     Write(quant.value);
+    // }
+
     void WriteVarInt(int64_t value)
     {
         const bool negative = value < 0;

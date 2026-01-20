@@ -101,6 +101,8 @@ void game::Vehicle::Update()
     ProcessInput();
     UpdateWheels();
 
+    sync_current_ = 1 - sync_current_;
+    UpdateSyncState();
     SendUpdateMsg();
 }
 
@@ -109,7 +111,12 @@ void game::Vehicle::SendInitData(Player& player, net::OutMessage& msg) const
     net::ModelName name(model_name_);
     msg.Write(name);
     net::WriteRGB(msg, color_); // primary color
-    WriteState(msg);
+
+    // write state against default
+    static const VehicleSyncState default_state;
+    size_t fields_pos = msg.Reserve<VehicleSyncFieldFlags>();
+    auto fields = WriteState(msg, default_state);
+    msg.WriteAt(fields_pos, fields);
 }
 
 void game::Vehicle::SetInput(VehicleInputType type, bool enable)
@@ -118,6 +125,12 @@ void game::Vehicle::SetInput(VehicleInputType type, bool enable)
         in_ |= (1 << type);
     else
         in_ &= ~(1 << type);
+}
+
+glm::vec3 game::Vehicle::GetPosition() const
+{
+    btVector3 pos = body_->getWorldTransform().getOrigin();
+    return glm::vec3(pos.x(), pos.y(), pos.z());
 }
 
 void game::Vehicle::SetPosition(const glm::vec3& pos)
@@ -240,25 +253,102 @@ void game::Vehicle::UpdateWheels()
     }
 }
 
-void game::Vehicle::WriteState(net::OutMessage& msg) const
+void game::Vehicle::UpdateSyncState()
 {
-    msg.Write(flags_);
-    net::WriteTransform(msg, root_.local);
+    VehicleSyncState& state = sync_[sync_current_];
 
-    // send wheel info
-    // msg.Write<uint8_t>(static_cast<uint8_t>(numwheels));
-    msg.Write<net::AngleQ>(steering_);
+    state.flags = flags_;
+    
+    net::EncodePosition(root_.local.position, state.pos);
+    net::EncodeRotation(root_.local.rotation, state.rot);
+
+    state.steering.Encode(steering_);
 
     for (size_t i = 0; i < num_wheels_; ++i)
     {
         auto& wheel = wheels_[i];
-        msg.Write<net::WheelZOffsetQ>(wheel.z_offset);
-        msg.Write<net::RotationSpeedQ>(wheel.speed);
+        state.wheels[i].z_offset.Encode(wheel.z_offset);
+        state.wheels[i].speed.Encode(wheel.speed);
     }
+}
+
+game::VehicleSyncFieldFlags game::Vehicle::WriteState(net::OutMessage& msg, const VehicleSyncState& base) const
+{
+    VehicleSyncFieldFlags fields = 0;
+    const VehicleSyncState& curr = sync_[sync_current_];
+
+    if (curr.flags != base.flags)
+    {
+        fields |= VSF_FLAGS;
+        msg.Write(curr.flags);
+    }
+
+    if (curr.pos.x.value != base.pos.x.value ||
+        curr.pos.y.value != base.pos.y.value ||
+        curr.pos.z.value != base.pos.z.value)
+    {
+        fields |= VSF_POSITION;
+
+        net::WriteDelta(msg, curr.pos.x, base.pos.x);
+        net::WriteDelta(msg, curr.pos.y, base.pos.y);
+        net::WriteDelta(msg, curr.pos.z, base.pos.z);
+    }
+
+    if (curr.rot.x.value != base.rot.x.value ||
+        curr.rot.y.value != base.rot.y.value ||
+        curr.rot.z.value != base.rot.z.value)
+    {
+        fields |= VSF_ROTATION;
+
+        net::WriteDelta(msg, curr.rot.x, base.rot.x);
+        net::WriteDelta(msg, curr.rot.y, base.rot.y);
+        net::WriteDelta(msg, curr.rot.z, base.rot.z);
+    }
+
+    if (curr.steering.value != base.steering.value)
+    {
+        fields |= VSF_STEERING;
+
+        net::WriteDelta(msg, curr.steering, base.steering);
+    }
+
+    bool wheels_changed = false;
+    for (size_t i = 0; i < num_wheels_; ++i)
+    {
+        if (curr.wheels[i].z_offset.value != base.wheels[i].z_offset.value ||
+            curr.wheels[i].speed.value != base.wheels[i].speed.value)
+        {
+            wheels_changed = true;
+            break;
+        }
+    }
+
+    if (wheels_changed)
+    {
+        fields |= VSF_WHEELS;
+
+        for (size_t i = 0; i < num_wheels_; ++i)
+        {
+            net::WriteDelta(msg, curr.wheels[i].z_offset, base.wheels[i].z_offset);
+            net::WriteDelta(msg, curr.wheels[i].speed, base.wheels[i].speed);
+        }
+    }
+
+    return fields;
 }
 
 void game::Vehicle::SendUpdateMsg()
 {
     auto msg = BeginEntMsg(net::EMSG_UPDATE);
-    WriteState(msg);
+    auto fields_pos = msg.Reserve<VehicleSyncFieldFlags>();
+    auto fields = WriteState(msg, sync_[1 - sync_current_]);
+
+    // TODO: allow this
+    // if (fields == 0)
+    // {
+    //     DiscardMsg();
+    //     return;
+    // }
+
+    msg.WriteAt(fields_pos, fields);
 }

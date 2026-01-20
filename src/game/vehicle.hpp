@@ -7,12 +7,10 @@
 #include "collision/motionstate.hpp"
 #include "entity.hpp"
 #include "world.hpp"
-#include "vehicleflags.hpp"
+#include "vehicle_sync.hpp"
 
 namespace game
 {
-
-static constexpr size_t MAX_WHEELS = 4;
 
 struct VehicleWheelState
 {
@@ -44,6 +42,7 @@ public:
 
     void SetInput(VehicleInputType type, bool enable);
 
+    glm::vec3 GetPosition() const;
     void SetPosition(const glm::vec3& pos);
 
     virtual ~Vehicle();
@@ -51,7 +50,8 @@ public:
 private:
     void ProcessInput();
     void UpdateWheels();
-    void WriteState(net::OutMessage& msg) const;
+    void UpdateSyncState();
+    VehicleSyncFieldFlags WriteState(net::OutMessage& msg, const VehicleSyncState& base) const;
     void SendUpdateMsg();
 
 private:
@@ -69,7 +69,9 @@ private:
     size_t num_wheels_ = 0;
     std::array<VehicleWheelState, MAX_WHEELS> wheels_;
 
-    VehicleFlags flags_;
+    VehicleFlags flags_ = VF_NONE;
+    VehicleSyncState sync_[2];
+    size_t sync_current_ = 0;
 
     VehicleInputFlags in_ = 0;
 };

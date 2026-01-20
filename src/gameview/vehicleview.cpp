@@ -20,6 +20,11 @@ game::view::VehicleView::VehicleView(WorldView& world, std::shared_ptr<const ass
     color_ = glm::vec4(color, 1.0f);
 
     snd_accel_ = assets::CacheManager::GetSound("data/auto.snd");
+
+    // sync state
+    net::DecodePosition(sync_.pos, root_.local.position);
+    net::DecodeRotation(sync_.rot, root_.local.rotation);
+
 }
 
 std::unique_ptr<game::view::VehicleView> game::view::VehicleView::InitFromMsg(WorldView& world, net::InMessage& msg)
@@ -32,7 +37,9 @@ std::unique_ptr<game::view::VehicleView> game::view::VehicleView::InitFromMsg(Wo
     auto model = assets::CacheManager::GetVehicleModel("data/" + std::string(modelname) + ".veh");
 
     auto vehicle = std::make_unique<VehicleView>(world, std::move(model), color);
-    vehicle->ReadState(msg);
+    if (!vehicle->ReadState(msg))
+        return nullptr;
+
     vehicle->root_trans_[0] = vehicle->root_trans_[1];
 
     return vehicle;
@@ -135,27 +142,73 @@ bool game::view::VehicleView::ReadState(net::InMessage& msg)
     auto& root_trans = root_trans_[1];
     update_time_ = world_.GetTime();
 
-    if (!msg.Read(flags_))
+    // parse state delta
+    VehicleSyncFieldFlags fields;
+    if (!msg.Read(fields))
         return false;
 
-    if (!net::ReadTransform(msg, root_trans))
-        return false;
+    // flags
+    if (fields & VSF_FLAGS)
+    {
+        if (!msg.Read(flags_))
+            return false;
+    }
 
-    float steering;
-    if (!msg.Read<net::AngleQ>(steering))
-        return false;
+    // pos
+    if (fields & VSF_POSITION)
+    {
+        if (!net::ReadDelta(msg, sync_.pos.x) ||
+            !net::ReadDelta(msg, sync_.pos.y) ||
+            !net::ReadDelta(msg, sync_.pos.z))
+            return false;
+
+        net::DecodePosition(sync_.pos, root_trans.position);
+    }
+
+    // rot
+    if (fields & VSF_ROTATION)
+    {
+        if (!net::ReadDelta(msg, sync_.rot.x) ||
+            !net::ReadDelta(msg, sync_.rot.y) ||
+            !net::ReadDelta(msg, sync_.rot.z))
+            return false;
+
+        net::DecodeRotation(sync_.rot, root_trans.rotation);
+    }
+
+    // steering
+    if (fields & VSF_STEERING)
+    {
+        if (!net::ReadDelta(msg, sync_.steering))
+            return false;
+
+    }
+        
+    float steering = sync_.steering.Decode();
+
+    // wheels
+    if (fields & VSF_WHEELS)
+    {
+        for (size_t i = 0; i < wheels_.size(); ++i)
+        {
+            if (!net::ReadDelta(msg, sync_.wheels[i].z_offset) ||
+                !net::ReadDelta(msg, sync_.wheels[i].speed))
+                return false;
+        }
+    }
 
     const auto& wheels = model_->GetWheels();
     for (size_t i = 0; i < wheels_.size(); ++i)
     {
         auto& wheel = wheels_[i];
-        if (!msg.Read<net::WheelZOffsetQ>(wheel.z_offset) || !msg.Read<net::RotationSpeedQ>(wheel.speed))
-            return false;
+        wheel.z_offset = sync_.wheels[i].z_offset.Decode();
+        wheel.speed = sync_.wheels[i].speed.Decode();
 
         wheel.steering = i < 2 ? steering : 0.0f;
     }
 
-    return true;}
+    return true;
+}
 
 bool game::view::VehicleView::ProcessUpdateMsg(net::InMessage& msg)
 {

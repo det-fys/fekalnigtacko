@@ -3,7 +3,7 @@
 #include "entityview.hpp"
 
 #include "assets/vehiclemdl.hpp"
-#include "game/vehicleflags.hpp"
+#include "game/vehicle_sync.hpp"
 
 #include <chrono>
 
@@ -38,6 +38,7 @@ private:
     std::shared_ptr<const assets::VehicleModel> model_;
     glm::vec4 color_;
 
+    game::VehicleSyncState sync_;
     std::vector<VehicleWheelViewInfo> wheels_;
 
     float update_time_ = 0.0f;

@@ -19,11 +19,11 @@ struct Quantized
     static constexpr float inv_scale = range / static_cast<float>(max_int);
 
 public:
-    T value;
+    T value{0};
 
     Quantized() = default;
     Quantized(T value) : value(value) {}
-    Quantized(float fvalue) { Encode(value); }
+    Quantized(float fvalue) { Encode(fvalue); }
 
     void Encode(float fvalue) noexcept
     {
