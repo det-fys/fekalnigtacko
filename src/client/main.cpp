@@ -350,7 +350,7 @@ static void Frame()
 	int mouse_state = SDL_GetMouseState(nullptr, nullptr);
 
 	if (mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT))
-		input |= game::IN_ATTACK;
+		input |= (1 << game::IN_ATTACK);
 
 	s_app->SetInput(input);
 
