@@ -6,6 +6,44 @@
 game::OpenWorld::OpenWorld() : World("openworld")
 {
     srand(time(NULL));
+
+    // spawn test vehicles
+    for (size_t i = 0; i < 150; ++i)
+    {
+        auto& vehicle = Spawn<Vehicle>("pickup_hd", glm::vec3{1.0f, 0.0f, 0.0f});
+        vehicle.SetPosition({ static_cast<float>(i * 3), 150.0f, 5.0f });
+        vehicle.SetInput(VIN_FORWARD, true);    
+        bots_.push_back(&vehicle);
+    }
+}
+
+void game::OpenWorld::Update(int64_t delta_time)
+{
+    World::Update(delta_time);
+
+    for (auto bot : bots_)
+    {
+        bot->SetInput(VIN_FORWARD, true);
+    
+        if (rand() % 1000 < 10)
+        {
+            bool turn_left = rand() % 2;
+            bot->SetInput(VIN_LEFT, turn_left);
+            bot->SetInput(VIN_RIGHT, !turn_left);
+        }
+        else
+        {
+            bot->SetInput(VIN_LEFT, false);
+            bot->SetInput(VIN_RIGHT, false);
+        }
+
+        auto pos = bot->GetPosition();
+        if (glm::distance(pos, glm::vec3(0.0f, 0.0f, 0.0f)) > 1000.0f || pos.z < -20.0f)
+        {
+            bot->SetPosition({ rand() % 30 * 3 + 100.0f, 200.0f, 10.0f });
+        }
+    
+    }
 }
 
 void game::OpenWorld::PlayerJoined(Player& player)

@@ -30,7 +30,7 @@ public:
     net::EntNum GetNewEntnum();
     void RegisterEntity(std::unique_ptr<Entity> ent);
 
-    void Update(int64_t delta_time);
+    virtual void Update(int64_t delta_time);
 
     // events
     virtual void PlayerJoined(Player& player) {}
