@@ -315,7 +315,7 @@ void gfx::Renderer::DrawHudList(std::span<DrawHudCmd> queue, const DrawListParam
 		}
 
 		// bind vao
-		if (last_vao = cmd.va)
+		if (last_vao != cmd.va)
 		{
 			glBindVertexArray(cmd.va->GetVAOId());
 			last_vao = cmd.va;
