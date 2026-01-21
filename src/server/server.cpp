@@ -28,25 +28,28 @@ void sv::Server::Run()
     bool exit = false;
     while (!exit)
     {
-        time_ += 40;
-
         PollWSEvents();
-        Update();
-        
-        t_next += 40ms;
-        
+
         auto t_now = std::chrono::steady_clock::now();
-        
-        while (t_now < t_next)
+        while (t_now > t_next && !exit_)
         {
-            std::this_thread::sleep_for(t_next - t_now);
+            time_ += 40;
+            Update();
+            std::cout << "Time: " << time_ << " ms, Clients: " << clients_.size() << std::endl;
+            t_next += 40ms;
             t_now = std::chrono::steady_clock::now();
         }
 
-        // auto t_diff = t_now - t_prev;
-        // t_prev = t_now;
+        while (t_now < t_next && !exit_)
+        {
+            std::this_thread::sleep_for(t_next - t_now);
 
-        // std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(t_diff).count() <<std::endl;
+            if (clients_.empty())
+            {
+                std::this_thread::sleep_for(1000ms); // sleep extra if no clients
+            }
+            t_now = std::chrono::steady_clock::now();
+        }
     }
 }
 
