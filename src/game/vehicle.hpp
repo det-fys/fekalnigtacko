@@ -41,9 +41,15 @@ public:
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
 
     void SetInput(VehicleInputType type, bool enable);
+    void SetInputs(VehicleInputFlags inputs) { in_ = inputs; }
 
     glm::vec3 GetPosition() const;
     void SetPosition(const glm::vec3& pos);
+
+    glm::quat GetRotation() const;
+    float GetSpeed() const;
+
+    void SetSteering(bool analog, float value = 0.0f);
 
     virtual ~Vehicle();
 
@@ -64,6 +70,8 @@ private:
     std::unique_ptr<btRaycastVehicle> vehicle_;
 
     float steering_ = 0.0f;
+    bool steering_analog_ = false;
+    float target_steering_ = 0.0f;
     float wheel_z_offset_ = 0.0f;
 
     size_t num_wheels_ = 0;

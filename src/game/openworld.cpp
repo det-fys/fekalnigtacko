@@ -1,19 +1,102 @@
 #include "openworld.hpp"
 
+#include <coroutine>
+#include <iostream>
+
 #include "player.hpp"
 #include "vehicle.hpp"
+
+// /* --------------- awaitable machinery --------------- */
+
+// struct CoroWrapper
+// {
+//     bool destroy = true;
+//     std::coroutine_handle<> handle;
+
+//     CoroWrapper(std::coroutine_handle<> h) : handle(h) {}
+//     ~CoroWrapper() { if (handle && destroy) handle.destroy(); }
+// };
+
+// struct CoroTask
+// {
+//     std::shared_ptr<CoroWrapper> wrapper;
+
+//     explicit CoroTask(std::coroutine_handle<> h) : wrapper(std::make_shared<CoroWrapper>(h)) {}
+    
+//     void operator()() const
+//     {
+//         if (wrapper && wrapper->handle && !wrapper->handle.done())
+//         {
+//             wrapper->destroy = false;
+//             wrapper->handle.resume();
+//         }
+//     }
+// };
+
+// class SchedulerAwaiter
+// {
+//     Scheduler& sch_;
+//     int64_t    when_;
+// public:
+//     explicit SchedulerAwaiter(Scheduler& s, int64_t t) noexcept
+//         : sch_(s), when_(t) {}
+
+//     // --- await interface ---
+//     bool await_ready() const noexcept { return when_ <= 0; }
+
+//     void await_suspend(std::coroutine_handle<> h) const
+//     {
+//         sch_.Schedule(when_, CoroTask{h});   // resume coro later
+//     }
+
+//     void await_resume() const noexcept {}
+// };
+
+// /* --------------- task type (minimal) --------------- */
+
+// template<typename T = void>
+// struct task
+// {
+//     struct promise_type
+//     {
+//         std::suspend_never initial_suspend() noexcept { return {}; }
+//         std::suspend_never final_suspend() noexcept { return {}; }
+//         task get_return_object() { return {}; }
+//         void return_void() {}
+//         void unhandled_exception() { std::terminate(); }
+//     };
+// };
+
+// static task<> BotThink(game::Vehicle& vehicle)
+// {
+//     while (true)
+//     {
+//         vehicle.SetInput(game::VIN_FORWARD, true);
+//         co_await SchedulerAwaiter{vehicle, 1000};
+//         vehicle.SetInput(game::VIN_FORWARD, false);
+//         co_await SchedulerAwaiter{vehicle, 1000};
+//     }
+// }
+
 
 game::OpenWorld::OpenWorld() : World("openworld")
 {
     srand(time(NULL));
 
-    // spawn test vehicles
-    for (size_t i = 0; i < 150; ++i)
+    // // spawn test vehicles
+    // for (size_t i = 0; i < 3; ++i)
+    // {
+    //     auto& vehicle = Spawn<Vehicle>("twingo", glm::vec3{0.3f, 0.3f, 0.3f});
+    //     vehicle.SetPosition({ static_cast<float>(i * 3), 150.0f, 5.0f });
+    //     // vehicle.SetInput(VIN_FORWARD, true);    
+    //     BotThink(vehicle);
+    //     bots_.push_back(&vehicle);
+    // }
+
+    // spawn bots
+    for (size_t i = 0; i < 20; ++i)
     {
-        auto& vehicle = Spawn<Vehicle>("pickup_hd", glm::vec3{1.0f, 0.0f, 0.0f});
-        vehicle.SetPosition({ static_cast<float>(i * 3), 150.0f, 5.0f });
-        vehicle.SetInput(VIN_FORWARD, true);    
-        bots_.push_back(&vehicle);
+        SpawnBot();
     }
 }
 
@@ -21,29 +104,29 @@ void game::OpenWorld::Update(int64_t delta_time)
 {
     World::Update(delta_time);
 
-    for (auto bot : bots_)
-    {
-        bot->SetInput(VIN_FORWARD, true);
+    // for (auto bot : bots_)
+    // {
+    //     bot->SetInput(VIN_FORWARD, true);
     
-        if (rand() % 1000 < 10)
-        {
-            bool turn_left = rand() % 2;
-            bot->SetInput(VIN_LEFT, turn_left);
-            bot->SetInput(VIN_RIGHT, !turn_left);
-        }
-        else
-        {
-            bot->SetInput(VIN_LEFT, false);
-            bot->SetInput(VIN_RIGHT, false);
-        }
+    //     if (rand() % 1000 < 10)
+    //     {
+    //         bool turn_left = rand() % 2;
+    //         bot->SetInput(VIN_LEFT, turn_left);
+    //         bot->SetInput(VIN_RIGHT, !turn_left);
+    //     }
+    //     else
+    //     {
+    //         bot->SetInput(VIN_LEFT, false);
+    //         bot->SetInput(VIN_RIGHT, false);
+    //     }
 
-        auto pos = bot->GetPosition();
-        if (glm::distance(pos, glm::vec3(0.0f, 0.0f, 0.0f)) > 1000.0f || pos.z < -20.0f)
-        {
-            bot->SetPosition({ rand() % 30 * 3 + 100.0f, 200.0f, 10.0f });
-        }
+    //     auto pos = bot->GetPosition();
+    //     if (glm::distance(pos, glm::vec3(0.0f, 0.0f, 0.0f)) > 1000.0f || pos.z < -20.0f)
+    //     {
+    //         bot->SetPosition({ rand() % 30 * 3 + 100.0f, 200.0f, 10.0f });
+    //     }
     
-    }
+    // }
 }
 
 void game::OpenWorld::PlayerJoined(Player& player)
@@ -104,15 +187,180 @@ void game::OpenWorld::RemoveVehicle(Player& player)
     }
 }
 
+// static void BotThink(game::Vehicle& vehicle)
+// {
+//     int direction = rand() % 3; // 0=none, 1=forward, 2=backward
+//     int steer = 0; // 0=none, 1=left, 2=right
+//     if (direction && rand() % 1000 < 300)
+//     {
+//         steer = (rand() % 2) ? 1 : 2;
+//     }
+
+//     game::VehicleInputFlags vin = 0;
+//     if (direction == 1)
+//         vin |= 1 << game::VIN_FORWARD;
+//     else if (direction == 2)
+//         vin |= 1 << game::VIN_BACKWARD;
+
+//     if (steer == 1)
+//         vin |= 1 << game::VIN_LEFT;
+//     else if (steer == 2)
+//         vin |= 1 << game::VIN_RIGHT;
+
+//     vehicle.SetInputs(vin);
+
+//     int time = 300 + (rand() % 3000);
+
+//     vehicle.Schedule(time, [&vehicle]() {
+//         BotThink(vehicle);
+//     } );
+// }
+
+
+struct BotThinkState
+{
+    game::Vehicle& vehicle;
+    const assets::MapGraph& roads;
+    size_t node = 0;
+    bool gas = false;
+    size_t stuck_counter = 0;
+    glm::vec3 last_pos = glm::vec3(0.0f);
+
+    BotThinkState(game::Vehicle& v, const assets::MapGraph& g, size_t n)
+        : vehicle(v), roads(g), node(n) {}
+};
+
+
+static float GetSteeringAngle(const glm::vec3& pos, const glm::quat& rot, const glm::vec3& target)
+{
+    glm::vec3 forward = rot * glm::vec3{0.0f, 1.0f, 0.0f};
+    glm::vec2 forward_xy = glm::normalize(glm::vec2{forward.x, forward.y});
+    glm::vec3 to_target = target - pos;
+    glm::vec2 to_target_xy = glm::normalize(glm::vec2{to_target.x, to_target.y});
+    float dot = glm::dot(forward_xy, to_target_xy);
+    float cross = forward_xy.x * to_target_xy.y - forward_xy.y * to_target_xy.x;
+
+    float angle = acosf(glm::clamp(dot, -1.0f, 1.0f)); // in [0, pi]
+
+    if (cross < 0)
+        angle = -angle;
+
+    return angle; // in [-pi, pi]
+}
+
+static void BotThink(std::shared_ptr<BotThinkState> s)
+{
+    glm::vec3 pos = s->vehicle.GetPosition();
+    glm::quat rot = s->vehicle.GetRotation();
+
+    glm::vec3 target = s->roads.nodes[s->node].position;
+    float angle = GetSteeringAngle(pos, rot, target);
+
+    if (glm::distance(pos, s->last_pos) < 2.0f)
+    {
+        s->stuck_counter++;
+        if (s->stuck_counter > 20)
+        {
+            s->stuck_counter = 0;
+            s->vehicle.SetSteering(true, -angle); // try turn away
+
+            s->vehicle.SetInputs(0); // stop
+            // stuck, go reverse for a while
+            s->vehicle.SetInput(game::VIN_BACKWARD, true);
+            s->vehicle.Schedule(2000, [s]() {
+                s->vehicle.SetInput(game::VIN_BACKWARD, false);
+                BotThink(s);
+            } );
+            return;
+        }
+    }
+    else
+    {
+        s->stuck_counter = 0;
+        s->last_pos = pos;
+    }
+
+    s->vehicle.SetSteering(true, angle);
+
+    game::VehicleInputFlags vin = 0;
+
+    float speed = s->vehicle.GetSpeed();
+    float target_speed = 50.0f;
+
+    if (glm::distance(pos, target) < 10.0f)
+    {
+        target_speed = 20.0f;
+    }
+
+    if (speed < target_speed * 0.9f && !s->gas)
+    {
+        s->gas = true;
+    }
+    else if (speed > target_speed * 1.1f && s->gas)
+    {
+        s->gas = false;
+    }
+
+    if (s->gas)
+    {
+        vin |= 1 << game::VIN_FORWARD;
+    }
+
+    if (speed > target_speed * 1.4f)
+    {
+        vin |= 1 << game::VIN_BACKWARD;
+    }
+
+    s->vehicle.SetInputs(vin);
+
+    float dist_to_node = glm::distance(pos, s->roads.nodes[s->node].position);
+    if (dist_to_node < 5.0f)
+    {
+        // advance to next node
+        const auto& graph = s->roads;
+        const auto& current_node = graph.nodes[s->node];
+
+        if (current_node.num_nbs > 0)
+        {
+            size_t next_idx = rand() % current_node.num_nbs;
+            s->node = s->roads.nbs[current_node.nbs + next_idx];
+        }
+    }
+
+    s->vehicle.Schedule(rand() % 120 + 40, [s]() {
+        BotThink(s);
+    } );
+}
+
+static const char* GetRandomCarModel()
+{
+    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat"};
+    return vehicles[rand() % (sizeof(vehicles) / sizeof(vehicles[0]))];
+}
+
+void game::OpenWorld::SpawnBot()
+{
+    auto roads = GetMap()->GetGraph("roads");
+
+    if (!roads)
+    {
+        std::cerr << "OpenWorld::SpawnBot: no roads graph in map\n";
+        return;
+    }
+
+    size_t start_node = rand() % roads->nodes.size();
+    auto& vehicle = Spawn<Vehicle>(GetRandomCarModel(), glm::vec3{0.3f, 0.3f, 0.3f});
+    vehicle.SetPosition(roads->nodes[start_node].position + glm::vec3{0.0f, 0.0f, 5.0f});
+
+    auto think_state = std::make_shared<BotThinkState>(vehicle, *roads, start_node);
+    BotThink(think_state);
+}
+
 void game::OpenWorld::SpawnVehicle(Player& player)
 {
     RemoveVehicle(player);
 
     // spawn him car
-    // random model
-    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat"};
-    auto vehicle_name = vehicles[rand() % (sizeof(vehicles) / sizeof(vehicles[0]))];
-
     // ranodm color
     glm::vec3 color;
     for (int i = 0; i < 3; ++i)
@@ -122,6 +370,7 @@ void game::OpenWorld::SpawnVehicle(Player& player)
         color[i] = qcol.Decode();
     }
 
+    auto vehicle_name = GetRandomCarModel();
     auto& vehicle = Spawn<Vehicle>(vehicle_name, color);
     vehicle.SetPosition({ 100.0f, 100.0f, 5.0f });
 

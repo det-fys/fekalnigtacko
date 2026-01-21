@@ -21,6 +21,8 @@ private:
     void SpawnVehicle(Player& player);
     void RemoveVehicle(Player& player);
 
+    void SpawnBot();
+
 private:
     std::map<Player*, Vehicle*> player_vehicles_;
     std::vector<Vehicle*> bots_;

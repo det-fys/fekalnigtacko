@@ -28,6 +28,7 @@ set(COMMON_SOURCES
     "src/collision/trianglemesh.cpp"
     "src/game/player_input.hpp"
     "src/game/transform_node.hpp"
+    "src/game/vehicle_sync.hpp"
     "src/net/defs.hpp"
     "src/net/fixed_str.hpp"
     "src/net/inmessage.hpp"
@@ -39,6 +40,7 @@ set(COMMON_SOURCES
     "src/utils/allocnum.hpp"
     "src/utils/defs.hpp"
     "src/utils/files.hpp"
+    "src/utils/scheduler.hpp"
     "src/utils/transform.hpp"
     "src/utils/validate.hpp"
 )

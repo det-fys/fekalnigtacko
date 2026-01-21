@@ -140,6 +140,23 @@ void game::Vehicle::SetPosition(const glm::vec3& pos)
     body_->setWorldTransform(t);
 }
 
+glm::quat game::Vehicle::GetRotation() const
+{
+    btQuaternion rot = body_->getWorldTransform().getRotation();
+    return glm::quat(rot.w(), rot.x(), rot.y(), rot.z());
+}
+
+float game::Vehicle::GetSpeed() const
+{
+    return vehicle_->getCurrentSpeedKmHour();
+}
+
+void game::Vehicle::SetSteering(bool analog, float value)
+{
+    steering_analog_ = analog;
+    target_steering_ = value;
+}
+
 game::Vehicle::~Vehicle()
 {
     auto& bt_world = world_.GetBtWorld();
@@ -196,32 +213,55 @@ void game::Vehicle::ProcessInput()
         breakingForce = maxBreakingForce * 0.05f;
     }
 
-    if (in_left)
+    if (!steering_analog_)
     {
-        if (steering_ < steeringClamp)
-            steering_ += steeringIncrement * t_delta;
-    }
-    else
-    {
-        if (in_right)
+        if (in_left)
         {
-            if (steering_ > -steeringClamp)
-                steering_ -= steeringIncrement * t_delta;
+            if (steering_ < steeringClamp)
+                steering_ += steeringIncrement * t_delta;
         }
         else
         {
-            if (steering_ < -steeringIncrement * t_delta)
-                steering_ += steeringIncrement * t_delta;
+            if (in_right)
+            {
+                if (steering_ > -steeringClamp)
+                    steering_ -= steeringIncrement * t_delta;
+            }
             else
             {
-                if (steering_ > steeringIncrement * t_delta)
-                    steering_ -= steeringIncrement * t_delta;
+                if (steering_ < -steeringIncrement * t_delta)
+                    steering_ += steeringIncrement * t_delta;
                 else
                 {
-                    steering_ = 0.0f;
+                    if (steering_ > steeringIncrement * t_delta)
+                        steering_ -= steeringIncrement * t_delta;
+                    else
+                    {
+                        steering_ = 0.0f;
+                    }
                 }
             }
         }
+    }
+    else
+    {
+        if (steering_ < target_steering_)
+        {
+            steering_ += steeringIncrement * t_delta;
+            if (steering_ > target_steering_)
+                steering_ = target_steering_;
+        }
+        else if (steering_ > target_steering_)
+        {
+            steering_ -= steeringIncrement * t_delta;
+            if (steering_ < target_steering_)
+                steering_ = target_steering_;
+        }
+
+        if (steering_ > steeringClamp)
+            steering_ = steeringClamp;
+        else if (steering_ < -steeringClamp)
+            steering_ = -steeringClamp;
     }
 
     vehicle_->applyEngineForce(engineForce, 2);

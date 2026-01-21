@@ -1,11 +1,31 @@
 #include "map.hpp"
+
+#include <algorithm>
+
 #include "cache.hpp"
-#include "utils/files.hpp"
 #include "cmdfile.hpp"
+#include "utils/files.hpp"
 
 std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& filename)
 {
     auto map = std::make_shared<Map>();
+
+    MapGraph* graph = nullptr;
+    std::vector<std::tuple<size_t, size_t>> graph_edges;
+
+    auto ProcessGraph = [&]() {
+        std::sort(graph_edges.begin(), graph_edges.end());
+        for (const auto& [from_idx, to_idx] : graph_edges)
+        {
+            graph->nbs.push_back(to_idx);
+
+            // update node info
+            auto& node = graph->nodes[from_idx];
+            if (node.nbs == 0)
+                node.nbs = graph->nbs.size() - 1;
+            node.num_nbs++;
+        }
+    };
 
     LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
         if (command == "basemodel")
@@ -44,12 +64,54 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
                 }
             }
 
-
             map->static_objects_.push_back(std::move(obj));
+        }
+        else if (command == "graph")
+        {
+            if (graph)
+                ProcessGraph();
+
+            std::string graph_name;
+            iss >> graph_name;
+
+            graph = &map->graphs_[graph_name];
+            graph_edges.clear();
+        }
+        else if (command == "n")
+        {
+            if (!graph)
+                throw std::runtime_error("Map file error: 'n' command without active graph");
+
+            MapGraphNode node;
+
+            iss >> node.position.x >> node.position.y >> node.position.z;
+
+            graph->nodes.emplace_back(std::move(node));
+        }
+        else if (command == "e")
+        {
+            if (!graph)
+                throw std::runtime_error("Map file error: 'e' command without active graph");
+
+            size_t from_idx, to_idx;
+            iss >> from_idx >> to_idx;
+
+            graph_edges.emplace_back(from_idx, to_idx);
         }
     });
 
+    if (graph)
+        ProcessGraph();
+
     return map;
+}
+
+const assets::MapGraph* assets::Map::GetGraph(const std::string& name) const
+{
+    auto it = graphs_.find(name);
+    if (it != graphs_.end())
+        return &it->second;
+    return nullptr;
 }
 
 #ifdef CLIENT
