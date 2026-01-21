@@ -133,10 +133,8 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
     {
         temp_hull->recalcLocalAabb();
 
-        // Optional but recommended
         auto shape_hull = std::make_unique<btShapeHull>(temp_hull.get());
-        // shape_hull->buildHull(temp_hull->getMargin());
-        shape_hull->buildHull(0.01f);
+        shape_hull->buildHull(temp_hull->getMargin());
 
         model->cshape_ = std::make_unique<btConvexHullShape>((btScalar*)shape_hull->getVertexPointer(), shape_hull->numVertices(), sizeof(btVector3));
     }
