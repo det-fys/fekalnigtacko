@@ -23,12 +23,19 @@ public:
     net::EntType GetViewType() const { return viewtype_; }
 
     virtual void Update();
-    virtual void SendInitData(Player& player, net::OutMessage& msg) const {}
+    virtual void SendInitData(Player& player, net::OutMessage& msg) const;
+
+    void SetNametag(const std::string& nametag);
 
     void Remove() { removed_ = true; }
     bool IsRemoved() const { return removed_; }
 
     virtual ~Entity() = default;
+
+private:
+    void WriteNametag(net::OutMessage& msg) const;
+    
+    void SendNametagMsg();
 
 protected:
     net::OutMessage BeginEntMsg(net::EntMsgType type);
@@ -39,8 +46,10 @@ protected:
     const net::EntType viewtype_;
 
     TransformNode root_;
+    std::string nametag_;
 
     bool removed_ = false;
+
 };
 
 }

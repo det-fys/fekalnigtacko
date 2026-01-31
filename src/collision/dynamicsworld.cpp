@@ -36,10 +36,11 @@ void collision::DynamicsWorld::AddMapCollision()
     }
 
     // add static objects
-    for (const auto& sobjs = map_->GetStaticObjects(); const auto& sobj : sobjs)
-    {
-        AddModelInstance(*sobj.model, sobj.node.local);
-    }
+
+    // for (const auto& sobjs = map_->GetStaticObjects(); const auto& sobj : sobjs)
+    // {
+    //     AddModelInstance(*sobj.model, sobj.node.local);
+    // }
 }
 
 void collision::DynamicsWorld::AddModelInstance(const assets::Model& model, const Transform& trans)

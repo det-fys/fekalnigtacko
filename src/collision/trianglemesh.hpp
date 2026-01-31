@@ -3,7 +3,6 @@
 #include <vector>
 #include <span>
 #include <glm/glm.hpp>
-#include "aabb.hpp"
 
 #include <memory>
 

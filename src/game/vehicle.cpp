@@ -108,6 +108,8 @@ void game::Vehicle::Update()
 
 void game::Vehicle::SendInitData(Player& player, net::OutMessage& msg) const
 {
+    Super::SendInitData(player, msg);
+
     net::ModelName name(model_name_);
     msg.Write(name);
     net::WriteRGB(msg, color_); // primary color

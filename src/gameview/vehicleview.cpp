@@ -6,9 +6,19 @@
 
 #include <iostream>
 
-game::view::VehicleView::VehicleView(WorldView& world, std::shared_ptr<const assets::VehicleModel> model, const glm::vec3& color)
-    : EntityView(world), model_(std::move(model))
+game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
+    : EntityView(world, msg)
 {
+    net::ModelName modelname;
+    glm::vec3 color;
+    if (!msg.Read(modelname) || !net::ReadRGB(msg, color))
+        throw EntityInitError();
+
+    model_ = assets::CacheManager::GetVehicleModel("data/" + std::string(modelname) + ".veh");
+
+    // init the other transform to identical
+    root_trans_[0] = root_trans_[1];
+
     auto& modelwheels = model_->GetWheels();
     wheels_.resize(modelwheels.size());
 
@@ -19,30 +29,17 @@ game::view::VehicleView::VehicleView(WorldView& world, std::shared_ptr<const ass
 
     color_ = glm::vec4(color, 1.0f);
 
+    if (!ReadState(msg))
+        throw EntityInitError();
+
     snd_accel_ = assets::CacheManager::GetSound("data/auto.snd");
 
     // sync state
     net::DecodePosition(sync_.pos, root_.local.position);
     net::DecodeRotation(sync_.rot, root_.local.rotation);
 
-}
 
-std::unique_ptr<game::view::VehicleView> game::view::VehicleView::InitFromMsg(WorldView& world, net::InMessage& msg)
-{
-    net::ModelName modelname;
-    glm::vec3 color;
-    if (!msg.Read(modelname) || !net::ReadRGB(msg, color))
-        return nullptr;
-
-    auto model = assets::CacheManager::GetVehicleModel("data/" + std::string(modelname) + ".veh");
-
-    auto vehicle = std::make_unique<VehicleView>(world, std::move(model), color);
-    if (!vehicle->ReadState(msg))
-        return nullptr;
-
-    vehicle->root_trans_[0] = vehicle->root_trans_[1];
-
-    return vehicle;
+    radius_ = 3.0f;
 }
 
 bool game::view::VehicleView::ProcessMsg(net::EntMsgType type, net::InMessage& msg)
@@ -53,7 +50,7 @@ bool game::view::VehicleView::ProcessMsg(net::EntMsgType type, net::InMessage& m
         return ProcessUpdateMsg(msg);
 
     default:
-        return false;
+        return Super::ProcessMsg(type, msg);
     }
 }
 
@@ -106,8 +103,10 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
     }
 }
 
-void game::view::VehicleView::Draw(gfx::DrawList& dlist)
+void game::view::VehicleView::Draw(const DrawArgs& args)
 {
+    Super::Draw(args);
+
     // TOOD: chceck and fix
     const auto& model = *model_->GetModel();
     const auto& mesh = *model.GetMesh();
@@ -118,7 +117,7 @@ void game::view::VehicleView::Draw(gfx::DrawList& dlist)
         cmd.surface = &surface;
         cmd.matrices = &root_.matrix;
         cmd.color = &color_;
-        dlist.AddSurface(cmd);
+        args.dlist.AddSurface(cmd);
     }
 
     const auto& wheels = model_->GetWheels();
@@ -131,7 +130,7 @@ void game::view::VehicleView::Draw(gfx::DrawList& dlist)
             gfx::DrawSurfaceCmd cmd;
             cmd.surface = &surface;
             cmd.matrices = &wheels_[i].node.matrix;
-            dlist.AddSurface(cmd);
+            args.dlist.AddSurface(cmd);
         }
     }
 }

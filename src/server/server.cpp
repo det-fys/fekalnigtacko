@@ -35,7 +35,7 @@ void sv::Server::Run()
         {
             time_ += 40;
             Update();
-            std::cout << "Time: " << time_ << " ms, Clients: " << clients_.size() << std::endl;
+            // std::cout << "Time: " << time_ << " ms, Clients: " << clients_.size() << std::endl;
             t_next += 40ms;
             t_now = std::chrono::steady_clock::now();
         }

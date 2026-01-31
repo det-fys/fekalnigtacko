@@ -40,14 +40,15 @@ void game::view::WorldView::Update(const UpdateInfo& info)
     }
 }
 
-void game::view::WorldView::Draw(gfx::DrawList& dlist) const
+void game::view::WorldView::Draw(const DrawArgs& args) const
 {
     if (map_)
-        map_->Draw(dlist);
+        map_->Draw(args);
 
     for (const auto& [entnum, ent] : ents_)
     {
-        ent->Draw(dlist);
+        if (args.frustum.IsSphereVisible(ent->GetBoundingSphere()))
+            ent->Draw(args);
     }
 }
 
@@ -72,23 +73,25 @@ bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)
     if (entslot)
         entslot.reset();
 
-    switch (type)
+    try
     {
-    case net::ET_VEHICLE:
-        entslot = VehicleView::InitFromMsg(*this, msg);
-        break;
+        switch (type)
+        {
+        case net::ET_VEHICLE:
+            entslot = std::make_unique<VehicleView>(*this, msg);
+            break;
 
-    default:
-        return false;
-    }
+        default:
+            return false; // unknown type
+        }
 
-    if (!entslot) // init failed
+        return true;
+
+    } catch (const EntityInitError& e) // failed
     {
         ents_.erase(entnum);
         return false;
     }
-
-    return true;
 }
 
 bool game::view::WorldView::ProcessEntMsgMsg(net::InMessage& msg)

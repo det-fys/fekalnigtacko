@@ -94,7 +94,7 @@ game::OpenWorld::OpenWorld() : World("openworld")
     // }
 
     // spawn bots
-    for (size_t i = 0; i < 20; ++i)
+    for (size_t i = 0; i < 30; ++i)
     {
         SpawnBot();
     }
@@ -221,25 +221,27 @@ struct BotThinkState
 {
     game::Vehicle& vehicle;
     const assets::MapGraph& roads;
-    size_t node = 0;
+    glm::vec3 seg_start;
+    std::deque<size_t> path;
     bool gas = false;
     size_t stuck_counter = 0;
     glm::vec3 last_pos = glm::vec3(0.0f);
+    float speed_limit = 0.0f;
+    const char* state_str = "init";
 
     BotThinkState(game::Vehicle& v, const assets::MapGraph& g, size_t n)
-        : vehicle(v), roads(g), node(n) {}
+        : vehicle(v), roads(g), path({n})
+    {
+        seg_start = v.GetPosition();
+    }
 };
 
-
-static float GetSteeringAngle(const glm::vec3& pos, const glm::quat& rot, const glm::vec3& target)
+static float GetTurnAngle2D(const glm::vec2& forward, const glm::vec2& to_target)
 {
-    glm::vec3 forward = rot * glm::vec3{0.0f, 1.0f, 0.0f};
-    glm::vec2 forward_xy = glm::normalize(glm::vec2{forward.x, forward.y});
-    glm::vec3 to_target = target - pos;
-    glm::vec2 to_target_xy = glm::normalize(glm::vec2{to_target.x, to_target.y});
+    glm::vec2 forward_xy = glm::normalize(forward);
+    glm::vec2 to_target_xy = glm::normalize(to_target);
     float dot = glm::dot(forward_xy, to_target_xy);
     float cross = forward_xy.x * to_target_xy.y - forward_xy.y * to_target_xy.x;
-
     float angle = acosf(glm::clamp(dot, -1.0f, 1.0f)); // in [0, pi]
 
     if (cross < 0)
@@ -248,22 +250,130 @@ static float GetSteeringAngle(const glm::vec3& pos, const glm::quat& rot, const 
     return angle; // in [-pi, pi]
 }
 
+static float GetTurnAngle(const glm::vec3& pos, const glm::quat& rot, const glm::vec3& target)
+{
+    glm::vec3 forward = rot * glm::vec3{0.0f, 1.0f, 0.0f};
+    glm::vec3 to_target = target - pos;
+    glm::vec2 forward_xy = glm::vec2{forward.x, forward.y};
+    glm::vec2 to_target_xy = glm::vec2{to_target.x, to_target.y};
+    return GetTurnAngle2D(forward_xy, to_target_xy);
+}
+
+static void SelectNextNode(BotThinkState& s)
+{
+    size_t node = s.path.back();
+    s.path.push_back(s.roads.nbs[s.roads.nodes[node].nbs + (rand() % s.roads.nodes[node].num_nbs)]);
+}
+
 static void BotThink(std::shared_ptr<BotThinkState> s)
 {
+    s->state_str = "path";
+
     glm::vec3 pos = s->vehicle.GetPosition();
     glm::quat rot = s->vehicle.GetRotation();
+    glm::vec3 forward = rot * glm::vec3{0.0f, 1.0f, 0.0f};
 
-    glm::vec3 target = s->roads.nodes[s->node].position;
-    float angle = GetSteeringAngle(pos, rot, target);
+    //glm::vec3 target = s->roads.nodes[s->node].position;
 
+    // 
+    std::array<glm::vec3, 8> waypoints;
+
+    while (s->path.size() < waypoints.size() - 1)
+    {
+        SelectNextNode(*s); 
+    }
+
+    glm::vec3 node_pos = s->roads.nodes[s->path[0]].position;
+    if (glm::distance(glm::vec2(pos), glm::vec2(node_pos)) < 6.0f && s->path.size() > 1)
+    {
+        s->seg_start = node_pos;
+        s->path.pop_front();
+        SelectNextNode(*s);
+    }
+
+    glm::vec3 target_node_pos = s->roads.nodes[s->path[0]].position;
+
+    waypoints[0] = pos - glm::normalize(forward) * 3.0f;
+    waypoints[1] = pos;
+
+    // find closest point on segment [seg_start -> target_node_pos]
+    glm::vec3 seg_end = target_node_pos;
+    glm::vec3 seg_dir = seg_end - s->seg_start;
+    float seg_len = glm::length(seg_dir);
+    if (seg_len > 5.0f)
+    {
+        glm::vec3 seg_dir_norm = seg_dir / seg_len;
+        float t = glm::clamp(glm::dot(pos - s->seg_start, seg_dir_norm) / seg_len, 0.0f, 1.0f);
+        waypoints[2] = s->seg_start + t * seg_dir;
+        if (glm::distance(waypoints[1], target_node_pos) > 10.0f)
+        {
+            waypoints[2] += seg_dir_norm * 10.0f; // look a bit ahead on segment
+        }
+        else
+        {
+            waypoints[2] = target_node_pos;
+        }
+        
+    }
+    else
+    {
+        waypoints[2] = target_node_pos;
+    }
+
+    for (size_t i = 3; i < waypoints.size(); ++i)
+    {
+        size_t path_idx = glm::min(i - 3, s->path.size() - 1);
+        waypoints[i] = s->roads.nodes[s->path[path_idx]].position;
+    }
+
+    // decrease speed based on curvature
+    const float base_speed = 100.0f;
+    float target_speed = base_speed;
+    float dist_accum = 0.0f;
+    for (size_t i = 1; i < waypoints.size() - 1; ++i)
+    {
+        glm::vec3 dir1 = waypoints[i] - waypoints[i - 1];
+        glm::vec3 dir2 = waypoints[i + 1] - waypoints[i];
+        float dist = glm::length(dir1);
+        dist_accum += dist;
+
+        glm::vec2 dir1_xy = glm::vec2{dir1.x, dir1.y};
+        glm::vec2 dir2_xy = glm::vec2{dir2.x, dir2.y};
+
+        const float min_dir_length = 0.001f;
+        float angle = glm::length(dir1_xy) > min_dir_length && glm::length(dir2_xy) > min_dir_length ? GetTurnAngle2D(dir1_xy, dir2_xy) : 0.0f;
+        // std::cout << "angle: " << angle << "\n";
+        float abs_angle = fabsf(angle);
+        if (abs_angle > glm::radians(7.0f))
+        {
+            // float speed_limit = 50.0f / abs_angle; // sharper turn -> lower speed
+            // speed_limit *= dist_accum / 20.0f; // more distance to turn -> higher speed
+            // speed_limit = glm::max(speed_limit, 20.0f);
+            // max_speed = glm::min(max_speed, speed_limit);
+            target_speed -= abs_angle * (base_speed / glm::pi<float>() / 2.0f) * 50.0f / glm::max(dist_accum - 1.0f, 1.0f);
+
+        }
+
+        if (dist_accum > 200.0f)
+            break;
+    }
+
+    target_speed = glm::clamp(target_speed, 25.0f, 100.0f);
+    s->speed_limit = target_speed;
+
+    // std::cout << "target speed: " << target_speed << "\n";
+
+    float angle = GetTurnAngle(pos, rot, waypoints[2]);
+    
     if (glm::distance(pos, s->last_pos) < 2.0f)
     {
         s->stuck_counter++;
         if (s->stuck_counter > 20)
         {
+            s->state_str = "stuck (reverse)";
             s->stuck_counter = 0;
             s->vehicle.SetSteering(true, -angle); // try turn away
-
+            
             s->vehicle.SetInputs(0); // stop
             // stuck, go reverse for a while
             s->vehicle.SetInput(game::VIN_BACKWARD, true);
@@ -279,18 +389,17 @@ static void BotThink(std::shared_ptr<BotThinkState> s)
         s->stuck_counter = 0;
         s->last_pos = pos;
     }
-
+    
     s->vehicle.SetSteering(true, angle);
 
     game::VehicleInputFlags vin = 0;
 
     float speed = s->vehicle.GetSpeed();
-    float target_speed = 50.0f;
 
-    if (glm::distance(pos, target) < 10.0f)
-    {
-        target_speed = 20.0f;
-    }
+    // if (glm::distance(pos, target) < 10.0f)
+    // {
+    //     target_speed = 20.0f;
+    // }
 
     if (speed < target_speed * 0.9f && !s->gas)
     {
@@ -313,22 +422,27 @@ static void BotThink(std::shared_ptr<BotThinkState> s)
 
     s->vehicle.SetInputs(vin);
 
-    float dist_to_node = glm::distance(pos, s->roads.nodes[s->node].position);
-    if (dist_to_node < 5.0f)
-    {
-        // advance to next node
-        const auto& graph = s->roads;
-        const auto& current_node = graph.nodes[s->node];
-
-        if (current_node.num_nbs > 0)
-        {
-            size_t next_idx = rand() % current_node.num_nbs;
-            s->node = s->roads.nbs[current_node.nbs + next_idx];
-        }
-    }
-
     s->vehicle.Schedule(rand() % 120 + 40, [s]() {
         BotThink(s);
+    } );
+}
+
+static void BotNametagThink(std::shared_ptr<BotThinkState> s)
+{
+    std::string nametag;
+    nametag += "s=" + std::to_string(static_cast<int>(s->vehicle.GetSpeed())) + "/" + std::to_string(static_cast<int>(s->speed_limit)) + " ";
+    nametag += "sc=" + std::to_string(s->stuck_counter) + " ";
+    nametag += "st=" + std::string(s->state_str); // + " ";
+
+    // nametag += "path=";
+    // for (auto n : path)
+    // {
+    //     nametag += std::to_string(n) + " ";
+    // }
+    s->vehicle.SetNametag(nametag);
+
+    s->vehicle.Schedule(240, [s]() {
+        BotNametagThink(s);
     } );
 }
 
@@ -336,6 +450,20 @@ static const char* GetRandomCarModel()
 {
     const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat"};
     return vehicles[rand() % (sizeof(vehicles) / sizeof(vehicles[0]))];
+}
+
+static glm::vec3 GetRandomColor()
+{
+    glm::vec3 color;
+    // shittiest way to do it
+    for (int i = 0; i < 3; ++i)
+    {
+        net::ColorQ qcol;
+        qcol.value = rand() % 256;
+        color[i] = qcol.Decode();
+    }
+
+    return color;
 }
 
 void game::OpenWorld::SpawnBot()
@@ -349,11 +477,17 @@ void game::OpenWorld::SpawnBot()
     }
 
     size_t start_node = rand() % roads->nodes.size();
-    auto& vehicle = Spawn<Vehicle>(GetRandomCarModel(), glm::vec3{0.3f, 0.3f, 0.3f});
+    // auto color = glm::vec3{0.3f, 0.3f, 0.3f};
+    auto color = GetRandomColor();
+    auto& vehicle = Spawn<Vehicle>(GetRandomCarModel(), color);
+    vehicle.SetNametag("bot (" + std::to_string(vehicle.GetEntNum()) + ")");
     vehicle.SetPosition(roads->nodes[start_node].position + glm::vec3{0.0f, 0.0f, 5.0f});
 
     auto think_state = std::make_shared<BotThinkState>(vehicle, *roads, start_node);
     BotThink(think_state);
+    vehicle.Schedule(rand() % 500, [think_state]() {
+        BotNametagThink(think_state);
+    } );
 }
 
 void game::OpenWorld::SpawnVehicle(Player& player)
@@ -362,16 +496,11 @@ void game::OpenWorld::SpawnVehicle(Player& player)
 
     // spawn him car
     // ranodm color
-    glm::vec3 color;
-    for (int i = 0; i < 3; ++i)
-    {
-        net::ColorQ qcol;
-        qcol.value = rand() % 256;
-        color[i] = qcol.Decode();
-    }
+
 
     auto vehicle_name = GetRandomCarModel();
-    auto& vehicle = Spawn<Vehicle>(vehicle_name, color);
+    auto& vehicle = Spawn<Vehicle>(vehicle_name, GetRandomColor());
+    vehicle.SetNametag("player (" + std::to_string(vehicle.GetEntNum()) + ")");
     vehicle.SetPosition({ 100.0f, 100.0f, 5.0f });
 
     player.SetCamera(vehicle.GetEntNum());

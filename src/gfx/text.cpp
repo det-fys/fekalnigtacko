@@ -78,18 +78,27 @@ void gfx::Text::SetText(const char* text)
 
     float space_size = font_->GetLineHeight() * 0.3f;
 
-    glm::vec2 cursor(0.0f, 0.0f);
+    const float line_height = font_->GetLineHeight();
+    size_ = glm::vec2(0.0f);
+    glm::vec2 cursor(0.0f);
 
     uint32_t cp = 0;
     const char* p = text;
 
     uint32_t color = color_;
 
+
     while (cp = DecodeUTF8Codepoint(p))
     {
         if (cp == ' ')
         {
             cursor.x += space_size; // Move cursor for space
+            continue;
+        }
+        else if (cp == '\n')
+        {
+            cursor.x = 0.0f;
+            cursor.y += line_height;
             continue;
         }
         else if (cp == '^')
@@ -155,7 +164,11 @@ void gfx::Text::SetText(const char* text)
         indices.push_back(base_index + 3);
 
         cursor.x += glyph->advance;
+
+        size_.x = glm::max(size_.x, cursor.x);
     }
+    
+    size_.y = cursor.y + line_height;
 
     va_.SetVBOData(vertices.data(), vertices.size() * sizeof(TextVertex));
     va_.SetIndices(indices.data(), indices.size());

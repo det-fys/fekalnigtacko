@@ -27,6 +27,8 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
         }
     };
 
+    Chunk* chunk = nullptr;
+
     LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
         if (command == "basemodel")
         {
@@ -37,8 +39,10 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
         }
         else if (command == "static")
         {
-            MapStaticObject obj;
+            if (!chunk)
+                throw std::runtime_error("static in map without chunk");
 
+            ChunkStaticObject obj;
             std::string model_name;
             iss >> model_name;
 
@@ -55,6 +59,9 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
 
             obj.node.UpdateMatrix();
 
+            obj.aabb.min = trans->position - glm::vec3(1.0f);
+            obj.aabb.max = trans->position + glm::vec3(1.0f);
+
             std::string flag;
             while (iss >> flag)
             {
@@ -64,8 +71,47 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
                 }
             }
 
-            map->static_objects_.push_back(std::move(obj));
+            chunk->objs.push_back(std::move(obj));
         }
+        else if (command == "chunk")
+        {
+            glm::ivec2 coord;
+            chunk = &map->chunks_.emplace_back();
+            iss >> coord.x >> coord.y;
+            iss >> chunk->aabb.min.x >> chunk->aabb.min.y >> chunk->aabb.min.z;
+            iss >> chunk->aabb.max.x >> chunk->aabb.max.y >> chunk->aabb.max.z;
+
+        }
+        else if (command == "surface")
+        {
+            std::string name;
+            size_t first, count;
+            iss >> name >> first >> count;
+
+            if (!chunk)
+                throw std::runtime_error("surface in map without chunk");
+
+#ifdef CLIENT
+            if (!map->basemodel_)
+                throw std::runtime_error("surface in map with no basemodel");
+
+            auto mesh = map->basemodel_->GetMesh();
+
+            if (!mesh)
+                throw std::runtime_error("surface in map with no basemodel mesh");
+
+            auto it = mesh->surface_names.find(name);
+            if (it == mesh->surface_names.end())
+                throw std::runtime_error("surface name not found");
+
+            if (first + count > mesh->surfaces[it->second].count)
+                throw std::runtime_error("surface invalid range");
+
+            chunk->surfaces.emplace_back(it->second, first, count);
+
+#endif /* CLIENT */
+        }
+
         else if (command == "graph")
         {
             if (graph)
@@ -115,23 +161,40 @@ const assets::MapGraph* assets::Map::GetGraph(const std::string& name) const
 }
 
 #ifdef CLIENT
-void assets::Map::Draw(gfx::DrawList& dlist) const
+void assets::Map::Draw(const game::view::DrawArgs& args) const
 {
     if (!basemodel_ || !basemodel_->GetMesh())
         return;
 
-    const auto& surfaces = basemodel_->GetMesh()->surfaces;
+    const auto& mesh = *basemodel_->GetMesh();
 
-    for (const auto& surface : surfaces)
+    for (auto& chunk : chunks_)
     {
-        gfx::DrawSurfaceCmd cmd;
-        cmd.surface = &surface;
-        dlist.AddSurface(cmd);
+        if (args.frustum.IsAABBVisible(chunk.aabb))
+            DrawChunk(args, mesh, chunk);
     }
 
-    for (const auto& obj : static_objects_)
+}
+
+void assets::Map::DrawChunk(const game::view::DrawArgs& args, const Mesh& basemesh, const Chunk& chunk) const
+{
+    for (const auto& surface_range : chunk.surfaces)
+    {
+        auto& surface = basemesh.surfaces[surface_range.idx];
+
+        gfx::DrawSurfaceCmd cmd;
+        cmd.surface = &surface;
+        cmd.first = surface_range.first;
+        cmd.count = surface_range.count;
+        args.dlist.AddSurface(cmd);
+    }
+
+    for (const auto& obj : chunk.objs)
     {
         if (!obj.model || !obj.model->GetMesh())
+            continue;
+
+        if (!args.frustum.IsAABBVisible(obj.aabb))
             continue;
 
         const auto& surfaces = obj.model->GetMesh()->surfaces;
@@ -142,8 +205,10 @@ void assets::Map::Draw(gfx::DrawList& dlist) const
             cmd.surface = &surface;
             cmd.matrices = &obj.node.matrix;
             // cmd.color_mod = glm::vec4(obj.color, 1.0f);
-            dlist.AddSurface(cmd);
+            args.dlist.AddSurface(cmd);
         }
     }
 }
+
 #endif // CLIENT
+

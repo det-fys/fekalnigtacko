@@ -80,14 +80,15 @@ void App::Frame()
 	const game::view::WorldView* world;
 	if (session_ && (world = session_->GetWorld()))
 	{
-		world->Draw(dlist_);
-	
 		// glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 		glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 3000.0f);
 		glm::mat4 view = session_->GetViewMatrix();
 
 		params.view_proj = proj * view;
-		
+
+		game::view::DrawArgs draw_args(dlist_, params.view_proj, viewport_size_);
+		world->Draw(draw_args);
+	
 		glm::mat4 camera_world = glm::inverse(view);
 		audiomaster_.SetListenerOrientation(camera_world);
 	}
@@ -127,8 +128,10 @@ void App::ProcessMessage(net::InMessage& msg)
 	if (!session_)
 		return;
 
-	//size_t s = msg.End() - msg.Ptr();
+	size_t s = msg.End() - msg.Ptr();
  //   AddChatMessage("recvd: ^f00;" + std::to_string(s));
+
+	// std::cout << "App::ProcessMessage: received message of size " << s << " bytes" << std::endl;
 
 	session_->ProcessMessage(msg);
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "assets/map.hpp"
-#include "gfx/draw_list.hpp"
+#include "draw_args.hpp"
 #include "net/defs.hpp"
 #include "net/inmessage.hpp"
 
@@ -20,7 +20,7 @@ public:
     bool ProcessMsg(net::MessageType type, net::InMessage& msg);
 
     void Update(const UpdateInfo& info);
-    void Draw(gfx::DrawList& dlist) const;
+    void Draw(const DrawArgs& args) const;
 
     EntityView* GetEntity(net::EntNum entnum);
     

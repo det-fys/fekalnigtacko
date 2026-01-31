@@ -23,12 +23,12 @@ class VehicleView : public EntityView
 {
     using Super = EntityView;
 public:
-    VehicleView(WorldView& world, std::shared_ptr<const assets::VehicleModel> model, const glm::vec3& color);
-    static std::unique_ptr<VehicleView> InitFromMsg(WorldView& world, net::InMessage& msg);
+    VehicleView(WorldView& world, net::InMessage& msg);
+    DELETE_COPY_MOVE(VehicleView)
 
     virtual bool ProcessMsg(net::EntMsgType type, net::InMessage& msg) override;
     virtual void Update(const UpdateInfo& info) override;
-    virtual void Draw(gfx::DrawList& dlist) override;
+    virtual void Draw(const DrawArgs& args) override;
 
 private:
     bool ReadState(net::InMessage& msg);
