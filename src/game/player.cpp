@@ -1,8 +1,11 @@
 #include "player.hpp"
 
-#include "world.hpp"
-
 #include <iostream>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/norm.hpp>
+
+#include "world.hpp"
 
 game::Player::Player(Game& game, std::string name) : game_(game), name_(std::move(name))
 {
@@ -30,7 +33,18 @@ void game::Player::Update()
     }
 
     if (world_)
+    {
+        if (cam_ent_)
+        {
+            auto cam_ent = world_->GetEntity(cam_ent_);
+            if (cam_ent)
+            {
+                cull_pos_ = cam_ent->GetRootTransform().position;
+            }
+        }
+
         SyncEntities();
+    }
 }
 
 void game::Player::SetWorld(std::shared_ptr<World> world)
@@ -49,6 +63,8 @@ void game::Player::SetWorld(std::shared_ptr<World> world)
 
 void game::Player::SetCamera(net::EntNum entnum)
 {
+    cam_ent_ = entnum;
+
     auto msg = BeginMsg(net::MSG_CAM);
     msg.Write(entnum);
 }
@@ -121,7 +137,14 @@ void game::Player::SyncEntities()
 
 bool game::Player::ShouldSeeEntity(const Entity& entity) const
 {
-    return true; // TODO: check distance?
+    // max distance check
+    float max_dist = entity.GetMaxDistance();
+    if (glm::distance2(entity.GetRootTransform().position, cull_pos_) > (max_dist * max_dist))
+        return false;
+
+    // TODO: custom callback
+
+    return true;
 }
 
 void game::Player::SendInitEntity(const Entity& entity)

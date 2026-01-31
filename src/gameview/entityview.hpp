@@ -48,6 +48,9 @@ public:
 private:
     bool ReadNametag(net::InMessage& msg);
 
+    void DrawNametag(const DrawArgs& args);
+    void DrawAxes(const DrawArgs& args);
+
 protected:
     WorldView& world_;
 

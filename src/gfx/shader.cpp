@@ -9,7 +9,8 @@ static const char* const s_uni_names[] = {
 	"u_view_proj",          // SU_VIEW_PROJ
     "u_tex",                // SU_TEX
 	"u_color",              // SU_COLOR
-	"u_flags",              // SU_FLAGS
+    "u_flags",              // SU_FLAGS
+    "u_camera",             // SU_CAMERA
 };
 
 // Vytvori shader z daneho zdroje

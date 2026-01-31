@@ -65,7 +65,7 @@ void game::view::ClientSession::Update(const UpdateInfo& info)
         world_->Update(info);
 }
 
-glm::mat4 game::view::ClientSession::GetViewMatrix() const
+void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) const
 {
     glm::vec3 center(0.0f, 0.0f, 2.5f);
 
@@ -84,9 +84,8 @@ glm::mat4 game::view::ClientSession::GetViewMatrix() const
 
     float distance = 8.0f;
 
-    auto eye = center - dir * distance;
-
-    return glm::lookAt(eye, center, glm::vec3(0, 0, 1));
+    eye = center - dir * distance;
+    view = glm::lookAt(eye, center, glm::vec3(0, 0, 1));
 }
 
 audio::Master& game::view::ClientSession::GetAudioMaster() const

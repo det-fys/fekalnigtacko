@@ -82,9 +82,12 @@ void App::Frame()
 	{
 		// glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 		glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 3000.0f);
-		glm::mat4 view = session_->GetViewMatrix();
+        glm::vec3 eye;
+		glm::mat4 view;
+        session_->GetViewInfo(eye, view);
 
 		params.view_proj = proj * view;
+        params.cam_pos = eye;
 
 		game::view::DrawArgs draw_args(dlist_, params.view_proj, viewport_size_);
 		world->Draw(draw_args);

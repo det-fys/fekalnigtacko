@@ -10,6 +10,7 @@ namespace gfx
 {
 	struct DrawListParams
 	{
+        glm::vec3 cam_pos;
 		glm::mat4 view_proj;
 		size_t screen_width = 0;
 		size_t screen_height = 0;
@@ -38,19 +39,29 @@ namespace gfx
 		void DrawList(gfx::DrawList& list, const DrawListParams& params);
 
 	private:
-		MeshShader mesh_shader_;
-		MeshShader skel_mesh_shader_;
-		std::unique_ptr<Shader> solid_shader_;
-		std::unique_ptr<Shader> hud_shader_;
-
-		const Shader* current_shader_ = nullptr;
+		void SetupBeamVA();
 
 		void InvalidateShaders();
 		void InvalidateMeshShader(MeshShader& mshader);
 		void SetupMeshShader(MeshShader& mshader, const DrawListParams& params);
 
 		void DrawSurfaceList(std::span<DrawSurfaceCmd> queue, const DrawListParams& params);
+		void DrawBeamList(std::span<DrawBeamCmd> queue, const DrawListParams& params);
 		void DrawHudList(std::span<DrawHudCmd> queue, const DrawListParams& params);
+
+	private:
+		MeshShader mesh_shader_;
+		MeshShader skel_mesh_shader_;
+		std::unique_ptr<Shader> solid_shader_;
+
+		std::unique_ptr<BufferObject> beam_segments_vbo_;
+		std::unique_ptr<VertexArray> beam_va_;
+		std::unique_ptr<Shader> beam_shader_;
+
+		std::unique_ptr<Shader> hud_shader_;
+
+		const Shader* current_shader_ = nullptr;
+
 
 	};
 

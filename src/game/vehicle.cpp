@@ -57,7 +57,7 @@ game::Vehicle::Vehicle(World& world, std::string model_name, const glm::vec3& co
     {
         float wheelRadius = wheeldef.radius;
 
-        float friction = 2.0f; // 5.0f;
+        float friction = 3.0f; // 5.0f;
         float suspensionStiffness = 50.0f;
         // float suspensionDamping = 2.3f;
         // float suspensionCompression = 4.4f;

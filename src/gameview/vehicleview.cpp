@@ -16,24 +16,25 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
 
     model_ = assets::CacheManager::GetVehicleModel("data/" + std::string(modelname) + ".veh");
 
-    // init the other transform to identical
-    root_trans_[0] = root_trans_[1];
-
+    
     auto& modelwheels = model_->GetWheels();
     wheels_.resize(modelwheels.size());
-
+    
     for (size_t i = 0; i < wheels_.size(); ++i)
     {
         wheels_[i].node.parent = &root_;
     }
-
+    
     color_ = glm::vec4(color, 1.0f);
-
+    
     if (!ReadState(msg))
         throw EntityInitError();
-
+    
+    // init the other transform to identical
+    root_trans_[0] = root_trans_[1];
+    
     snd_accel_ = assets::CacheManager::GetSound("data/auto.snd");
-
+    
     // sync state
     net::DecodePosition(sync_.pos, root_.local.position);
     net::DecodeRotation(sync_.rot, root_.local.rotation);

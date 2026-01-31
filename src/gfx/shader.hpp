@@ -15,6 +15,7 @@ namespace gfx
 		SU_TEX,
 		SU_COLOR,
 		SU_FLAGS,
+		SU_CAMERA,
 	
 		SU_COUNT
 	};

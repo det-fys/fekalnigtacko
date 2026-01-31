@@ -33,7 +33,23 @@ void game::view::EntityView::Update(const UpdateInfo& info)
 void game::view::EntityView::Draw(const DrawArgs& args)
 {
     // std::cout << "TODO draw entity nametag: " << nametag_ << std::endl;
+    DrawNametag(args);
+    //DrawAxes(args);
+}
 
+bool game::view::EntityView::ReadNametag(net::InMessage& msg)
+{
+    // read nametag
+    net::NameTag nametag;
+    if (!msg.Read(nametag))
+        return false;
+
+    nametag_ = nametag;
+    nametag_text_.SetText(nametag);
+}
+
+void game::view::EntityView::DrawNametag(const DrawArgs& args)
+{
     if (nametag_.empty())
         return;
 
@@ -68,13 +84,23 @@ void game::view::EntityView::Draw(const DrawArgs& args)
 
 }
 
-bool game::view::EntityView::ReadNametag(net::InMessage& msg)
+void game::view::EntityView::DrawAxes(const DrawArgs& args)
 {
-    // read nametag
-    net::NameTag nametag;
-    if (!msg.Read(nametag))
-        return false;
+    const float len = 5.0f;
+    static const uint32_t colors[] = {0xFF0000FF, 0xFF00FF00, 0xFFFF0000};
 
-    nametag_ = nametag;
-    nametag_text_.SetText(nametag);
+    for (size_t i = 0; i < 3; i++)
+    {
+        glm::vec3 end(0.0f);
+        end[i] = len;
+
+        gfx::DrawBeamCmd cmd;
+        cmd.start = glm::vec3(root_.matrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        cmd.end = glm::vec3(root_.matrix * glm::vec4(end, 1.0f));
+        cmd.color = colors[i];
+        cmd.radius = 0.05f;
+        //cmd.num_segments = 10;
+        //cmd.max_offset = 0.1f;
+        args.dlist.AddBeam(cmd);
+    }
 }

@@ -59,6 +59,9 @@ private:
     std::set<net::EntNum> known_ents_;
 
     PlayerInputFlags in_ = 0;
+
+    net::EntNum cam_ent_ = 0;
+    glm::vec3 cull_pos_ = glm::vec3(0.0f);
 };
 
 }

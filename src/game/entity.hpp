@@ -30,6 +30,9 @@ public:
     void Remove() { removed_ = true; }
     bool IsRemoved() const { return removed_; }
 
+    const Transform& GetRootTransform() const { return root_.local; }
+    float GetMaxDistance() const { return max_distance_; }
+
     virtual ~Entity() = default;
 
 private:
@@ -46,7 +49,10 @@ protected:
     const net::EntType viewtype_;
 
     TransformNode root_;
+
+    float max_distance_ = 700.0f;
     std::string nametag_;
+
 
     bool removed_ = false;
 

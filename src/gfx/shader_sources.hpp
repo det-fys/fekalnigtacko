@@ -19,6 +19,8 @@ namespace gfx
 		SS_HUD_VERT,
 		SS_HUD_FRAG,
 
+		SS_BEAM_VERT,
+		SS_BEAM_FRAG,
 	};
 
 	class ShaderSources

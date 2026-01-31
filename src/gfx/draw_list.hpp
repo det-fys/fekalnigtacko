@@ -19,6 +19,16 @@ struct DrawSurfaceCmd
     float dist = 0.0f;                   // distance to camera - for transparnt sorting
 };
 
+struct DrawBeamCmd
+{
+    glm::vec3 start;
+    glm::vec3 end;
+    uint32_t color = 0xFFFFFFFF;
+    float radius = 0.1f;
+    size_t num_segments = 1;
+    float max_offset = 0.0f;
+};
+
 struct DrawHudCmd
 {
     const VertexArray* va = nullptr;
@@ -30,14 +40,17 @@ struct DrawHudCmd
 struct DrawList
 {
     std::vector<DrawSurfaceCmd> surfaces;
+    std::vector<DrawBeamCmd> beams;
     std::vector<DrawHudCmd> huds;
 
     void AddSurface(const DrawSurfaceCmd& cmd) { surfaces.emplace_back(cmd); }
+    void AddBeam(const DrawBeamCmd& cmd) { beams.emplace_back(cmd); }
     void AddHUD(const DrawHudCmd& cmd) { huds.emplace_back(cmd); }
 
     void Clear()
     {
         surfaces.clear();
+        beams.clear();
         huds.clear();
     }
 };

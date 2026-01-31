@@ -94,7 +94,7 @@ game::OpenWorld::OpenWorld() : World("openworld")
     // }
 
     // spawn bots
-    for (size_t i = 0; i < 30; ++i)
+    for (size_t i = 0; i < 70; ++i)
     {
         SpawnBot();
     }
@@ -262,7 +262,16 @@ static float GetTurnAngle(const glm::vec3& pos, const glm::quat& rot, const glm:
 static void SelectNextNode(BotThinkState& s)
 {
     size_t node = s.path.back();
-    s.path.push_back(s.roads.nbs[s.roads.nodes[node].nbs + (rand() % s.roads.nodes[node].num_nbs)]);
+    size_t num_nbs = s.roads.nodes[node].num_nbs;
+
+    if (num_nbs < 1)
+    {
+        const auto& pos = s.roads.nodes[node].position;
+        std::cout << "node " << node << " has no neighbors!!!1 position: " << pos.x << " " << pos.y << " " << pos.z << std::endl;
+        throw std::runtime_error("no neighbors");
+    }
+
+    s.path.push_back(s.roads.nbs[s.roads.nodes[node].nbs + (rand() % num_nbs)]);
 }
 
 static void BotThink(std::shared_ptr<BotThinkState> s)
@@ -480,13 +489,13 @@ void game::OpenWorld::SpawnBot()
     // auto color = glm::vec3{0.3f, 0.3f, 0.3f};
     auto color = GetRandomColor();
     auto& vehicle = Spawn<Vehicle>(GetRandomCarModel(), color);
-    vehicle.SetNametag("bot (" + std::to_string(vehicle.GetEntNum()) + ")");
+    //vehicle.SetNametag("bot (" + std::to_string(vehicle.GetEntNum()) + ")");
     vehicle.SetPosition(roads->nodes[start_node].position + glm::vec3{0.0f, 0.0f, 5.0f});
 
     auto think_state = std::make_shared<BotThinkState>(vehicle, *roads, start_node);
     BotThink(think_state);
     vehicle.Schedule(rand() % 500, [think_state]() {
-        BotNametagThink(think_state);
+        //BotNametagThink(think_state);
     } );
 }
 

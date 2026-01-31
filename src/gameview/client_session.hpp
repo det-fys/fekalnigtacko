@@ -27,7 +27,7 @@ public:
 
     const WorldView* GetWorld() const { return world_.get(); } 
 
-    glm::mat4 GetViewMatrix() const;
+    void GetViewInfo(glm::vec3& eye, glm::mat4& view) const;
 
     audio::Master& GetAudioMaster() const;
 

@@ -18,6 +18,9 @@ gfx::Renderer::Renderer()
     ShaderSources::MakeShader(skel_mesh_shader_.shader, SS_SKEL_MESH_VERT, SS_SKEL_MESH_FRAG);
     ShaderSources::MakeShader(solid_shader_, SS_SOLID_VERT, SS_SOLID_FRAG);
     ShaderSources::MakeShader(hud_shader_, SS_HUD_VERT, SS_HUD_FRAG);
+    ShaderSources::MakeShader(beam_shader_, SS_BEAM_VERT, SS_BEAM_FRAG);
+
+	SetupBeamVA();
 }
 
 void gfx::Renderer::Begin(size_t width, size_t height)
@@ -40,7 +43,59 @@ void gfx::Renderer::ClearDepth()
 void gfx::Renderer::DrawList(gfx::DrawList& list, const DrawListParams& params)
 {
 	DrawSurfaceList(list.surfaces, params);
+	DrawBeamList(list.beams, params);
     DrawHudList(list.huds, params);
+}
+
+struct BeamSegment
+{
+	glm::vec3 p0;
+	uint32_t color;
+	glm::vec3 p1;
+	float radius;
+};
+
+void gfx::Renderer::SetupBeamVA()
+{
+	beam_va_ = std::make_unique<VertexArray>(VA_POSITION, 0);
+	
+	static const float quad_points[] = {
+		0.0f, 0.0f, 0.0f,	
+		1.0f, 0.0f, 0.0f,	
+		0.0f, 1.0f, 0.0f,	
+		1.0f, 1.0f, 0.0f,	
+	};
+
+	beam_va_->SetVBOData(quad_points, sizeof(quad_points));
+
+	// create points buffer
+	glBindVertexArray(beam_va_->GetVAOId());
+	beam_segments_vbo_ = std::make_unique<BufferObject>(GL_ARRAY_BUFFER, GL_STREAM_DRAW);
+	beam_segments_vbo_->Bind();
+
+	constexpr size_t STRIDE = sizeof(BeamSegment);
+
+	// p0
+	glEnableVertexAttribArray(10); 
+	glVertexAttribPointer(10, 3, GL_FLOAT, GL_FALSE, STRIDE, (const void*)offsetof(BeamSegment, p0));
+	glVertexAttribDivisor(10, 1);
+	
+	// color
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, STRIDE, (const void*)offsetof(BeamSegment, color));
+	glVertexAttribDivisor(2, 1);
+
+	// p1
+	glEnableVertexAttribArray(11);
+	glVertexAttribPointer(11, 3, GL_FLOAT, GL_FALSE, STRIDE, (const void*)offsetof(BeamSegment, p1));
+	glVertexAttribDivisor(11, 1);
+
+	// radius
+	glEnableVertexAttribArray(12);
+	glVertexAttribPointer(12, 1, GL_FLOAT, GL_FALSE, STRIDE, (const void*)offsetof(BeamSegment, radius));
+	glVertexAttribDivisor(12, 1);
+
+	glBindVertexArray(0);
 }
 
 void gfx::Renderer::InvalidateShaders()
@@ -249,6 +304,82 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 	}
 
 	// reset this as it is rare and other stuff might not reset this
+	glDepthMask(GL_TRUE);
+
+}
+
+static float GetRandomOffset(float max_offset)
+{
+	return (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) - 0.5f) * 2.0f * max_offset;
+}
+
+void gfx::Renderer::DrawBeamList(std::span<DrawBeamCmd> queue, const DrawListParams& params)
+{
+	static std::vector<BeamSegment> segments;
+	static std::vector<glm::vec3> points;
+	segments.clear();
+
+	for (const auto& cmd : queue)
+	{
+		if (cmd.num_segments < 1)
+			continue;
+
+		points.resize(cmd.num_segments + 1);
+
+		const glm::vec3 seg_step = (cmd.end - cmd.start) / static_cast<float>(cmd.num_segments);
+		glm::vec3 pos = cmd.start;
+		for (size_t i = 0; i <= cmd.num_segments; ++i)
+		{
+			points[i] = pos;
+			pos += seg_step;
+		}
+
+		if (cmd.max_offset > 0.0f)
+		{
+			for (auto& p : points)
+			{
+				p.x += GetRandomOffset(cmd.max_offset);
+				p.y += GetRandomOffset(cmd.max_offset);
+				p.z += GetRandomOffset(cmd.max_offset);
+			}
+		}
+
+		for (size_t i = 1; i < points.size(); ++i)
+		{
+			auto& segment = segments.emplace_back();
+			segment.p0 = points[i - 1];
+			segment.p1 = points[i];
+			segment.color = cmd.color;
+			segment.radius = cmd.radius;
+		}
+
+	}
+
+	if (segments.empty())
+		return;
+
+	glBindVertexArray(beam_va_->GetVAOId());
+	beam_segments_vbo_->SetData(segments.data(), segments.size() * sizeof(segments[0]));
+
+	Shader* shader = beam_shader_.get();
+	glUseProgram(shader->GetId());
+	current_shader_ = shader;
+
+	glDisable(GL_CULL_FACE);
+
+	glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE); // ADDITIVE blend
+
+	glUniformMatrix4fv(shader->U(gfx::SU_VIEW_PROJ), 1, GL_FALSE, &params.view_proj[0][0]);
+    glUniform3fv(shader->U(gfx::SU_CAMERA), 1, &params.cam_pos[0]);
+
+	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, segments.size());
+
+	glBindVertexArray(0);
+
 	glDepthMask(GL_TRUE);
 
 }
