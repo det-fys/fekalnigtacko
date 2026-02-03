@@ -160,10 +160,14 @@ static void PollEvents()
     }
 }
 
-#ifdef NDEBUG
-#define WS_URL "ws://deadfish.cz:11200/ws"
-#else
+#ifndef NDEBUG
+#define USE_LOCAL_SERVER
+#endif
+
+#ifdef USE_LOCAL_SERVER
 #define WS_URL "ws://127.0.0.1:11200/ws"
+#else
+#define WS_URL "ws://deadfish.cz:11200/ws"
 #endif
 
 
