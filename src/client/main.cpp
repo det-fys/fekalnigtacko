@@ -58,6 +58,9 @@ static void InitSDL()
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
+    //SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+    //SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 8); 
+
 	std::cout << "Creating SDL window..." << std::endl;
     s_window =
         SDL_CreateWindow("PortalGame", 100, 100, 640, 480,

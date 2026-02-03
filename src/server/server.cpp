@@ -25,6 +25,10 @@ void sv::Server::Run()
     timeBeginPeriod(1);
 #endif
 
+#ifndef NDEBUG
+    std::cout << "Running DEBUG build!" << std::endl;
+#endif
+
     bool exit = false;
     while (!exit)
     {

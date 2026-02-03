@@ -27,6 +27,8 @@ void gfx::Renderer::Begin(size_t width, size_t height)
 {
 	current_shader_ = nullptr;
     glViewport(0, 0, width, height);
+
+	//glEnable(GL_MULTISAMPLE);
 }
 
 void gfx::Renderer::ClearColor(const glm::vec3& color)

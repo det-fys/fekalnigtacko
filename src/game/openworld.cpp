@@ -94,7 +94,7 @@ game::OpenWorld::OpenWorld() : World("openworld")
     // }
 
     // spawn bots
-    for (size_t i = 0; i < 70; ++i)
+    for (size_t i = 0; i < 300; ++i)
     {
         SpawnBot();
     }

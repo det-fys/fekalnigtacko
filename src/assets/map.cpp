@@ -2,6 +2,9 @@
 
 #include <algorithm>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/norm.hpp>
+
 #include "cache.hpp"
 #include "cmdfile.hpp"
 #include "utils/files.hpp"
@@ -168,10 +171,19 @@ void assets::Map::Draw(const game::view::DrawArgs& args) const
 
     const auto& mesh = *basemodel_->GetMesh();
 
+    const float max_dist = args.render_distance + 200.0f;
+    const float max_dist2 = max_dist * max_dist;
+
     for (auto& chunk : chunks_)
     {
-        if (args.frustum.IsAABBVisible(chunk.aabb))
-            DrawChunk(args, mesh, chunk);
+        glm::vec3 center = (chunk.aabb.min + chunk.aabb.max) * 0.5f;
+        if (glm::distance2(args.eye, center) > max_dist2)
+            continue;
+
+        if (!args.frustum.IsAABBVisible(chunk.aabb))
+            continue;
+
+        DrawChunk(args, mesh, chunk);
     }
 
 }

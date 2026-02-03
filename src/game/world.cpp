@@ -35,7 +35,9 @@ void game::World::RegisterEntity(std::unique_ptr<Entity> ent)
 void game::World::Update(int64_t delta_time)
 {
     time_ms_ += delta_time; 
-    GetBtWorld().stepSimulation(static_cast<float>(delta_time) * 0.001f, 5);
+    float delta_s = static_cast<float>(delta_time) * 0.001f;
+    // GetBtWorld().stepSimulation(delta_s, 1, delta_s);
+    GetBtWorld().stepSimulation(delta_s, 2, delta_s * 0.5f);
 
     // update entities
     for (auto it = ents_.begin(); it != ents_.end();)

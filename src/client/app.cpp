@@ -89,7 +89,7 @@ void App::Frame()
 		params.view_proj = proj * view;
         params.cam_pos = eye;
 
-		game::view::DrawArgs draw_args(dlist_, params.view_proj, viewport_size_);
+		game::view::DrawArgs draw_args(dlist_, params.view_proj, eye, viewport_size_, 500.0f);
 		world->Draw(draw_args);
 	
 		glm::mat4 camera_world = glm::inverse(view);
