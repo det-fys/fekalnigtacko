@@ -170,15 +170,21 @@ void game::Vehicle::ProcessInput()
 {
     // TODO: totally fix
 
-    float steeringIncrement = .04 * 60;
+    float t_delta = 1.0f / 25.0f;
+
+    // float steeringIncrement = .04 * 60;
     // float steeringClamp = .5;
-    float maxEngineForce = 7000;
+    // float maxEngineForce = 7000;
+    float maxEngineForce = 4500;
     float maxBreakingForce = 300;
+
+    float speed = vehicle_->getCurrentSpeedKmHour();
+    if (glm::abs(speed) > 200.0f)
+        maxEngineForce = 100.0f;
 
     float engineForce = 0;
     float breakingForce = 0;
 
-    float speed = vehicle_->getCurrentSpeedKmHour();
 
     float maxsc = .5f;
     float minsc = .08f;
@@ -186,8 +192,9 @@ void game::Vehicle::ProcessInput()
 
     float steeringClamp = std::max(minsc, (1.f - (std::abs(speed) / sl)) * maxsc);
     // steeringClamp = .5f;
+    float steeringSpeed = steeringClamp * 5.0f;
+    float steeringInc = steeringSpeed * t_delta;
 
-    float t_delta = 1.0f / 25.0f;
 
     const bool in_forward = in_ & (1 << VIN_FORWARD);
     const bool in_backward = in_ & (1 << VIN_BACKWARD);
@@ -220,23 +227,23 @@ void game::Vehicle::ProcessInput()
         if (in_left)
         {
             if (steering_ < steeringClamp)
-                steering_ += steeringIncrement * t_delta;
+                steering_ += steeringInc;
         }
         else
         {
             if (in_right)
             {
                 if (steering_ > -steeringClamp)
-                    steering_ -= steeringIncrement * t_delta;
+                    steering_ -= steeringInc;
             }
             else
             {
-                if (steering_ < -steeringIncrement * t_delta)
-                    steering_ += steeringIncrement * t_delta;
+                if (steering_ < -steeringInc)
+                    steering_ += steeringInc;
                 else
                 {
-                    if (steering_ > steeringIncrement * t_delta)
-                        steering_ -= steeringIncrement * t_delta;
+                    if (steering_ > steeringInc)
+                        steering_ -= steeringInc;
                     else
                     {
                         steering_ = 0.0f;
@@ -249,13 +256,13 @@ void game::Vehicle::ProcessInput()
     {
         if (steering_ < target_steering_)
         {
-            steering_ += steeringIncrement * t_delta;
+            steering_ += steeringInc;
             if (steering_ > target_steering_)
                 steering_ = target_steering_;
         }
         else if (steering_ > target_steering_)
         {
-            steering_ -= steeringIncrement * t_delta;
+            steering_ -= steeringInc;
             if (steering_ < target_steering_)
                 steering_ = target_steering_;
         }
