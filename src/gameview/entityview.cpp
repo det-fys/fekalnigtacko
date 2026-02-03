@@ -46,6 +46,7 @@ bool game::view::EntityView::ReadNametag(net::InMessage& msg)
 
     nametag_ = nametag;
     nametag_text_.SetText(nametag);
+    return true;
 }
 
 void game::view::EntityView::DrawNametag(const DrawArgs& args)
