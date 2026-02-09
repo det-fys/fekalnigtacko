@@ -95,13 +95,9 @@ void game::view::EntityView::DrawAxes(const DrawArgs& args)
         glm::vec3 end(0.0f);
         end[i] = len;
 
-        gfx::DrawBeamCmd cmd;
-        cmd.start = glm::vec3(root_.matrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        cmd.end = glm::vec3(root_.matrix * glm::vec4(end, 1.0f));
-        cmd.color = colors[i];
-        cmd.radius = 0.05f;
-        //cmd.num_segments = 10;
-        //cmd.max_offset = 0.1f;
-        args.dlist.AddBeam(cmd);
+        glm::vec3 beam_start = glm::vec3(root_.matrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        glm::vec3 beam_end = glm::vec3(root_.matrix * glm::vec4(end, 1.0f));
+
+        args.dlist.AddBeam(beam_start, beam_end, colors[i], 0.05f);
     }
 }

@@ -26,6 +26,8 @@ set(COMMON_SOURCES
     "src/collision/trianglemesh.hpp"
     "src/collision/trianglemesh.cpp"
     "src/game/player_input.hpp"
+    "src/game/skeletoninstance.hpp"
+    "src/game/skeletoninstance.cpp"
     "src/game/transform_node.hpp"
     "src/game/vehicle_sync.hpp"
     "src/net/defs.hpp"
@@ -67,6 +69,8 @@ set(CLIENT_ONLY_SOURCES
     "src/client/gl.hpp"
     "src/client/main.cpp"
     "src/client/utils.hpp"
+    "src/gameview/characterview.hpp"
+    "src/gameview/characterview.cpp"
     "src/gameview/client_session.hpp"
     "src/gameview/client_session.cpp"
     "src/gameview/entityview.hpp"
@@ -102,6 +106,8 @@ set(CLIENT_ONLY_SOURCES
 )
 
 set(SERVER_ONLY_SOURCES
+    "src/game/character.hpp"
+    "src/game/character.cpp"
     "src/game/entity.hpp"
     "src/game/entity.cpp"
     "src/game/game.hpp"

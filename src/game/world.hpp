@@ -35,6 +35,7 @@ public:
     // events
     virtual void PlayerJoined(Player& player) {}
     virtual void PlayerInput(Player& player, PlayerInputType type, bool enabled) {}
+    virtual void PlayerViewAnglesChanged(Player& player, float yaw, float pitch) {}
     virtual void PlayerLeft(Player& player) {}
 
     Entity* GetEntity(net::EntNum entnum);

@@ -94,7 +94,7 @@ game::OpenWorld::OpenWorld() : World("openworld")
     // }
 
     // spawn bots
-    for (size_t i = 0; i < 300; ++i)
+    for (size_t i = 0; i < 100; ++i)
     {
         SpawnBot();
     }
@@ -131,40 +131,79 @@ void game::OpenWorld::Update(int64_t delta_time)
 
 void game::OpenWorld::PlayerJoined(Player& player)
 {
-    SpawnVehicle(player);
+    // SpawnVehicle(player);
+    SpawnCharacter(player);
 }
 
 void game::OpenWorld::PlayerInput(Player& player, PlayerInputType type, bool enabled)
 {
-    auto vehicle = player_vehicles_.at(&player);
-    // player.SendChat("input zmenen: " + std::to_string(static_cast<int>(type)) + "=" + (enabled ? "1" : "0"));
+    // auto vehicle = player_vehicles_.at(&player);
+    // // player.SendChat("input zmenen: " + std::to_string(static_cast<int>(type)) + "=" + (enabled ? "1" : "0"));
+
+    // switch (type)
+    // {
+    // case IN_FORWARD:
+    //     vehicle->SetInput(VIN_FORWARD, enabled);
+    //     break;
+
+    // case IN_BACKWARD:
+    //     vehicle->SetInput(VIN_BACKWARD, enabled);
+    //     break;
+
+    // case IN_LEFT:
+    //     vehicle->SetInput(VIN_LEFT, enabled);
+    //     break;
+
+    // case IN_RIGHT:
+    //     vehicle->SetInput(VIN_RIGHT, enabled);
+    //     break;
+
+    // case IN_DEBUG1:
+    //     if (enabled)
+    //         vehicle->SetPosition({ 100.0f, 100.0f, 5.0f });
+    //     break;
+    
+    // case IN_DEBUG2:
+    //     if (enabled)
+    //         SpawnVehicle(player);
+    //     break;
+
+    // default:
+    //     break;
+    // }
+
+    auto character = player_characters_.at(&player);
 
     switch (type)
     {
     case IN_FORWARD:
-        vehicle->SetInput(VIN_FORWARD, enabled);
+        character->SetInput(CIN_FORWARD, enabled);
         break;
 
     case IN_BACKWARD:
-        vehicle->SetInput(VIN_BACKWARD, enabled);
+        character->SetInput(CIN_BACKWARD, enabled);
         break;
 
     case IN_LEFT:
-        vehicle->SetInput(VIN_LEFT, enabled);
+        character->SetInput(CIN_LEFT, enabled);
         break;
 
     case IN_RIGHT:
-        vehicle->SetInput(VIN_RIGHT, enabled);
+        character->SetInput(CIN_RIGHT, enabled);
+        break;
+
+    case IN_JUMP:
+        character->SetInput(CIN_JUMP, enabled);
         break;
 
     case IN_DEBUG1:
         if (enabled)
-            vehicle->SetPosition({ 100.0f, 100.0f, 5.0f });
+            character->SetPosition({ 100.0f, 100.0f, 5.0f });
         break;
     
     case IN_DEBUG2:
         if (enabled)
-            SpawnVehicle(player);
+            SpawnCharacter(player);
         break;
 
     default:
@@ -172,9 +211,17 @@ void game::OpenWorld::PlayerInput(Player& player, PlayerInputType type, bool ena
     }
 }
 
+void game::OpenWorld::PlayerViewAnglesChanged(Player& player, float yaw, float pitch) 
+{
+    auto character = player_characters_.at(&player);
+    std::cout << "player aiming " << yaw << " " << pitch <<std::endl;
+    character->SetForwardYaw(yaw);
+}
+
 void game::OpenWorld::PlayerLeft(Player& player)
 {
-    RemoveVehicle(player);
+    // RemoveVehicle(player);
+    RemoveCharacter(player);
 }
 
 void game::OpenWorld::RemoveVehicle(Player& player)
@@ -184,6 +231,30 @@ void game::OpenWorld::RemoveVehicle(Player& player)
     {
         it->second->Remove();
         player_vehicles_.erase(it);
+    }
+}
+
+void game::OpenWorld::SpawnCharacter(Player& player)
+{
+    RemoveCharacter(player);
+
+    CharacterInfo cinfo;
+    auto& character = Spawn<Character>(cinfo);
+    character.SetNametag("player (" + std::to_string(character.GetEntNum()) + ")");
+    character.SetPosition({ 100.0f, 100.0f, 5.0f });
+
+    player.SetCamera(character.GetEntNum());
+
+    player_characters_[&player] = &character;
+}
+
+void game::OpenWorld::RemoveCharacter(Player& player)
+{
+    auto it = player_characters_.find(&player);
+    if (it != player_characters_.end())
+    {
+        it->second->Remove();
+        player_characters_.erase(it);
     }
 }
 

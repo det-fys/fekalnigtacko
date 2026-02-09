@@ -31,6 +31,8 @@ public:
     void SendChat(const std::string text);
 
     PlayerInputFlags GetInput() const { return in_; }
+    float GetViewYaw() const { return view_yaw_; }
+    float GetViewPitch() const { return view_pitch_; }
 
     ~Player();
 
@@ -46,6 +48,7 @@ private:
 
     // msg handlers
     bool ProcessInputMsg(net::InMessage& msg);
+    bool ProcessViewAnglesMsg(net::InMessage& msg);
 
     // events
     void Input(PlayerInputType type, bool enabled);
@@ -59,6 +62,7 @@ private:
     std::set<net::EntNum> known_ents_;
 
     PlayerInputFlags in_ = 0;
+    float view_yaw_ = 0.0f, view_pitch_ = 0.0f;
 
     net::EntNum cam_ent_ = 0;
     glm::vec3 cull_pos_ = glm::vec3(0.0f);

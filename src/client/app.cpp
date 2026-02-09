@@ -94,6 +94,25 @@ void App::Frame()
 	
 		glm::mat4 camera_world = glm::inverse(view);
 		audiomaster_.SetListenerOrientation(camera_world);
+
+		if (time_ - last_send_time_ > 0.040f)
+		{
+			net::ViewYawQ yaw_q;
+			net::ViewPitchQ pitch_q;
+			yaw_q.Encode(session_->GetYaw());
+			pitch_q.Encode(session_->GetPitch());
+
+			if (yaw_q.value != view_yaw_q_.value || pitch_q.value != view_pitch_q_.value)
+			{
+				auto msg = BeginMsg(net::MSG_VIEWANGLES);
+				msg.Write(yaw_q.value);
+				msg.Write(pitch_q.value);
+				
+				view_yaw_q_.value = yaw_q.value;
+				view_pitch_q_.value = pitch_q.value;
+				last_send_time_ = time_;
+			}
+		}
 	}
 	
 	// draw chat
@@ -101,15 +120,6 @@ void App::Frame()
 	DrawChat(dlist_);
 
 	renderer_.DrawList(dlist_, params);
-
-	// if (time_ - last_send_time_ > 0.040f)
-	// {
-    //     auto msg = BeginMsg(net::MSG_IN);
-    //     msg.Write(input_);
-
-	// 	last_send_time_ = time_;
-
-	// }
 }
 
 void App::Connected()
@@ -153,7 +163,7 @@ void App::MouseMove(const glm::vec2& delta)
 {
 	float sensitivity = 0.002f; // Sensitivity factor for mouse movement
 
-	float delta_yaw = delta.x * sensitivity;
+	float delta_yaw = -delta.x * sensitivity;
 	float delta_pitch = -delta.y * sensitivity;
 
 	if (session_)

@@ -17,8 +17,11 @@ enum MessageType : uint8_t
     // ID <PlayerName>
     MSG_ID,
 
-    // IN <PlayerInputFlags> <ViewYawQ> <ViewPitchQ>
+    // IN <u8, MSB=down/~up, 6..0=input type>
     MSG_IN,
+
+    // VIEWANGLES <ViewYawQ> <ViewPitchQ>
+    MSG_VIEWANGLES,
 
     /*~~~~~~~~ Session ~~~~~~~~*/
     // CHAT <ChatMessage>
@@ -82,6 +85,7 @@ struct PositionQ
 };
 
 using AngleQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
+using PositiveAngleQ = Quantized<uint16_t, 0, PI_N * 2, PI_D>;
 
 using QuatElemQ = Quantized<uint16_t, -1, 1, 1>;
 struct QuatQ

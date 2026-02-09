@@ -31,6 +31,9 @@ public:
 
     audio::Master& GetAudioMaster() const;
 
+    float GetYaw() const { return yaw_; }
+    float GetPitch() const { return pitch_; }
+
 private:
     // msg handlers
     bool ProcessWorldMsg(net::InMessage& msg);

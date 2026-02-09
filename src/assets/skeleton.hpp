@@ -1,47 +1,46 @@
 #pragma once
 
-#include <string>
-#include <vector>
 #include <map>
 #include <memory>
+#include <string>
+#include <vector>
 
-#include "utils/transform.hpp"
 #include "animation.hpp"
+#include "utils/transform.hpp"
 
 namespace assets
 {
-	struct Bone
-	{
-		int parent_idx;
-		std::string name;
-		Transform bind_transform;
-		glm::mat4 inv_bind_matrix;
-	};
 
-	class Skeleton
-	{
-		std::vector<Bone> bones_;
-		std::map<std::string, int> bone_map_;
+struct Bone
+{
+    int parent_idx;
+    std::string name;
+    Transform bind_transform;
+    glm::mat4 inv_bind_matrix;
+};
 
-		std::map<std::string, std::shared_ptr<const Animation>> anims_;
+class Skeleton
+{
+public:
+    Skeleton() = default;
+    static std::shared_ptr<const Skeleton> LoadFromFile(const std::string& filename);
 
-	public:
-		Skeleton() = default;
+    int GetBoneIndex(const std::string& name) const;
 
-		void AddBone(const std::string& name, const std::string& parent_name, const Transform& transform);
+    size_t GetNumBones() const { return bones_.size(); }
+    const Bone& GetBone(size_t idx) const { return bones_[idx]; }
 
-		int GetBoneIndex(const std::string& name) const;
-		
-		size_t GetNumBones() const { return bones_.size(); }
-		const Bone& GetBone(size_t idx) const { return bones_[idx]; }
+    const Animation* GetAnimation(const std::string& name) const;
 
-		const Animation* GetAnimation(const std::string& name) const;
+private:
+    void AddBone(const std::string& name, const std::string& parent_name, const Transform& transform);
+    void AddAnimation(const std::string& name, const std::shared_ptr<const Animation>& anim) { anims_[name] = anim; }
 
-		static std::shared_ptr<const Skeleton> LoadFromFile(const std::string& filename);
+private:
+    std::vector<Bone> bones_;
+    std::map<std::string, int> bone_map_;
 
-	private:
-		void AddAnimation(const std::string& name, const std::shared_ptr<const Animation>& anim) { anims_[name] = anim; }
-	};
+    std::map<std::string, std::shared_ptr<const Animation>> anims_;
+};
 
-
-}
+} // namespace assets

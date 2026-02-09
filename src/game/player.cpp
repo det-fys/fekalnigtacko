@@ -18,6 +18,10 @@ bool game::Player::ProcessMsg(net::MessageType type, net::InMessage& msg)
     {
     case net::MSG_IN:
         return ProcessInputMsg(msg);
+
+    case net::MSG_VIEWANGLES:
+        return ProcessViewAnglesMsg(msg);
+
     default:
         return false;
     }
@@ -187,6 +191,23 @@ bool game::Player::ProcessInputMsg(net::InMessage& msg)
     return true;
 }
 
+bool game::Player::ProcessViewAnglesMsg(net::InMessage& msg)
+{
+    net::ViewYawQ yaw_q;
+    net::ViewPitchQ pitch_q;
+
+    if (!msg.Read(yaw_q.value) || !msg.Read(pitch_q.value))
+        return false;
+
+    view_yaw_ = yaw_q.Decode();
+    view_pitch_ = pitch_q.Decode();
+    
+    if (world_)
+        world_->PlayerViewAnglesChanged(*this, view_yaw_, view_pitch_);
+        
+    return true;
+}
+
 void game::Player::Input(PlayerInputType type, bool enabled)
 {
     if (enabled)
@@ -200,3 +221,4 @@ void game::Player::Input(PlayerInputType type, bool enabled)
             world_->PlayerInput(*this, type, enabled);
     }
 }
+

@@ -53,17 +53,13 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
 
             glm::vec3 angles;
 
-            auto trans = &obj.node.local;
-
-            iss >> trans->position.x >> trans->position.y >> trans->position.z;
-            iss >> angles.x >> angles.y >> angles.z;
-            trans->SetAngles(angles);
-            iss >> trans->scale;
+            auto& trans = obj.node.local;
+            ParseTransform(iss, trans);
 
             obj.node.UpdateMatrix();
 
-            obj.aabb.min = trans->position - glm::vec3(1.0f);
-            obj.aabb.max = trans->position + glm::vec3(1.0f);
+            obj.aabb.min = trans.position - glm::vec3(1.0f);
+            obj.aabb.max = trans.position + glm::vec3(1.0f);
 
             std::string flag;
             while (iss >> flag)

@@ -1,7 +1,7 @@
 #include "client_session.hpp"
 
-#include <iostream>
 #include "client/app.hpp"
+#include <iostream>
 // #include <glm/gtx/common.hpp>
 
 game::view::ClientSession::ClientSession(App& app) : app_(app) {}
@@ -32,7 +32,7 @@ bool game::view::ClientSession::ProcessSingleMessage(net::MessageType type, net:
 
     case net::MSG_CAM:
         return ProcessCameraMsg(msg);
-    
+
     case net::MSG_CHAT:
         return ProcessChatMsg(msg);
 
@@ -47,16 +47,18 @@ bool game::view::ClientSession::ProcessSingleMessage(net::MessageType type, net:
 
 void game::view::ClientSession::ProcessMouseMove(float delta_yaw, float delta_pitch)
 {
-    yaw_ += delta_yaw;
-    // yaw_ = glm::fmod(yaw_, 2.0f * glm::pi<float>());
+    yaw_ = glm::mod(yaw_ + delta_yaw, glm::two_pi<float>());
 
     pitch_ += delta_pitch;
     // Clamp pitch to avoid gimbal lock
-	if (pitch_ > glm::radians(89.0f)) {
-		pitch_ = glm::radians(89.0f);
-	} else if (pitch_ < glm::radians(-89.0f)) {
-		pitch_ = glm::radians(-89.0f);
-	}
+    if (pitch_ > glm::radians(89.0f))
+    {
+        pitch_ = glm::radians(89.0f);
+    }
+    else if (pitch_ < glm::radians(-89.0f))
+    {
+        pitch_ = glm::radians(-89.0f);
+    }
 }
 
 void game::view::ClientSession::Update(const UpdateInfo& info)
@@ -76,11 +78,11 @@ void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) con
             center += ent->GetRoot().local.position;
     }
 
-	float yaw_cos = glm::cos(yaw_);
-	float yaw_sin = glm::sin(yaw_);
-	float pitch_cos = glm::cos(pitch_);
-	float pitch_sin = glm::sin(pitch_);
-    glm::vec3 dir(yaw_sin * pitch_cos, yaw_cos * pitch_cos, pitch_sin);
+    float yaw_cos = glm::cos(yaw_);
+    float yaw_sin = glm::sin(yaw_);
+    float pitch_cos = glm::cos(pitch_);
+    float pitch_sin = glm::sin(pitch_);
+    glm::vec3 dir(yaw_cos * pitch_cos, yaw_sin * pitch_cos, pitch_sin);
 
     float distance = 8.0f;
 

@@ -2,6 +2,7 @@
 
 #include "assets/cache.hpp"
 
+#include "characterview.hpp"
 #include "vehicleview.hpp"
 #include "client_session.hpp"
 
@@ -77,6 +78,10 @@ bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)
     {
         switch (type)
         {
+        case net::ET_CHARACTER:
+            entslot = std::make_unique<CharacterView>(*this, msg);
+            break;
+    
         case net::ET_VEHICLE:
             entslot = std::make_unique<VehicleView>(*this, msg);
             break;
