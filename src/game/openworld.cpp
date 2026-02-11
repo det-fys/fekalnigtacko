@@ -214,7 +214,6 @@ void game::OpenWorld::PlayerInput(Player& player, PlayerInputType type, bool ena
 void game::OpenWorld::PlayerViewAnglesChanged(Player& player, float yaw, float pitch) 
 {
     auto character = player_characters_.at(&player);
-    std::cout << "player aiming " << yaw << " " << pitch <<std::endl;
     character->SetForwardYaw(yaw);
 }
 

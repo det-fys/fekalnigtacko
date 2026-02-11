@@ -75,6 +75,8 @@ set(CLIENT_ONLY_SOURCES
     "src/gameview/client_session.cpp"
     "src/gameview/entityview.hpp"
     "src/gameview/entityview.cpp"
+    "src/gameview/skinning_ubo.hpp"
+    "src/gameview/skinning_ubo.cpp"
     "src/gameview/vehicleview.hpp"
     "src/gameview/vehicleview.cpp"
     "src/gameview/worldview.hpp"

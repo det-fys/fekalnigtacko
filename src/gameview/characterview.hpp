@@ -1,7 +1,9 @@
 #pragma once
 
 #include "entityview.hpp"
+#include "assets/model.hpp"
 #include "game/skeletoninstance.hpp"
+#include "skinning_ubo.hpp"
 
 namespace game::view
 {
@@ -24,7 +26,10 @@ private:
 private:
     float yaw_ = 0.0f;
 
+    std::shared_ptr<const assets::Model> basemodel_;
     SkeletonInstance sk_;
+    SkinningUBO ubo_;
+    bool ubo_valid_ = false;
 
 };
 

@@ -3,8 +3,8 @@
 #include <string>
 #include <memory>
 
+#include "skeleton.hpp"
 #include "utils/defs.hpp"
-
 #include "collision/trianglemesh.hpp"
 
 #ifdef CLIENT
@@ -43,6 +43,7 @@ public:
     const collision::TriangleMesh* GetColMesh() const { return cmesh_.get(); }
     btCollisionShape* GetColShape() const { return cshape_.get(); }
 
+    const std::shared_ptr<const Skeleton>& GetSkeleton() const { return skeleton_; }
     CLIENT_ONLY(const std::shared_ptr<const Mesh>& GetMesh() const { return mesh_; })
 
 private:
@@ -50,6 +51,7 @@ private:
     // std::vector<ModelCollisionShape> cshapes_;
     std::unique_ptr<btCollisionShape> cshape_;
 
+    std::shared_ptr<const Skeleton> skeleton_;
     CLIENT_ONLY(std::shared_ptr<const Mesh> mesh_;)
 
 };

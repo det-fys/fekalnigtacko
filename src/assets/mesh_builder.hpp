@@ -11,8 +11,8 @@ namespace assets
 
 struct MeshVertexBoneInfluence
 {
-    int bone_index;
-    float weight;
+    int bone_index = -1;
+    float weight = 0.0f;
 };
 
 struct MeshVertex

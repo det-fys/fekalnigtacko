@@ -141,6 +141,7 @@ SHADER_HEADER
 R"GLSL(
 layout (location = 0) in vec3 a_pos;
 layout (location = 1) in vec3 a_normal;
+layout (location = 2) in vec4 a_color;
 layout (location = 3) in vec2 a_uv;
 layout (location = 5) in ivec4 a_bone_ids;
 layout (location = 6) in vec4 a_bone_weights;
@@ -156,7 +157,6 @@ COMPUTE_LIGHTS_GLSL
 R"GLSL(
 
 out vec2 v_uv;
-
 out vec3 v_color;
 
 void main() {
@@ -168,13 +168,12 @@ void main() {
         }
     }
 
-    vec4 world_pos = u_model * bone_transform * vec4(a_pos, 1.0);
-    vec3 world_normal = normalize(mat3(u_model) * mat3(bone_transform) * a_normal);
+    vec4 world_pos = bone_transform * vec4(a_pos, 1.0);
+    vec3 world_normal = normalize(mat3(bone_transform) * a_normal);
     gl_Position = u_view_proj * world_pos;
 
     v_uv = a_uv;
-
-    v_color = ComputeLights(world_pos.xyz, world_normal);
+    v_color = ComputeLights(world_pos.xyz, world_normal) * a_color.rgb;
 }	
 )GLSL",
 
@@ -182,16 +181,33 @@ void main() {
 SHADER_HEADER
 R"GLSL(
 in vec2 v_uv;
-
 in vec3 v_color;
 
+#define SHF_CULL_ALPHA 1
+#define SHF_BACKGROUND 2
+
 uniform sampler2D u_tex;
+uniform vec4 u_color;
+uniform int u_flags;
 
 layout (location = 0) out vec4 o_color;
 
 void main() {
     o_color = vec4(texture(u_tex, v_uv));
+    
+    if ((u_flags & SHF_CULL_ALPHA) > 0)
+    {
+        if (o_color.a < 0.5)
+            discard;
+    }
+    else if ((u_flags & SHF_BACKGROUND) > 0)
+    {
+        // blend with bg
+        o_color = mix(u_color, o_color, o_color.a);
+    }
+    
     o_color.rgb *= v_color; // Apply vertex color
+    //o_color = vec4(1.0, 0.0, 0.0, 1.0);
 }	
 
 )GLSL",

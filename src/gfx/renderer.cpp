@@ -167,6 +167,7 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 	// cache to eliminate fake state changes
 	const gfx::Texture* last_texture = nullptr;
 	const gfx::VertexArray* last_vao = nullptr;
+    const gfx::UniformBuffer<glm::mat4>* last_skin = nullptr;
 	InvalidateShaders();
 	
 	// enable depth test
@@ -288,6 +289,13 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 			GLuint tex_id = surface->texture ? surface->texture->GetId() : 0;
 			glBindTexture(GL_TEXTURE_2D, tex_id);
 			last_texture = surface->texture.get();
+		}
+
+		// bind skinning UBO
+		if (cmd.skinning && last_skin != cmd.skinning)
+		{
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, cmd.skinning->GetId());
+            last_skin = cmd.skinning;
 		}
 
 		// bind VAO

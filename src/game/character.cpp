@@ -48,6 +48,7 @@ void game::Character::Update()
 
     auto bt_trans = bt_ghost_.getWorldTransform();
     root_.local.SetBtTransform(bt_trans);
+    root_.local.position.z -= shape_.height * 0.5f + shape_.radius - 0.05f; // foot pos
 
     UpdateMovement();
     SendUpdateMsg();

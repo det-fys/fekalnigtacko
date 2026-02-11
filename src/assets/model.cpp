@@ -27,7 +27,15 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
     
                 v.uv.y = 1.0f - v.uv.y; // FLIP FOR GL
                 
-                // TODO: LUV & bone data
+                if (model->skeleton_)
+                {
+                    size_t num_bones = 0;
+                    iss >> num_bones;
+                    for (size_t i = 0; i < num_bones; ++i)
+                    {
+                        iss >> v.bones[i].bone_index >> v.bones[i].weight;
+                    }
+                }
     
                 mb.AddVertex(v);
             )
@@ -48,6 +56,7 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                 t.vert[0] = indices[0];
                 t.vert[1] = indices[1];
                 t.vert[2] = indices[2];
+
                 mb.AddTriangle(t);
             )
 
@@ -97,7 +106,7 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                 std::shared_ptr<const gfx::Texture> texture;
                 if (!texture_name.empty())
                 {
-                    texture = CacheManager::GetTexture("data/" + surface_name + ".png");
+                    texture = CacheManager::GetTexture("data/" + texture_name + ".png");
                 }
     
                 mb.BeginSurface(sflags, surface_name, texture);
@@ -111,10 +120,18 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
         {
             temp_hull = std::make_unique<btConvexHullShape>();
         }
+        else if (command == "skeleton")
+        {
+            std::string skel_name;
+            iss >> skel_name;
+            model->skeleton_ = CacheManager::GetSkeleton("data/" + skel_name + ".sk");
+            CLIENT_ONLY(mb.SetMeshFlag(gfx::MF_SKELETAL));
+        }
         else
         {
             throw std::runtime_error("Unknown command in model file: " + command);
         }
+        
 
         // TODO: skeleton
     });
