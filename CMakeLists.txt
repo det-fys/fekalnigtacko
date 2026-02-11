@@ -25,6 +25,8 @@ set(COMMON_SOURCES
     "src/collision/motionstate.hpp"
     "src/collision/trianglemesh.hpp"
     "src/collision/trianglemesh.cpp"
+    "src/game/character_anim_state.hpp"
+    "src/game/character_anim_state.cpp"
     "src/game/player_input.hpp"
     "src/game/skeletoninstance.hpp"
     "src/game/skeletoninstance.cpp"

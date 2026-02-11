@@ -1,6 +1,8 @@
 #include "character.hpp"
 #include "world.hpp"
 #include "net/utils.hpp"
+#include "assets/cache.hpp"
+#include "utils/math.hpp"
 
 game::Character::Character(World& world, const CharacterInfo& info)
     : Super(world, net::ET_CHARACTER), shape_(info.shape), bt_shape_(shape_.radius, shape_.height),
@@ -14,12 +16,14 @@ game::Character::Character(World& world, const CharacterInfo& info)
 
     
     btDynamicsWorld& bt_world = world_.GetBtWorld();
-    static btGhostPairCallback ghostpaircb;
-    bt_world.getBroadphase()->getOverlappingPairCache()->setInternalGhostPairCallback(&ghostpaircb);
-    // bt_world.addCollisionObject(&bt_ghost_, btBroadphaseProxy::CharacterFilter,
-    //                             btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter);
-    bt_world.addCollisionObject(&bt_ghost_);
+    bt_world.addCollisionObject(&bt_ghost_, btBroadphaseProxy::CharacterFilter,
+                                btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter);
+    // bt_world.addCollisionObject(&bt_ghost_);
     bt_world.addAction(&bt_character_);
+
+    sk_ = SkeletonInstance(assets::CacheManager::GetSkeleton("data/human.sk"), &root_);
+    animstate_.idle_anim_idx = GetAnim("idle");
+    animstate_.walk_anim_idx = GetAnim("walk");
 }
 
 static bool Turn(float& angle, float target, float step)
@@ -51,12 +55,21 @@ void game::Character::Update()
     root_.local.position.z -= shape_.height * 0.5f + shape_.radius - 0.05f; // foot pos
 
     UpdateMovement();
+
+    sync_current_ = 1 - sync_current_;
+    UpdateSyncState();
     SendUpdateMsg();
 }
 
 void game::Character::SendInitData(Player& player, net::OutMessage& msg) const
 {
     Super::SendInitData(player, msg);
+
+    // write state against default
+    static const CharacterSyncState default_state;
+    size_t fields_pos = msg.Reserve<CharacterSyncFieldFlags>();
+    auto fields = WriteState(msg, default_state);
+    msg.WriteAt(fields_pos, fields);
 }
 
 void game::Character::SetInput(CharacterInputType type, bool enable)
@@ -110,7 +123,7 @@ game::Character::~Character()
 void game::Character::UpdateMovement()
 {
     constexpr float dt = 1.0f / 25.0f;
-
+    bool walking = false;
     glm::vec2 movedir(0.0f);
 
     if (in_ & (1 << CIN_FORWARD))
@@ -129,6 +142,7 @@ void game::Character::UpdateMovement()
 
     if (movedir.x != 0.0f || movedir.y != 0.0f)
     {
+        walking = true;
         float target_yaw = forward_yaw_ + std::atan2(movedir.y, movedir.x);
         Turn(yaw_, target_yaw, 4.0f * dt);
 
@@ -142,16 +156,96 @@ void game::Character::UpdateMovement()
     {
         bt_character_.jump(btVector3(0.0f, 0.0f, 10.0f));
     }
+
+    // update anim
+    float run_blend_target = walking ? 0.5f : 0.0f;
+    MoveToward(animstate_.loco_blend, run_blend_target, dt * 2.0f);
+    float anim_speed = glm::mix(0.5f, 1.5f, UnMix(0.0f, 0.5f, animstate_.loco_blend));
+    animstate_.loco_phase = glm::mod(animstate_.loco_phase + anim_speed * dt, 1.0f);
+}
+
+void game::Character::UpdateSyncState()
+{
+    auto& state = sync_[sync_current_];
+
+    // transform
+    net::EncodePosition(root_.local.position, state.pos);
+    state.yaw.Encode(yaw_);
+
+    // idle
+    state.idle_anim = animstate_.idle_anim_idx;
+
+    // loco
+    state.walk_anim = animstate_.walk_anim_idx;
+    state.run_anim = animstate_.run_anim_idx;
+    state.loco_phase.Encode(animstate_.loco_phase);
+    state.loco_blend.Encode(animstate_.loco_blend);
+
+
 }
 
 void game::Character::SendUpdateMsg()
 {  
-    net::PositionQ posq;
-    net::EncodePosition(root_.local.position, posq);
-
     auto msg = BeginEntMsg(net::EMSG_UPDATE);
-    net::WritePositionQ(msg, posq);
-    msg.Write<net::PositiveAngleQ>(yaw_);
+    auto fields_pos = msg.Reserve<CharacterSyncFieldFlags>();
+    auto fields = WriteState(msg, sync_[1 - sync_current_]);
+
+    // TODO: allow this
+    // if (fields == 0)
+    // {
+    //     DiscardMsg();
+    //     return;
+    // }
+
+    msg.WriteAt(fields_pos, fields);
+}
+
+game::CharacterSyncFieldFlags game::Character::WriteState(net::OutMessage& msg, const CharacterSyncState& base) const
+{
+    const auto& curr = sync_[sync_current_];
+
+    game::CharacterSyncFieldFlags fields = 0;
+
+    // transform
+    if (curr.pos.x.value != base.pos.x.value || curr.pos.y.value != base.pos.y.value ||
+        curr.pos.z.value != base.pos.z.value || curr.yaw.value != base.yaw.value)
+    {
+        fields |= CSF_TRANSFORM;
+
+        net::WriteDelta(msg, curr.pos.x, base.pos.x);
+        net::WriteDelta(msg, curr.pos.y, base.pos.y);
+        net::WriteDelta(msg, curr.pos.z, base.pos.z);
+
+        net::WriteDelta(msg, curr.yaw, base.yaw);
+    }
+
+    // idle
+    if (curr.idle_anim != base.idle_anim)
+    {
+        fields |= CSF_IDLE_ANIM;
+
+        msg.Write(curr.idle_anim);
+    }
+
+    // loco anims
+    if (curr.walk_anim != base.walk_anim || curr.run_anim != base.run_anim)
+    {
+        fields |= CSF_LOCO_ANIMS;
+
+        msg.Write(curr.walk_anim);
+        msg.Write(curr.run_anim);
+    }
+
+    // loco vals
+    if (curr.loco_blend.value != base.loco_blend.value || curr.loco_phase.value != base.loco_phase.value)
+    {
+        fields |= CSF_LOCO_VALS;
+
+        net::WriteDelta(msg, curr.loco_blend, base.loco_blend);
+        net::WriteDelta(msg, curr.loco_phase, base.loco_phase);
+    }
+
+    return fields;
 }
 
 void game::Character::Move(glm::vec3& velocity, float t)
@@ -187,4 +281,9 @@ void game::Character::Move(glm::vec3& velocity, float t)
     //     u -= glm::dot(u, hit_normal) * hit_normal;               // Reflect the velocity along the hit normal
     //     velocity -= glm::dot(velocity, hit_normal) * hit_normal; // Adjust the velocity
     // }
+}
+
+assets::AnimIdx game::Character::GetAnim(const std::string& name) const
+{
+    return sk_.GetSkeleton()->GetAnimationIdx(name);
 }

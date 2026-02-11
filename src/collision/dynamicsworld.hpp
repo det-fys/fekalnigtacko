@@ -3,6 +3,7 @@
 #include <map>
 
 #include <btBulletDynamicsCommon.h>
+#include <BulletCollision/CollisionDispatch/btGhostObject.h>
 
 #include "assets/map.hpp"
 
@@ -44,6 +45,7 @@ private:
 
     btDefaultCollisionConfiguration bt_cfg_;
     btCollisionDispatcher bt_dispatcher_;
+    btGhostPairCallback bt_ghost_pair_cb_;
     btDbvtBroadphase bt_broadphase_;
     btSequentialImpulseConstraintSolver bt_solver_;
     btDiscreteDynamicsWorld bt_world_;

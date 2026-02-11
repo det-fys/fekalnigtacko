@@ -8,18 +8,21 @@ collision::DynamicsWorld::DynamicsWorld(std::shared_ptr<const assets::Map> map)
 {
     bt_world_.setGravity(btVector3(0, 0, -9.81f));
 
+    bt_broadphase_.getOverlappingPairCache()->setInternalGhostPairCallback(&bt_ghost_pair_cb_);
+    
     AddMapCollision();
 
-    btTransform t;
-    t.setIdentity();
-    t.setOrigin(btVector3(0,0,-12));
+    // btTransform t;
+    // t.setIdentity();
+    // t.setOrigin(btVector3(0,0,-12));
+
 
     // TODO: remove
-    static btDefaultMotionState motion(t);
-    static btBoxShape box(btVector3(100, 100, 2));
-    btRigidBody::btRigidBodyConstructionInfo rbInfo(0.0f, &motion, &box, btVector3(0,0,0));
-    static btRigidBody body(rbInfo);
-    bt_world_.addRigidBody(&body);
+    // static btDefaultMotionState motion(t);
+    // static btBoxShape box(btVector3(100, 100, 2));
+    // btRigidBody::btRigidBodyConstructionInfo rbInfo(0.0f, &motion, &box, btVector3(0,0,0));
+    // static btRigidBody body(rbInfo);
+    // bt_world_.addRigidBody(&body);
 }
 
 void collision::DynamicsWorld::AddMapCollision()
@@ -36,11 +39,13 @@ void collision::DynamicsWorld::AddMapCollision()
     }
 
     // add static objects
-
-    // for (const auto& sobjs = map_->GetStaticObjects(); const auto& sobj : sobjs)
-    // {
-    //     AddModelInstance(*sobj.model, sobj.node.local);
-    // }
+    for (const auto& chunks = map_->GetChunks(); const auto& chunk : chunks)
+    {
+        for (const auto& obj : chunk.objs)
+        {
+            AddModelInstance(*obj.model, obj.node.local);
+        }
+    }
 }
 
 void collision::DynamicsWorld::AddModelInstance(const assets::Model& model, const Transform& trans)

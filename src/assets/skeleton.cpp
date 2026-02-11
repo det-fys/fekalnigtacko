@@ -54,14 +54,27 @@ int assets::Skeleton::GetBoneIndex(const std::string& name) const
     return -1;
 }
 
+assets::AnimIdx assets::Skeleton::GetAnimationIdx(const std::string& name) const
+{
+    auto it = anim_idxs_.find(name);
+    if (it != anim_idxs_.end())
+    {
+        return it->second;
+    }
+    return NO_ANIM;
+}
+
+const assets::Animation* assets::Skeleton::GetAnimation(AnimIdx idx) const
+{
+    if (idx >= anims_.size())
+        return nullptr;
+
+    return anims_[idx].get();
+}
+
 const assets::Animation* assets::Skeleton::GetAnimation(const std::string& name) const
 {
-    auto it = anims_.find(name);
-    if (it != anims_.end())
-    {
-        return it->second.get();
-    }
-    return nullptr;
+    return GetAnimation(GetAnimationIdx(name));
 }
 
 void assets::Skeleton::AddBone(const std::string& name, const std::string& parent_name, const Transform& transform)
@@ -75,4 +88,10 @@ void assets::Skeleton::AddBone(const std::string& name, const std::string& paren
     bone.inv_bind_matrix = glm::inverse(transform.ToMatrix());
 
     bone_map_[bone.name] = index;
+}
+
+void assets::Skeleton::AddAnimation(const std::string& name, const std::shared_ptr<const Animation>& anim)
+{
+    anim_idxs_[name] = anims_.size();
+    anims_.push_back(anim);
 }

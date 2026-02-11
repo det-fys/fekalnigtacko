@@ -100,4 +100,7 @@ using ColorQ = Quantized<uint8_t, 0, 1>;
 
 using NameTag = FixedStr<64>;
 
+using AnimBlendQ = Quantized<uint8_t, 0, 1>;
+using AnimTimeQ = Quantized<uint8_t, 0, 1>;
+
 } // namespace net

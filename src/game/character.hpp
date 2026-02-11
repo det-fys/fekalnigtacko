@@ -3,6 +3,8 @@
 #include "entity.hpp"
 #include "BulletCollision/CollisionDispatch/btGhostObject.h"
 #include "BulletDynamics/Character/btKinematicCharacterController.h"
+#include "character_anim_state.hpp"
+#include "character_sync.hpp"
 
 namespace game
 {
@@ -52,9 +54,13 @@ public:
 
 private:
     void UpdateMovement();
+    void UpdateSyncState();
     void SendUpdateMsg();
+    CharacterSyncFieldFlags WriteState(net::OutMessage& msg, const CharacterSyncState& base) const;
 
     void Move(glm::vec3& velocity, float t);
+
+    assets::AnimIdx GetAnim(const std::string& name) const;
 
 private:
     CapsuleShape shape_;
@@ -74,6 +80,11 @@ private:
 
     float walk_speed_ = 2.0f;
 
+    SkeletonInstance sk_;
+    CharacterAnimState animstate_;
+
+    CharacterSyncState sync_[2];
+    size_t sync_current_ = 0;
 };
 
 } // namespace game

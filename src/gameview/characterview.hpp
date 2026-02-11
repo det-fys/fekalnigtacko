@@ -4,9 +4,18 @@
 #include "assets/model.hpp"
 #include "game/skeletoninstance.hpp"
 #include "skinning_ubo.hpp"
+#include "game/character_anim_state.hpp"
+#include "game/character_sync.hpp"
 
 namespace game::view
 {
+
+struct CharacterViewState
+{
+    Transform trans;
+    float loco_blend = 0.0f;
+    float loco_phase = 0.0f;
+};
 
 class CharacterView : public EntityView
 {
@@ -21,6 +30,7 @@ public:
     virtual void Draw(const DrawArgs& args) override;
 
 private:
+    bool ReadState(net::InMessage& msg);
     bool ProcessUpdateMsg(net::InMessage& msg);
 
 private:
@@ -30,6 +40,14 @@ private:
     SkeletonInstance sk_;
     SkinningUBO ubo_;
     bool ubo_valid_ = false;
+
+    CharacterAnimState animstate_;
+
+    // sync
+    CharacterSyncState sync_;
+    CharacterViewState states_[2];
+    float update_time_ = 0.0f;
+
 
 };
 
