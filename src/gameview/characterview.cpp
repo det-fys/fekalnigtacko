@@ -52,13 +52,13 @@ void game::view::CharacterView::Draw(const DrawArgs& args)
 {
     Super::Draw(args);
 
-    glm::vec3 start = root_.local.position;
-    glm::vec3 end = start + glm::vec3(0.0f, 0.0f, 1.5f);
-    args.dlist.AddBeam(start, end, 0xFF777777, 0.1f);
+    //glm::vec3 start = root_.local.position;
+    //glm::vec3 end = start + glm::vec3(0.0f, 0.0f, 1.5f);
+    //args.dlist.AddBeam(start, end, 0xFF777777, 0.1f);
 
-    start = root_.local.position;
-    end = start + glm::vec3(glm::cos(yaw_), glm::sin(yaw_), 0.0f) * 0.5f;
-    args.dlist.AddBeam(start, end, 0xFF007700, 0.05f);
+    //start = root_.local.position;
+    //end = start + glm::vec3(glm::cos(yaw_), glm::sin(yaw_), 0.0f) * 0.5f;
+    //args.dlist.AddBeam(start, end, 0xFF007700, 0.05f);
 
     //// draw bones debug
     // const auto& bone_nodes = sk_.GetBoneNodes();
