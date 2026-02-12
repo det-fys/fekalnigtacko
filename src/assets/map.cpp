@@ -58,8 +58,8 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
 
             obj.node.UpdateMatrix();
 
-            obj.aabb.min = trans.position - glm::vec3(1.0f);
-            obj.aabb.max = trans.position + glm::vec3(1.0f);
+            obj.aabb.min = trans.position - glm::vec3(10.0f);
+            obj.aabb.max = trans.position + glm::vec3(10.0f);
 
             std::string flag;
             while (iss >> flag)
