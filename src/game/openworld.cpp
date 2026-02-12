@@ -233,6 +233,20 @@ void game::OpenWorld::RemoveVehicle(Player& player)
     }
 }
 
+static glm::vec3 GetRandomColor()
+{
+    glm::vec3 color;
+    // shittiest way to do it
+    for (int i = 0; i < 3; ++i)
+    {
+        net::ColorQ qcol;
+        qcol.value = rand() % 256;
+        color[i] = qcol.Decode();
+    }
+
+    return color;
+}
+
 void game::OpenWorld::SpawnCharacter(Player& player)
 {
     RemoveCharacter(player);
@@ -241,6 +255,10 @@ void game::OpenWorld::SpawnCharacter(Player& player)
     auto& character = Spawn<Character>(cinfo);
     character.SetNametag("player (" + std::to_string(character.GetEntNum()) + ")");
     character.SetPosition({ 100.0f, 100.0f, 5.0f });
+
+    // add clothes
+    character.AddClothes("tshirt", GetRandomColor());
+    character.AddClothes("shorts", GetRandomColor());
 
     player.SetCamera(character.GetEntNum());
 
@@ -531,19 +549,6 @@ static const char* GetRandomCarModel()
     return vehicles[rand() % (sizeof(vehicles) / sizeof(vehicles[0]))];
 }
 
-static glm::vec3 GetRandomColor()
-{
-    glm::vec3 color;
-    // shittiest way to do it
-    for (int i = 0; i < 3; ++i)
-    {
-        net::ColorQ qcol;
-        qcol.value = rand() % 256;
-        color[i] = qcol.Decode();
-    }
-
-    return color;
-}
 
 void game::OpenWorld::SpawnBot()
 {

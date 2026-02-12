@@ -103,4 +103,7 @@ using NameTag = FixedStr<64>;
 using AnimBlendQ = Quantized<uint8_t, 0, 1>;
 using AnimTimeQ = Quantized<uint8_t, 0, 1>;
 
+using NumClothes = uint8_t;
+using ClothesName = FixedStr<32>;
+
 } // namespace net

@@ -65,6 +65,14 @@ void game::Character::SendInitData(Player& player, net::OutMessage& msg) const
 {
     Super::SendInitData(player, msg);
 
+    // write clothes
+    msg.Write<net::NumClothes>(clothes_.size());
+    for (const auto& clothes : clothes_)
+    {
+        msg.Write(net::ClothesName(clothes.name));
+        net::WriteRGB(msg, clothes.color);
+    }
+
     // write state against default
     static const CharacterSyncState default_state;
     size_t fields_pos = msg.Reserve<CharacterSyncFieldFlags>();
@@ -111,6 +119,11 @@ void game::Character::SetPosition(const glm::vec3& position)
     auto trans = bt_ghost_.getWorldTransform();
     trans.setOrigin(btVector3(position.x, position.y, position.z));
     bt_ghost_.setWorldTransform(trans);
+}
+
+void game::Character::AddClothes(std::string name, const glm::vec3& color)
+{
+    clothes_.emplace_back(std::move(name), color);
 }
 
 game::Character::~Character()

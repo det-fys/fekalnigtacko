@@ -33,6 +33,12 @@ struct CharacterInfo
     CapsuleShape shape = CapsuleShape(0.3f, 0.75f);
 };
 
+struct CharacterClothes
+{
+    std::string name;
+    glm::vec3 color;
+};
+
 class Character : public Entity
 {
 public:
@@ -49,6 +55,8 @@ public:
     void SetForwardYaw(float yaw) { forward_yaw_ = yaw; }
 
     void SetPosition(const glm::vec3& position);
+
+    void AddClothes(std::string name, const glm::vec3& color);
 
     ~Character() override;
 
@@ -85,6 +93,8 @@ private:
 
     CharacterSyncState sync_[2];
     size_t sync_current_ = 0;
+
+    std::vector<CharacterClothes> clothes_;
 };
 
 } // namespace game

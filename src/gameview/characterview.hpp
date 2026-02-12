@@ -17,10 +17,18 @@ struct CharacterViewState
     float loco_phase = 0.0f;
 };
 
+struct CharacterViewClothes
+{
+    std::shared_ptr<const assets::Model> model;
+    glm::vec4 color = glm::vec4(1.0f);
+    uint32_t surfacemask = 0;
+};
+
 class CharacterView : public EntityView
 {
 public:
     using Super = EntityView;
+    using SurfaceMask = uint32_t;
 
     CharacterView(WorldView& world, net::InMessage& msg);
     DELETE_COPY_MOVE(CharacterView)
@@ -33,6 +41,11 @@ private:
     bool ReadState(net::InMessage& msg);
     bool ProcessUpdateMsg(net::InMessage& msg);
 
+    SurfaceMask GetSurfaceMask(const std::string& name);
+    void UpdateSurfaceMask();
+
+    void AddClothes(const std::string& name, const glm::vec3& color);
+
 private:
     float yaw_ = 0.0f;
 
@@ -43,12 +56,13 @@ private:
 
     CharacterAnimState animstate_;
 
+    uint32_t surfacemask_ = 0xFFFFFFFF;
+    std::vector<CharacterViewClothes> clothes_;
+
     // sync
     CharacterSyncState sync_;
     CharacterViewState states_[2];
     float update_time_ = 0.0f;
-
-
 };
 
 }

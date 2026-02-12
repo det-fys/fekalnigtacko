@@ -4,18 +4,37 @@
 #include "net/utils.hpp"
 #include "worldview.hpp"
 
-
 game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) : EntityView(world, msg), ubo_(sk_)
 {
+    basemodel_ = assets::CacheManager::GetModel("data/human.mdl");
+    sk_ = SkeletonInstance(basemodel_->GetSkeleton(), &root_);
+    ubo_.Update();
+    ubo_valid_ = true;
+
+    // read clothes
+    net::NumClothes num_clothes = 0;
+    if (!msg.Read(num_clothes))
+        throw EntityInitError();
+
+    for (net::NumClothes i = 0; i < num_clothes; ++i)
+    {
+        net::ClothesName name;
+        glm::vec3 color;
+
+        if (!msg.Read(name) || !net::ReadRGB(msg, color))
+            throw EntityInitError();
+
+        AddClothes(name, color);
+    }
+
+    UpdateSurfaceMask();
+
+    // read initial state
     if (!ReadState(msg))
         throw EntityInitError();
 
     states_[0] = states_[1]; // lerp from the read state to avoid jump
 
-    basemodel_ = assets::CacheManager::GetModel("data/human.mdl");
-    sk_ = SkeletonInstance(basemodel_->GetSkeleton(), &root_);
-    ubo_.Update();
-    ubo_valid_ = true;
 }
 
 bool game::view::CharacterView::ProcessMsg(net::EntMsgType type, net::InMessage& msg)
@@ -73,19 +92,37 @@ void game::view::CharacterView::Draw(const DrawArgs& args)
     //    args.dlist.AddBeam(p0, p1, 0xFF00EEEE, 0.01f);
     //}
 
-    // draw human
-
+    // update skinning matrices
     if (!ubo_valid_)
     {
         ubo_.Update();
         ubo_valid_ = true;
     }
 
-    const auto& mesh = *basemodel_->GetMesh();
-    for (const auto& surface : mesh.surfaces)
+    // draw clothes
+    for (const auto& clothes : clothes_)
     {
+        const auto& mesh = *clothes.model->GetMesh();
+        for (const auto& surface : mesh.surfaces)
+        {
+            gfx::DrawSurfaceCmd cmd;
+            cmd.surface = &surface;
+            cmd.matrices = &root_.matrix;
+            cmd.skinning = &ubo_;
+            cmd.color = &clothes.color;
+            args.dlist.AddSurface(cmd);
+        }
+    }
+
+    // draw basemodel
+    const auto& mesh = *basemodel_->GetMesh();
+    for (size_t i = 0; i < mesh.surfaces.size(); ++i)
+    {
+        if (!(surfacemask_ & (1 << i))) // hidden by clothes?
+            continue;
+
         gfx::DrawSurfaceCmd cmd;
-        cmd.surface = &surface;
+        cmd.surface = &mesh.surfaces[i];
         cmd.matrices = &root_.matrix;
         cmd.skinning = &ubo_;
         args.dlist.AddSurface(cmd);
@@ -155,4 +192,49 @@ bool game::view::CharacterView::ReadState(net::InMessage& msg)
 bool game::view::CharacterView::ProcessUpdateMsg(net::InMessage& msg)
 {
     return ReadState(msg);
+}
+
+game::view::CharacterView::SurfaceMask game::view::CharacterView::GetSurfaceMask(const std::string& name)
+{
+    const auto& surface_names = basemodel_->GetMesh()->surface_names;
+    auto it = surface_names.find(name);
+    if (it != surface_names.end())
+    {
+        return 1 << it->second;
+    }
+
+    return 0;
+}
+
+void game::view::CharacterView::UpdateSurfaceMask()
+{
+    surfacemask_ = 0xFFFFFFFF;
+    for (const auto& clothes : clothes_)
+    {
+        surfacemask_ &= ~clothes.surfacemask;
+    }
+
+}
+
+void game::view::CharacterView::AddClothes(const std::string& name, const glm::vec3& color)
+{
+    CharacterViewClothes c;
+    c.color = glm::vec4(color, 1.0f);
+
+    if (name == "tshirt")
+    {
+        c.model = assets::CacheManager::GetModel("data/tshirt.mdl");
+        c.surfacemask = GetSurfaceMask("upperbody");
+    }
+    else if (name == "shorts")
+    {
+        c.model = assets::CacheManager::GetModel("data/shorts.mdl");
+        c.surfacemask = GetSurfaceMask("upperlegs");
+    }
+    else
+    {
+        return; // unknown??
+    }
+
+    clothes_.emplace_back(std::move(c));
 }
