@@ -45,6 +45,8 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
 
             if (temp_hull)
                 temp_hull->addPoint(btVector3(pos.x, pos.y, pos.z), false);
+
+            model->aabb_.AddPoint(pos);
         }
         else if (command == "f")
         {

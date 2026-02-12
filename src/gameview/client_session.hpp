@@ -5,6 +5,7 @@
 #include "worldview.hpp"
 
 #include "gfx/draw_list.hpp"
+#include "gfx/renderer.hpp"
 #include "net/defs.hpp"
 #include "net/inmessage.hpp"
 
@@ -24,6 +25,7 @@ public:
     void ProcessMouseMove(float delta_yaw, float delta_pitch);
 
     void Update(const UpdateInfo& info);
+    void Draw(gfx::DrawList& dlist, gfx::DrawListParams& params);
 
     const WorldView* GetWorld() const { return world_.get(); } 
 
@@ -31,14 +33,14 @@ public:
 
     audio::Master& GetAudioMaster() const;
 
-    float GetYaw() const { return yaw_; }
-    float GetPitch() const { return pitch_; }
-
 private:
     // msg handlers
     bool ProcessWorldMsg(net::InMessage& msg);
     bool ProcessCameraMsg(net::InMessage& msg);
     bool ProcessChatMsg(net::InMessage& msg);
+
+    void DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params);
+    void SendViewAngles(float time);
 
 private:
     App& app_;
@@ -48,6 +50,9 @@ private:
     float yaw_ = 0.0f, pitch_ = 0.0f;
     net::EntNum follow_ent_ = 0;
 
+    net::ViewYawQ view_yaw_q_;
+    net::ViewPitchQ view_pitch_q_;
+    float last_send_time_ = 0.0f;
 };
 
 } // namespace game::view

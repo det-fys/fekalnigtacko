@@ -9,6 +9,26 @@
 #include "cmdfile.hpp"
 #include "utils/files.hpp"
 
+static AABB3 TransformAABB(const AABB3& aabb, const glm::mat4& mat)
+{
+    const glm::vec3 corners[] = {
+        glm::vec3(aabb.min.x, aabb.min.y, aabb.min.z), glm::vec3(aabb.max.x, aabb.min.y, aabb.min.z),
+        glm::vec3(aabb.min.x, aabb.max.y, aabb.min.z), glm::vec3(aabb.max.x, aabb.max.y, aabb.min.z),
+        glm::vec3(aabb.min.x, aabb.min.y, aabb.max.z), glm::vec3(aabb.max.x, aabb.min.y, aabb.max.z),
+        glm::vec3(aabb.min.x, aabb.max.y, aabb.max.z), glm::vec3(aabb.max.x, aabb.max.y, aabb.max.z),
+    };
+
+    AABB3 new_aabb;
+
+    for (size_t i = 0; i < 8; ++i)
+    {
+        glm::vec3 p = mat * glm::vec4(corners[i], 1.0f);
+        new_aabb.AddPoint(p);
+    }
+
+    return new_aabb;
+}
+
 std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& filename)
 {
     auto map = std::make_shared<Map>();
@@ -58,8 +78,8 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
 
             obj.node.UpdateMatrix();
 
-            obj.aabb.min = trans.position - glm::vec3(10.0f);
-            obj.aabb.max = trans.position + glm::vec3(10.0f);
+            obj.aabb = TransformAABB(obj.model->GetAABB(), obj.node.matrix);
+            chunk->aabb.AddAABB(obj.aabb);
 
             std::string flag;
             while (iss >> flag)
@@ -79,7 +99,6 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
             iss >> coord.x >> coord.y;
             iss >> chunk->aabb.min.x >> chunk->aabb.min.y >> chunk->aabb.min.z;
             iss >> chunk->aabb.max.x >> chunk->aabb.max.y >> chunk->aabb.max.z;
-
         }
         else if (command == "surface")
         {
@@ -181,7 +200,6 @@ void assets::Map::Draw(const game::view::DrawArgs& args) const
 
         DrawChunk(args, mesh, chunk);
     }
-
 }
 
 void assets::Map::DrawChunk(const game::view::DrawArgs& args, const Mesh& basemesh, const Chunk& chunk) const
@@ -219,4 +237,3 @@ void assets::Map::DrawChunk(const game::view::DrawArgs& args, const Mesh& baseme
 }
 
 #endif // CLIENT
-

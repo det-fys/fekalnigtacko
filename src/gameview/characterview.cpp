@@ -35,6 +35,8 @@ game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) 
 
     states_[0] = states_[1]; // lerp from the read state to avoid jump
 
+
+    radius_ = 2.0f;
 }
 
 bool game::view::CharacterView::ProcessMsg(net::EntMsgType type, net::InMessage& msg)

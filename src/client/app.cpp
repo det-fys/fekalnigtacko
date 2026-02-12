@@ -66,7 +66,6 @@ void App::Frame()
 		session_->Update(updinfo);
 	}
 
-	float aspect = static_cast<float>(viewport_size_.x) / static_cast<float>(viewport_size_.y);
 
 	renderer_.Begin(viewport_size_.x, viewport_size_.y);
 	renderer_.ClearColor(glm::vec3(0.5f, 0.7f, 1.0f));
@@ -78,43 +77,11 @@ void App::Frame()
 	params.screen_height = viewport_size_.y;
 	
 	const game::view::WorldView* world;
-	if (session_ && (world = session_->GetWorld()))
+	if (session_)
 	{
-		// glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 3000.0f);
-        glm::vec3 eye;
-		glm::mat4 view;
-        session_->GetViewInfo(eye, view);
-
-		params.view_proj = proj * view;
-        params.cam_pos = eye;
-
-		game::view::DrawArgs draw_args(dlist_, params.view_proj, eye, viewport_size_, 500.0f);
-		world->Draw(draw_args);
-	
-		glm::mat4 camera_world = glm::inverse(view);
-		audiomaster_.SetListenerOrientation(camera_world);
-
-		if (time_ - last_send_time_ > 0.040f)
-		{
-			net::ViewYawQ yaw_q;
-			net::ViewPitchQ pitch_q;
-			yaw_q.Encode(session_->GetYaw());
-			pitch_q.Encode(session_->GetPitch());
-
-			if (yaw_q.value != view_yaw_q_.value || pitch_q.value != view_pitch_q_.value)
-			{
-				auto msg = BeginMsg(net::MSG_VIEWANGLES);
-				msg.Write(yaw_q.value);
-				msg.Write(pitch_q.value);
-				
-				view_yaw_q_.value = yaw_q.value;
-				view_pitch_q_.value = pitch_q.value;
-				last_send_time_ = time_;
-			}
-		}
+        session_->Draw(dlist_, params);
 	}
-	
+
 	// draw chat
 	UpdateChat();
 	DrawChat(dlist_);

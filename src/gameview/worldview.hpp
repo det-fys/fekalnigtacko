@@ -4,7 +4,7 @@
 #include "draw_args.hpp"
 #include "net/defs.hpp"
 #include "net/inmessage.hpp"
-
+#include "collision/dynamicsworld.hpp"
 #include "entityview.hpp"
 
 namespace game::view
@@ -12,7 +12,7 @@ namespace game::view
 
 class ClientSession;
 
-class WorldView
+class WorldView : public collision::DynamicsWorld
 {
 public:
     WorldView(ClientSession& session);
@@ -22,10 +22,11 @@ public:
     void Update(const UpdateInfo& info);
     void Draw(const DrawArgs& args) const;
 
-    EntityView* GetEntity(net::EntNum entnum);
-    
-    float GetTime() const { return time_; }
+    glm::vec3 CameraSweep(const glm::vec3& start, const glm::vec3& end);
 
+    EntityView* GetEntity(net::EntNum entnum);
+
+    float GetTime() const { return time_; }
     audio::Master& GetAudioMaster() const { return audiomaster_; }
 
 private:

@@ -36,7 +36,7 @@ public:
     void SetInput(game::PlayerInputFlags input) { input_ = input; }
     void MouseMove(const glm::vec2& delta);
 
-    float GetTime() const { return delta_time_; }
+    float GetTime() const { return time_; }
     float GetDeltaTime() const { return delta_time_; }
 
     audio::Master& GetAudioMaster() { return audiomaster_; }
@@ -55,12 +55,10 @@ private:
 
 private:
     float time_ = 0.0f;
-    float last_send_time_ = 0.0f;
     glm::ivec2 viewport_size_ = {800, 600};
     game::PlayerInputFlags input_ = 0;
     game::PlayerInputFlags prev_input_ = 0;
-    net::ViewYawQ view_yaw_q_;
-    net::ViewPitchQ view_pitch_q_;
+
 
     float prev_time_ = 0.0f;
     float delta_time_ = 0.0f;

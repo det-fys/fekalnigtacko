@@ -552,7 +552,7 @@ static const char* GetRandomCarModel()
 
 void game::OpenWorld::SpawnBot()
 {
-    auto roads = GetMap()->GetGraph("roads");
+    auto roads = GetMap().GetGraph("roads");
 
     if (!roads)
     {

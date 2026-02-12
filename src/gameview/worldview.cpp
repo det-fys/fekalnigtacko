@@ -11,6 +11,7 @@ game::view::WorldView::WorldView(ClientSession& session) :
     audiomaster_(session_.GetAudioMaster())
 {
     map_ = assets::CacheManager::GetMap("data/openworld.map");
+    AddMapCollision(map_);
 }
 
 bool game::view::WorldView::ProcessMsg(net::MessageType type, net::InMessage& msg)
@@ -51,6 +52,31 @@ void game::view::WorldView::Draw(const DrawArgs& args) const
         if (args.frustum.IsSphereVisible(ent->GetBoundingSphere()))
             ent->Draw(args);
     }
+}
+
+glm::vec3 game::view::WorldView::CameraSweep(const glm::vec3& start, const glm::vec3& end)
+{
+    const auto& bt_world = GetBtWorld();
+
+    static const btSphereShape shape(0.1f);
+
+    btVector3 bt_start(start.x, start.y, start.z);
+    btVector3 bt_end(end.x, end.y, end.z);
+
+    btTransform from, to;
+    from.setIdentity();
+    from.setOrigin(bt_start);
+    to.setIdentity();
+    to.setOrigin(bt_end);
+
+    btCollisionWorld::ClosestConvexResultCallback cb(bt_start, bt_end);
+
+    bt_world.convexSweepTest(&shape, from, to, cb);
+
+    if (!cb.hasHit())
+        return end;
+
+    return glm::mix(start, end, cb.m_closestHitFraction);
 }
 
 game::view::EntityView* game::view::WorldView::GetEntity(net::EntNum entnum)

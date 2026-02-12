@@ -64,18 +64,29 @@ void game::view::ClientSession::ProcessMouseMove(float delta_yaw, float delta_pi
 void game::view::ClientSession::Update(const UpdateInfo& info)
 {
     if (world_)
+    {
         world_->Update(info);
+        SendViewAngles(info.time);
+    }
+}
+
+void game::view::ClientSession::Draw(gfx::DrawList& dlist, gfx::DrawListParams& params)
+{
+    if (world_)
+    {
+        DrawWorld(dlist, params);
+    }
 }
 
 void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) const
 {
-    glm::vec3 center(0.0f, 0.0f, 2.5f);
+    glm::vec3 start(0.0f, 0.0f, 2.0f);
 
-    if (world_ && follow_ent_)
+    if (follow_ent_)
     {
         auto ent = world_->GetEntity(follow_ent_);
         if (ent)
-            center += ent->GetRoot().local.position;
+            start += ent->GetRoot().local.position;
     }
 
     float yaw_cos = glm::cos(yaw_);
@@ -84,10 +95,12 @@ void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) con
     float pitch_sin = glm::sin(pitch_);
     glm::vec3 dir(yaw_cos * pitch_cos, yaw_sin * pitch_cos, pitch_sin);
 
-    float distance = 8.0f;
+    float distance = 5.0f;
+    glm::vec3 end = start - dir * distance;
 
-    eye = center - dir * distance;
-    view = glm::lookAt(eye, center, glm::vec3(0, 0, 1));
+    //start.z -= 0.5f; // shift this a bit to make it better when occluded
+    eye = world_->CameraSweep(start, end);
+    view = glm::lookAt(eye, eye + dir, glm::vec3(0, 0, 1));
 }
 
 audio::Master& game::view::ClientSession::GetAudioMaster() const
@@ -123,4 +136,50 @@ bool game::view::ClientSession::ProcessChatMsg(net::InMessage& msg)
 
     app_.AddChatMessagePrefix("Server", chatm);
     return true;
+}
+
+void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params)
+{
+    // glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f,
+    // 0.0f, 1.0f));
+    float aspect = static_cast<float>(params.screen_width) / static_cast<float>(params.screen_height);
+
+    glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 3000.0f);
+    glm::vec3 eye;
+    glm::mat4 view;
+    GetViewInfo(eye, view);
+
+    params.view_proj = proj * view;
+    params.cam_pos = eye;
+
+    // glm::mat4 fake_view_proj = glm::perspective(glm::radians(30.0f), aspect, 0.1f, 3000.0f) * view;
+
+    game::view::DrawArgs draw_args(dlist, params.view_proj, eye, glm::ivec2(params.screen_width, params.screen_height),
+                                   500.0f);
+    world_->Draw(draw_args);
+
+    glm::mat4 camera_world = glm::inverse(view);
+    GetAudioMaster().SetListenerOrientation(camera_world);
+}
+
+void game::view::ClientSession::SendViewAngles(float time)
+{
+    if (time - last_send_time_ < 0.040f)
+        return;
+
+    net::ViewYawQ yaw_q;
+    net::ViewPitchQ pitch_q;
+    yaw_q.Encode(yaw_);
+    pitch_q.Encode(pitch_);
+
+    if (yaw_q.value == view_yaw_q_.value && pitch_q.value == view_pitch_q_.value)
+        return;
+
+    auto msg = app_.BeginMsg(net::MSG_VIEWANGLES);
+    msg.Write(yaw_q.value);
+    msg.Write(pitch_q.value);
+
+    view_yaw_q_.value = yaw_q.value;
+    view_pitch_q_.value = pitch_q.value;
+    last_send_time_ = time;
 }

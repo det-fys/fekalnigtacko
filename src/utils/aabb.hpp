@@ -22,6 +22,12 @@ struct AABB
         max = glm::max(max, point);
     }
 
+    void AddAABB(const AABB& other)
+    {
+        min = glm::min(min, other.min);
+        max = glm::max(max, other.max);
+    }
+
     bool CollidesWith(const AABB<dim>& other) const;
 
     AABB<dim> Intersection(const AABB<dim>& other) const

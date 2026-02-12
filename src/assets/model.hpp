@@ -5,6 +5,7 @@
 
 #include "skeleton.hpp"
 #include "utils/defs.hpp"
+#include "utils/aabb.hpp"
 #include "collision/trianglemesh.hpp"
 
 #ifdef CLIENT
@@ -45,6 +46,7 @@ public:
 
     const std::shared_ptr<const Skeleton>& GetSkeleton() const { return skeleton_; }
     CLIENT_ONLY(const std::shared_ptr<const Mesh>& GetMesh() const { return mesh_; })
+    const AABB3& GetAABB() const { return aabb_; }
 
 private:
     std::unique_ptr<collision::TriangleMesh> cmesh_;
@@ -52,7 +54,8 @@ private:
     std::unique_ptr<btCollisionShape> cshape_;
 
     std::shared_ptr<const Skeleton> skeleton_;
-    CLIENT_ONLY(std::shared_ptr<const Mesh> mesh_;)
+    CLIENT_ONLY(std::shared_ptr<const Mesh> mesh_;);
+    AABB3 aabb_;
 
 };
 

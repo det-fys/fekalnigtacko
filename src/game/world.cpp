@@ -5,12 +5,11 @@
 #include "assets/cache.hpp"
 #include "utils/allocnum.hpp"
 
-static std::shared_ptr<const assets::Map> LoadMapByName(const std::string& mapname)
+game::World::World(std::string mapname) : mapname_(std::move(mapname))
 {
-    return assets::CacheManager::GetMap("data/" + mapname + ".map");
+    map_ = assets::CacheManager::GetMap("data/" + mapname_ + ".map");
+    AddMapCollision(map_);
 }
-
-game::World::World(std::string mapname) : DynamicsWorld(LoadMapByName(mapname)), mapname_(std::move(mapname)) {}
 
 net::EntNum game::World::GetNewEntnum()
 {

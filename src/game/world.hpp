@@ -46,7 +46,11 @@ public:
 
     virtual ~World() = default;
 
+protected:
+    const assets::Map& GetMap() const { return *map_; }
+
 private:
+    std::shared_ptr<const assets::Map> map_;
     std::string mapname_;
     std::map<net::EntNum, std::unique_ptr<Entity>> ents_;
     net::EntNum last_entnum_ = 0;
