@@ -97,6 +97,8 @@ void game::Vehicle::Update()
 {
     Super::Update();
 
+    root_.UpdateMatrix();
+
     flags_ = 0;
     ProcessInput();
     UpdateWheels();

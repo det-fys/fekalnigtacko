@@ -43,7 +43,7 @@ void game::Player::Update()
             auto cam_ent = world_->GetEntity(cam_ent_);
             if (cam_ent)
             {
-                cull_pos_ = cam_ent->GetRootTransform().position;
+                cull_pos_ = cam_ent->GetRoot().GetGlobalPosition();
             }
         }
 
@@ -143,7 +143,7 @@ bool game::Player::ShouldSeeEntity(const Entity& entity) const
 {
     // max distance check
     float max_dist = entity.GetMaxDistance();
-    if (glm::distance2(entity.GetRootTransform().position, cull_pos_) > (max_dist * max_dist))
+    if (glm::distance2(entity.GetRoot().GetGlobalPosition(), cull_pos_) > (max_dist * max_dist))
         return false;
 
     // TODO: custom callback

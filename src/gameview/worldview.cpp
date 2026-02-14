@@ -38,7 +38,7 @@ void game::view::WorldView::Update(const UpdateInfo& info)
 
     for (const auto& [entnum, ent] : ents_)
     {
-        ent->Update(info);
+        ent->TryUpdate(info);
     }
 }
 

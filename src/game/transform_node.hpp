@@ -24,6 +24,11 @@ namespace game
 				matrix = parent->matrix * matrix;
 			}
 		}
+
+		glm::vec3 GetGlobalPosition() const
+		{
+			return matrix[3];
+		}
 	};
 
 }

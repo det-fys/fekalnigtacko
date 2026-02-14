@@ -22,14 +22,21 @@ public:
     net::EntNum GetEntNum() const { return entnum_; }
     net::EntType GetViewType() const { return viewtype_; }
 
-    virtual void Update();
     virtual void SendInitData(Player& player, net::OutMessage& msg) const;
 
+    virtual void Update();
+    bool TryUpdate(); // if not already updated
+    int64_t GetUpdateTime() const { return upd_time_; }
+
     void SetNametag(const std::string& nametag);
+
+    void Attach(net::EntNum parentnum);
+    net::EntNum GetParentNum() const { return parentnum_; }
 
     void Remove() { removed_ = true; }
     bool IsRemoved() const { return removed_; }
 
+    const TransformNode& GetRoot() const { return root_; }
     const Transform& GetRootTransform() const { return root_.local; }
     float GetMaxDistance() const { return max_distance_; }
 
@@ -37,8 +44,10 @@ public:
 
 private:
     void WriteNametag(net::OutMessage& msg) const;
-    
     void SendNametagMsg();
+
+    void WriteAttach(net::OutMessage& msg) const;
+    void SendAttachMsg();
 
 protected:
     net::OutMessage BeginEntMsg(net::EntMsgType type);
@@ -49,13 +58,16 @@ protected:
     const net::EntType viewtype_;
 
     TransformNode root_;
+    Entity* parent_ = nullptr;
 
     float max_distance_ = 700.0f;
-    std::string nametag_;
-
 
     bool removed_ = false;
 
+private:
+    int64_t upd_time_ = -1;
+    std::string nametag_;
+    net::EntNum parentnum_ = 0;
 };
 
 }

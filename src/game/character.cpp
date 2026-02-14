@@ -1,25 +1,13 @@
 #include "character.hpp"
-#include "world.hpp"
-#include "net/utils.hpp"
 #include "assets/cache.hpp"
+#include "net/utils.hpp"
 #include "utils/math.hpp"
+#include "world.hpp"
 
 game::Character::Character(World& world, const CharacterInfo& info)
-    : Super(world, net::ET_CHARACTER), shape_(info.shape), bt_shape_(shape_.radius, shape_.height),
-      bt_character_(&bt_ghost_, &bt_shape_, 0.3f, btVector3(0, 0, 1))
+    : Super(world, net::ET_CHARACTER), shape_(info.shape), bt_shape_(shape_.radius, shape_.height)
 {
-    btTransform start_transform;
-    start_transform.setIdentity();
-    bt_ghost_.setWorldTransform(start_transform);
-    bt_ghost_.setCollisionShape(&bt_shape_);
-    bt_ghost_.setCollisionFlags(btCollisionObject::CF_CHARACTER_OBJECT);
-
-    
-    btDynamicsWorld& bt_world = world_.GetBtWorld();
-    bt_world.addCollisionObject(&bt_ghost_, btBroadphaseProxy::CharacterFilter,
-                                btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter);
-    // bt_world.addCollisionObject(&bt_ghost_);
-    bt_world.addAction(&bt_character_);
+    z_offset_ = shape_.height * 0.5f + shape_.radius - 0.05f;
 
     sk_ = SkeletonInstance(assets::CacheManager::GetSkeleton("data/human.sk"), &root_);
     animstate_.idle_anim_idx = GetAnim("idle");
@@ -50,9 +38,8 @@ void game::Character::Update()
 {
     Super::Update();
 
-    auto bt_trans = bt_ghost_.getWorldTransform();
-    root_.local.SetBtTransform(bt_trans);
-    root_.local.position.z -= shape_.height * 0.5f + shape_.radius - 0.05f; // foot pos
+    SyncTransformFromController();
+    root_.UpdateMatrix();
 
     UpdateMovement();
 
@@ -78,6 +65,19 @@ void game::Character::SendInitData(Player& player, net::OutMessage& msg) const
     size_t fields_pos = msg.Reserve<CharacterSyncFieldFlags>();
     auto fields = WriteState(msg, default_state);
     msg.WriteAt(fields_pos, fields);
+}
+
+void game::Character::EnablePhysics(bool enable)
+{
+    if (enable && !controller_)
+    {
+        controller_ = std::make_unique<CharacterPhysicsController>(world_.GetBtWorld(), bt_shape_);
+        SyncControllerTransform();
+    }
+    else if (!enable && controller_)
+    {
+        controller_.reset();
+    }
 }
 
 void game::Character::SetInput(CharacterInputType type, bool enable)
@@ -116,9 +116,8 @@ void game::Character::SetInput(CharacterInputType type, bool enable)
 
 void game::Character::SetPosition(const glm::vec3& position)
 {
-    auto trans = bt_ghost_.getWorldTransform();
-    trans.setOrigin(btVector3(position.x, position.y, position.z));
-    bt_ghost_.setWorldTransform(trans);
+    root_.local.position = position;
+    SyncControllerTransform();
 }
 
 void game::Character::AddClothes(std::string name, const glm::vec3& color)
@@ -126,11 +125,31 @@ void game::Character::AddClothes(std::string name, const glm::vec3& color)
     clothes_.emplace_back(std::move(name), color);
 }
 
-game::Character::~Character()
+void game::Character::SetMainAnim(const std::string& anim_name)
 {
-    btDynamicsWorld& bt_world = world_.GetBtWorld();
-    bt_world.removeAction(&bt_character_);
-    bt_world.removeCollisionObject(&bt_ghost_);
+    animstate_.idle_anim_idx = GetAnim(anim_name);
+}
+
+void game::Character::SyncControllerTransform()
+{
+    if (!controller_)
+        return;
+
+    auto& position = root_.local.position;
+    auto& bt_ghost = controller_->GetBtGhost();
+    auto trans = bt_ghost.getWorldTransform();
+    trans.setOrigin(btVector3(position.x, position.y, position.z + z_offset_));
+    bt_ghost.setWorldTransform(trans);
+}
+
+void game::Character::SyncTransformFromController()
+{
+    if (!controller_)
+        return;
+
+    auto bt_trans = controller_->GetBtGhost().getWorldTransform();
+    root_.local.SetBtTransform(bt_trans);
+    root_.local.position.z -= z_offset_; // foot pos
 }
 
 void game::Character::UpdateMovement()
@@ -163,11 +182,15 @@ void game::Character::UpdateMovement()
         walkdir = forward_dir * walk_speed_ * dt;
     }
 
-    bt_character_.setWalkDirection(btVector3(walkdir.x, walkdir.y, walkdir.z));
-
-    if (in_ & (1 << CIN_JUMP) && bt_character_.canJump())
+    if (controller_)
     {
-        bt_character_.jump(btVector3(0.0f, 0.0f, 10.0f));
+        auto& bt_character = controller_->GetBtController();
+        bt_character.setWalkDirection(btVector3(walkdir.x, walkdir.y, walkdir.z));
+
+        if (in_ & (1 << CIN_JUMP) && bt_character.canJump())
+        {
+            bt_character.jump(btVector3(0.0f, 0.0f, 10.0f));
+        }
     }
 
     // update anim
@@ -193,12 +216,10 @@ void game::Character::UpdateSyncState()
     state.run_anim = animstate_.run_anim_idx;
     state.loco_phase.Encode(animstate_.loco_phase);
     state.loco_blend.Encode(animstate_.loco_blend);
-
-
 }
 
 void game::Character::SendUpdateMsg()
-{  
+{
     auto msg = BeginEntMsg(net::EMSG_UPDATE);
     auto fields_pos = msg.Reserve<CharacterSyncFieldFlags>();
     auto fields = WriteState(msg, sync_[1 - sync_current_]);
@@ -299,4 +320,25 @@ void game::Character::Move(glm::vec3& velocity, float t)
 assets::AnimIdx game::Character::GetAnim(const std::string& name) const
 {
     return sk_.GetSkeleton()->GetAnimationIdx(name);
+}
+
+game::CharacterPhysicsController::CharacterPhysicsController(btDynamicsWorld& bt_world, btCapsuleShapeZ& bt_shape)
+    : bt_world_(bt_world), bt_character_(&bt_ghost_, &bt_shape, 0.3f, btVector3(0, 0, 1))
+{
+    btTransform start_transform;
+    start_transform.setIdentity();
+    bt_ghost_.setWorldTransform(start_transform);
+    bt_ghost_.setCollisionShape(&bt_shape);
+    bt_ghost_.setCollisionFlags(btCollisionObject::CF_CHARACTER_OBJECT);
+
+    bt_world_.addCollisionObject(&bt_ghost_, btBroadphaseProxy::CharacterFilter,
+                                 btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter);
+    // bt_world.addCollisionObject(&bt_ghost_);
+    bt_world_.addAction(&bt_character_);
+}
+
+game::CharacterPhysicsController::~CharacterPhysicsController()
+{
+    bt_world_.removeAction(&bt_character_);
+    bt_world_.removeCollisionObject(&bt_ghost_);
 }

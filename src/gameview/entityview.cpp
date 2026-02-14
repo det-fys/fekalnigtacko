@@ -10,7 +10,8 @@ game::view::EntityView::EntityView(WorldView& world, net::InMessage& msg) :
     audioplayer_(world_.GetAudioMaster()),
     nametag_text_(assets::CacheManager::GetFont("data/comic32.font"), 0xFFFFFFFF)
 {
-    if (!ReadNametag(msg))
+    // read nametag and attachment info
+    if (!ReadNametag(msg) || !ReadAttach(msg))
         throw EntityInitError();
 }
 
@@ -20,13 +21,38 @@ bool game::view::EntityView::ProcessMsg(net::EntMsgType type, net::InMessage& ms
     {
     case net::EMSG_NAMETAG:
         return ReadNametag(msg);
+    case net::EMSG_ATTACH:
+        return ReadAttach(msg);
+    default:
+        return false;
     }
+}
 
-    return false;
+bool game::view::EntityView::TryUpdate(const UpdateInfo& info)
+{
+    float time = world_.GetTime();
+    if (time == upd_time_)
+        return false;
+
+    Update(info);
+    return true;
 }
 
 void game::view::EntityView::Update(const UpdateInfo& info)
 {
+    upd_time_ = world_.GetTime();
+
+    // ensure parent is updated
+    parent_ = nullptr;
+    if (parentnum_)
+    {
+        parent_ = world_.GetEntity(parentnum_);
+        parent_->TryUpdate(info);
+    }
+
+    // update transform parent
+    root_.parent = parent_ ? &parent_->GetRoot() : nullptr;
+
     audioplayer_.Update();
 }
 
@@ -47,6 +73,11 @@ bool game::view::EntityView::ReadNametag(net::InMessage& msg)
     nametag_ = nametag;
     nametag_text_.SetText(nametag);
     return true;
+}
+
+bool game::view::EntityView::ReadAttach(net::InMessage& msg)
+{
+    return msg.Read(parentnum_);
 }
 
 void game::view::EntityView::DrawNametag(const DrawArgs& args)

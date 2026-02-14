@@ -41,7 +41,7 @@ void game::World::Update(int64_t delta_time)
     // update entities
     for (auto it = ents_.begin(); it != ents_.end();)
     {
-        it->second->Update();
+        it->second->TryUpdate();
 
         if (it->second->IsRemoved())
             it = ents_.erase(it);

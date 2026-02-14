@@ -247,18 +247,27 @@ static glm::vec3 GetRandomColor()
     return color;
 }
 
-void game::OpenWorld::SpawnCharacter(Player& player)
+game::Character& game::OpenWorld::SpawnRandomCharacter()
 {
-    RemoveCharacter(player);
-
     CharacterInfo cinfo;
     auto& character = Spawn<Character>(cinfo);
-    character.SetNametag("player (" + std::to_string(character.GetEntNum()) + ")");
-    character.SetPosition({ 100.0f, 100.0f, 5.0f });
 
     // add clothes
     character.AddClothes("tshirt", GetRandomColor());
     character.AddClothes("shorts", GetRandomColor());
+
+    return character;
+}
+
+
+void game::OpenWorld::SpawnCharacter(Player& player)
+{
+    RemoveCharacter(player);
+
+    auto& character = SpawnRandomCharacter();
+    character.SetNametag("player (" + std::to_string(character.GetEntNum()) + ")");
+    character.SetPosition({ 100.0f, 100.0f, 5.0f });
+    character.EnablePhysics(true);
 
     player.SetCamera(character.GetEntNum());
 
@@ -572,6 +581,13 @@ void game::OpenWorld::SpawnBot()
     vehicle.Schedule(rand() % 500, [think_state]() {
         //BotNametagThink(think_state);
     } );
+
+    // spawn driver
+    auto& driver = SpawnRandomCharacter();
+    driver.Attach(vehicle.GetEntNum());
+    driver.SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+    driver.SetMainAnim("vehicle_drive");
+    driver.SetYaw(0.5f * glm::pi<float>());
 }
 
 void game::OpenWorld::SpawnVehicle(Player& player)

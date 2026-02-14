@@ -75,6 +75,7 @@ enum EntMsgType : uint8_t
     EMSG_NONE,
 
     EMSG_NAMETAG,
+    EMSG_ATTACH,
     EMSG_UPDATE,
 };
 

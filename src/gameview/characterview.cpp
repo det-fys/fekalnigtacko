@@ -53,6 +53,8 @@ bool game::view::CharacterView::ProcessMsg(net::EntMsgType type, net::InMessage&
 
 void game::view::CharacterView::Update(const UpdateInfo& info)
 {
+    Super::Update(info);
+
     // interpolate states
     float tps = 25.0f;
     float t = (info.time - update_time_) * tps * 0.8f; // assume some jitter, interpolate for longer

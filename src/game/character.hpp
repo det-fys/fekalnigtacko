@@ -1,10 +1,11 @@
 #pragma once
 
-#include "entity.hpp"
-#include "BulletCollision/CollisionDispatch/btGhostObject.h"
-#include "BulletDynamics/Character/btKinematicCharacterController.h"
+#include <btBulletDynamicsCommon.h>
+#include <BulletCollision/CollisionDispatch/btGhostObject.h>
+#include <BulletDynamics/Character/btKinematicCharacterController.h>
 #include "character_anim_state.hpp"
 #include "character_sync.hpp"
+#include "entity.hpp"
 
 namespace game
 {
@@ -39,6 +40,25 @@ struct CharacterClothes
     glm::vec3 color;
 };
 
+class CharacterPhysicsController
+{
+public:
+    CharacterPhysicsController(btDynamicsWorld& bt_world, btCapsuleShapeZ& bt_shape);
+    DELETE_COPY_MOVE(CharacterPhysicsController)
+
+    btKinematicCharacterController& GetBtController() { return bt_character_; }
+    const btKinematicCharacterController& GetBtController() const { return bt_character_; }
+    btGhostObject& GetBtGhost() { return bt_ghost_; }
+    const btGhostObject& GetBtGhost() const { return bt_ghost_; }
+
+    ~CharacterPhysicsController();
+
+private:
+    btDynamicsWorld& bt_world_;
+    btPairCachingGhostObject bt_ghost_;
+    btKinematicCharacterController bt_character_;
+};
+
 class Character : public Entity
 {
 public:
@@ -49,18 +69,26 @@ public:
     virtual void Update() override;
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
 
+    void EnablePhysics(bool enable);
+
     void SetInput(CharacterInputType type, bool enable);
     void SetInputs(CharacterInputFlags inputs) { in_ = inputs; }
 
     void SetForwardYaw(float yaw) { forward_yaw_ = yaw; }
+    void SetYaw(float yaw) { yaw_ = yaw; }
 
     void SetPosition(const glm::vec3& position);
 
     void AddClothes(std::string name, const glm::vec3& color);
 
-    ~Character() override;
+    void SetMainAnim(const std::string& anim_name);
+
+    ~Character() override = default;
 
 private:
+    void SyncControllerTransform();
+    void SyncTransformFromController();
+
     void UpdateMovement();
     void UpdateSyncState();
     void SendUpdateMsg();
@@ -79,9 +107,8 @@ private:
     CharacterInputFlags in_ = 0;
 
     btCapsuleShapeZ bt_shape_;
-    btPairCachingGhostObject bt_ghost_;
-
-    btKinematicCharacterController bt_character_;
+    float z_offset_ = 0.0f; // offset of controller from root
+    std::unique_ptr<CharacterPhysicsController> controller_;
 
     float yaw_ = 0.0f;
     float forward_yaw_ = 0.0f;

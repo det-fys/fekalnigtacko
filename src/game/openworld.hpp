@@ -22,7 +22,9 @@ public:
 private:
     void SpawnVehicle(Player& player);
     void RemoveVehicle(Player& player);
-
+    
+    Character& SpawnRandomCharacter();
+    
     void SpawnCharacter(Player& player);
     void RemoveCharacter(Player& player);
 
