@@ -40,14 +40,12 @@ public:
 
     Entity* GetEntity(net::EntNum entnum);
 
+    const assets::Map& GetMap() const { return *map_; }
     const std::string& GetMapName() const { return mapname_; }
     const std::map<net::EntNum, std::unique_ptr<Entity>>& GetEntities() const { return ents_; }
     const int64_t& GetTime() const { return time_ms_; }
 
     virtual ~World() = default;
-
-protected:
-    const assets::Map& GetMap() const { return *map_; }
 
 private:
     std::shared_ptr<const assets::Map> map_;

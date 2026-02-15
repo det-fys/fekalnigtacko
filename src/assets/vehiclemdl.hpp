@@ -34,10 +34,12 @@ public:
 
     const std::shared_ptr<const Model>& GetModel() const { return basemodel_; } 
     const std::vector<VehicleWheel>& GetWheels() const { return wheels_; }
+    const Transform* GetLocation(const std::string& name) const;
 
 private:
     std::shared_ptr<const Model> basemodel_;
     std::vector<VehicleWheel> wheels_;
+    std::map<std::string, Transform> locations_;
 
 
 };

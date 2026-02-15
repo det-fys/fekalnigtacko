@@ -39,7 +39,23 @@ std::shared_ptr<const assets::VehicleModel> assets::VehicleModel::LoadFromFile(c
 
             veh->wheels_.emplace_back(wheel);
         }
+        else if (command == "loc")
+        {
+            std::string loc_name;
+            iss >> loc_name;
+            Transform& trans = veh->locations_[loc_name];
+            ParseTransform(iss, trans);
+        }
     });
 
     return veh;
+}
+
+const Transform* assets::VehicleModel::GetLocation(const std::string& name) const
+{
+    auto it = locations_.find(name);
+    if (it != locations_.end())
+        return &it->second;
+
+    return nullptr;
 }

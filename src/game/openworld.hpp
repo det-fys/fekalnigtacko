@@ -7,6 +7,9 @@
 namespace game
 {
 
+class PlayerCharacter;
+class NpcCharacter;
+
 class OpenWorld : public World
 {
 public:
@@ -20,20 +23,14 @@ public:
     virtual void PlayerLeft(Player& player) override;
 
 private:
-    void SpawnVehicle(Player& player);
-    void RemoveVehicle(Player& player);
+    void CreatePlayerCharacter(Player& player);
+    void RemovePlayerCharacter(Player& player);
     
-    Character& SpawnRandomCharacter();
-    
-    void SpawnCharacter(Player& player);
-    void RemoveCharacter(Player& player);
-
     void SpawnBot();
 
 private:
-    std::map<Player*, Vehicle*> player_vehicles_;
-    std::map<Player*, Character*> player_characters_;
-    std::vector<Vehicle*> bots_;
+    std::map<Player*, PlayerCharacter*> player_characters_;
+    std::vector<NpcCharacter*> npcs_;
 };
 
 }

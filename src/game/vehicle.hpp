@@ -51,6 +51,8 @@ public:
 
     void SetSteering(bool analog, float value = 0.0f);
 
+    const std::shared_ptr<const assets::VehicleModel>& GetModel() const { return model_; }
+
     virtual ~Vehicle();
 
 private:
