@@ -45,7 +45,6 @@ class Vec3:
             a.z if a.z > b.z else b.z
         )
 
-
     def norm(self):
         return math.sqrt(self.dot(self))
 
@@ -54,18 +53,22 @@ class Vertex:
     normal: tuple[float, float, float]
     uv: tuple[float, float]
     color: tuple[float, float, float] | None
+    bone_indices: tuple[int, int, int, int] | None
+    bone_weights: tuple[float, float, float, float] | None
 
-    def __init__(self, position, normal, uv, color=None):
+    def __init__(self, position, normal, uv, color=None, bone_indices=None, bone_weights=None):
         self.position = tuple(round(x, 6) for x in position)
         self.normal = tuple(round(x, 6) for x in normal)
         self.uv = tuple(round(x, 6) for x in uv)
         self.color = tuple(round(c, 3) for c in color) if color else None
+        self.bone_indices = bone_indices
+        self.bone_weights = tuple(round(w, 5) for w in bone_weights) if bone_weights else None
 
     def __hash__(self):
-        return hash((self.position, self.normal, self.uv, self.color))
+        return hash((self.position, self.normal, self.uv, self.color, self.bone_indices, self.bone_weights))
     
     def __eq__(self, other):
-        return (self.position, self.normal, self.uv, self.color) == (other.position, other.normal, other.uv, other.color)
+        return (self.position, self.normal, self.uv, self.color, self.bone_indices, self.bone_weights) == (other.position, other.normal, other.uv, other.color, other.bone_indices, other.bone_weights)
 
 class Surface:
     tris: list[tuple[int, int, int]]
@@ -82,13 +85,15 @@ class Surface:
         self.blend = None
 
 class Model:
+    skeleton: Skeleton|None
     vertices: list[Vertex]
     vertex_map: dict[Vertex, int]
     materials: dict[str, Surface]
     make_col_trimesh: bool
     make_convex_hull: bool
 
-    def __init__(self):
+    def __init__(self, skeleton=None):
+        self.skeleton = skeleton
         self.vertices = []
         self.vertex_map = {}
         self.materials = {}
@@ -286,9 +291,11 @@ class Wheel:
 class Vehicle:
     basemodel_name: str
     wheels: list[Wheel] # type, model, transform
+    locations: list[tuple[str, Transform]]
 
     def __init__(self):
         self.wheels = []
+        self.locations = []
 
 class Bone:
     name: str
@@ -321,13 +328,13 @@ class Animation:
 class Skeleton:
     name: str
     bones: list[Bone]
-    bone_set: set[str]
+    bone_indices: dict[str, int]
     anims: list[Animation]
 
     def __init__(self, name, armature):
         self.name = name
         self.bones = []
-        self.bone_set = set()
+        self.bone_indices = {}
         self.armature = armature
         self.anims = []
 
@@ -385,7 +392,33 @@ class Exporter:
                     color_data = color_attr.data[loop_index]
                     color = tuple(c for c in color_data.color[:3]) # ignore alpha
 
-                vert = Vertex(position=pos, normal=normal, uv=uv, color=color)
+                bone_indices = None
+                bone_weights = None
+
+                if model.skeleton is not None:
+                    deform_bones = []
+
+                    for vert_group in vertex.groups:
+                        weight = round(vert_group.weight, 3)
+
+                        if weight < 0.001:
+                            continue
+
+                        group = obj.vertex_groups[vert_group.group]
+
+                        if group.name not in model.skeleton.bone_indices:
+                            continue
+
+                        deform_bones.append((group.name, weight))
+
+                    deform_bones.sort(key=lambda x: x[1], reverse=True)
+                    deform_bones = deform_bones[:4]
+                    weight_sum = sum(w for _, w in deform_bones)
+
+                    bone_indices = tuple(model.skeleton.bone_indices[name] for name, _ in deform_bones)
+                    bone_weights = tuple(w / weight_sum for _, w in deform_bones)
+
+                vert = Vertex(position=pos, normal=normal, uv=uv, color=color, bone_indices=bone_indices, bone_weights=bone_weights)
                 vert_index = model.add_vertex(vert)
 
                 face_indices.append(vert_index)
@@ -394,9 +427,15 @@ class Exporter:
                 surface = Surface(mat_name)
                 surface.twosided = "2S" in mat_params
                 surface.ocolor = "OCOLOR" in mat_params
+                
                 blend = mat_params.get("BLEND")
                 if isinstance(blend, str):
                     surface.blend = blend
+
+                texture = mat_params.get("T")
+                if isinstance(texture, str):
+                    surface.texture = texture
+
                 model.materials[mat_name] = surface
 
             model.add_triangle(mat_name, *face_indices)
@@ -441,9 +480,13 @@ class Exporter:
             if model.make_convex_hull:
                 f.write("makeconvexhull\n")
 
+            if model.skeleton is not None:
+                f.write(f"skeleton {model.skeleton.name}\n")
+
             for v in model.vertices:
                 color_str = f" {v.color[0]} {v.color[1]} {v.color[2]}" if v.color else ""
-                f.write(f"v {v.position[0]} {v.position[1]} {v.position[2]} {v.normal[0]} {v.normal[1]} {v.normal[2]} {v.uv[0]} {v.uv[1]}{color_str}\n")
+                bones_str = f" {len(v.bone_indices)} " + " ".join(f"{i} {w}" for i, w in zip(v.bone_indices, v.bone_weights)) if model.skeleton is not None else ""
+                f.write(f"v {v.position[0]} {v.position[1]} {v.position[2]} {v.normal[0]} {v.normal[1]} {v.normal[2]} {v.uv[0]} {v.uv[1]}{color_str}{bones_str}\n")
             
             for mat_name, surface in model.materials.items():
                 f.write(f"surface {mat_name} +texture {surface.texture}")
@@ -494,6 +537,10 @@ class Exporter:
             for wheel in veh.wheels:
                 f.write(f"wheel {wheel.type} {wheel.model_name} {wheel.position[0]} {wheel.position[1]} {wheel.position[2]} {wheel.radius}\n")
     
+            for name, trans in veh.locations:
+                f.write(f"loc {name} {self.transform_str(trans)}\n")
+
+
     def export_sk(self, sk: Skeleton, filepath: str):
         with open(filepath, "w") as f:
             for bone in sk.bones:
@@ -618,7 +665,12 @@ class Exporter:
                 wheel.radius = radius
                 veh.wheels.append(wheel)
 
+            elif type == "LOC":
+                transform = self.get_obj_transform(obj)
+                veh.locations.append((obj_name, transform))
+
         veh.wheels.sort(key=lambda w: w.type)
+        veh.locations.sort(key=lambda l: l[0])
 
         veh_filepath = os.path.join(self.out_path, f"{name}.veh")
         self.export_veh(veh, veh_filepath)
@@ -668,9 +720,19 @@ class Exporter:
             xbone.trans = Transform(*self.matrix_decompose(bind_matrix))
 
             sk.bones.append(xbone)
-            sk.bone_set.add(xbone.name)
+            sk.bone_indices[xbone.name] = len(sk.bones) - 1
 
         self.skeletons[name] = sk
+
+        # export meshes
+        for obj in obj.children:
+            type, obj_name, _ = self.extract_name(obj.name)
+
+            if type == "SKM":
+                model = Model(sk)
+                self.add_mesh_to_model(obj, model)
+                mdl_filepath = os.path.join(self.out_path, f"{obj_name}.mdl")
+                self.export_mdl(model, mdl_filepath)
 
     def process_A(self, action, name, params):
         if not "_" in name:
@@ -690,7 +752,7 @@ class Exporter:
 
         sk.armature.animation_data.action = action
 
-        bone_frames = {bonename: [] for bonename in sk.bone_set}
+        bone_frames = {bonename: [] for bonename in sk.bone_indices}
 
         _, end = map(int, action.frame_range)
         fps = bpy.context.scene.render.fps
@@ -720,7 +782,7 @@ class Exporter:
             bpy.context.scene.frame_set(frame)
             bpy.context.view_layer.update()
 
-            for bonename in sk.bone_set:
+            for bonename in sk.bone_indices:
                 pose_bone = sk.armature.pose.bones.get(bonename)
 
                 if not pose_bone:
