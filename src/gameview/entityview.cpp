@@ -47,7 +47,9 @@ void game::view::EntityView::Update(const UpdateInfo& info)
     if (parentnum_)
     {
         parent_ = world_.GetEntity(parentnum_);
-        parent_->TryUpdate(info);
+
+        if (parent_)
+            parent_->TryUpdate(info);
     }
 
     // update transform parent

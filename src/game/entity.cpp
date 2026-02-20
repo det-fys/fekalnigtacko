@@ -21,7 +21,9 @@ void game::Entity::Update()
     if (parentnum_)
     {
         parent_ = world_.GetEntity(parentnum_);
-        parent_->TryUpdate();
+
+        if (parent_)
+            parent_->TryUpdate();
     }
 
     // update transform parent
