@@ -15,6 +15,7 @@ public:
     Game();
 
     void Update();
+    void FinishFrame();
 
     void PlayerJoined(Player& player);
     void PlayerLeft(Player& player);

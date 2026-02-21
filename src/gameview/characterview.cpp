@@ -46,6 +46,10 @@ bool game::view::CharacterView::ProcessMsg(net::EntMsgType type, net::InMessage&
     case net::EMSG_UPDATE:
         return ProcessUpdateMsg(msg);
 
+    case net::EMSG_ATTACH:
+        skip_lerps_ = 1;
+        return Super::ProcessMsg(type, msg);
+    
     default:
         return Super::ProcessMsg(type, msg);
     }
@@ -188,6 +192,12 @@ bool game::view::CharacterView::ReadState(net::InMessage& msg)
 
         if (new_state.loco_phase < states_[0].loco_phase)
             states_[0].loco_phase -= 1.0f;
+    }
+
+    if (skip_lerps_ > 0)
+    {
+        states_[0] = states_[1];
+        skip_lerps_--;
     }
 
     return true;

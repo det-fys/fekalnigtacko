@@ -14,6 +14,11 @@ void game::Game::Update()
     default_world_->Update(40);
 }
 
+void game::Game::FinishFrame()
+{
+    default_world_->FinishFrame();
+}
+
 void game::Game::PlayerJoined(Player& player)
 {
     player.SetWorld(default_world_);
@@ -21,7 +26,6 @@ void game::Game::PlayerJoined(Player& player)
 
 void game::Game::PlayerLeft(Player& player)
 {
-    
 }
 
 bool game::Game::PlayerInput(Player& player, PlayerInputType type, bool enabled)

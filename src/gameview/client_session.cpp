@@ -4,6 +4,8 @@
 #include <iostream>
 // #include <glm/gtx/common.hpp>
 
+#include "vehicleview.hpp"
+
 game::view::ClientSession::ClientSession(App& app) : app_(app) {}
 
 bool game::view::ClientSession::ProcessMessage(net::InMessage& msg)
@@ -81,12 +83,18 @@ void game::view::ClientSession::Draw(gfx::DrawList& dlist, gfx::DrawListParams& 
 void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) const
 {
     glm::vec3 start(0.0f, 0.0f, 2.0f);
+    float distance = 5.0f;
 
     if (follow_ent_)
     {
         auto ent = world_->GetEntity(follow_ent_);
         if (ent)
-            start += ent->GetRoot().local.position;
+        {
+            start += ent->GetRoot().GetGlobalPosition();
+        
+            if (dynamic_cast<const VehicleView*>(ent))
+                distance = 8.0f;
+        }
     }
 
     float yaw_cos = glm::cos(yaw_);
@@ -95,7 +103,6 @@ void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) con
     float pitch_sin = glm::sin(pitch_);
     glm::vec3 dir(yaw_cos * pitch_cos, yaw_sin * pitch_cos, pitch_sin);
 
-    float distance = 5.0f;
     glm::vec3 end = start - dir * distance;
 
     //start.z -= 0.5f; // shift this a bit to make it better when occluded

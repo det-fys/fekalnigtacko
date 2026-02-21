@@ -88,7 +88,7 @@ void game::view::EntityView::DrawNametag(const DrawArgs& args)
         return;
 
     // calc screen position
-    glm::vec4 world_pos = glm::vec4(root_.local.position + glm::vec3(0.0f, 0.0f, 2.0f), 1.0f);
+    glm::vec4 world_pos = GetRoot().matrix * glm::vec4(glm::vec3(0.0f, 0.0f, 2.0f), 1.0f);
     glm::vec4 clip_pos = args.view_proj * world_pos;
     if (clip_pos.w == 0.0f)
         return;

@@ -31,6 +31,7 @@ public:
     void RegisterEntity(std::unique_ptr<Entity> ent);
 
     virtual void Update(int64_t delta_time);
+    void FinishFrame();
 
     // events
     virtual void PlayerJoined(Player& player) {}

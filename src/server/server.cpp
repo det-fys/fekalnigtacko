@@ -120,4 +120,6 @@ void sv::Server::Update()
     {
         client->Update();
     }
+
+    game_.FinishFrame();
 }

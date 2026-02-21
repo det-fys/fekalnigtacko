@@ -3,6 +3,9 @@
 #include "world.hpp"
 #include "vehicle.hpp"
 #include "character.hpp"
+#include "usable.hpp"
+
+#include <optional>
 
 namespace game
 {
@@ -21,6 +24,8 @@ public:
     virtual void PlayerInput(Player& player, PlayerInputType type, bool enabled) override;
     virtual void PlayerViewAnglesChanged(Player& player, float yaw, float pitch) override;
     virtual void PlayerLeft(Player& player) override;
+
+    std::optional<std::pair<Usable&, const UseTarget&>> GetBestUseTarget(const glm::vec3& pos) const;
 
 private:
     void CreatePlayerCharacter(Player& player);

@@ -51,7 +51,9 @@ public:
 
     void SetSteering(bool analog, float value = 0.0f);
 
+    const std::string& GetModelName() const { return model_name_; }
     const std::shared_ptr<const assets::VehicleModel>& GetModel() const { return model_; }
+    const glm::vec3& GetColor() const { return color_; }
 
     virtual ~Vehicle();
 

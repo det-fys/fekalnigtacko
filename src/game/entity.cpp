@@ -12,8 +12,6 @@ void game::Entity::SendInitData(Player& player, net::OutMessage& msg) const
 
 void game::Entity::Update()
 {
-    ResetMsg();
-
     upd_time_ = world_.GetTime();
 
     // ensure parent is updated

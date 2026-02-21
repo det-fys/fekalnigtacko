@@ -50,6 +50,16 @@ void game::World::Update(int64_t delta_time)
     }
 }
 
+void game::World::FinishFrame()
+{
+    // reset ent msgs
+    for (auto& [entnum, ent] : ents_)
+    {
+        ent->ResetMsg();
+    }
+
+}
+
 game::Entity* game::World::GetEntity(net::EntNum entnum)
 {
     auto it = ents_.find(entnum);

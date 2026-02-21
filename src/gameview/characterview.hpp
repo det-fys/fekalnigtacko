@@ -63,6 +63,7 @@ private:
     CharacterSyncState sync_;
     CharacterViewState states_[2];
     float update_time_ = 0.0f;
+    size_t skip_lerps_ = 0;
 };
 
 }
