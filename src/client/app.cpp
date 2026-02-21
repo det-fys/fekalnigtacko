@@ -14,7 +14,7 @@ App::App()
 #ifndef EMSCRIPTEN
 	audiomaster_.SetMasterVolume(0.2f);
 #else
-	audiomaster_.SetMasterVolume(2.0f);
+	audiomaster_.SetMasterVolume(0.8f);
 #endif
 
 	font_ = assets::CacheManager::GetFont("data/comic32.font");
