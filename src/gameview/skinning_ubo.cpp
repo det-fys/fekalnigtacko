@@ -1,8 +1,13 @@
 #include "skinning_ubo.hpp"
 #include "gfx/shader_defs.hpp"
 
+#include <vector>
+
 game::view::SkinningUBO::SkinningUBO(const SkeletonInstance& sk) : sk_(sk)
 {
+    // init to MAX size because webgl
+    std::vector<glm::mat4> skin_mats(SD_MAX_BONES);
+    SetData(skin_mats.data(), skin_mats.size());
 }
 
 void game::view::SkinningUBO::Update()

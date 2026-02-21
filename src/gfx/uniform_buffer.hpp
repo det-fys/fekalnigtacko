@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include "buffer_object.hpp"
 
 namespace gfx
