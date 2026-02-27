@@ -10,38 +10,16 @@
 namespace collision
 {
 
-// struct StaticObjectInstance
-// {
-//     std::unique_ptr<btCollisionShape> shape;
-//     btRigidBody body;
-
-//     StaticObjectInstance(std::unique_ptr<btCollisionShape> shape) : body() 
-
-// }
-
-
-
-
 class DynamicsWorld
 {
 public:
     DynamicsWorld();
-
-    void AddMapCollision(std::shared_ptr<const assets::Map> map);
     
     btDynamicsWorld& GetBtWorld() { return bt_world_; }
     const btDynamicsWorld& GetBtWorld() const { return bt_world_; }
     btVehicleRaycaster& GetVehicleRaycaster() { return bt_veh_raycaster_; }
-    
-private:
-    void AddModelInstance(const assets::Model& model, const Transform& trans);
 
 private:
-    // this is BEFORE bt_world_!!!
-    std::shared_ptr<const assets::Map> map_;
-    std::vector<std::unique_ptr<btRigidBody>> static_objs_;
-    // ^-----
-
     btDefaultCollisionConfiguration bt_cfg_;
     btCollisionDispatcher bt_dispatcher_;
     btGhostPairCallback bt_ghost_pair_cb_;

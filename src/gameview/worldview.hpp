@@ -6,6 +6,7 @@
 #include "net/inmessage.hpp"
 #include "collision/dynamicsworld.hpp"
 #include "entityview.hpp"
+#include "mapinstanceview.hpp"
 
 namespace game::view
 {
@@ -15,7 +16,7 @@ class ClientSession;
 class WorldView : public collision::DynamicsWorld
 {
 public:
-    WorldView(ClientSession& session);
+    WorldView(ClientSession& session, net::InMessage& msg);
 
     bool ProcessMsg(net::MessageType type, net::InMessage& msg);
 
@@ -35,10 +36,12 @@ private:
     bool ProcessEntMsgMsg(net::InMessage& msg);
     bool ProcessEntDestroyMsg(net::InMessage& msg);
 
+    bool ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, bool enable);
+
 private:
     ClientSession& session_;
     
-    std::shared_ptr<const assets::Map> map_;
+    MapInstanceView map_;
     std::map<net::EntNum, std::unique_ptr<EntityView>> ents_;
     
     float time_ = 0.0f;

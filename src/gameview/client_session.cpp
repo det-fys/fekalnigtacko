@@ -117,12 +117,14 @@ audio::Master& game::view::ClientSession::GetAudioMaster() const
 
 bool game::view::ClientSession::ProcessWorldMsg(net::InMessage& msg)
 {
-    net::MapName mapname;
-    if (!msg.Read(mapname))
+    try
+    {
+        world_ = std::make_unique<WorldView>(*this, msg);
+    }
+    catch (const EntityInitError&)
+    {
         return false;
-
-    // TODO: pass mapname
-    world_ = std::make_unique<WorldView>(*this);
+    }
 
     return true;
 }

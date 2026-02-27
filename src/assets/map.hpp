@@ -9,14 +9,10 @@
 #include "model.hpp"
 #include "utils/aabb.hpp"
 
-#ifdef CLIENT
-#include "gameview/draw_args.hpp"
-#endif // CLIENT
-
 namespace assets
 {
 
-struct ChunkStaticObject
+struct MapStaticObject
 {
     game::TransformNode node;
     AABB3 aabb;
@@ -37,7 +33,8 @@ struct Chunk
 {
     AABB3 aabb;
     std::vector<ChunkSurfaceRange> surfaces;
-    std::vector<ChunkStaticObject> objs;
+    size_t first_obj = 0;
+    size_t num_objs = 0;
 };
 
 struct MapGraphNode
@@ -61,16 +58,13 @@ public:
 
     const std::shared_ptr<const Model>& GetBaseModel() const { return basemodel_; }
     const std::vector<Chunk>& GetChunks() const { return chunks_; }
+    const std::vector<MapStaticObject>& GetStaticObjects() const { return objs_; }
     const MapGraph* GetGraph(const std::string& name) const;
-
-    CLIENT_ONLY(void Draw(const game::view::DrawArgs& args) const;)
-
-private:
-    CLIENT_ONLY(void DrawChunk(const game::view::DrawArgs& args, const Mesh& basemesh, const Chunk& chunk) const;)
 
 private:
     std::shared_ptr<const Model> basemodel_;
     std::vector<Chunk> chunks_;
+    std::vector<MapStaticObject> objs_;
     std::map<std::string, MapGraph> graphs_;
 };
 

@@ -31,6 +31,9 @@ enum MessageType : uint8_t
     // CHWORLD <MapName>
     MSG_CHWORLD,
 
+    // CAM <EntNum>
+    MSG_CAM,
+
     /*~~~~~~~~ Entity ~~~~~~~~*/
     // ENTSPAWN <EntNum> <EntType> data...
     MSG_ENTSPAWN,
@@ -39,8 +42,12 @@ enum MessageType : uint8_t
     // ENTDESTROY <EntNum>
     MSG_ENTDESTROY,
     
-    // CAM <EntNum>
-    MSG_CAM,
+    /*~~~~~~~~ Destructibles ~~~~~~~~*/
+    // OBJDESTROY <ObjNum>
+    MSG_OBJDESTROY,
+    // OBJRESPAWN <ObjNum>
+    MSG_OBJRESPAWN,
+    
 
     /*~~~~~~~~~~~~~~~~*/
     MSG_COUNT,
@@ -58,6 +65,7 @@ constexpr long long PI_D = 78256779;
 using ViewYawQ = Quantized<uint16_t, 0, 2 * PI_N, PI_D>;
 using ViewPitchQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
 
+// entities
 using EntNum = uint16_t;
 
 enum EntType : uint8_t
@@ -106,5 +114,9 @@ using AnimTimeQ = Quantized<uint8_t, 0, 1>;
 
 using NumClothes = uint8_t;
 using ClothesName = FixedStr<32>;
+
+// destructibles
+using ObjNum = uint16_t;
+using ObjCount = ObjNum;
 
 } // namespace net

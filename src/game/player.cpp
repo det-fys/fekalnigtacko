@@ -38,15 +38,7 @@ void game::Player::Update()
 
     if (world_)
     {
-        if (cam_ent_)
-        {
-            auto cam_ent = world_->GetEntity(cam_ent_);
-            if (cam_ent)
-            {
-                cull_pos_ = cam_ent->GetRoot().GetGlobalPosition();
-            }
-        }
-
+        SendWorldUpdateMsg();
         SyncEntities();
     }
 }
@@ -90,11 +82,30 @@ void game::Player::SendWorldMsg()
 {
     MSGDEBUG(std::cout << "seding CHWORLD" << std::endl;)
     auto msg = BeginMsg(net::MSG_CHWORLD);
-    msg.Write(net::MapName(world_->GetMapName()));
+    world_->SendInitData(*this, msg);
+}
+
+void game::Player::SendWorldUpdateMsg()
+{
+    if (!world_)
+        return;
+
+    auto msg = BeginMsg(); // no CMD here, included in world payload
+    msg.Write(world_->GetMsg());
 }
 
 void game::Player::SyncEntities()
 {
+    // update cull pos
+    if (cam_ent_)
+    {
+        auto cam_ent = world_->GetEntity(cam_ent_);
+        if (cam_ent)
+        {
+            cull_pos_ = cam_ent->GetRoot().GetGlobalPosition();
+        }
+    }
+
     const auto& ents = world_->GetEntities();
 
     auto ent_it = ents.begin();

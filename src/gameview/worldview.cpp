@@ -6,12 +6,26 @@
 #include "vehicleview.hpp"
 #include "client_session.hpp"
 
-game::view::WorldView::WorldView(ClientSession& session) : 
-    session_(session),
-    audiomaster_(session_.GetAudioMaster())
+game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) : 
+    session_(session), audiomaster_(session_.GetAudioMaster()), map_("openworld")
 {
-    map_ = assets::CacheManager::GetMap("data/openworld.map");
-    AddMapCollision(map_);
+    net::MapName mapname;
+    if (!msg.Read(mapname))
+        throw EntityInitError();
+
+    // init destroyed objs
+    net::ObjCount objcount;
+    if (!msg.Read(objcount))
+        throw EntityInitError();
+
+    for (net::ObjCount i = 0; i < objcount; ++i)
+    {
+        net::ObjNum objnum;
+        if (!msg.Read(objnum))
+            throw EntityInitError();
+
+        map_.EnableObj(objnum, false);
+    }
 }
 
 bool game::view::WorldView::ProcessMsg(net::MessageType type, net::InMessage& msg)
@@ -26,6 +40,12 @@ bool game::view::WorldView::ProcessMsg(net::MessageType type, net::InMessage& ms
 
     case net::MSG_ENTDESTROY:
         return ProcessEntDestroyMsg(msg);
+
+    case net::MSG_OBJDESTROY:
+        return ProcessObjDestroyOrRespawnMsg(msg, false);
+
+    case net::MSG_OBJRESPAWN:
+        return ProcessObjDestroyOrRespawnMsg(msg, true);
 
     default:
         return false;
@@ -44,8 +64,7 @@ void game::view::WorldView::Update(const UpdateInfo& info)
 
 void game::view::WorldView::Draw(const DrawArgs& args) const
 {
-    if (map_)
-        map_->Draw(args);
+    map_.Draw(args);
 
     for (const auto& [entnum, ent] : ents_)
     {
@@ -148,5 +167,15 @@ bool game::view::WorldView::ProcessEntDestroyMsg(net::InMessage& msg)
         return false;
 
     ents_.erase(entnum);
+    return true;
+}
+
+bool game::view::WorldView::ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, bool enable)
+{
+    net::ObjNum objnum;
+    if (!msg.Read(objnum))
+        return false;
+
+    map_.EnableObj(objnum, enable);
     return true;
 }

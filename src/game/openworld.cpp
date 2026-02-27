@@ -1,6 +1,5 @@
 #include "openworld.hpp"
 
-#include <coroutine>
 #include <iostream>
 
 #include "player.hpp"
@@ -24,6 +23,9 @@ game::OpenWorld::OpenWorld() : World("openworld")
     {
         SpawnBot();
     }
+
+    auto& veh = Spawn<game::DrivableVehicle>("twingo", glm::vec3{0.8f, 0.1f, 0.1f});
+    veh.SetPosition({110.0f, 100.0f, 5.0f});
 }
 
 void game::OpenWorld::Update(int64_t delta_time)

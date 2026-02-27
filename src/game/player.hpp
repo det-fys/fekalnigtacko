@@ -37,7 +37,9 @@ public:
     ~Player();
 
 private:
+    // world sync
     void SendWorldMsg();
+    void SendWorldUpdateMsg();
 
     // entities sync
     void SyncEntities();

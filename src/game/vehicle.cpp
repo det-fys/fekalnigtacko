@@ -89,7 +89,7 @@ game::Vehicle::Vehicle(World& world, std::string model_name, const glm::vec3& co
     }
 
     auto& bt_world = world_.GetBtWorld();
-    bt_world.addRigidBody(body_.get());
+    bt_world.addRigidBody(body_.get(), btBroadphaseProxy::DefaultFilter, btBroadphaseProxy::AllFilter);
     bt_world.addAction(vehicle_.get());
 }
 

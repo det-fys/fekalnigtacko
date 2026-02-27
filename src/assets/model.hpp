@@ -51,6 +51,7 @@ public:
 private:
     std::unique_ptr<collision::TriangleMesh> cmesh_;
     // std::vector<ModelCollisionShape> cshapes_;
+    std::vector<std::unique_ptr<btCollisionShape>> subshapes_;
     std::unique_ptr<btCollisionShape> cshape_;
 
     std::shared_ptr<const Skeleton> skeleton_;

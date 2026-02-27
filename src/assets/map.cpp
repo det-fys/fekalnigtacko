@@ -2,9 +2,6 @@
 
 #include <algorithm>
 
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/norm.hpp>
-
 #include "cache.hpp"
 #include "cmdfile.hpp"
 #include "utils/files.hpp"
@@ -65,7 +62,7 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
             if (!chunk)
                 throw std::runtime_error("static in map without chunk");
 
-            ChunkStaticObject obj;
+            MapStaticObject obj;
             std::string model_name;
             iss >> model_name;
 
@@ -90,7 +87,8 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
                 }
             }
 
-            chunk->objs.push_back(std::move(obj));
+            map->objs_.push_back(std::move(obj));
+            chunk->num_objs++;
         }
         else if (command == "chunk")
         {
@@ -99,6 +97,8 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
             iss >> coord.x >> coord.y;
             iss >> chunk->aabb.min.x >> chunk->aabb.min.y >> chunk->aabb.min.z;
             iss >> chunk->aabb.max.x >> chunk->aabb.max.y >> chunk->aabb.max.z;
+
+            chunk->first_obj = map->objs_.size();
         }
         else if (command == "surface")
         {
@@ -177,63 +177,3 @@ const assets::MapGraph* assets::Map::GetGraph(const std::string& name) const
         return &it->second;
     return nullptr;
 }
-
-#ifdef CLIENT
-void assets::Map::Draw(const game::view::DrawArgs& args) const
-{
-    if (!basemodel_ || !basemodel_->GetMesh())
-        return;
-
-    const auto& mesh = *basemodel_->GetMesh();
-
-    const float max_dist = args.render_distance + 200.0f;
-    const float max_dist2 = max_dist * max_dist;
-
-    for (auto& chunk : chunks_)
-    {
-        glm::vec3 center = (chunk.aabb.min + chunk.aabb.max) * 0.5f;
-        if (glm::distance2(args.eye, center) > max_dist2)
-            continue;
-
-        if (!args.frustum.IsAABBVisible(chunk.aabb))
-            continue;
-
-        DrawChunk(args, mesh, chunk);
-    }
-}
-
-void assets::Map::DrawChunk(const game::view::DrawArgs& args, const Mesh& basemesh, const Chunk& chunk) const
-{
-    for (const auto& surface_range : chunk.surfaces)
-    {
-        auto& surface = basemesh.surfaces[surface_range.idx];
-
-        gfx::DrawSurfaceCmd cmd;
-        cmd.surface = &surface;
-        cmd.first = surface_range.first;
-        cmd.count = surface_range.count;
-        args.dlist.AddSurface(cmd);
-    }
-
-    for (const auto& obj : chunk.objs)
-    {
-        if (!obj.model || !obj.model->GetMesh())
-            continue;
-
-        if (!args.frustum.IsAABBVisible(obj.aabb))
-            continue;
-
-        const auto& surfaces = obj.model->GetMesh()->surfaces;
-
-        for (const auto& surface : surfaces)
-        {
-            gfx::DrawSurfaceCmd cmd;
-            cmd.surface = &surface;
-            cmd.matrices = &obj.node.matrix;
-            // cmd.color_mod = glm::vec4(obj.color, 1.0f);
-            args.dlist.AddSurface(cmd);
-        }
-    }
-}
-
-#endif // CLIENT

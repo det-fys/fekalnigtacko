@@ -1,8 +1,9 @@
 #pragma once
 
 #include <concepts>
+#include <set>
 
-#include "assets/map.hpp"
+#include "mapinstance.hpp"
 #include "collision/dynamicsworld.hpp"
 #include "entity.hpp"
 #include "net/defs.hpp"
@@ -11,11 +12,13 @@
 namespace game
 {
 
-class World : public collision::DynamicsWorld
+class World : public collision::DynamicsWorld, public net::MsgProducer
 {
 public:
     World(std::string mapname);
     DELETE_COPY_MOVE(World)
+
+    void SendInitData(Player& player, net::OutMessage& msg);
 
     // spawn entity of type T
     template <std::derived_from<Entity> T, typename... TArgs>
@@ -39,18 +42,29 @@ public:
     virtual void PlayerViewAnglesChanged(Player& player, float yaw, float pitch) {}
     virtual void PlayerLeft(Player& player) {}
 
+    virtual void DestructibleDestroyed(net::ObjNum num, std::unique_ptr<MapObjectCollision> col) {}
+
     Entity* GetEntity(net::EntNum entnum);
 
-    const assets::Map& GetMap() const { return *map_; }
-    const std::string& GetMapName() const { return mapname_; }
+    const assets::Map& GetMap() const { return map_.GetMap(); }
+    const std::string& GetMapName() const { return map_.GetName(); }
     const std::map<net::EntNum, std::unique_ptr<Entity>>& GetEntities() const { return ents_; }
     const int64_t& GetTime() const { return time_ms_; }
 
     virtual ~World() = default;
 
 private:
-    std::shared_ptr<const assets::Map> map_;
-    std::string mapname_;
+    void DetectDestructibleCollisions();
+
+    void DestroyObject(net::ObjNum objnum);
+
+    void SendObjDestroyedMsg(net::ObjNum objnum);
+    void SendObjRespawnedMsg(net::ObjNum objnum);
+
+private:
+    MapInstance map_;
+    std::set<net::ObjNum> destroyed_objs_;
+
     std::map<net::EntNum, std::unique_ptr<Entity>> ents_;
     net::EntNum last_entnum_ = 0;
 

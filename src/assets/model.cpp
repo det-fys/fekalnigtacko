@@ -12,6 +12,7 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
     
     CLIENT_ONLY(MeshBuilder mb(gfx::MF_NONE);)
     std::unique_ptr<btConvexHullShape> temp_hull;
+    std::unique_ptr<btCompoundShape> compound;
 
     LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
         if (command == "v")
@@ -129,6 +130,33 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
             model->skeleton_ = CacheManager::GetSkeleton("data/" + skel_name + ".sk");
             CLIENT_ONLY(mb.SetMeshFlag(gfx::MF_SKELETAL));
         }
+        else if (command == "col")
+        {
+            std::string shape_type;
+            Transform trans;
+            float sy, sz;
+            iss >> shape_type;
+            ParseTransform(iss, trans);
+            iss >> sy >> sz;
+            glm::vec3 scale(trans.scale, sy, sz);
+            trans.scale = 1.0f; 
+
+            if (!compound)
+            {
+                compound = std::make_unique<btCompoundShape>();
+            }
+
+            if (shape_type == "box")
+            {
+                auto box_shape = std::make_unique<btBoxShape>(btVector3(scale.x, scale.y, scale.z));
+                compound->addChildShape(trans.ToBtTransform(), box_shape.get());
+                model->subshapes_.push_back(std::move(box_shape));
+            }
+            else
+            {
+                throw std::runtime_error("Unknown collision shape type: " + shape_type);
+            }
+        }
         else
         {
             throw std::runtime_error("Unknown command in model file: " + command);
@@ -156,6 +184,10 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
         shape_hull->buildHull(temp_hull->getMargin());
 
         model->cshape_ = std::make_unique<btConvexHullShape>((btScalar*)shape_hull->getVertexPointer(), shape_hull->numVertices(), sizeof(btVector3));
+    }
+    else
+    {
+        model->cshape_ = std::move(compound);
     }
 
     return model;
