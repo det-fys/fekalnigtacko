@@ -8,6 +8,7 @@
 std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::string& filename)
 {
     auto model = std::make_shared<Model>();
+    model->name_ = filename; // TODO: name not filename
     std::vector<glm::vec3> vert_pos; // rember for collision trimesh
     
     CLIENT_ONLY(MeshBuilder mb(gfx::MF_NONE);)
@@ -45,7 +46,12 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                 vert_pos.emplace_back(pos);
 
             if (temp_hull)
-                temp_hull->addPoint(btVector3(pos.x, pos.y, pos.z), false);
+            {
+                auto offset_pos = pos - model->col_offset_;
+
+                temp_hull->addPoint(btVector3(offset_pos.x, offset_pos.y, offset_pos.z), false);
+
+            }
 
             model->aabb_.AddPoint(pos);
         }
@@ -65,8 +71,17 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
 
             if (model->cmesh_)
             {
-                // FIXME: possible index segfault
-                model->cmesh_->AddTriangle(vert_pos[indices[0]], vert_pos[indices[1]], vert_pos[indices[2]]);
+                glm::vec3 p[3];
+                for (size_t i = 0; i < 3; ++i)
+                {
+                    size_t index = indices[i];
+                    if (index >= vert_pos.size())
+                        throw std::runtime_error("Vertex index out of bounds in model");
+                    
+                    p[i] = vert_pos[index] - model->col_offset_;
+                }
+
+                model->cmesh_->AddTriangle(p[0], p[1], p[2]);
             }
         }
         else if (command == "surface")
@@ -141,6 +156,8 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
             glm::vec3 scale(trans.scale, sy, sz);
             trans.scale = 1.0f; 
 
+            trans.position -= model->col_offset_; // apply offset
+
             if (!compound)
             {
                 compound = std::make_unique<btCompoundShape>();
@@ -156,6 +173,12 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
             {
                 throw std::runtime_error("Unknown collision shape type: " + shape_type);
             }
+        }
+        else if (command == "centerofmass")
+        {
+            glm::vec3 com;
+            iss >> com.x >> com.y >> com.z;
+            model->col_offset_ = com;
         }
         else
         {

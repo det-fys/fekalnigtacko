@@ -7,7 +7,7 @@
 #include "utils/allocnum.hpp"
 #include "collision/object_type.hpp"
 
-game::World::World(std::string mapname) : map_(*this, std::move(mapname))
+game::World::World(std::string mapname) : Scheduler(time_ms_), map_(*this, std::move(mapname))
 {
 }
 
@@ -51,6 +51,8 @@ void game::World::Update(int64_t delta_time)
 
     DetectDestructibleCollisions();
 
+    RunTasks();
+
     // update entities
     for (auto it = ents_.begin(); it != ents_.end();)
     {
@@ -61,10 +63,13 @@ void game::World::Update(int64_t delta_time)
         else
             ++it;
     }
+
 }
 
 void game::World::FinishFrame()
 {
+    ResetMsg();
+
     // reset ent msgs
     for (auto& [entnum, ent] : ents_)
     {
@@ -80,6 +85,15 @@ game::Entity* game::World::GetEntity(net::EntNum entnum)
         return nullptr;
 
     return it->second.get();
+}
+
+void game::World::RespawnObj(net::ObjNum objnum)
+{
+    if (destroyed_objs_.erase(objnum) > 0)
+    {
+        map_.SpawnObj(objnum);
+        SendObjRespawnedMsg(objnum);
+    }
 }
 
 void game::World::DetectDestructibleCollisions()
@@ -110,7 +124,7 @@ void game::World::DetectDestructibleCollisions()
 
         for (int j = 0; j < contactManifold->getNumContacts(); j++)
         {
-            const float break_threshold = 3000.0f; // TODO: per-object threshold
+            const float break_threshold = 100.0f; // TODO: per-object threshold
 
             btManifoldPoint& pt = contactManifold->getContactPoint(j);
 

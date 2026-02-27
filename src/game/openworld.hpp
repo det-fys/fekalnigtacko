@@ -25,6 +25,8 @@ public:
     virtual void PlayerViewAnglesChanged(Player& player, float yaw, float pitch) override;
     virtual void PlayerLeft(Player& player) override;
 
+    virtual void DestructibleDestroyed(net::ObjNum num, std::unique_ptr<MapObjectCollision> col) override;
+
     std::optional<std::pair<Usable&, const UseTarget&>> GetBestUseTarget(const glm::vec3& pos) const;
 
 private:

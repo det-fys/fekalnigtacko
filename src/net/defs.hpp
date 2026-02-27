@@ -72,9 +72,10 @@ enum EntType : uint8_t
 {
     ET_NONE,
 
+    ET_SIMPLE,
     ET_CHARACTER,
     ET_VEHICLE,
-
+    
     ET_COUNT,
 };
 

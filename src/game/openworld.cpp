@@ -8,6 +8,7 @@
 #include "player_character.hpp"
 #include "npc_character.hpp"
 #include "drivable_vehicle.hpp"
+#include "destroyed_object.hpp"
 
 namespace game
 {
@@ -75,6 +76,16 @@ void game::OpenWorld::PlayerViewAnglesChanged(Player& player, float yaw, float p
 void game::OpenWorld::PlayerLeft(Player& player)
 {
     RemovePlayerCharacter(player);
+}
+
+void game::OpenWorld::DestructibleDestroyed(net::ObjNum num, std::unique_ptr<MapObjectCollision> col)
+{
+    auto& destroyed_obj = Spawn<DestroyedObject>(std::move(col));
+
+    // Schedule(100000, [this, objnum = num]()
+    // {
+    //     RespawnObj(objnum);
+    // });
 }
 
 std::optional<std::pair<game::Usable&, const game::UseTarget&>> game::OpenWorld::GetBestUseTarget(const glm::vec3& pos) const

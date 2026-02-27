@@ -23,8 +23,12 @@ public:
 
     void Break();
 
+    void GetModelTransform(Transform& trans) const;
+    
+    const std::shared_ptr<const assets::Model>& GetModel() const { return model_; }
     btRigidBody& GetBtBody() { return *body_; }
     net::ObjNum GetNum() const { return num_; }
+
     
     ~MapObjectCollision();
 

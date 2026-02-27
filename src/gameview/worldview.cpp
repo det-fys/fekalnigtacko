@@ -2,6 +2,7 @@
 
 #include "assets/cache.hpp"
 
+#include "simple_entity_view.hpp"
 #include "characterview.hpp"
 #include "vehicleview.hpp"
 #include "client_session.hpp"
@@ -123,6 +124,10 @@ bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)
     {
         switch (type)
         {
+        case net::ET_SIMPLE:
+            entslot = std::make_unique<SimpleEntityView>(*this, msg);
+            break;
+
         case net::ET_CHARACTER:
             entslot = std::make_unique<CharacterView>(*this, msg);
             break;
@@ -132,6 +137,7 @@ bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)
             break;
 
         default:
+            ents_.erase(entnum);
             return false; // unknown type
         }
 

@@ -12,7 +12,7 @@
 namespace game
 {
 
-class World : public collision::DynamicsWorld, public net::MsgProducer
+class World : public collision::DynamicsWorld, public net::MsgProducer, public Scheduler
 {
 public:
     World(std::string mapname);
@@ -45,6 +45,8 @@ public:
     virtual void DestructibleDestroyed(net::ObjNum num, std::unique_ptr<MapObjectCollision> col) {}
 
     Entity* GetEntity(net::EntNum entnum);
+
+    void RespawnObj(net::ObjNum objnum);
 
     const assets::Map& GetMap() const { return map_.GetMap(); }
     const std::string& GetMapName() const { return map_.GetName(); }

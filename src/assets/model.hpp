@@ -41,6 +41,9 @@ public:
     Model() = default;
     static std::shared_ptr<const Model> LoadFromFile(const std::string& filename);
 
+    const std::string& GetName() const { return name_; }
+    
+    const glm::vec3& GetColOffset() const { return col_offset_; }
     const collision::TriangleMesh* GetColMesh() const { return cmesh_.get(); }
     btCollisionShape* GetColShape() const { return cshape_.get(); }
 
@@ -49,6 +52,8 @@ public:
     const AABB3& GetAABB() const { return aabb_; }
 
 private:
+    std::string name_;
+    glm::vec3 col_offset_ = glm::vec3(0.0f);
     std::unique_ptr<collision::TriangleMesh> cmesh_;
     // std::vector<ModelCollisionShape> cshapes_;
     std::vector<std::unique_ptr<btCollisionShape>> subshapes_;

@@ -89,7 +89,10 @@ game::MapObjectCollision::MapObjectCollision(collision::DynamicsWorld& world,
             btRigidBody::btRigidBodyConstructionInfo(mass, nullptr, cmesh->GetShape(), local_inertia));
     }
 
-    body_->setWorldTransform(trans.ToBtTransform());
+    auto offset_trans = trans;
+    offset_trans.position += trans.rotation * model_->GetColOffset();
+
+    body_->setWorldTransform(offset_trans.ToBtTransform());
     body_->setUserIndex(static_cast<int>(obj_type));
     body_->setUserPointer(this);
 
@@ -102,17 +105,28 @@ void game::MapObjectCollision::Break()
     if (!body_)
         return;
 
-    // body_->setCollisionFlags(body_->getCollisionFlags() & ~btCollisionObject::CF_KINEMATIC_OBJECT);
-
+    btCollisionShape* shape = body_->getCollisionShape();
     float mass = 10.0f;
     btVector3 local_inertia(0, 0, 0);
-    body_->getCollisionShape()->calculateLocalInertia(mass, local_inertia);
+    shape->calculateLocalInertia(mass, local_inertia);
 
-    body_->setMassProps(mass, local_inertia);
-    body_->forceActivationState(ACTIVE_TAG);
+    btTransform trans = body_->getWorldTransform();
 
-    // set to undefined to avoid breaking again
+    // remove old
+    world_.GetBtWorld().removeRigidBody(body_.get());
+    body_.reset();
+    
+    // make new
+    body_ = std::make_unique<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(mass, nullptr, shape, local_inertia)); 
+    body_->setWorldTransform(trans);
     body_->setUserIndex(static_cast<int>(collision::OT_UNDEFINED));
+    world_.GetBtWorld().addRigidBody(body_.get());
+}
+
+void game::MapObjectCollision::GetModelTransform(Transform& trans) const
+{
+    trans.SetBtTransform(body_->getWorldTransform());
+    trans.position -= trans.rotation * model_->GetColOffset(); // unapply offset
 }
 
 game::MapObjectCollision::~MapObjectCollision()
