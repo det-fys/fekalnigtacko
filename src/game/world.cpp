@@ -5,7 +5,7 @@
 
 #include "assets/cache.hpp"
 #include "utils/allocnum.hpp"
-#include "collision/object_type.hpp"
+#include "collision/object_info.hpp"
 
 game::World::World(std::string mapname) : Scheduler(time_ms_), map_(*this, std::move(mapname))
 {
@@ -49,7 +49,7 @@ void game::World::Update(int64_t delta_time)
     // GetBtWorld().stepSimulation(delta_s, 1, delta_s);
     GetBtWorld().stepSimulation(delta_s, 2, delta_s * 0.5f);
 
-    DetectDestructibleCollisions();
+    HandleContacts();
 
     RunTasks();
 
@@ -96,7 +96,7 @@ void game::World::RespawnObj(net::ObjNum objnum)
     }
 }
 
-void game::World::DetectDestructibleCollisions()
+void game::World::HandleContacts()
 {
     auto& bt_world = GetBtWorld();
     int numManifolds = bt_world.getDispatcher()->getNumManifolds();
@@ -104,41 +104,48 @@ void game::World::DetectDestructibleCollisions()
     static std::vector<net::ObjNum> to_destroy;
     to_destroy.clear();
 
+    auto ProcessContact = [&](btRigidBody* body, btRigidBody* other_body, btManifoldPoint& pt) {
+        collision::ObjectType type;
+        collision::ObjectFlags flags;
+        collision::ObjectCallback* cb;
+        collision::GetObjectInfo(body, type, flags, cb);
+
+        if (cb && (flags & collision::OF_NOTIFY_CONTACT))
+        {
+            cb->OnContact(pt.getAppliedImpulse());
+        }
+
+        if (type == collision::OT_MAP_OBJECT && (flags & collision::OF_DESTRUCTIBLE))
+        {
+            auto col = dynamic_cast<MapObjectCollision*>(cb);
+            if (!col)
+                return;
+            
+            const float break_threshold = 100.0f; // TODO: per-object threshold
+               
+            if (pt.getAppliedImpulse() > break_threshold)
+            {
+                to_destroy.push_back(col->GetNum());
+                other_body->applyCentralImpulse(pt.m_normalWorldOnB * pt.getAppliedImpulse() * 0.5f);        
+            }
+
+            return;
+        }
+    };
+
     // std::cout << "Checking " << numManifolds << " manifolds for destructible collisions..." << std::endl;
     for (int i = 0; i < numManifolds; i++)
     {
         btPersistentManifold* contactManifold = bt_world.getDispatcher()->getManifoldByIndexInternal(i);
 
-        const btRigidBody* bodyA = static_cast<const btRigidBody*>(contactManifold->getBody0());
-        const btRigidBody* bodyB = static_cast<const btRigidBody*>(contactManifold->getBody1());
-
-        const btRigidBody* destructibleBody = nullptr;
-
-        if (bodyA->getUserIndex() == collision::OT_MAP_DESTRUCTIBLE)
-            destructibleBody = bodyA;
-        else if (bodyB->getUserIndex() == collision::OT_MAP_DESTRUCTIBLE)
-            destructibleBody = bodyB;
-
-        if (!destructibleBody)
-            continue;
+        btRigidBody* body0 = const_cast<btRigidBody*>(static_cast<const btRigidBody*>(contactManifold->getBody0()));
+        btRigidBody* body1 = const_cast<btRigidBody*>(static_cast<const btRigidBody*>(contactManifold->getBody1()));
 
         for (int j = 0; j < contactManifold->getNumContacts(); j++)
         {
-            const float break_threshold = 100.0f; // TODO: per-object threshold
-
             btManifoldPoint& pt = contactManifold->getContactPoint(j);
-
-            if (pt.getAppliedImpulse() > break_threshold)
-            {
-                std::cout << "Destructible collision detected: impulse = " << pt.getAppliedImpulse() << std::endl;
-
-                MapObjectCollision* obj_col = static_cast<MapObjectCollision*>(destructibleBody->getUserPointer());
-                to_destroy.push_back(obj_col->GetNum());
-
-                const btRigidBody* otherBody = (destructibleBody == bodyA) ? bodyB : bodyA;
-                btRigidBody* otherBodyNonConst = const_cast<btRigidBody*>(otherBody);
-                otherBodyNonConst->applyCentralImpulse(pt.m_normalWorldOnB * pt.getAppliedImpulse() * 0.5f);
-            }
+            ProcessContact(body0, body1, pt);
+            ProcessContact(body1, body0, pt);
         }
     }
 

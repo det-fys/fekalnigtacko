@@ -3,6 +3,8 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
+#include <iostream>
+
 audio::SoundSource::SoundSource(Player* player, std::shared_ptr<const Sound> sound)
     : Super(sound->GetCategoryName(), player), sound_(std::move(sound))
 {
@@ -26,6 +28,7 @@ void audio::SoundSource::SetPitch(float pitch)
 void audio::SoundSource::SetVolume(float volume)
 {
     Super::SetSourceVolume(sound_->GetVolume() * volume);
+    //std::cout << "src volume " << sound_->GetVolume() * volume << std::endl;
 }
 
 void audio::SoundSource::Update()

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <any>
+
 #include "assets/map.hpp"
 #include "draw_args.hpp"
 #include "net/defs.hpp"
@@ -38,6 +40,8 @@ private:
 
     bool ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, bool enable);
 
+    void Cache(std::any val);
+
 private:
     ClientSession& session_;
     
@@ -47,6 +51,8 @@ private:
     float time_ = 0.0f;
     
     audio::Master& audiomaster_;
+
+    std::vector<std::any> cache_;
 };
 
 } // namespace game::view

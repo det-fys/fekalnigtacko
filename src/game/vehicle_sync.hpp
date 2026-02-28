@@ -14,8 +14,9 @@ using VehicleFlags = uint8_t;
 enum VehicleFlag : VehicleFlags
 {
     VF_NONE,
-    VF_ACCELERATING = 1,
-    VF_BREAKING = 2,
+    VF_ACCELERATING = 0x01,
+    VF_BREAKING = 0x02,
+    VF_BROKENWINDOWS = 0x04,
 };
 
 struct VehicleSyncState

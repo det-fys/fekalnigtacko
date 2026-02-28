@@ -27,6 +27,12 @@ game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) :
 
         map_.EnableObj(objnum, false);
     }
+
+    // cache common snds and stuff
+    Cache(assets::CacheManager::GetSound("data/breaksign.snd"));
+    Cache(assets::CacheManager::GetSound("data/breakpatnik.snd"));
+    Cache(assets::CacheManager::GetSound("data/crash.snd"));
+    Cache(assets::CacheManager::GetSound("data/breakwindow.snd"));
 }
 
 bool game::view::WorldView::ProcessMsg(net::MessageType type, net::InMessage& msg)
@@ -184,4 +190,9 @@ bool game::view::WorldView::ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, b
 
     map_.EnableObj(objnum, enable);
     return true;
+}
+
+void game::view::WorldView::Cache(std::any val)
+{
+    cache_.emplace_back(std::move(val));
 }

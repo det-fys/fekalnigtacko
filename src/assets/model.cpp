@@ -180,13 +180,16 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
             iss >> com.x >> com.y >> com.z;
             model->col_offset_ = com;
         }
+        else if (command == "param")
+        {
+            std::string key, val;
+            iss >> key >> val;
+            model->params_[key] = val;
+        }
         else
         {
             throw std::runtime_error("Unknown command in model file: " + command);
         }
-        
-
-        // TODO: skeleton
     });
     
     CLIENT_ONLY(
@@ -214,4 +217,30 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
     }
 
     return model;
+}
+
+const std::string* assets::Model::GetParam(const std::string& key) const
+{
+    auto it = params_.find(key);
+    if (it == params_.end())
+        return nullptr;
+
+    return &it->second;
+}
+
+bool assets::Model::GetParamFloat(const std::string& key, float& out) const
+{
+    auto str_val = GetParam(key);
+    if (!str_val)
+        return false;
+
+    std::string str = *str_val;
+    
+    auto dashpos = str.find(',');
+    if (dashpos != std::string::npos)
+        str[dashpos] = '.';
+
+    out = std::strtof(str.c_str(), nullptr);
+
+    return true;
 }

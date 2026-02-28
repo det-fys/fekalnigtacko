@@ -1,5 +1,6 @@
 #include "drivable_vehicle.hpp"
 #include "player_character.hpp"
+#include "utils/random.hpp"
 
 game::DrivableVehicle::DrivableVehicle(World& world, std::string model_name, const glm::vec3& color)
     : Vehicle(world, std::move(model_name), color)
@@ -13,6 +14,8 @@ void game::DrivableVehicle::Use(PlayerCharacter& character, uint32_t target_id)
         return;
 
     character.SetVehicle(this, target_id); // seat idx is same as target_id
+    PlaySound("cardoor", 1.0f, RandomFloat(0.9f, 1.1f));
+
 }
 
 bool game::DrivableVehicle::SetPassenger(uint32_t seat_idx, ControllableCharacter* character)

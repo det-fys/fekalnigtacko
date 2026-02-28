@@ -3,7 +3,6 @@
 #include <stdexcept>
 
 #include "assets/cache.hpp"
-#include "collision/object_type.hpp"
 
 game::MapInstance::MapInstance(collision::DynamicsWorld& world, std::string mapname)
     : world_(world), mapname_(std::move(mapname))
@@ -67,14 +66,13 @@ game::MapObjectCollision::MapObjectCollision(collision::DynamicsWorld& world,
 
     const bool destructible = (flags & MAPOBJ_DESTRUCTIBLE) != 0 && cshape != nullptr;
 
-    collision::ObjectType obj_type = collision::OT_MAP_STATIC;
-
     btVector3 local_inertia(0, 0, 0);
     float mass = 0.0f;
-    
+    collision::ObjectFlags oflags = 0;
+
     if (destructible)
     {
-        obj_type = collision::OT_MAP_DESTRUCTIBLE;
+        oflags |= collision::OF_DESTRUCTIBLE;
     }
 
     // prefer simple cshape which allow destruction
@@ -93,8 +91,8 @@ game::MapObjectCollision::MapObjectCollision(collision::DynamicsWorld& world,
     offset_trans.position += trans.rotation * model_->GetColOffset();
 
     body_->setWorldTransform(offset_trans.ToBtTransform());
-    body_->setUserIndex(static_cast<int>(obj_type));
-    body_->setUserPointer(this);
+
+    collision::SetObjectInfo(body_.get(), collision::OT_MAP_OBJECT, oflags, this);
 
     // world_.GetBtWorld().addRigidBody(body_.get(), btBroadphaseProxy::StaticFilter, btBroadphaseProxy::AllFilter);
     world_.GetBtWorld().addRigidBody(body_.get());
@@ -119,7 +117,9 @@ void game::MapObjectCollision::Break()
     // make new
     body_ = std::make_unique<btRigidBody>(btRigidBody::btRigidBodyConstructionInfo(mass, nullptr, shape, local_inertia)); 
     body_->setWorldTransform(trans);
-    body_->setUserIndex(static_cast<int>(collision::OT_UNDEFINED));
+    
+    collision::SetObjectInfo(body_.get(), collision::OT_UNDEFINED, 0, this);
+
     world_.GetBtWorld().addRigidBody(body_.get());
 }
 

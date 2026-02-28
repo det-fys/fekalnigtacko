@@ -4,6 +4,7 @@
 #include "net/utils.hpp"
 #include "player.hpp"
 #include "player_input.hpp"
+#include "utils/random.hpp"
 
 #include <iostream>
 
@@ -32,6 +33,8 @@ game::Vehicle::Vehicle(World& world, std::string model_name, const glm::vec3& co
     btRigidBody::btRigidBodyConstructionInfo rb_info(mass, &motion_, shape, local_inertia);
     body_ = std::make_unique<btRigidBody>(rb_info);
     body_->setActivationState(DISABLE_DEACTIVATION);
+
+    collision::SetObjectInfo(body_.get(), collision::OT_ENTITY, collision::OF_NOTIFY_CONTACT, this);
 
     // setup vehicle
     btRaycastVehicle::btVehicleTuning tuning;
@@ -100,6 +103,7 @@ void game::Vehicle::Update()
     root_.UpdateMatrix();
 
     flags_ = 0;
+    UpdateCrash();
     ProcessInput();
     UpdateWheels();
 
@@ -121,6 +125,27 @@ void game::Vehicle::SendInitData(Player& player, net::OutMessage& msg) const
     size_t fields_pos = msg.Reserve<VehicleSyncFieldFlags>();
     auto fields = WriteState(msg, default_state);
     msg.WriteAt(fields_pos, fields);
+}
+
+void game::Vehicle::OnContact(float impulse)
+{
+    Super::OnContact(impulse);
+
+    crash_intensity_ += impulse;
+
+    if (impulse < 1000.0f)
+        return;
+
+    if (window_health_ > 0.0f)
+    {
+        window_health_ -= impulse;
+
+        if (window_health_ <= 0.0f) // just broken
+        {
+            PlaySound("breakwindow", 1.0f, 1.0f);
+        }
+    }
+
 }
 
 void game::Vehicle::SetInput(VehicleInputType type, bool enable)
@@ -291,6 +316,47 @@ void game::Vehicle::ProcessInput()
 
     if (glm::abs(breakingForce) > 0)
         flags_ |= VF_BREAKING;
+}
+
+void game::Vehicle::UpdateCrash()
+{
+    if (window_health_ <= 0.0f)
+        flags_ |= VF_BROKENWINDOWS;
+    
+    if (no_crash_frames_)
+    {
+        --no_crash_frames_;
+    }
+    else
+    {
+        if (crash_intensity_ > 1000.0f)
+        {
+            float volume = RandomFloat(0.9f, 1.2f);
+            float pitch = RandomFloat(1.0f, 1.3f);
+
+            if (crash_intensity_ > 12000.0f)
+            {
+                volume *= 1.7f;
+                pitch *= 0.8f;
+            }
+            if (crash_intensity_ > 4000.0f)
+            {
+                volume *= 1.3f;
+                pitch *= 0.8f;
+            }
+            else
+            {
+                volume *= 0.8f;
+                pitch *= 1.2f;
+            }
+
+            PlaySound("crash", volume, pitch);
+            no_crash_frames_ = 7 + rand() % 10;
+        }
+
+    }
+
+    crash_intensity_ = 0.0f;
 }
 
 void game::Vehicle::UpdateWheels()

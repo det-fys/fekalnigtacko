@@ -34,7 +34,6 @@ namespace assets
 //     };
 // };
 
-
 class Model
 {
 public:
@@ -51,6 +50,9 @@ public:
     CLIENT_ONLY(const std::shared_ptr<const Mesh>& GetMesh() const { return mesh_; })
     const AABB3& GetAABB() const { return aabb_; }
 
+    const std::string* GetParam(const std::string& key) const;
+    bool GetParamFloat(const std::string& key, float& out) const;
+
 private:
     std::string name_;
     glm::vec3 col_offset_ = glm::vec3(0.0f);
@@ -62,6 +64,8 @@ private:
     std::shared_ptr<const Skeleton> skeleton_;
     CLIENT_ONLY(std::shared_ptr<const Mesh> mesh_;);
     AABB3 aabb_;
+
+    std::map<std::string, std::string> params_;
 
 };
 

@@ -15,7 +15,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
         throw EntityInitError();
 
     model_ = assets::CacheManager::GetVehicleModel("data/" + std::string(modelname) + ".veh");
-
+    mesh_ = *model_->GetModel()->GetMesh();
     
     auto& modelwheels = model_->GetWheels();
     wheels_.resize(modelwheels.size());
@@ -102,17 +102,26 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
         snd_accel_src_->Delete();
         snd_accel_src_ = nullptr;
     }
+
+    // update windows
+    if ((flags_ & VF_BROKENWINDOWS) && !windows_broken_)
+    {
+        windows_broken_ = true;
+
+        auto it = mesh_.surface_names.find("carwindows"); 
+        if (it != mesh_.surface_names.end())
+        {
+            size_t idx = it->second;
+            mesh_.surfaces[idx].texture = assets::CacheManager::GetTexture("data/carbrokenwindows.png");
+        }
+    }
 }
 
 void game::view::VehicleView::Draw(const DrawArgs& args)
 {
     Super::Draw(args);
 
-    // TOOD: chceck and fix
-    const auto& model = *model_->GetModel();
-    const auto& mesh = *model.GetMesh();
-
-    for (const auto& surface : mesh.surfaces)
+    for (const auto& surface : mesh_.surfaces)
     {
         gfx::DrawSurfaceCmd cmd;
         cmd.surface = &surface;

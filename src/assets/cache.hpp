@@ -13,6 +13,8 @@
 #include "gfx/font.hpp"
 #endif
 
+#include <iostream>
+
 namespace assets
 {
 
@@ -33,6 +35,7 @@ public:
             }
         }
 
+        std::cout << "loading " << key << "..." << std::endl;
         PtrType obj = Load(key);
         cache_[key] = obj; // Cache the loaded object
         return obj;

@@ -86,6 +86,7 @@ enum EntMsgType : uint8_t
     EMSG_NAMETAG,
     EMSG_ATTACH,
     EMSG_UPDATE,
+    EMSG_PLAYSOUND,
 };
 
 using PositionElemQ = Quantized<uint32_t, -10000, 10000, 1>;
@@ -109,6 +110,10 @@ using RotationSpeedQ = Quantized<uint16_t, -300, 300, 1>;
 using ColorQ = Quantized<uint8_t, 0, 1>;
 
 using NameTag = FixedStr<64>;
+
+using SoundName = FixedStr<64>;
+using SoundVolumeQ = Quantized<uint8_t, 0, 2>;
+using SoundPitchQ = Quantized<uint8_t, 0, 2>;
 
 using AnimBlendQ = Quantized<uint8_t, 0, 1>;
 using AnimTimeQ = Quantized<uint8_t, 0, 1>;

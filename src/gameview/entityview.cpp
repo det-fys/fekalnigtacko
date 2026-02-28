@@ -23,6 +23,8 @@ bool game::view::EntityView::ProcessMsg(net::EntMsgType type, net::InMessage& ms
         return ReadNametag(msg);
     case net::EMSG_ATTACH:
         return ReadAttach(msg);
+    case net::EMSG_PLAYSOUND:
+        return ProcessPlaySoundMsg(msg);
     default:
         return false;
     }
@@ -80,6 +82,21 @@ bool game::view::EntityView::ReadNametag(net::InMessage& msg)
 bool game::view::EntityView::ReadAttach(net::InMessage& msg)
 {
     return msg.Read(parentnum_);
+}
+
+bool game::view::EntityView::ProcessPlaySoundMsg(net::InMessage& msg)
+{
+    net::SoundName name;
+    float volume, pitch;
+    if (!msg.Read(name) || !msg.Read<net::SoundVolumeQ>(volume) || !msg.Read<net::SoundPitchQ>(pitch))
+        return false;
+
+    auto sound = assets::CacheManager::GetSound("data/" + std::string(name) + ".snd");
+    auto snd = audioplayer_.PlaySound(sound, &root_.local.position);
+    snd->SetVolume(volume);
+    snd->SetPitch(pitch);
+
+    return true;
 }
 
 void game::view::EntityView::DrawNametag(const DrawArgs& args)

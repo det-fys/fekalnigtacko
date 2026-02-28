@@ -40,6 +40,8 @@ public:
     virtual void Update() override;
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
 
+    virtual void OnContact(float impulse) override;
+
     void SetInput(VehicleInputType type, bool enable);
     void SetInputs(VehicleInputFlags inputs) { in_ = inputs; }
 
@@ -59,6 +61,7 @@ public:
 
 private:
     void ProcessInput();
+    void UpdateCrash();
     void UpdateWheels();
     void UpdateSyncState();
     VehicleSyncFieldFlags WriteState(net::OutMessage& msg, const VehicleSyncState& base) const;
@@ -86,6 +89,11 @@ private:
     size_t sync_current_ = 0;
 
     VehicleInputFlags in_ = 0;
+
+    float window_health_ = 10000.0f;
+
+    float crash_intensity_ = 0.0f;
+    size_t no_crash_frames_ = 0;
 };
 
 } // namespace game

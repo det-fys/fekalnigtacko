@@ -82,10 +82,9 @@ void game::OpenWorld::DestructibleDestroyed(net::ObjNum num, std::unique_ptr<Map
 {
     auto& destroyed_obj = Spawn<DestroyedObject>(std::move(col));
 
-    // Schedule(100000, [this, objnum = num]()
-    // {
-    //     RespawnObj(objnum);
-    // });
+    Schedule(10000, [this, num] {
+        RespawnObj(num);
+    });
 }
 
 std::optional<std::pair<game::Usable&, const game::UseTarget&>> game::OpenWorld::GetBestUseTarget(const glm::vec3& pos) const

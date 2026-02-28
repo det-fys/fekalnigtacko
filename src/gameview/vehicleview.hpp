@@ -36,6 +36,7 @@ private:
 
 private:
     std::shared_ptr<const assets::VehicleModel> model_;
+    assets::Mesh mesh_;
     glm::vec4 color_;
 
     game::VehicleSyncState sync_;
@@ -48,6 +49,8 @@ private:
 
     std::shared_ptr<const audio::Sound> snd_accel_;
     audio::SoundSource* snd_accel_src_ = nullptr;
+
+    bool windows_broken_ = false;
 };
 
 }

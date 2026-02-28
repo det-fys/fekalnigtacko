@@ -50,6 +50,7 @@ public:
 private:
     bool ReadNametag(net::InMessage& msg);
     bool ReadAttach(net::InMessage& msg);
+    bool ProcessPlaySoundMsg(net::InMessage& msg);
 
     void DrawNametag(const DrawArgs& args);
     void DrawAxes(const DrawArgs& args);

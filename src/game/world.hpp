@@ -56,7 +56,7 @@ public:
     virtual ~World() = default;
 
 private:
-    void DetectDestructibleCollisions();
+    void HandleContacts();
 
     void DestroyObject(net::ObjNum objnum);
 

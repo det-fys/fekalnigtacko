@@ -52,6 +52,14 @@ void game::Entity::Attach(net::EntNum parentnum)
     SendAttachMsg();
 }
 
+void game::Entity::PlaySound(const std::string& name, float volume, float pitch)
+{
+    auto msg = BeginEntMsg(net::EMSG_PLAYSOUND);
+    msg.Write(net::SoundName(name));
+    msg.Write<net::SoundVolumeQ>(volume);
+    msg.Write<net::SoundPitchQ>(pitch);
+}
+
 void game::Entity::WriteNametag(net::OutMessage& msg) const
 {
     msg.Write(net::NameTag{nametag_});

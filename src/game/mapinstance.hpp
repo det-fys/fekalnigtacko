@@ -3,6 +3,7 @@
 #include "assets/map.hpp"
 #include "collision/dynamicsworld.hpp"
 #include "net/defs.hpp"
+#include "collision/object_info.hpp"
 
 namespace game
 {
@@ -14,7 +15,7 @@ enum MapObjectCollisionFlag : MapObjectCollisionFlags
     MAPOBJ_DESTRUCTIBLE = 0x01,
 };
 
-class MapObjectCollision
+class MapObjectCollision : public collision::ObjectCallback
 {
 public:
     MapObjectCollision(collision::DynamicsWorld& world, std::shared_ptr<const assets::Model> model,
@@ -29,8 +30,7 @@ public:
     btRigidBody& GetBtBody() { return *body_; }
     net::ObjNum GetNum() const { return num_; }
 
-    
-    ~MapObjectCollision();
+    virtual ~MapObjectCollision() override;
 
 private:
     collision::DynamicsWorld& world_;

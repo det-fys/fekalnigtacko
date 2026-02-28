@@ -12,9 +12,9 @@ App::App()
 	std::cout << "Initializing App..." << std::endl;
 
 #ifndef EMSCRIPTEN
-	audiomaster_.SetMasterVolume(0.2f);
+	audiomaster_.SetMasterVolume(1.0f);
 #else
-	audiomaster_.SetMasterVolume(0.8f);
+	audiomaster_.SetMasterVolume(2.0f);
 #endif
 
 	font_ = assets::CacheManager::GetFont("data/comic32.font");

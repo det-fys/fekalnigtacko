@@ -6,6 +6,7 @@
 #include "transform_node.hpp"
 #include "utils/defs.hpp"
 #include "utils/scheduler.hpp"
+#include "collision/object_info.hpp"
 
 namespace game
 {
@@ -13,7 +14,7 @@ namespace game
 class World;
 class Player;
 
-class Entity : public net::MsgProducer, public Scheduler
+class Entity : public net::MsgProducer, public Scheduler, public collision::ObjectCallback
 {
 public:
     Entity(World& world, net::EntType viewtype);
@@ -29,15 +30,18 @@ public:
     int64_t GetUpdateTime() const { return upd_time_; }
 
     void SetNametag(const std::string& nametag);
-
+     
     void Attach(net::EntNum parentnum);
     net::EntNum GetParentNum() const { return parentnum_; }
+
+    void PlaySound(const std::string& name, float volume = 1.0f, float pitch = 1.0f);
 
     void Remove() { removed_ = true; }
     bool IsRemoved() const { return removed_; }
 
     const TransformNode& GetRoot() const { return root_; }
     const Transform& GetRootTransform() const { return root_.local; }
+
     float GetMaxDistance() const { return max_distance_; }
 
     virtual ~Entity() = default;
