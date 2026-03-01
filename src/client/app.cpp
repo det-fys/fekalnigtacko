@@ -167,7 +167,7 @@ void App::SendInput(game::PlayerInputType type, bool enable)
 
 void App::InitChat()
 {
-	chatpos_.resize(30); // max messages on screen
+	chatpos_.resize(20); // max messages on screen
     const float chat_scale = 1.0f;
 	for (size_t i = 0; i < chatpos_.size(); ++i)
 	{
