@@ -32,13 +32,13 @@ game::Vehicle::Vehicle(World& world, std::string model_name, const glm::vec3& co
 
     btRigidBody::btRigidBodyConstructionInfo rb_info(mass, &motion_, shape, local_inertia);
     body_ = std::make_unique<btRigidBody>(rb_info);
-    body_->setActivationState(DISABLE_DEACTIVATION);
+    // body_->setActivationState(DISABLE_DEACTIVATION);
 
     collision::SetObjectInfo(body_.get(), collision::OT_ENTITY, collision::OF_NOTIFY_CONTACT, this);
 
     // setup vehicle
     btRaycastVehicle::btVehicleTuning tuning;
-    vehicle_ = std::make_unique<btRaycastVehicle>(tuning, body_.get(), &world_.GetVehicleRaycaster());
+    vehicle_ = std::make_unique<collision::RaycastVehicle>(tuning, body_.get(), &world_.GetVehicleRaycaster());
     vehicle_->setCoordinateSystem(0, 2, 1);
 
     // setup wheels
@@ -94,6 +94,8 @@ game::Vehicle::Vehicle(World& world, std::string model_name, const glm::vec3& co
     auto& bt_world = world_.GetBtWorld();
     bt_world.addRigidBody(body_.get(), btBroadphaseProxy::DefaultFilter, btBroadphaseProxy::AllFilter);
     bt_world.addAction(vehicle_.get());
+
+    Update();
 }
 
 void game::Vehicle::Update()
@@ -196,6 +198,21 @@ game::Vehicle::~Vehicle()
 void game::Vehicle::ProcessInput()
 {
     // TODO: totally fix
+
+    //std::string nt = "";
+
+    if (in_) {
+        //nt += "in ";
+        // body_->setActivationState(ACTIVE_TAG);
+        body_->activate();
+    }
+    else
+    {
+        //nt += "no in";
+    }
+
+    //nt += std::to_string(body_->getActivationState());
+    //SetNametag(nt);
 
     float t_delta = 1.0f / 25.0f;
 

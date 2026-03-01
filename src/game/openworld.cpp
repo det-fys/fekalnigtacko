@@ -15,6 +15,28 @@ namespace game
 
 } // namespace game
 
+
+static const char* GetRandomCarModel()
+{
+    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat"};
+    return vehicles[rand() % (sizeof(vehicles) / sizeof(vehicles[0]))];
+}
+
+static glm::vec3 GetRandomColor()
+{
+    glm::vec3 color;
+    // shittiest way to do it
+    for (int i = 0; i < 3; ++i)
+    {
+        net::ColorQ qcol;
+        qcol.value = rand() % 256;
+        color[i] = qcol.Decode();
+    }
+
+    return color;
+}
+
+
 game::OpenWorld::OpenWorld() : World("openworld")
 {
     srand(time(NULL));
@@ -27,6 +49,21 @@ game::OpenWorld::OpenWorld() : World("openworld")
 
     auto& veh = Spawn<game::DrivableVehicle>("twingo", glm::vec3{0.8f, 0.1f, 0.1f});
     veh.SetPosition({110.0f, 100.0f, 5.0f});
+
+    constexpr size_t in_row = 20;
+
+    for (size_t i = 0; i < 3000; ++i)
+    {
+        Schedule(i * 40, [this, i] {
+            size_t col = i % in_row;
+            size_t row = i / in_row;
+            glm::vec3 pos(62.0f + static_cast<float>(col) * 4.0f, 165.0f + static_cast<float>(row) * 7.0f, 7.0f);
+
+            auto& veh = Spawn<game::DrivableVehicle>(GetRandomCarModel(), GetRandomColor());
+            veh.SetPosition(pos);
+        });
+    }
+
 }
 
 void game::OpenWorld::Update(int64_t delta_time)
@@ -119,20 +156,6 @@ std::optional<std::pair<game::Usable&, const game::UseTarget&>> game::OpenWorld:
 
 }
 
-static glm::vec3 GetRandomColor()
-{
-    glm::vec3 color;
-    // shittiest way to do it
-    for (int i = 0; i < 3; ++i)
-    {
-        net::ColorQ qcol;
-        qcol.value = rand() % 256;
-        color[i] = qcol.Decode();
-    }
-
-    return color;
-}
-
 template <class T, typename... TArgs>
 static T& SpawnRandomCharacter(game::OpenWorld& world, TArgs&&... args)
 {
@@ -164,12 +187,6 @@ void game::OpenWorld::RemovePlayerCharacter(Player& player)
         it->second->Remove();
         player_characters_.erase(it);
     }
-}
-
-static const char* GetRandomCarModel()
-{
-    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat"};
-    return vehicles[rand() % (sizeof(vehicles) / sizeof(vehicles[0]))];
 }
 
 static game::DrivableVehicle& SpawnRandomVehicle(game::World& world)

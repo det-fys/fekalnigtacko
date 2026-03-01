@@ -5,6 +5,7 @@
 
 #include "assets/vehiclemdl.hpp"
 #include "collision/motionstate.hpp"
+#include "collision/raycastvehicle.hpp"
 #include "entity.hpp"
 #include "world.hpp"
 #include "vehicle_sync.hpp"
@@ -74,7 +75,7 @@ private:
 
     collision::MotionState motion_;
     std::unique_ptr<btRigidBody> body_;
-    std::unique_ptr<btRaycastVehicle> vehicle_;
+    std::unique_ptr<collision::RaycastVehicle> vehicle_;
 
     float steering_ = 0.0f;
     bool steering_analog_ = false;
