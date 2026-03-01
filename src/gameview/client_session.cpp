@@ -19,7 +19,8 @@ bool game::view::ClientSession::ProcessMessage(net::InMessage& msg)
         if (type == net::MSG_NONE || type >= net::MSG_COUNT)
             return false;
 
-        ProcessSingleMessage(type, msg);
+        if (!ProcessSingleMessage(type, msg))
+            return false;
     }
 }
 
