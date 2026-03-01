@@ -31,6 +31,7 @@ game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) :
     // cache common snds and stuff
     Cache(assets::CacheManager::GetSound("data/breaksign.snd"));
     Cache(assets::CacheManager::GetSound("data/breakpatnik.snd"));
+    Cache(assets::CacheManager::GetSound("data/breakwindow.snd"));
     Cache(assets::CacheManager::GetSound("data/breakwood.snd"));
     Cache(assets::CacheManager::GetSound("data/cardoor.snd"));
     Cache(assets::CacheManager::GetSound("data/crash.snd"));
