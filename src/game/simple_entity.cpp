@@ -71,11 +71,18 @@ game::SimpleEntitySyncFieldFlags game::SimpleEntity::WriteState(net::OutMessage&
 
 void game::SimpleEntity::SendUpdateMsg()
 {
-    auto msg = BeginEntMsg(net::EMSG_UPDATE);
+    auto msg = BeginUpdateMsg();
 
     // write state against previous
     const SimpleEntitySyncState& prev = sync_[1 - sync_current_];
     size_t fields_pos = msg.Reserve<SimpleEntitySyncFieldFlags>();
     auto fields = WriteState(msg, prev);
+    
+    if (fields == 0)
+    {
+        DiscardUpdateMsg();
+        return;
+    }
+
     msg.WriteAt(fields_pos, fields);
 }

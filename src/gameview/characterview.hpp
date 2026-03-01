@@ -34,12 +34,15 @@ public:
     DELETE_COPY_MOVE(CharacterView)
 
     virtual bool ProcessMsg(net::EntMsgType type, net::InMessage& msg) override;
+    virtual bool ProcessUpdateMsg(net::InMessage* msg) override;
     virtual void Update(const UpdateInfo& info) override;
     virtual void Draw(const DrawArgs& args) override;
 
+protected:
+    virtual void OnAttach() override;
+
 private:
-    bool ReadState(net::InMessage& msg);
-    bool ProcessUpdateMsg(net::InMessage& msg);
+    bool ReadState(net::InMessage* msg);
 
     SurfaceMask GetSurfaceMask(const std::string& name);
     void UpdateSurfaceMask();
@@ -63,7 +66,6 @@ private:
     CharacterSyncState sync_;
     CharacterViewState states_[2];
     float update_time_ = 0.0f;
-    size_t skip_lerps_ = 0;
 };
 
 }

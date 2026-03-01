@@ -17,10 +17,11 @@ game::view::SimpleEntityView::SimpleEntityView(WorldView& world, net::InMessage&
             throw EntityInitError();
     }
 
-    if (!ReadState(msg))
+    if (!ReadState(&msg))
         throw EntityInitError();
 
     states_[0] = states_[1]; // lerp from the read state to avoid jump
+    root_.local = states_[0].trans;
 
     radius_ = 20.0f;
 }
@@ -29,12 +30,14 @@ bool game::view::SimpleEntityView::ProcessMsg(net::EntMsgType type, net::InMessa
 {
     switch (type)
     {
-    case net::EMSG_UPDATE:
-        return ProcessUpdateMsg(msg);
-
     default:
         return Super::ProcessMsg(type, msg);
     }
+}
+
+bool game::view::SimpleEntityView::ProcessUpdateMsg(net::InMessage* msg)
+{
+    return ReadState(msg);
 }
 
 void game::view::SimpleEntityView::Update(const UpdateInfo& info)
@@ -67,7 +70,7 @@ void game::view::SimpleEntityView::Draw(const DrawArgs& args)
     }
 }
 
-bool game::view::SimpleEntityView::ReadState(net::InMessage& msg)
+bool game::view::SimpleEntityView::ReadState(net::InMessage* msg)
 {
     update_time_ = world_.GetTime();
 
@@ -76,33 +79,31 @@ bool game::view::SimpleEntityView::ReadState(net::InMessage& msg)
 
     auto& new_state = states_[1];
 
-    // parse state delta
-    SimpleEntitySyncFieldFlags fields;
-    if (!msg.Read(fields))
-        return false;
-
-    // pos
-    if (fields & SESF_POSITION)
+    if (msg)
     {
-        if (!net::ReadDelta(msg, sync_.pos.x) || !net::ReadDelta(msg, sync_.pos.y) || !net::ReadDelta(msg, sync_.pos.z))
+        // parse state delta
+        SimpleEntitySyncFieldFlags fields;
+        if (!msg->Read(fields))
             return false;
 
-        net::DecodePosition(sync_.pos, new_state.trans.position);
-    }
+        // pos
+        if (fields & SESF_POSITION)
+        {
+            if (!net::ReadDelta(*msg, sync_.pos.x) || !net::ReadDelta(*msg, sync_.pos.y) || !net::ReadDelta(*msg, sync_.pos.z))
+                return false;
 
-    // rot
-    if (fields & SESF_ROTATION)
-    {
-        if (!net::ReadDelta(msg, sync_.rot.x) || !net::ReadDelta(msg, sync_.rot.y) || !net::ReadDelta(msg, sync_.rot.z))
-            return false;
+            net::DecodePosition(sync_.pos, new_state.trans.position);
+        }
 
-        net::DecodeRotation(sync_.rot, new_state.trans.rotation);
+        // rot
+        if (fields & SESF_ROTATION)
+        {
+            if (!net::ReadDelta(*msg, sync_.rot.x) || !net::ReadDelta(*msg, sync_.rot.y) || !net::ReadDelta(*msg, sync_.rot.z))
+                return false;
+
+            net::DecodeRotation(sync_.rot, new_state.trans.rotation);
+        }
     }
 
     return true;
-}
-
-bool game::view::SimpleEntityView::ProcessUpdateMsg(net::InMessage& msg)
-{
-    return ReadState(msg);
 }

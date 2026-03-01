@@ -31,8 +31,9 @@ game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) :
     // cache common snds and stuff
     Cache(assets::CacheManager::GetSound("data/breaksign.snd"));
     Cache(assets::CacheManager::GetSound("data/breakpatnik.snd"));
+    Cache(assets::CacheManager::GetSound("data/breakwood.snd"));
+    Cache(assets::CacheManager::GetSound("data/cardoor.snd"));
     Cache(assets::CacheManager::GetSound("data/crash.snd"));
-    Cache(assets::CacheManager::GetSound("data/breakwindow.snd"));
 }
 
 bool game::view::WorldView::ProcessMsg(net::MessageType type, net::InMessage& msg)
@@ -44,6 +45,9 @@ bool game::view::WorldView::ProcessMsg(net::MessageType type, net::InMessage& ms
 
     case net::MSG_ENTMSG:
         return ProcessEntMsgMsg(msg);
+        
+    case net::MSG_UPDATEENTS:
+        return ProcessUpdateEntsMsg(msg);
 
     case net::MSG_ENTDESTROY:
         return ProcessEntDestroyMsg(msg);
@@ -170,6 +174,49 @@ bool game::view::WorldView::ProcessEntMsgMsg(net::InMessage& msg)
         return false;
 
     return ent_it->second->ProcessMsg(type, msg);
+}
+
+bool game::view::WorldView::ProcessUpdateEntsMsg(net::InMessage& msg)
+{
+    net::EntCount count;
+    if (!msg.Read(count))
+        return false;
+
+    net::EntNum current = 0;
+    auto it = ents_.begin();
+
+    for (net::EntNum i = 0; i < count; ++i)
+    {
+        int64_t diff;
+        if (!msg.ReadVarInt(diff))
+            return false;
+        
+        current += static_cast<net::EntNum>(diff);
+
+        while (it->first < current)
+        {
+            it->second->ProcessUpdateMsg(nullptr); // blank update
+            ++it;
+            if (it == ents_.end())
+                return false;
+        }
+
+        if (it->first != current)
+        {
+            return false; // exact num wasnt found and it overrun 
+        }
+
+        if (!it->second->ProcessUpdateMsg(&msg))
+            return false;
+    }
+
+    // process remaining
+    for (; it != ents_.end(); ++it)
+    {
+        it->second->ProcessUpdateMsg(nullptr);
+    }
+
+    return true;
 }
 
 bool game::view::WorldView::ProcessEntDestroyMsg(net::InMessage& msg)

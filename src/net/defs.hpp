@@ -39,6 +39,8 @@ enum MessageType : uint8_t
     MSG_ENTSPAWN,
     // ENTMSG <EntNum> data...
     MSG_ENTMSG,
+    // UPDATEENTS <EntCount> ...
+    MSG_UPDATEENTS,
     // ENTDESTROY <EntNum>
     MSG_ENTDESTROY,
     
@@ -67,6 +69,7 @@ using ViewPitchQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
 
 // entities
 using EntNum = uint16_t;
+using EntCount = EntNum;
 
 enum EntType : uint8_t
 {
@@ -85,7 +88,7 @@ enum EntMsgType : uint8_t
 
     EMSG_NAMETAG,
     EMSG_ATTACH,
-    EMSG_UPDATE,
+    // EMSG_UPDATE, // deprecated
     EMSG_PLAYSOUND,
 };
 

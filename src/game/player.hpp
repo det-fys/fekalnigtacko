@@ -45,7 +45,6 @@ private:
     void SyncEntities();
     bool ShouldSeeEntity(const Entity& entity) const;
     void SendInitEntity(const Entity& entity);
-    void SendUpdateEntity(const Entity& entity);
     void SendDestroyEntity(net::EntNum entnum);
 
     // msg handlers

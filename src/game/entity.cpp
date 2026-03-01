@@ -40,6 +40,12 @@ bool game::Entity::TryUpdate()
     return true;
 }
 
+void game::Entity::FinalizeFrame()
+{
+    ResetMsg();
+    DiscardUpdateMsg();
+}
+
 void game::Entity::SetNametag(const std::string& nametag)
 {
     nametag_ = nametag;
@@ -88,4 +94,15 @@ net::OutMessage game::Entity::BeginEntMsg(net::EntMsgType type)
     msg.Write(entnum_);
     msg.Write(type);
     return msg;
+}
+
+net::OutMessage game::Entity::BeginUpdateMsg()
+{
+    update_msg_buf_.clear(); // make sure
+    return net::OutMessage(update_msg_buf_);
+}
+
+void game::Entity::DiscardUpdateMsg()
+{
+    update_msg_buf_.clear();
 }

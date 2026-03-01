@@ -20,13 +20,12 @@ public:
     SimpleEntityView(WorldView& world, net::InMessage& msg);
 
     virtual bool ProcessMsg(net::EntMsgType type, net::InMessage& msg) override;
+    virtual bool ProcessUpdateMsg(net::InMessage* msg) override;
     virtual void Update(const UpdateInfo& info) override;
     virtual void Draw(const DrawArgs& args) override;
 
 private:
-    bool ReadState(net::InMessage& msg);
-
-    bool ProcessUpdateMsg(net::InMessage& msg);
+    bool ReadState(net::InMessage* msg);
 
 private:
     std::shared_ptr<const assets::Model> model_;

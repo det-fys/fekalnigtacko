@@ -36,6 +36,7 @@ public:
     DELETE_COPY_MOVE(EntityView)
 
     virtual bool ProcessMsg(net::EntMsgType type, net::InMessage& msg);
+    virtual bool ProcessUpdateMsg(net::InMessage* msg);
 
     bool TryUpdate(const UpdateInfo& info); // if not updated already
     virtual void Update(const UpdateInfo& info);
@@ -46,6 +47,9 @@ public:
     const TransformNode& GetRoot() const { return root_; }
 
     virtual ~EntityView() = default;
+
+protected:
+    virtual void OnAttach() {}
 
 private:
     bool ReadNametag(net::InMessage& msg);

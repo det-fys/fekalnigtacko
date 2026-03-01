@@ -73,7 +73,7 @@ void game::World::FinishFrame()
     // reset ent msgs
     for (auto& [entnum, ent] : ents_)
     {
-        ent->ResetMsg();
+        ent->FinalizeFrame();
     }
 
 }

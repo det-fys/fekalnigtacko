@@ -30,6 +30,11 @@ bool game::view::EntityView::ProcessMsg(net::EntMsgType type, net::InMessage& ms
     }
 }
 
+bool game::view::EntityView::ProcessUpdateMsg(net::InMessage* msg)
+{
+    return true;
+}
+
 bool game::view::EntityView::TryUpdate(const UpdateInfo& info)
 {
     float time = world_.GetTime();
@@ -81,7 +86,12 @@ bool game::view::EntityView::ReadNametag(net::InMessage& msg)
 
 bool game::view::EntityView::ReadAttach(net::InMessage& msg)
 {
-    return msg.Read(parentnum_);
+    if (!msg.Read(parentnum_))
+        return false;
+
+    OnAttach();
+
+    return true;
 }
 
 bool game::view::EntityView::ProcessPlaySoundMsg(net::InMessage& msg)

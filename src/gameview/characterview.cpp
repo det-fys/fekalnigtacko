@@ -30,11 +30,10 @@ game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) 
     UpdateSurfaceMask();
 
     // read initial state
-    if (!ReadState(msg))
+    if (!ReadState(&msg))
         throw EntityInitError();
 
-    states_[0] = states_[1]; // lerp from the read state to avoid jump
-
+    OnAttach();
 
     radius_ = 2.0f;
 }
@@ -43,16 +42,14 @@ bool game::view::CharacterView::ProcessMsg(net::EntMsgType type, net::InMessage&
 {
     switch (type)
     {
-    case net::EMSG_UPDATE:
-        return ProcessUpdateMsg(msg);
-
-    case net::EMSG_ATTACH:
-        skip_lerps_ = 1;
-        return Super::ProcessMsg(type, msg);
-    
     default:
         return Super::ProcessMsg(type, msg);
     }
+}
+
+bool game::view::CharacterView::ProcessUpdateMsg(net::InMessage* msg)
+{
+    return ReadState(msg);
 }
 
 void game::view::CharacterView::Update(const UpdateInfo& info)
@@ -66,7 +63,12 @@ void game::view::CharacterView::Update(const UpdateInfo& info)
 
     root_.local = Transform::Lerp(states_[0].trans, states_[1].trans, t);
     animstate_.loco_blend = glm::mix(states_[0].loco_blend, states_[1].loco_blend, t);
-    animstate_.loco_phase = glm::mod(glm::mix(states_[0].loco_phase, states_[1].loco_phase, t), 1.0f);
+
+    float loco_phase0 = states_[0].loco_phase;
+    float loco_phase1 = states_[1].loco_phase;
+    if (loco_phase0 > loco_phase1)
+        loco_phase0 -= 1.0f;
+    animstate_.loco_phase = glm::mod(glm::mix(loco_phase0, loco_phase1, t), 1.0f);
 
     animstate_.ApplyToSkeleton(sk_);
 
@@ -137,7 +139,17 @@ void game::view::CharacterView::Draw(const DrawArgs& args)
     }
 }
 
-bool game::view::CharacterView::ReadState(net::InMessage& msg)
+void game::view::CharacterView::OnAttach()
+{
+    states_[0] = states_[1]; // lerp from the read state to avoid jump
+
+    // init view state
+    root_.local = states_[0].trans;
+    animstate_.loco_blend = states_[0].loco_blend;
+    animstate_.loco_phase = states_[0].loco_phase;
+}
+
+bool game::view::CharacterView::ReadState(net::InMessage* msg)
 {
     update_time_ = world_.GetTime();
 
@@ -148,64 +160,53 @@ bool game::view::CharacterView::ReadState(net::InMessage& msg)
 
     auto& new_state = states_[1];
 
-    // parse state delta
-    CharacterSyncFieldFlags fields;
-    if (!msg.Read(fields))
-        return false;
-
-    // transform
-    if (fields & CSF_TRANSFORM)
+    if (msg)
     {
-        if (!net::ReadDelta(msg, sync_.pos.x) || !net::ReadDelta(msg, sync_.pos.y) ||
-            !net::ReadDelta(msg, sync_.pos.z) || !net::ReadDelta(msg, sync_.yaw))
+        // parse state delta
+        CharacterSyncFieldFlags fields;
+        if (!msg->Read(fields))
             return false;
 
-        net::DecodePosition(sync_.pos, new_state.trans.position);
-        new_state.trans.rotation = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-                                               sync_.yaw.Decode() + glm::pi<float>() * 0.5f, glm::vec3(0, 0, 1));
-    }
+        // transform
+        if (fields & CSF_TRANSFORM)
+        {
+            if (!net::ReadDelta(*msg, sync_.pos.x) || !net::ReadDelta(*msg, sync_.pos.y) ||
+                !net::ReadDelta(*msg, sync_.pos.z) || !net::ReadDelta(*msg, sync_.yaw))
+                return false;
 
-    if (fields & CSF_IDLE_ANIM)
-    {
-        if (!msg.Read(sync_.idle_anim))
-            return false;
+            net::DecodePosition(sync_.pos, new_state.trans.position);
+            new_state.trans.rotation = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
+                                                sync_.yaw.Decode() + glm::pi<float>() * 0.5f, glm::vec3(0, 0, 1));
+        }
 
-        animstate_.idle_anim_idx = sync_.idle_anim;
-    }
+        if (fields & CSF_IDLE_ANIM)
+        {
+            if (!msg->Read(sync_.idle_anim))
+                return false;
 
-    if (fields & CSF_LOCO_ANIMS)
-    {
-        if (!msg.Read(sync_.walk_anim) || !msg.Read(sync_.run_anim))
-            return false;
+            animstate_.idle_anim_idx = sync_.idle_anim;
+        }
 
-        animstate_.walk_anim_idx = sync_.walk_anim;
-        animstate_.run_anim_idx = sync_.run_anim;
-    }
+        if (fields & CSF_LOCO_ANIMS)
+        {
+            if (!msg->Read(sync_.walk_anim) || !msg->Read(sync_.run_anim))
+                return false;
 
-    if (fields & CSF_LOCO_VALS)
-    {
-        if (!net::ReadDelta(msg, sync_.loco_blend) || !net::ReadDelta(msg, sync_.loco_phase))
-            return false;
+            animstate_.walk_anim_idx = sync_.walk_anim;
+            animstate_.run_anim_idx = sync_.run_anim;
+        }
 
-        new_state.loco_blend = sync_.loco_blend.Decode();
-        new_state.loco_phase = sync_.loco_phase.Decode();
+        if (fields & CSF_LOCO_VALS)
+        {
+            if (!net::ReadDelta(*msg, sync_.loco_blend) || !net::ReadDelta(*msg, sync_.loco_phase))
+                return false;
 
-        if (new_state.loco_phase < states_[0].loco_phase)
-            states_[0].loco_phase -= 1.0f;
-    }
-
-    if (skip_lerps_ > 0)
-    {
-        states_[0] = states_[1];
-        skip_lerps_--;
+            new_state.loco_blend = sync_.loco_blend.Decode();
+            new_state.loco_phase = sync_.loco_phase.Decode();
+        }
     }
 
     return true;
-}
-
-bool game::view::CharacterView::ProcessUpdateMsg(net::InMessage& msg)
-{
-    return ReadState(msg);
 }
 
 game::view::CharacterView::SurfaceMask game::view::CharacterView::GetSurfaceMask(const std::string& name)

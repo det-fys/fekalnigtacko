@@ -456,16 +456,15 @@ game::VehicleSyncFieldFlags game::Vehicle::WriteState(net::OutMessage& msg, cons
 
 void game::Vehicle::SendUpdateMsg()
 {
-    auto msg = BeginEntMsg(net::EMSG_UPDATE);
+    auto msg = BeginUpdateMsg();
     auto fields_pos = msg.Reserve<VehicleSyncFieldFlags>();
     auto fields = WriteState(msg, sync_[1 - sync_current_]);
 
-    // TODO: allow this
-    // if (fields == 0)
-    // {
-    //     DiscardMsg();
-    //     return;
-    // }
+    if (fields == 0)
+    {
+        DiscardUpdateMsg();
+        return;
+    }
 
     msg.WriteAt(fields_pos, fields);
 }

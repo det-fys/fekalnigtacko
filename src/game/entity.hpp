@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <span>
 
 #include "net/msg_producer.hpp"
 #include "transform_node.hpp"
@@ -28,6 +29,10 @@ public:
     virtual void Update();
     bool TryUpdate(); // if not already updated
     int64_t GetUpdateTime() const { return upd_time_; }
+ 
+    std::span<const char> GetUpdateMsg() const { return update_msg_buf_; }
+
+    void FinalizeFrame();
 
     void SetNametag(const std::string& nametag);
      
@@ -55,6 +60,8 @@ private:
 
 protected:
     net::OutMessage BeginEntMsg(net::EntMsgType type);
+    net::OutMessage BeginUpdateMsg();
+    void DiscardUpdateMsg();
 
 protected:
     World& world_;
@@ -70,6 +77,9 @@ protected:
 
 private:
     int64_t upd_time_ = -1;
+    
+    std::vector<char> update_msg_buf_;
+
     std::string nametag_;
     net::EntNum parentnum_ = 0;
 };

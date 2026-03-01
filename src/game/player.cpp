@@ -106,6 +106,10 @@ void game::Player::SyncEntities()
         }
     }
 
+    // list of entities to send update and messages of
+    static std::vector<const Entity*> upd_ents;
+    upd_ents.clear();
+
     const auto& ents = world_->GetEntities();
 
     auto ent_it = ents.begin();
@@ -116,36 +120,73 @@ void game::Player::SyncEntities()
         const net::EntNum entnum = (ent_it != ents.end() ? ent_it->first : std::numeric_limits<net::EntNum>::max());
         const net::EntNum knownum = (know_it != known_ents_.end() ? *know_it : std::numeric_limits<net::EntNum>::max());
 
-        if (entnum == knownum) // ----- entity exists and is currently known -----
+        if (entnum == knownum) // entity exists and is currently known
         {
             const Entity& e = *ent_it->second;
             if (ShouldSeeEntity(e)) // still visible?
             {
-                SendUpdateEntity(e); // 2) update
+                upd_ents.push_back(&e);
                 ++ent_it;
                 ++know_it;
             }
-            else // vanished for player
+            else // not longed visible for player
             {
-                SendDestroyEntity(knownum);           // 3) destroy
-                know_it = known_ents_.erase(know_it); // remove from known
+                SendDestroyEntity(knownum);
+                know_it = known_ents_.erase(know_it); 
                 ++ent_it;
             }
         }
-        else if (entnum < knownum) // ----- entity exists, player does NOT know it -----
+        else if (entnum < knownum) // entity exists, player does NOT know it
         {
             const Entity& e = *ent_it->second;
-            if (ShouldSeeEntity(e)) // 1) become visible
+            if (ShouldSeeEntity(e))
             {
                 SendInitEntity(e);
-                known_ents_.insert(entnum); // add to known
-            } // else: stays invisible, nothing to do
+                known_ents_.insert(entnum);
+            }
             ++ent_it;
         }
-        else // ----- player knows it, but it no longer exists -----
+        else // player knows it, but it no longer exists
         {
-            SendDestroyEntity(knownum);           // 3) destroy
-            know_it = known_ents_.erase(know_it); // remove from known
+            SendDestroyEntity(knownum);
+            know_it = known_ents_.erase(know_it);
+        }
+    }
+
+    // write update payload
+    {
+        auto msg = BeginMsg(net::MSG_UPDATEENTS);
+        size_t count_pos = msg.Reserve<net::EntCount>();
+    
+        net::EntCount count = 0;
+        net::EntNum lastnum = 0;
+        
+        for (auto ent : upd_ents)
+        {
+            auto ent_upd = ent->GetUpdateMsg();
+            if (!ent_upd.empty())
+            {
+                auto numdiff = ent->GetEntNum() - lastnum;
+                
+                msg.WriteVarInt(numdiff);
+                msg.Write(ent_upd);
+                
+                ++count;
+                lastnum = ent->GetEntNum();
+            }
+        }
+
+        msg.WriteAt(count_pos, count);
+    }
+
+    // write other entity msgs
+    for (auto ent : upd_ents)
+    {
+        auto ent_msg = ent->GetMsg();
+        if (!ent_msg.empty())
+        {
+            auto msg = BeginMsg();
+            msg.Write(ent_msg);
         }
     }
 }
@@ -169,13 +210,6 @@ void game::Player::SendInitEntity(const Entity& entity)
     msg.Write(entity.GetEntNum());
     msg.Write(entity.GetViewType());
     entity.SendInitData(*this, msg);
-}
-
-void game::Player::SendUpdateEntity(const Entity& entity)
-{
-    MSGDEBUG(std::cout << "seding update ent " << entity.GetEntNum() << std::endl;)
-    auto msg = BeginMsg(); // no CMD here, these are already included in entity message payload!
-    msg.Write(entity.GetMsg());
 }
 
 void game::Player::SendDestroyEntity(net::EntNum entnum)

@@ -36,6 +36,7 @@ private:
     // msg handlers
     bool ProcessEntSpawnMsg(net::InMessage& msg);
     bool ProcessEntMsgMsg(net::InMessage& msg);
+    bool ProcessUpdateEntsMsg(net::InMessage& msg);
     bool ProcessEntDestroyMsg(net::InMessage& msg);
 
     bool ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, bool enable);
