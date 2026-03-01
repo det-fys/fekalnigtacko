@@ -73,6 +73,7 @@ game::MapObjectCollision::MapObjectCollision(collision::DynamicsWorld& world,
     if (destructible)
     {
         oflags |= collision::OF_DESTRUCTIBLE;
+        model_->GetParamFloat("destr_th", destr_th_);
     }
 
     // prefer simple cshape which allow destruction
@@ -105,6 +106,7 @@ void game::MapObjectCollision::Break()
 
     btCollisionShape* shape = body_->getCollisionShape();
     float mass = 10.0f;
+    model_->GetParamFloat("destr_mass", mass); // dont care if not present
     btVector3 local_inertia(0, 0, 0);
     shape->calculateLocalInertia(mass, local_inertia);
 

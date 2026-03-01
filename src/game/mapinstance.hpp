@@ -29,6 +29,7 @@ public:
     const std::shared_ptr<const assets::Model>& GetModel() const { return model_; }
     btRigidBody& GetBtBody() { return *body_; }
     net::ObjNum GetNum() const { return num_; }
+    float GetDestroyThreshold() const { return destr_th_; }
 
     virtual ~MapObjectCollision() override;
 
@@ -37,6 +38,7 @@ private:
     std::shared_ptr<const assets::Model> model_;
     net::ObjNum num_;
     std::unique_ptr<btRigidBody> body_;
+    float destr_th_ = 10.0f;
 };
 
 class MapInstance

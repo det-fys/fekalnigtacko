@@ -101,6 +101,7 @@ void game::World::HandleContacts()
     auto& bt_world = GetBtWorld();
     int numManifolds = bt_world.getDispatcher()->getNumManifolds();
 
+    // destructibles
     static std::vector<net::ObjNum> to_destroy;
     to_destroy.clear();
 
@@ -120,10 +121,8 @@ void game::World::HandleContacts()
             auto col = dynamic_cast<MapObjectCollision*>(cb);
             if (!col)
                 return;
-            
-            const float break_threshold = 100.0f; // TODO: per-object threshold
-               
-            if (pt.getAppliedImpulse() > break_threshold)
+                           
+            if (pt.getAppliedImpulse() > col->GetDestroyThreshold())
             {
                 to_destroy.push_back(col->GetNum());
                 other_body->applyCentralImpulse(pt.m_normalWorldOnB * pt.getAppliedImpulse() * 0.5f);        
