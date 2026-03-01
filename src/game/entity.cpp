@@ -48,6 +48,9 @@ void game::Entity::FinalizeFrame()
 
 void game::Entity::SetNametag(const std::string& nametag)
 {
+    if (nametag_ == nametag)
+        return;
+
     nametag_ = nametag;
     SendNametagMsg(); // notify viewers
 }
