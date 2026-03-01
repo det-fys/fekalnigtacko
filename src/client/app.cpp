@@ -113,7 +113,10 @@ void App::ProcessMessage(net::InMessage& msg)
 
 	// std::cout << "App::ProcessMessage: received message of size " << s << " bytes" << std::endl;
 
-	session_->ProcessMessage(msg);
+	if (!session_->ProcessMessage(msg))
+	{
+        std::cerr << "FAILED to process message!" << std::endl;
+	}
 }
 
 void App::Disconnected(const std::string& reason)
