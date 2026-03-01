@@ -32,12 +32,11 @@ void sv::Server::Run()
     bool exit = false;
     while (!exit)
     {
-        PollWSEvents();
-
         auto t_now = std::chrono::steady_clock::now();
         while (t_now > t_next && !exit_)
         {
             time_ += 40;
+            PollWSEvents();
             Update();
             // std::cout << "Time: " << time_ << " ms, Clients: " << clients_.size() << std::endl;
             t_next += 40ms;
