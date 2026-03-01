@@ -10,3 +10,4 @@ out/
 .cxx/
 .gradle/
 /android/app/src/main/assets/
+*.lnk
