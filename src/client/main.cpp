@@ -2,6 +2,8 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <chrono>
+#include <thread>
 
 #ifdef EMSCRIPTEN
 #include <emscripten.h>
