@@ -6,9 +6,9 @@
 
 #include <glm/glm.hpp>
 
-#include "texture.hpp"
+#include "gfx/texture.hpp"
 
-namespace gfx
+namespace gui
 {
 
 using Codepoint = uint32_t;
@@ -87,12 +87,12 @@ public:
         return data ? data : glyphs_.Get(0); // try return missing codepoint glyph if missing
     }
 
-    const std::shared_ptr<const Texture>& GetTexture() const { return texture_; }
+    const std::shared_ptr<const gfx::Texture>& GetTexture() const { return texture_; }
 
     float GetLineHeight() const { return line_height_; }
 
 private:
-    std::shared_ptr<const Texture> texture_; // Texture atlas for the font
+    std::shared_ptr<const gfx::Texture> texture_; // Texture atlas for the font
     CodepointMap<FontGlyphData> glyphs_;
 
     float line_height_ = 0.0f; // Line height in pixels, used for text layout

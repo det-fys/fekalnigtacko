@@ -10,7 +10,7 @@
 #ifdef CLIENT
 #include "audio/sound.hpp"
 #include "gfx/texture.hpp"
-#include "gfx/font.hpp"
+#include "gui/font.hpp"
 #endif
 
 #include <iostream>
@@ -61,10 +61,10 @@ protected:
     PtrType Load(const std::string& key) override { return audio::Sound::LoadFromFile(key); }
 };
 
-class FontCache final : public Cache<gfx::Font>
+class FontCache final : public Cache<gui::Font>
 {
 protected:
-    PtrType Load(const std::string& key) override { return gfx::Font::LoadFromFile(key); }
+    PtrType Load(const std::string& key) override { return gui::Font::LoadFromFile(key); }
 };
 #endif // CLIENT
 
@@ -120,7 +120,7 @@ public:
         return sound_cache_.Get(filename);
     }
 
-    static std::shared_ptr<const gfx::Font> GetFont(const std::string& filename)
+    static std::shared_ptr<const gui::Font> GetFont(const std::string& filename)
     {
         return font_cache_.Get(filename);
     }

@@ -3,7 +3,7 @@
 #include "assets/cache.hpp"
 #include "assets/cmdfile.hpp"
 
-std::shared_ptr<const gfx::Font> gfx::Font::LoadFromFile(const std::string& path)
+std::shared_ptr<const gui::Font> gui::Font::LoadFromFile(const std::string& path)
 {
     auto font = std::make_shared<Font>();
 

@@ -25,7 +25,7 @@ public:
     void ProcessMouseMove(float delta_yaw, float delta_pitch);
 
     void Update(const UpdateInfo& info);
-    void Draw(gfx::DrawList& dlist, gfx::DrawListParams& params);
+    void Draw(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui);
 
     const WorldView* GetWorld() const { return world_.get(); } 
 
@@ -39,7 +39,7 @@ private:
     bool ProcessCameraMsg(net::InMessage& msg);
     bool ProcessChatMsg(net::InMessage& msg);
 
-    void DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params);
+    void DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui);
     void SendViewAngles(float time);
 
 private:

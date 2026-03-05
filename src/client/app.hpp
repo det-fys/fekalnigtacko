@@ -5,7 +5,8 @@
 
 #include "game/player_input.hpp"
 #include "gfx/renderer.hpp"
-#include "gfx/text.hpp"
+#include "gui/font.hpp"
+#include "gui/context.hpp"
 #include "audio/master.hpp"
 #include "net/msg_producer.hpp"
 #include "net/inmessage.hpp"
@@ -14,14 +15,13 @@
 
 struct ChatMessage
 {
-    std::unique_ptr<gfx::Text> text;
+    std::string text;
     float timeout = 0.0f;
     glm::vec4 color = glm::vec4(1.0f);
 };
 
 class App : public net::MsgProducer
 {
-
 public:
     App();
 
@@ -49,9 +49,8 @@ public:
 private:
     void SendInput(game::PlayerInputType type, bool enable);
 
-    void InitChat();
     void UpdateChat();
-    void DrawChat(gfx::DrawList& dlist);
+    void DrawChat();
 
 private:
     float time_ = 0.0f;
@@ -59,19 +58,16 @@ private:
     game::PlayerInputFlags input_ = 0;
     game::PlayerInputFlags prev_input_ = 0;
 
-
     float prev_time_ = 0.0f;
     float delta_time_ = 0.0f;
 
     gfx::Renderer renderer_;
     gfx::DrawList dlist_;
+    gui::Context gui_;
 
     audio::Master audiomaster_;
 
     std::unique_ptr<game::view::ClientSession> session_;
 
-    std::shared_ptr<const gfx::Font> font_;
-
     std::deque<ChatMessage> chat_;
-    std::vector<gfx::HudPosition> chatpos_;
 };

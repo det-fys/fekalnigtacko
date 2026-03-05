@@ -73,11 +73,11 @@ void game::view::ClientSession::Update(const UpdateInfo& info)
     }
 }
 
-void game::view::ClientSession::Draw(gfx::DrawList& dlist, gfx::DrawListParams& params)
+void game::view::ClientSession::Draw(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui)
 {
     if (world_)
     {
-        DrawWorld(dlist, params);
+        DrawWorld(dlist, params, gui);
     }
 }
 
@@ -148,7 +148,7 @@ bool game::view::ClientSession::ProcessChatMsg(net::InMessage& msg)
     return true;
 }
 
-void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params)
+void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui)
 {
     // glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f,
     // 0.0f, 1.0f));
@@ -164,8 +164,7 @@ void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListPar
 
     // glm::mat4 fake_view_proj = glm::perspective(glm::radians(30.0f), aspect, 0.1f, 3000.0f) * view;
 
-    game::view::DrawArgs draw_args(dlist, params.view_proj, eye, glm::ivec2(params.screen_width, params.screen_height),
-                                   500.0f);
+    game::view::DrawArgs draw_args(dlist, gui, params.view_proj, eye, glm::ivec2(params.screen_width, params.screen_height), 500.0f);
     world_->Draw(draw_args);
 
     glm::mat4 camera_world = glm::inverse(view);

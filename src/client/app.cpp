@@ -7,7 +7,8 @@
 #include "assets/cache.hpp"
 #include "gameview/worldview.hpp"
 
-App::App()
+App::App() :
+	gui_(dlist_, assets::CacheManager::GetFont("data/comic32.font"))
 {
 	std::cout << "Initializing App..." << std::endl;
 
@@ -17,9 +18,6 @@ App::App()
 	audiomaster_.SetMasterVolume(2.0f);
 #endif
 
-	font_ = assets::CacheManager::GetFont("data/comic32.font");
-
-	InitChat();
 	AddChatMessage("Test!");
 }
 
@@ -76,16 +74,19 @@ void App::Frame()
 	params.screen_width = viewport_size_.x;
 	params.screen_height = viewport_size_.y;
 	
+	gui_.Begin();
+
 	const game::view::WorldView* world;
 	if (session_)
 	{
-        session_->Draw(dlist_, params);
+        session_->Draw(dlist_, params, gui_);
 	}
 
 	// draw chat
 	UpdateChat();
-	DrawChat(dlist_);
+	DrawChat();
 
+	gui_.Render();
 	renderer_.DrawList(dlist_, params);
 }
 
@@ -144,8 +145,7 @@ void App::AddChatMessage(const std::string& text)
 {
 	auto& ch = chat_.emplace_back();
 	ch.timeout = time_ + 10.0f;
-	ch.text = std::make_unique<gfx::Text>(font_, 0xFF'FF'FF'FF);
-    ch.text->SetText(text);
+	ch.text = text;
 	UpdateChat();
 }
 
@@ -165,38 +165,21 @@ void App::SendInput(game::PlayerInputType type, bool enable)
 	msg.Write(val);
 }
 
-void App::InitChat()
-{
-	chatpos_.resize(20); // max messages on screen
-    const float chat_scale = 1.0f;
-	for (size_t i = 0; i < chatpos_.size(); ++i)
-	{
-		auto& hudp = chatpos_[i];
-		hudp.pos.y = (i+1) * font_->GetLineHeight() * chat_scale;
-        hudp.scale.x = chat_scale;
-        hudp.scale.y = -chat_scale;
-	}
-
-}
-
 void App::UpdateChat()
 {
 	// remove expired or over the limit messages
-	while (!chat_.empty() && (chat_.size() > chatpos_.size() ||chat_[0].timeout < time_))
+	while (!chat_.empty() && (chat_.size() > 20 ||chat_[0].timeout < time_))
 	{
 		chat_.pop_front();
 	}
 }
 
-void App::DrawChat(gfx::DrawList& dlist)
+void App::DrawChat()
 {
 	for (size_t i = 0; i < chat_.size(); ++i)
 	{
-        const auto& va = chat_[i].text->GetVA();
+		glm::vec2 pos(10.0f, static_cast<float>(i) * gui_.GetFont()->GetLineHeight() + 10.0f);
 
-		if (va.GetNumIndices() < 1)
-            continue;
-		
 		float t_rem = chat_[i].timeout - time_;
         const float fade = 1.0f;
 		if (t_rem < fade)
@@ -204,11 +187,7 @@ void App::DrawChat(gfx::DrawList& dlist)
             chat_[i].color.a = t_rem / fade;
 		}
 
-		gfx::DrawHudCmd cmd;
-		cmd.pos = &chatpos_[i];
-		cmd.texture = chat_[i].text->GetFont()->GetTexture().get();
-		cmd.va = &va;
-        cmd.color = &chat_[i].color;
-		dlist.AddHUD(cmd);
+		uint32_t color = glm::packUnorm4x8(chat_[i].color);
+		gui_.DrawText(chat_[i].text, pos, color);
 	}
 }

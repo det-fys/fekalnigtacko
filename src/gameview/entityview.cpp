@@ -7,8 +7,7 @@
 
 game::view::EntityView::EntityView(WorldView& world, net::InMessage& msg) : 
     world_(world),
-    audioplayer_(world_.GetAudioMaster()),
-    nametag_text_(assets::CacheManager::GetFont("data/comic32.font"), 0xFFFFFFFF)
+    audioplayer_(world_.GetAudioMaster())
 {
     // read nametag and attachment info
     if (!ReadNametag(msg) || !ReadAttach(msg))
@@ -80,7 +79,6 @@ bool game::view::EntityView::ReadNametag(net::InMessage& msg)
         return false;
 
     nametag_ = nametag;
-    nametag_text_.SetText(nametag);
     return true;
 }
 
@@ -125,24 +123,14 @@ void game::view::EntityView::DrawNametag(const DrawArgs& args)
     if (ndc_pos.z < -1.0f || ndc_pos.z > 1.0f)
         return; // behind camera
 
-    nametag_pos_.anchor.x = ndc_pos.x * 0.5f + 0.5f;
-    nametag_pos_.anchor.y = 1.0f - (ndc_pos.y * 0.5f + 0.5f); // flip y
+    glm::vec2 anchor = ndc_pos * 0.5f + 0.5f;
+    anchor.y = 1.0f - anchor.y;
+    anchor *= args.screen_size;
     
-    // center
     float scale = 0.7f;
-    nametag_pos_.scale = glm::vec2(scale, -scale);
-    nametag_pos_.pos = nametag_text_.GetSize() * glm::vec2(-0.5f, -1.0f) * scale;
+    glm::vec2 pos = anchor + args.gui.MeasureText(nametag_) * glm::vec2(-0.5f, -1.0f) * scale;
 
-    // static const glm::vec4 nametag_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    
-    gfx::DrawHudCmd hudcmd;
-    hudcmd.va = &nametag_text_.GetVA();
-    hudcmd.texture = nametag_text_.GetFont()->GetTexture().get();
-    hudcmd.pos = &nametag_pos_;
-    // hudcmd.color = &nametag_color;
-    args.dlist.AddHUD(hudcmd);
-    // std::cout << "at position: " << root_.local.position.x << ", " << root_.local.position.y << ", " << root_.local.position.z << std::endl;
-
+    args.gui.DrawText(nametag_, pos, 0xFFFFFFFF, scale);
 }
 
 void game::view::EntityView::DrawAxes(const DrawArgs& args)

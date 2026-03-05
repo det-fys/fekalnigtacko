@@ -43,6 +43,8 @@ struct DrawHudCmd
     const Texture* texture = nullptr;
     const HudPosition* pos = nullptr;
     const glm::vec4* color = nullptr;
+    size_t first = 0;
+    size_t count = 0;
 };
 
 struct DrawList

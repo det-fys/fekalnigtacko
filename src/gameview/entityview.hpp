@@ -5,7 +5,6 @@
 #include "audio/player.hpp"
 #include "draw_args.hpp"
 #include "game/transform_node.hpp"
-#include "gfx/text.hpp"
 
 #include "net/defs.hpp"
 #include "net/inmessage.hpp"
@@ -72,8 +71,6 @@ protected:
 
 private:
     std::string nametag_;
-    gfx::Text nametag_text_;
-    gfx::HudPosition nametag_pos_;
 
     net::EntNum parentnum_ = 0;
     float upd_time_ = 0.0f;

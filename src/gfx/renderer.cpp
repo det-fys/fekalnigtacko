@@ -150,13 +150,16 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 			return a.dist > b.dist; // do not optimize blended, sort by distance instead
 		}
 
-		if (auto cmp = sa <=> sb; cmp != 0)
-			return cmp < 0;
+		if (sa == sb)
+			return false;
 
 		if (auto cmp = sa->texture <=> sb->texture; cmp != 0)
 			return cmp < 0;
 
 		if (auto cmp = sa->va.get() <=> sb->va.get(); cmp != 0)
+			return cmp < 0;
+
+		if (auto cmp = sa <=> sb; cmp != 0)
 			return cmp < 0;
 
 		return false;
@@ -462,6 +465,9 @@ void gfx::Renderer::DrawHudList(std::span<DrawHudCmd> queue, const DrawListParam
 			last_vao = cmd.va;
 		}
 
-		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(cmd.va->GetNumIndices()), GL_UNSIGNED_INT, NULL);
+		size_t first = cmd.first * 3;
+		size_t count = cmd.count ? cmd.count * 3 : cmd.va->GetNumIndices();
+
+		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(count), GL_UNSIGNED_INT, (void*)(first * sizeof(GLuint)));
 	}
 }
