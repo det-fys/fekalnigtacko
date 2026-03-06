@@ -47,12 +47,12 @@ game::OpenWorld::OpenWorld() : World("openworld")
         SpawnBot();
     }
 
-    auto& veh = Spawn<game::DrivableVehicle>("twingo", glm::vec3{0.8f, 0.1f, 0.1f});
+    auto& veh = Spawn<game::DrivableVehicle>("twingo", glm::vec3{1.0f, 0.8f, 0.1f});
     veh.SetPosition({110.0f, 100.0f, 5.0f});
 
     constexpr size_t in_row = 20;
 
-    for (size_t i = 0; i < 3000; ++i)
+    for (size_t i = 0; i < 1500; ++i)
     {
         Schedule(i * 40, [this, i] {
             size_t col = i % in_row;

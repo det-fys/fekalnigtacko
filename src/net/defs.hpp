@@ -90,6 +90,7 @@ enum EntMsgType : uint8_t
     EMSG_ATTACH,
     // EMSG_UPDATE, // deprecated
     EMSG_PLAYSOUND,
+    EMSG_DEFORM,
 };
 
 using PositionElemQ = Quantized<uint32_t, -10000, 10000, 1>;
@@ -127,5 +128,7 @@ using ClothesName = FixedStr<32>;
 // destructibles
 using ObjNum = uint16_t;
 using ObjCount = ObjNum;
+
+using NumTexels = uint16_t;
 
 } // namespace net

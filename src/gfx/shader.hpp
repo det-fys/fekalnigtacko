@@ -16,6 +16,8 @@ namespace gfx
 		SU_COLOR,
 		SU_FLAGS,
 		SU_CAMERA,
+		SU_DEFORM_TEX,
+		SU_DEFORM_INFO,
 	
 		SU_COUNT
 	};

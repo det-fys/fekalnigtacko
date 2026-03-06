@@ -212,6 +212,76 @@ void main() {
 
 )GLSL",
 
+// SS_DEFORM_MESH_VERT
+SHADER_HEADER
+R"GLSL(
+layout (location = 0) in vec3 a_pos;
+layout (location = 1) in vec3 a_normal;
+layout (location = 2) in vec4 a_color;
+layout (location = 3) in vec2 a_uv;
+
+)GLSL"
+MESH_MATRICES_GLSL
+LIGHT_MATRICES_GLSL
+COMPUTE_LIGHTS_GLSL
+R"GLSL(
+
+uniform sampler3D u_deform_tex;
+uniform mat3 u_deform_info;
+
+out vec2 v_uv;
+out vec3 v_color;
+
+void main() {
+    vec3 deform_pos = (a_pos - u_deform_info[0]) / (u_deform_info[1] - u_deform_info[0]);
+    vec3 pos = a_pos + texture(u_deform_tex, deform_pos).xyz * u_deform_info[2].x;
+    //vec3 pos = a_pos + u_deform_info[0] * u_deform_info[2].x;
+    //vec3 pos = a_pos + vec3(0.0, 0.0, 1.0);
+
+    vec4 world_pos = u_model * vec4(pos, 1.0);
+    vec3 world_normal = normalize(mat3(u_model) * a_normal);
+    gl_Position = u_view_proj * world_pos;
+
+    v_uv = a_uv;
+    v_color = ComputeLights(world_pos.xyz, world_normal) * a_color.rgb;
+}	
+)GLSL",
+
+// SS_DEFORM_MESH_FRAG
+SHADER_HEADER
+R"GLSL(
+in vec2 v_uv;
+in vec3 v_color;
+
+#define SHF_CULL_ALPHA 1
+#define SHF_BACKGROUND 2
+
+uniform sampler2D u_tex;
+uniform vec4 u_color;
+uniform int u_flags;
+
+layout (location = 0) out vec4 o_color;
+
+void main() {
+    o_color = vec4(texture(u_tex, v_uv));
+    
+    if ((u_flags & SHF_CULL_ALPHA) > 0)
+    {
+        if (o_color.a < 0.5)
+            discard;
+    }
+    else if ((u_flags & SHF_BACKGROUND) > 0)
+    {
+        // blend with bg
+        o_color = mix(u_color, o_color, o_color.a);
+    }
+    
+    o_color.rgb *= v_color; // Apply vertex color
+    //o_color = vec4(1.0, 0.0, 0.0, 1.0);
+}	
+
+)GLSL",
+
 // SS_SOLID_VERT
 SHADER_HEADER
 R"GLSL(

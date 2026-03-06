@@ -11,6 +11,8 @@ static const char* const s_uni_names[] = {
 	"u_color",              // SU_COLOR
     "u_flags",              // SU_FLAGS
     "u_camera",             // SU_CAMERA
+    "u_deform_tex",         // SU_DEFORM_TEX
+    "u_deform_info",        // SU_DEFORM_INFO
 };
 
 // Vytvori shader z daneho zdroje
@@ -93,6 +95,7 @@ void gfx::Shader::SetupBindings()
     glUseProgram(m_id);
     
     glUniform1i(m_uni[SU_TEX], 0);
+    glUniform1i(m_uni[SU_DEFORM_TEX], 1);
 
     // Bones UBO
 	int ubo_index = glGetUniformBlockIndex(m_id, "Bones");

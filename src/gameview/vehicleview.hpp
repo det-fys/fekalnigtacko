@@ -4,6 +4,7 @@
 
 #include "assets/vehiclemdl.hpp"
 #include "game/vehicle_sync.hpp"
+#include "game/deform_grid.hpp"
 
 #include <chrono>
 
@@ -19,6 +20,14 @@ struct VehicleWheelViewInfo
     float rotation = 0.0f;
 };
 
+struct VehicleDeformView
+{
+    DeformGrid grid;
+    std::shared_ptr<gfx::DeformTexture> tex;
+
+    VehicleDeformView(const gfx::DeformGridInfo& info) : grid(info), tex(std::make_shared<gfx::DeformTexture>(info)) {}
+};
+
 class VehicleView : public EntityView
 {
     using Super = EntityView;
@@ -32,7 +41,12 @@ public:
     virtual void Draw(const DrawArgs& args) override;
 
 private:
+    void InitMesh();
+
     bool ReadState(net::InMessage* msg);
+
+    bool ReadDeformSync(net::InMessage& msg);
+    bool ProcessDeformMsg(net::InMessage& msg);
 
 private:
     std::shared_ptr<const assets::VehicleModel> model_;
@@ -51,6 +65,8 @@ private:
     audio::SoundSource* snd_accel_src_ = nullptr;
 
     bool windows_broken_ = false;
+    std::unique_ptr<VehicleDeformView> deform_;
+    std::vector<std::tuple<glm::vec3, glm::vec3>> debug_deforms_;
 };
 
 }

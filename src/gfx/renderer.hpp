@@ -52,6 +52,7 @@ namespace gfx
 	private:
 		MeshShader mesh_shader_;
 		MeshShader skel_mesh_shader_;
+		MeshShader deform_mesh_shader_;
 		std::unique_ptr<Shader> solid_shader_;
 
 		std::unique_ptr<BufferObject> beam_segments_vbo_;

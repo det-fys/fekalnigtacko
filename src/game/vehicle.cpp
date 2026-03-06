@@ -95,6 +95,14 @@ game::Vehicle::Vehicle(World& world, std::string model_name, const glm::vec3& co
     bt_world.addRigidBody(body_.get(), btBroadphaseProxy::DefaultFilter, btBroadphaseProxy::AllFilter);
     bt_world.addAction(vehicle_.get());
 
+    // init deform
+    gfx::DeformGridInfo info{};
+    info.min = glm::vec3(-1.0f, -2.5f, 0.10f);
+    info.max = glm::vec3(1.0f, 2.0f, 1.8f);
+    info.res = glm::ivec3(8, 16, 8);
+    info.max_offset = 0.1f;
+    deformgrid_ = std::make_unique<DeformGrid>(info);
+
     Update();
 }
 
@@ -127,25 +135,32 @@ void game::Vehicle::SendInitData(Player& player, net::OutMessage& msg) const
     size_t fields_pos = msg.Reserve<VehicleSyncFieldFlags>();
     auto fields = WriteState(msg, default_state);
     msg.WriteAt(fields_pos, fields);
+
+    WriteDeformSync(msg);
 }
 
-void game::Vehicle::OnContact(float impulse)
+void game::Vehicle::OnContact(const collision::ContactInfo& info)
 {
-    Super::OnContact(impulse);
+    Super::OnContact(info);
 
-    crash_intensity_ += impulse;
+    crash_intensity_ += info.impulse;
 
-    if (impulse < 1000.0f)
+    if (info.impulse < 1000.0f)
         return;
 
     if (window_health_ > 0.0f)
     {
-        window_health_ -= impulse;
+        window_health_ -= info.impulse;
 
         if (window_health_ <= 0.0f) // just broken
         {
             PlaySound("breakwindow", 1.0f, 1.0f);
         }
+    }
+
+    if (window_health_ <= 0.0f)
+    {
+        Deform(info.pos, -glm::normalize(info.normal) * 0.1f, 1.0f);
     }
 
 }
@@ -484,4 +499,57 @@ void game::Vehicle::SendUpdateMsg()
     }
 
     msg.WriteAt(fields_pos, fields);
+}
+
+void game::Vehicle::WriteDeformSync(net::OutMessage& msg) const
+{
+    const auto texels = deformgrid_->GetData();
+
+    auto numtexels_pos = msg.Reserve<net::NumTexels>();
+    net::NumTexels numtexels = 0;
+
+    size_t last = 0;
+
+    for (size_t i = 0; i < texels.size(); ++i)
+    {
+        if (texels[i] == glm::i8vec3(0))
+            continue; // unchanged, no write
+
+        auto diff = i - last;
+        msg.WriteVarInt(diff);
+
+        for (size_t j = 0; j < 3; ++j)
+        {
+            msg.Write(texels[i][j]);
+        }
+
+        last = i;
+        ++numtexels;
+    }
+
+    msg.WriteAt(numtexels_pos, numtexels);
+}
+
+void game::Vehicle::Deform(const glm::vec3& pos, const glm::vec3& deform, float radius)
+{
+    net::PositionQ pos_q;
+    net::PositionQ deform_q;
+    net::EncodePosition(pos, pos_q);
+    net::EncodePosition(deform, deform_q);
+    
+    SendDeformMsg(pos_q, deform_q);
+
+    // defeorm locally
+    glm::vec3 new_pos, new_deform;
+    net::DecodePosition(pos_q, new_pos);
+    net::DecodePosition(deform_q, new_deform);
+
+    deformgrid_->ApplyImpulse(new_pos, new_deform, 0.3f);
+}
+
+void game::Vehicle::SendDeformMsg(const net::PositionQ& pos, const net::PositionQ& deform)
+{
+    auto msg = BeginEntMsg(net::EMSG_DEFORM);
+    net::WritePositionQ(msg, pos);
+    net::WritePositionQ(msg, deform);
 }

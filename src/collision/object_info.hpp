@@ -21,12 +21,19 @@ enum ObjectFlag : ObjectFlags
     OF_NOTIFY_CONTACT = 0x02,
 };
 
+struct ContactInfo
+{
+    glm::vec3 pos;
+    glm::vec3 normal;
+    float impulse;
+};
+
 class ObjectCallback
 {
 public:
     ObjectCallback() = default;
 
-    virtual void OnContact(float impulse) {}
+    virtual void OnContact(const ContactInfo& info) {}
 
     virtual ~ObjectCallback() = default;
 };

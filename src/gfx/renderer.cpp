@@ -16,6 +16,7 @@ gfx::Renderer::Renderer()
 {
     ShaderSources::MakeShader(mesh_shader_.shader, SS_MESH_VERT, SS_MESH_FRAG);
     ShaderSources::MakeShader(skel_mesh_shader_.shader, SS_SKEL_MESH_VERT, SS_SKEL_MESH_FRAG);
+    ShaderSources::MakeShader(deform_mesh_shader_.shader, SS_DEFORM_MESH_VERT, SS_DEFORM_MESH_FRAG);
     ShaderSources::MakeShader(solid_shader_, SS_SOLID_VERT, SS_SOLID_FRAG);
     ShaderSources::MakeShader(hud_shader_, SS_HUD_VERT, SS_HUD_FRAG);
     ShaderSources::MakeShader(beam_shader_, SS_BEAM_VERT, SS_BEAM_FRAG);
@@ -104,6 +105,7 @@ void gfx::Renderer::InvalidateShaders()
 {
 	InvalidateMeshShader(mesh_shader_);
 	InvalidateMeshShader(skel_mesh_shader_);
+	InvalidateMeshShader(deform_mesh_shader_);
 }
 
 void gfx::Renderer::InvalidateMeshShader(MeshShader& mshader)
@@ -171,6 +173,7 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 	const gfx::Texture* last_texture = nullptr;
 	const gfx::VertexArray* last_vao = nullptr;
     const gfx::UniformBuffer<glm::mat4>* last_skin = nullptr;
+	const DeformTexture* last_deform = nullptr;
 	InvalidateShaders();
 	
 	// enable depth test
@@ -199,6 +202,7 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		const bool twosided_flag = surface->sflags & SF_2SIDED;
 		const bool blend_flag = surface->sflags & SF_BLEND;
 		const bool object_color_flag = surface->sflags & SF_OBJECT_COLOR;
+		const bool deform_flag = surface->sflags & SF_DEFORM_GRID;
 
 		// sync 2sided
 		if (last_twosided != twosided_flag)
@@ -212,7 +216,7 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		}
 
 		// select shader
-		MeshShader& mshader = skeletal_flag ? skel_mesh_shader_ : mesh_shader_;
+		MeshShader& mshader = skeletal_flag ? skel_mesh_shader_ : (deform_flag ? deform_mesh_shader_ : mesh_shader_);
 		SetupMeshShader(mshader, params);
 
 		// set model matrix
@@ -290,15 +294,34 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		if (last_texture != surface->texture.get())
 		{
 			GLuint tex_id = surface->texture ? surface->texture->GetId() : 0;
+			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, tex_id);
 			last_texture = surface->texture.get();
 		}
-
+		
 		// bind skinning UBO
 		if (cmd.skinning && last_skin != cmd.skinning)
 		{
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, cmd.skinning->GetId());
+			glBindBufferBase(GL_UNIFORM_BUFFER, 0, cmd.skinning->GetId());
             last_skin = cmd.skinning;
+		}
+		
+		// bind deform texture
+		if (deform_flag && surface->deform_tex.get() != last_deform)
+		{
+			const auto& deform_tex = *surface->deform_tex;
+			GLuint tex_id = deform_tex.GetId();
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_3D, tex_id);
+			last_deform = &deform_tex;
+
+			// update deform tex info
+			const auto& deform_info = deform_tex.GetInfo();
+			glm::mat3 deform_info_mat;
+			deform_info_mat[0] = deform_info.min;
+			deform_info_mat[1] = deform_info.max;
+			deform_info_mat[2] = glm::vec3(deform_info.max_offset, 0.0f, 0.0f);
+			glUniformMatrix3fv(mshader.shader->U(SU_DEFORM_INFO), 1, GL_FALSE, &deform_info_mat[0][0]);
 		}
 
 		// bind VAO
@@ -427,6 +450,8 @@ void gfx::Renderer::DrawHudList(std::span<DrawHudCmd> queue, const DrawListParam
 
 	const gfx::Texture* last_texture = nullptr;
 	const gfx::VertexArray* last_vao = nullptr;
+
+	glActiveTexture(GL_TEXTURE0);
 
 	for (const auto& cmd : queue)
 	{

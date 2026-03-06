@@ -3,8 +3,10 @@
 #include "assets/cache.hpp"
 #include "net/utils.hpp"
 #include "worldview.hpp"
+#include "utils/random.hpp"
 
 #include <iostream>
+#include <ranges>
 
 game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
     : EntityView(world, msg)
@@ -16,6 +18,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
 
     model_ = assets::CacheManager::GetVehicleModel("data/" + std::string(modelname) + ".veh");
     mesh_ = *model_->GetModel()->GetMesh();
+    InitMesh();
     
     auto& modelwheels = model_->GetWheels();
     wheels_.resize(modelwheels.size());
@@ -29,7 +32,10 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
     
     if (!ReadState(&msg))
         throw EntityInitError();
-    
+
+    if (!ReadDeformSync(msg))
+        throw EntityInitError();
+
     // init the other transform to identical
     root_trans_[0] = root_trans_[1];
     root_.local = root_trans_[0];
@@ -43,6 +49,8 @@ bool game::view::VehicleView::ProcessMsg(net::EntMsgType type, net::InMessage& m
 {
     switch (type)
     {
+    case net::EMSG_DEFORM:
+        return ProcessDeformMsg(msg);
     default:
         return Super::ProcessMsg(type, msg);
     }
@@ -141,6 +149,44 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
             args.dlist.AddSurface(cmd);
         }
     }
+
+    // temp deforms
+    for (const auto& [pos, deform] : debug_deforms_)
+    {
+        glm::vec3 start = root_.matrix * glm::vec4(pos, 1.0f);
+        glm::vec3 end = root_.matrix * glm::vec4(pos + deform, 1.0f);
+        glm::vec3 end2 = end + glm::vec3(0.0f, 0.0f, 0.1f);
+
+        args.dlist.AddBeam(start, end, 0xFFFFFF00, 0.01f);
+        args.dlist.AddBeam(end, end2, 0xFFFF00FF, 0.01f);
+    }
+}
+
+void game::view::VehicleView::InitMesh()
+{
+    gfx::DeformGridInfo info{};
+    info.min = glm::vec3(-1.0f, -2.5f, 0.10f);
+    info.max = glm::vec3(1.0f, 2.0f, 1.8f);
+    info.res = glm::ivec3(8, 16, 8);
+    info.max_offset = 0.1f;
+    deform_ = std::make_unique<VehicleDeformView>(info);
+
+    for (auto& surface : mesh_.surfaces)
+    {
+        surface.deform_tex = deform_->tex;
+        surface.sflags |= gfx::SF_DEFORM_GRID;
+    }
+
+    // for (size_t i = 0; i < 20; ++i)
+    // {
+    //     glm::vec3 pos(RandomFloat(-1.0f, 1.0f), RandomFloat(-2.0f, 2.0f), RandomFloat(0.0f, 2.0f));
+    //     glm::vec3 impulse(RandomFloat(-1.0f, 1.0f), RandomFloat(-1.0f, 1.0f), RandomFloat(-1.0f, 1.0f));
+    //     impulse *= 0.05f;
+
+    //     deform_->grid.ApplyImpulse(pos, impulse, 1.0f);
+    // }
+
+    deform_->tex->SetData(deform_->grid.GetData());
 }
 
 bool game::view::VehicleView::ReadState(net::InMessage* msg)
@@ -192,7 +238,7 @@ bool game::view::VehicleView::ReadState(net::InMessage* msg)
                 return false;
 
         }
-            
+
         float steering = sync_.steering.Decode();
 
         // wheels
@@ -217,4 +263,59 @@ bool game::view::VehicleView::ReadState(net::InMessage* msg)
         }
     }
     return true;
+}
+
+bool game::view::VehicleView::ReadDeformSync(net::InMessage& msg)
+{
+    net::NumTexels numtexels;
+    if (!msg.Read(numtexels))
+        return false;
+
+    auto texels = deform_->grid.GetData();
+    std::ranges::fill(texels, glm::i8vec3(0));
+
+    size_t current = 0;
+    for (size_t i = 0; i < numtexels; ++i)
+    {
+        int64_t diff;
+        if (!msg.ReadVarInt(diff))
+            return false;
+
+        current += static_cast<size_t>(diff);
+
+        if (current >= texels.size())
+            return false;
+
+        auto& texel = texels[current];
+        for (size_t j = 0; j < 3; ++j)
+        {
+            if (!msg.Read(texel[j]))
+                return false;
+        }
+    }
+
+    deform_->tex->SetData(deform_->grid.GetData());
+
+    return true;
+}
+
+bool game::view::VehicleView::ProcessDeformMsg(net::InMessage& msg)
+{
+    net::PositionQ pos_q, deform_q;
+    if (!net::ReadPositionQ(msg, pos_q) || !net::ReadPositionQ(msg, deform_q))
+        return false;
+
+
+    glm::vec3 pos, deform;
+    net::DecodePosition(pos_q, pos);
+    net::DecodePosition(deform_q, deform);
+
+    deform_->grid.ApplyImpulse(pos, deform, 0.3f);
+    deform_->tex->SetData(deform_->grid.GetData());
+
+    //debug_deforms_.emplace_back(std::make_tuple(pos, deform));
+
+    return true;
+
+
 }

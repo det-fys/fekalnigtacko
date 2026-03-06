@@ -105,7 +105,7 @@ void game::World::HandleContacts()
     static std::vector<net::ObjNum> to_destroy;
     to_destroy.clear();
 
-    auto ProcessContact = [&](btRigidBody* body, btRigidBody* other_body, btManifoldPoint& pt) {
+    auto ProcessContact = [&](btRigidBody* body, btRigidBody* other_body, const btVector3& pos, const btVector3& normal, float impulse) {
         collision::ObjectType type;
         collision::ObjectFlags flags;
         collision::ObjectCallback* cb;
@@ -113,7 +113,11 @@ void game::World::HandleContacts()
 
         if (cb && (flags & collision::OF_NOTIFY_CONTACT))
         {
-            cb->OnContact(pt.getAppliedImpulse());
+            collision::ContactInfo info;
+            info.pos = glm::vec3(pos.x(), pos.y(), pos.z());
+            info.normal = glm::vec3(normal.x(), normal.y(), normal.z());
+            info.impulse = impulse;
+            cb->OnContact(info);
         }
 
         if (type == collision::OT_MAP_OBJECT && (flags & collision::OF_DESTRUCTIBLE))
@@ -122,10 +126,10 @@ void game::World::HandleContacts()
             if (!col)
                 return;
                            
-            if (pt.getAppliedImpulse() > col->GetDestroyThreshold())
+            if (impulse > col->GetDestroyThreshold())
             {
                 to_destroy.push_back(col->GetNum());
-                other_body->applyCentralImpulse(pt.m_normalWorldOnB * pt.getAppliedImpulse() * 0.5f);        
+                other_body->applyCentralImpulse(-normal * impulse * 0.5f);        
             }
 
             return;
@@ -143,8 +147,8 @@ void game::World::HandleContacts()
         for (int j = 0; j < contactManifold->getNumContacts(); j++)
         {
             btManifoldPoint& pt = contactManifold->getContactPoint(j);
-            ProcessContact(body0, body1, pt);
-            ProcessContact(body1, body0, pt);
+            ProcessContact(body0, body1, pt.m_localPointA, -pt.m_normalWorldOnB, pt.getAppliedImpulse());
+            ProcessContact(body1, body0, pt.m_localPointB, pt.m_normalWorldOnB, pt.getAppliedImpulse());
         }
     }
 
