@@ -204,13 +204,10 @@ void gui::Context::Render()
     va_.SetVBOData(vertices_.data(), vertices_.size() * sizeof(vertices_[0]));
     va_.SetIndices(indices_.data(), indices_.size());
 
-    static const gfx::HudPosition pos;
-
     for (const auto& range : ranges_)
     {
         gfx::DrawHudCmd hudcmd;
         hudcmd.va = &va_;
-        hudcmd.pos = &pos;
         hudcmd.texture = range.texture;
         hudcmd.first = range.start;
         hudcmd.count = range.count;

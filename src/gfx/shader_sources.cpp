@@ -250,7 +250,6 @@ layout (location = 2) in vec4 a_color;
 layout (location = 3) in vec2 a_uv;
 
 uniform mat3 u_model;
-uniform vec4 u_color;
 
 out vec4 v_color;
 out vec2 v_uv;
@@ -258,7 +257,7 @@ out vec2 v_uv;
 void main() {
     vec3 pos2d = u_model * vec3(a_pos.xy, 1.0);
     gl_Position = vec4(pos2d.xy, 0.0, 1.0);
-    v_color = a_color * u_color;
+    v_color = a_color;
     v_uv = a_uv;
 }	
 )GLSL",

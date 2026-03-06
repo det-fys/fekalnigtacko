@@ -93,7 +93,6 @@ set(CLIENT_ONLY_SOURCES
     "src/gfx/draw_list.hpp"
     "src/gfx/frustum.hpp"
     "src/gfx/frustum.cpp"
-    "src/gfx/hud.hpp"
     "src/gfx/renderer.hpp"
     "src/gfx/renderer.cpp"
     "src/gfx/shader_defs.hpp"

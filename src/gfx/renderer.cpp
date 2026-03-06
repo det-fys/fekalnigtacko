@@ -417,37 +417,22 @@ void gfx::Renderer::DrawHudList(std::span<DrawHudCmd> queue, const DrawListParam
     glm::vec2 ndc_scale(2.0f / screen_size_px.x, -2.0f / screen_size_px.y);
 	constexpr glm::vec2 ndc_offset(-1.0f, 1.0f);
 
+	glm::mat3 matrix(1.0f);
+	matrix[0][0] = ndc_scale.x;
+	matrix[1][1] = ndc_scale.y;
+    matrix[2][0] = ndc_offset.x;
+    matrix[2][1] = ndc_offset.y;
+
+	glUniformMatrix3fv(shader->U(SU_MODEL), 1, GL_FALSE, &matrix[0][0]);
+
 	const gfx::Texture* last_texture = nullptr;
 	const gfx::VertexArray* last_vao = nullptr;
-	glm::vec4 last_color = glm::vec4(-1.0f);
 
 	for (const auto& cmd : queue)
 	{
-		if (!cmd.va || !cmd.texture || !cmd.pos)
+		if (!cmd.va || !cmd.texture)
 		{
             throw std::runtime_error("invalid hud draw");
-		}
-
-		// calculate transform
-		const auto& hp = *cmd.pos;
-		
-		glm::vec2 pos_px = hp.anchor * screen_size_px + hp.pos;
-		glm::vec2 trans_ndc = ndc_offset + pos_px * ndc_scale;
-
-		glm::mat3 matrix(1.0f);
-		matrix[0][0] = hp.scale.x * ndc_scale.x;
-		matrix[1][1] = hp.scale.y * ndc_scale.y;
-		matrix[2][0] = trans_ndc.x;
-		matrix[2][1] = trans_ndc.y;
-
-		glUniformMatrix3fv(shader->U(SU_MODEL), 1, GL_FALSE, &matrix[0][0]);
-
-		//sync color
-		glm::vec4 color = cmd.color ? *cmd.color : glm::vec4(1.0f);
-		if (last_color != color)
-		{
-			glUniform4fv(shader->U(SU_COLOR), 1, &color[0]);
-			last_color = color;
 		}
 
 		// bind texture

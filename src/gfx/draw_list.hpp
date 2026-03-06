@@ -3,7 +3,6 @@
 #include <vector>
 
 #include "assets/skeleton.hpp"
-#include "hud.hpp"
 #include "surface.hpp"
 #include "uniform_buffer.hpp"
 
@@ -41,8 +40,6 @@ struct DrawHudCmd
 {
     const VertexArray* va = nullptr;
     const Texture* texture = nullptr;
-    const HudPosition* pos = nullptr;
-    const glm::vec4* color = nullptr;
     size_t first = 0;
     size_t count = 0;
 };
