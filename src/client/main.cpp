@@ -4,6 +4,7 @@
 #include <vector>
 #include <chrono>
 #include <thread>
+#include <map>
 
 #ifdef EMSCRIPTEN
 #include <emscripten.h>
@@ -138,6 +139,20 @@ static void ShutdownSDL()
     SDL_Quit();
 }
 
+static const std::map<SDL_Scancode, game::PlayerInputType> s_inputmap = {
+    { SDL_SCANCODE_W, game::IN_FORWARD },
+    { SDL_SCANCODE_S, game::IN_BACKWARD },
+    { SDL_SCANCODE_A, game::IN_LEFT },
+    { SDL_SCANCODE_D, game::IN_RIGHT },
+    { SDL_SCANCODE_SPACE, game::IN_JUMP },
+    { SDL_SCANCODE_LCTRL, game::IN_CROUCH },
+    { SDL_SCANCODE_E, game::IN_USE },
+    { SDL_SCANCODE_F3, game::IN_DEBUG1 },
+    { SDL_SCANCODE_F4, game::IN_DEBUG2 },
+    { SDL_SCANCODE_F5, game::IN_DEBUG3 },
+    { SDL_SCANCODE_TAB, game::IN_MENU },
+};
+
 static void PollEvents()
 {
     SDL_Event event;
@@ -150,13 +165,27 @@ static void PollEvents()
             return;
 
         case SDL_MOUSEMOTION:
-			int xrel = event.motion.xrel;
-			int yrel = event.motion.yrel;
-            if (xrel != 0 || yrel != 0)
             {
-				s_app->MouseMove(glm::vec2(static_cast<float>(xrel), static_cast<float>(yrel)));
+                int xrel = event.motion.xrel;
+                int yrel = event.motion.yrel;
+                if (xrel != 0 || yrel != 0)
+                {
+                    s_app->MouseMove(glm::vec2(static_cast<float>(xrel), static_cast<float>(yrel)));
+                }
             }
             break;
+
+        case SDL_KEYDOWN:
+        case SDL_KEYUP:
+            {
+                auto in_it = s_inputmap.find(event.key.keysym.scancode);
+                if (in_it != s_inputmap.end())
+                {
+                    s_app->Input(in_it->second, event.key.state == SDL_PRESSED, event.key.repeat != 0);
+                }
+            }
+            break;
+
         }
         
     }
@@ -326,55 +355,29 @@ static void Frame()
 	game::PlayerInputFlags input = 0;
 	const uint8_t* kbd_state = SDL_GetKeyboardState(nullptr);
     
-    if (kbd_state[SDL_GetScancodeFromKey(SDLK_w)])
-		input |= (1 << game::IN_FORWARD);
 
-	if (kbd_state[SDL_GetScancodeFromKey(SDLK_s)])
-		input |= (1 << game::IN_BACKWARD);
-
-	if (kbd_state[SDL_GetScancodeFromKey(SDLK_a)])
-		input |= (1 << game::IN_LEFT);
-
-	if (kbd_state[SDL_GetScancodeFromKey(SDLK_d)])
-		input |= (1 << game::IN_RIGHT);
-
-	if (kbd_state[SDL_GetScancodeFromKey(SDLK_SPACE)])
-		input |= (1 << game::IN_JUMP);
-
-	if (kbd_state[SDL_GetScancodeFromKey(SDLK_LCTRL)])
-		input |= (1 << game::IN_CROUCH);
-
-	if (kbd_state[SDL_GetScancodeFromKey(SDLK_e)])
-		input |= (1 << game::IN_USE);
-
-    if (kbd_state[SDL_GetScancodeFromKey(SDLK_F3)])
-		input |= (1 << game::IN_DEBUG1);
-
-	if (kbd_state[SDL_GetScancodeFromKey(SDLK_F4)])
-		input |= (1 << game::IN_DEBUG2);
-
-	if (kbd_state[SDL_GetScancodeFromKey(SDLK_F5)])
-		input |= (1 << game::IN_DEBUG3);
 
 	int mouse_state = SDL_GetMouseState(nullptr, nullptr);
 
 	if (mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT))
 		input |= (1 << game::IN_ATTACK);
 
-	s_app->SetInput(input);
-
     s_app->Frame();
 
-    if (s_ws_connected)
+    auto session = s_app->GetSession();
+    if (session)
     {
-        auto msg = s_app->GetMsg();
-        if (!msg.empty())
+        if (s_ws_connected)
         {
-            WSSend(msg);
+            auto msg = session->GetMsg();
+            if (!msg.empty())
+            {
+                WSSend(msg);
+            }
         }
+    
+        session->ResetMsg();
     }
-
-    s_app->ResetMsg();
 
     SDL_GL_SwapWindow(s_window);
 }

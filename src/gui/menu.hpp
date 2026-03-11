@@ -82,10 +82,12 @@ class ButtonMenuItem : public MenuItem
 public:
     using Super = MenuItem;
 
-    ButtonMenuItem(std::string text, std::function<void()> click_cb);
+    ButtonMenuItem(std::string text);
 
     virtual void Draw(const DrawMenuItemArgs& args) const override;
     virtual void Input(MenuInput in) override;
+
+    void SetClickCallback(std::function<void()> click_cb);
 
     virtual ~ButtonMenuItem() = default;
 
@@ -99,11 +101,12 @@ class SelectMenuItem : public ButtonMenuItem
 public:
     using Super = ButtonMenuItem;
 
-    SelectMenuItem(std::string text, std::function<void()> click_cb, std::function<void(int)> switch_cb);
+    SelectMenuItem(std::string text);
 
     virtual void Draw(const DrawMenuItemArgs& args) const override;
     virtual void Input(MenuInput in) override;
 
+    void SetSwitchCallback(std::function<void(int)> switch_cb);
     void SetSelectionText(std::string select_text) { select_text_ = std::move(select_text); }
 
     virtual ~SelectMenuItem() = default;

@@ -21,6 +21,7 @@ namespace game
 		IN_DEBUG3,
 		IN_DEBUG4,
 		IN_DEBUG5,
+		IN_MENU,
 
 		IN__COUNT,
 	};

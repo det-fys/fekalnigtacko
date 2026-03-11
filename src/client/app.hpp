@@ -10,7 +10,7 @@
 #include "audio/master.hpp"
 #include "net/msg_producer.hpp"
 #include "net/inmessage.hpp"
-
+#include "gui/menu.hpp"
 #include "gameview/client_session.hpp"
 
 struct ChatMessage
@@ -20,7 +20,7 @@ struct ChatMessage
     glm::vec4 color = glm::vec4(1.0f);
 };
 
-class App : public net::MsgProducer
+class App
 {
 public:
     App();
@@ -33,11 +33,14 @@ public:
 
     void SetTime(float time) { time_ = time; }
     void SetViewportSize(int width, int height) { viewport_size_ = {width, height}; }
-    void SetInput(game::PlayerInputFlags input) { input_ = input; }
+
+    void Input(game::PlayerInputType in, bool pressed, bool repeated);
     void MouseMove(const glm::vec2& delta);
 
     float GetTime() const { return time_; }
     float GetDeltaTime() const { return delta_time_; }
+
+    game::view::ClientSession* GetSession() { return session_.get(); }
 
     audio::Master& GetAudioMaster() { return audiomaster_; }
 
@@ -47,16 +50,17 @@ public:
     ~App();
 
 private:
-    void SendInput(game::PlayerInputType type, bool enable);
-
     void UpdateChat();
     void DrawChat();
+
+    void OpenSettings();
+
+    void UpdateStats();
+    void DrawStats();
 
 private:
     float time_ = 0.0f;
     glm::ivec2 viewport_size_ = {800, 600};
-    game::PlayerInputFlags input_ = 0;
-    game::PlayerInputFlags prev_input_ = 0;
 
     float prev_time_ = 0.0f;
     float delta_time_ = 0.0f;
@@ -70,4 +74,19 @@ private:
     std::unique_ptr<game::view::ClientSession> session_;
 
     std::deque<ChatMessage> chat_;
+
+    std::unique_ptr<gui::Menu> menu_;
+
+    // settings
+    int volume_ = 50;
+
+    // stats
+    float stats_time_ = 0.0f;
+    size_t stat_frames_ = 0;
+    size_t stat_msgs_ = 0;
+    size_t stat_msglen_total_ = 0;
+    size_t stat_msglen_min_ = SIZE_MAX;
+    size_t stat_msglen_max_ = 0;
+    std::string fps_text_ = { 0 };
+    std::string msglen_text_ = { 0 };
 };

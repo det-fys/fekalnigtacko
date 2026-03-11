@@ -8,13 +8,15 @@
 #include "gfx/renderer.hpp"
 #include "net/defs.hpp"
 #include "net/inmessage.hpp"
+#include "net/msg_producer.hpp"
+#include "game/player_input.hpp"
 
 class App;
 
 namespace game::view
 {
 
-class ClientSession
+class ClientSession : public net::MsgProducer
 {
 public:
     ClientSession(App& app);
@@ -22,15 +24,14 @@ public:
     bool ProcessMessage(net::InMessage& msg);
     bool ProcessSingleMessage(net::MessageType type, net::InMessage& msg);
 
+    void Input(game::PlayerInputType in, bool pressed, bool repeated);
     void ProcessMouseMove(float delta_yaw, float delta_pitch);
 
     void Update(const UpdateInfo& info);
     void Draw(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui);
 
     const WorldView* GetWorld() const { return world_.get(); } 
-
     void GetViewInfo(glm::vec3& eye, glm::mat4& view) const;
-
     audio::Master& GetAudioMaster() const;
 
 private:
@@ -40,6 +41,8 @@ private:
     bool ProcessChatMsg(net::InMessage& msg);
 
     void DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui);
+    
+    void SendInput(game::PlayerInputType type, bool enable);
     void SendViewAngles(float time);
 
 private:

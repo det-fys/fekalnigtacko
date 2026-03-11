@@ -6,7 +6,13 @@
 
 #include "vehicleview.hpp"
 
-game::view::ClientSession::ClientSession(App& app) : app_(app) {}
+game::view::ClientSession::ClientSession(App& app) : app_(app)
+{
+	// send login
+	auto msg = BeginMsg(net::MSG_ID);
+	net::PlayerName name;
+	msg.Write(name);
+}
 
 bool game::view::ClientSession::ProcessMessage(net::InMessage& msg)
 {
@@ -46,6 +52,17 @@ bool game::view::ClientSession::ProcessSingleMessage(net::MessageType type, net:
 
         return false;
     }
+}
+
+void game::view::ClientSession::Input(game::PlayerInputType in, bool pressed, bool repeated)
+{
+
+
+    if (repeated)
+        return;
+
+    SendInput(in, pressed);
+
 }
 
 void game::view::ClientSession::ProcessMouseMove(float delta_yaw, float delta_pitch)
@@ -171,6 +188,15 @@ void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListPar
     GetAudioMaster().SetListenerOrientation(camera_world);
 }
 
+void game::view::ClientSession::SendInput(game::PlayerInputType type, bool enable)
+{
+    auto msg = BeginMsg(net::MSG_IN);
+	uint8_t val = type;
+	if (enable)
+		val |= 128;
+	msg.Write(val);
+}
+
 void game::view::ClientSession::SendViewAngles(float time)
 {
     if (time - last_send_time_ < 0.040f)
@@ -184,7 +210,7 @@ void game::view::ClientSession::SendViewAngles(float time)
     if (yaw_q.value == view_yaw_q_.value && pitch_q.value == view_pitch_q_.value)
         return;
 
-    auto msg = app_.BeginMsg(net::MSG_VIEWANGLES);
+    auto msg = BeginMsg(net::MSG_VIEWANGLES);
     msg.Write(yaw_q.value);
     msg.Write(pitch_q.value);
 

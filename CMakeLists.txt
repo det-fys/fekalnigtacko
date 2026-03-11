@@ -114,6 +114,8 @@ set(CLIENT_ONLY_SOURCES
     "src/gui/context.cpp"
     "src/gui/font.hpp"
     "src/gui/font.cpp"
+    "src/gui/menu.hpp"
+    "src/gui/menu.cpp"
     "src/utils/files.cpp"
 )
 

@@ -35,27 +35,6 @@ void App::Frame()
 		delta_time_ = 0.1f; // Cap delta time to avoid large jumps
 	}
 
-	// detect inputs originating in this frame
-	//game::PlayerInputFlags new_input = input_ & ~prev_input_;
-
-	// detect input changes
-	for (size_t i = 0; i < game::IN__COUNT; ++i)
-	{
-		auto in_old = prev_input_ & (1 << i);
-		auto in_new = input_ & (1 << i);
-
-		if (in_old > in_new) // released
-		{
-			SendInput(static_cast<game::PlayerInputType>(i), false);
-		}
-		else if (in_new > in_old) // pressed
-		{
-			SendInput(static_cast<game::PlayerInputType>(i), true);
-		}
-	}
-
-	prev_input_ = input_;
-
 	if (session_)
 	{
 		game::view::UpdateInfo updinfo;
@@ -76,18 +55,31 @@ void App::Frame()
 	
 	gui_.Begin();
 
-	const game::view::WorldView* world;
+	// draw session
 	if (session_)
 	{
         session_->Draw(dlist_, params, gui_);
 	}
 
+	// draw stats
+	UpdateStats();
+	DrawStats();
+
 	// draw chat
 	UpdateChat();
 	DrawChat();
 
+	// draw menu
+	if (menu_)
+	{
+		auto menu_size = menu_->MeasureSize();
+		menu_->Draw(gui_, glm::vec2(viewport_size_) - menu_size - 10.0f);
+	}
+
 	gui_.Render();
 	renderer_.DrawList(dlist_, params);
+
+	++stat_frames_;
 }
 
 void App::Connected()
@@ -97,11 +89,6 @@ void App::Connected()
 
 	// init session
 	session_ = std::make_unique<game::view::ClientSession>(*this);
-
-	// send login
-	auto msg = BeginMsg(net::MSG_ID);
-	net::PlayerName name;
-	msg.Write(name);
 }
 
 void App::ProcessMessage(net::InMessage& msg)
@@ -118,6 +105,12 @@ void App::ProcessMessage(net::InMessage& msg)
 	{
         std::cerr << "FAILED to process message!" << std::endl;
 	}
+
+	// record stats
+	++stat_msgs_;
+	stat_msglen_total_ += s;
+	stat_msglen_min_ = std::min(stat_msglen_min_, s);
+	stat_msglen_max_ = std::max(stat_msglen_max_, s);
 }
 
 void App::Disconnected(const std::string& reason)
@@ -128,6 +121,40 @@ void App::Disconnected(const std::string& reason)
 
 	// close session
 	session_.reset();
+}
+
+static bool InputToMenuInput(game::PlayerInputType& in, gui::MenuInput& mi)
+{
+	switch (in)
+	{
+		case game::IN_FORWARD: mi = gui::MI_UP; return true;
+		case game::IN_BACKWARD: mi = gui::MI_DOWN; return true;
+		case game::IN_LEFT: mi = gui::MI_LEFT; return true;
+		case game::IN_RIGHT: mi = gui::MI_RIGHT; return true;
+		case game::IN_JUMP: mi = gui::MI_ENTER; return true;
+		case game::IN_CROUCH: mi = gui::MI_BACK; return true;
+		default: return false;
+	}
+};
+
+void App::Input(game::PlayerInputType in, bool pressed, bool repeated)
+{
+	if (in == game::IN_MENU && pressed)
+	{
+		OpenSettings();
+		return;
+	}
+
+	gui::MenuInput mi;
+	if (menu_ && pressed && InputToMenuInput(in, mi))
+	{
+		menu_->Input(mi);
+		return;
+	}
+
+	if (session_)
+		session_->Input(in, pressed, repeated);
+
 }
 
 void App::MouseMove(const glm::vec2& delta)
@@ -156,15 +183,6 @@ void App::AddChatMessagePrefix(const std::string& prefix, const std::string& tex
 
 App::~App() {}
 
-void App::SendInput(game::PlayerInputType type, bool enable)
-{
-	auto msg = BeginMsg(net::MSG_IN);
-	uint8_t val = type;
-	if (enable)
-		val |= 128;
-	msg.Write(val);
-}
-
 void App::UpdateChat()
 {
 	// remove expired or over the limit messages
@@ -190,4 +208,75 @@ void App::DrawChat()
 		uint32_t color = glm::packUnorm4x8(chat_[i].color);
 		gui_.DrawText(chat_[i].text, pos, color);
 	}
+}
+
+static void AddSlider(gui::Menu& menu, std::string text, int& value, int min, int max)
+{
+	auto& slider = menu.Add<gui::SelectMenuItem>(std::move(text));
+	auto on_switch = [&slider, &value, min, max] (int v) {
+		value += v;
+		
+		// clamp
+		if (value < min)
+			value = min;
+		else if (value > max)
+			value = max;
+
+		slider.SetSelectionText(std::to_string(value));
+	};
+
+	slider.SetSwitchCallback(on_switch);
+	on_switch(0);
+}
+
+void App::OpenSettings()
+{
+	menu_ = std::make_unique<gui::Menu>();
+
+	AddSlider(*menu_, "jak moc to řve", volume_, 0, 100);
+	
+	auto& ok = menu_->Add<gui::ButtonMenuItem>("0k");
+	ok.SetClickCallback([this] { menu_.reset(); });
+}
+
+#define COL_LABEL "^ccc"
+#define COL_VALUE "^5ff"
+
+void App::UpdateStats()
+{
+	if (time_ < stats_time_ + 1.0f)
+		return;
+
+	stats_time_ = time_;
+
+	fps_text_.clear();
+	fps_text_ += COL_VALUE;
+	fps_text_ += std::to_string(stat_frames_);
+	fps_text_ += COL_LABEL " fps";
+
+	if (stat_msgs_ > 0)
+	{
+		msglen_text_ = COL_LABEL "net: n=" COL_VALUE;
+		msglen_text_ += std::to_string(stat_msgs_);
+		msglen_text_ += COL_LABEL " min=" COL_VALUE;
+		msglen_text_ += std::to_string(stat_msglen_min_);
+		msglen_text_ += COL_LABEL " max=" COL_VALUE;
+		msglen_text_ += std::to_string(stat_msglen_max_);
+		msglen_text_ += COL_LABEL " total=" COL_VALUE;
+		msglen_text_ += std::to_string(stat_msglen_total_);
+	}
+
+    stat_frames_ = 0;
+    stat_msgs_ = 0;
+    stat_msglen_total_ = 0;
+    stat_msglen_min_ = SIZE_MAX;
+    stat_msglen_max_ = 0;
+}
+
+void App::DrawStats()
+{
+	glm::vec2 pos(viewport_size_.x - 5.0f, 5.0f);
+	gui_.DrawTextAligned(fps_text_, pos, glm::vec2(-1.0f, 0.0f));
+	pos.y += 30.0f;
+	gui_.DrawTextAligned(msglen_text_, pos, glm::vec2(-1.0f, 0.0f));
 }

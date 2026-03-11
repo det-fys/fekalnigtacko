@@ -131,7 +131,7 @@ void gui::Context::DrawText(std::string_view text, const glm::vec2& pos, uint32_
     BeginTexture(font_->GetTexture().get());
 
     uint32_t cp = 0;
-    const float line_height = font_->GetLineHeight();
+    const float line_height = font_->GetLineHeight() * scale;
     float space_size = line_height * 0.3f;
 
     glm::vec2 cursor = pos;
@@ -191,7 +191,7 @@ void gui::Context::DrawText(std::string_view text, const glm::vec2& pos, uint32_
         if (!glyph)
             continue; // Dont even have "missing" glyph, font is shit
 
-        glm::vec2 p0 = cursor + glyph->offset;
+        glm::vec2 p0 = cursor + glyph->offset * scale;
         glm::vec2 p1 = p0 + glyph->size * scale;
 
         PushRect(p0, glyph->uv0, p1, glyph->uv1, curr_color);

@@ -60,10 +60,10 @@ void gui::Menu::SwitchFocus(int dir)
 
 // ButtonMenuItem
 
-gui::ButtonMenuItem::ButtonMenuItem(std::string text, std::function<void()> click_cb)
-    : text_(std::move(text)), click_cb_(std::move(click_cb))
+gui::ButtonMenuItem::ButtonMenuItem(std::string text)
+    : text_(std::move(text))
 {
-    size_ = glm::vec2(500.0f, 30.0f);
+    size_ = glm::vec2(300.0f, 30.0f);
 }
 
 void gui::ButtonMenuItem::Draw(const DrawMenuItemArgs& args) const
@@ -79,11 +79,15 @@ void gui::ButtonMenuItem::Input(MenuInput in)
         click_cb_();
 }
 
+void gui::ButtonMenuItem::SetClickCallback(std::function<void()> click_cb)
+{
+    click_cb_ = std::move(click_cb);
+}
+
 // SelectMenuItem
 
-gui::SelectMenuItem::SelectMenuItem(std::string text, std::function<void()> click_cb,
-                                    std::function<void(int)> switch_cb)
-    : ButtonMenuItem(std::move(text), std::move(click_cb)), switch_cb_(std::move(switch_cb))
+gui::SelectMenuItem::SelectMenuItem(std::string text)
+    : ButtonMenuItem(std::move(text))
 {
 }
 
@@ -117,4 +121,9 @@ void gui::SelectMenuItem::Input(MenuInput in)
         Super::Input(in);
         break;
     }
+}
+
+void gui::SelectMenuItem::SetSwitchCallback(std::function<void(int)> switch_cb)
+{
+    switch_cb_ = std::move(switch_cb);
 }
