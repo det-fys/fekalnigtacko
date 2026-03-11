@@ -36,6 +36,7 @@ public:
 
     glm::vec2 MeasureText(std::string_view text);
     void DrawText(std::string_view text, const glm::vec2& pos, uint32_t color = 0xFFFFFFFF, float scale = 1.0f);
+    void DrawTextAligned(std::string_view text, const glm::vec2& pos, const glm::vec2& align, uint32_t color = 0xFFFFFFFF, float scale = 1.0f);
 
     void Render();
 

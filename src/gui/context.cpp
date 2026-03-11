@@ -199,6 +199,12 @@ void gui::Context::DrawText(std::string_view text, const glm::vec2& pos, uint32_
     }
 }
 
+void gui::Context::DrawTextAligned(std::string_view text, const glm::vec2& pos, const glm::vec2& align, uint32_t color, float scale)
+{
+    auto size = MeasureText(text) * scale;
+    DrawText(text, pos + size * align, color, scale);
+}
+
 void gui::Context::Render()
 {
     va_.SetVBOData(vertices_.data(), vertices_.size() * sizeof(vertices_[0]));
