@@ -1,11 +1,13 @@
 #include "context.hpp"
 
+#include "assets/cache.hpp"
+
 gui::Context::Context(gfx::DrawList& dlist, std::shared_ptr<const Font> default_font) :
     dlist_(dlist),
     font_(std::move(default_font)),
     va_(gfx::VA_POSITION | gfx::VA_UV | gfx::VA_COLOR, gfx::VF_CREATE_EBO | gfx::VF_DYNAMIC)
 {
-
+    white_tex_ = assets::CacheManager::GetTexture("data/white.png");
 }
 
 void gui::Context::Begin()
@@ -13,6 +15,12 @@ void gui::Context::Begin()
     vertices_.clear();
     indices_.clear();
     ranges_.clear();
+}
+
+void gui::Context::DrawRect(const glm::vec2& p0, const glm::vec2& p1, uint32_t color)
+{
+    BeginTexture(white_tex_.get());
+    PushRect(p0, glm::vec2(0.0f), p1, glm::vec2(1.0f), color);
 }
 
 static uint32_t DecodeUTF8Codepoint(const char*& p, const char* end)
@@ -227,7 +235,7 @@ void gui::Context::BeginTexture(const gfx::Texture* texture)
         return;
 
     auto& range = ranges_.emplace_back();
-    range.start = indices_.size();
+    range.start = indices_.size() / 3;
     range.count = 0;
     range.texture = texture;
 }

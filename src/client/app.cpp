@@ -123,7 +123,7 @@ void App::Disconnected(const std::string& reason)
 	session_.reset();
 }
 
-static bool InputToMenuInput(game::PlayerInputType& in, gui::MenuInput& mi)
+static bool InputToMenuInput(game::PlayerInputType in, gui::MenuInput& mi)
 {
 	switch (in)
 	{

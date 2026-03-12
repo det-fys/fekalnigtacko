@@ -34,6 +34,8 @@ public:
 
     void Begin();
 
+    void DrawRect(const glm::vec2& p0, const glm::vec2& p1, uint32_t color);
+
     glm::vec2 MeasureText(std::string_view text);
     void DrawText(std::string_view text, const glm::vec2& pos, uint32_t color = 0xFFFFFFFF, float scale = 1.0f);
     void DrawTextAligned(std::string_view text, const glm::vec2& pos, const glm::vec2& align, uint32_t color = 0xFFFFFFFF, float scale = 1.0f);
@@ -48,8 +50,11 @@ private:
 
 private:
     gfx::DrawList& dlist_;
-    std::shared_ptr<const Font> font_;
     gfx::VertexArray va_;
+    
+    // assets
+    std::shared_ptr<const Font> font_;
+    std::shared_ptr<const gfx::Texture> white_tex_;
 
     // building
     std::vector<GuiVertex> vertices_;

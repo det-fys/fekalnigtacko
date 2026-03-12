@@ -6,10 +6,11 @@
 
 void gui::Menu::Draw(Context& ctx, const glm::vec2& pos) const
 {
-    // TODO: draw bg
+    // background
+    auto size = MeasureSize();
+    ctx.DrawRect(pos, pos + size, 0x55000000);
 
     glm::vec2 cursor = pos;
-    
     for (size_t i = 0; i < items_.size(); ++i)
     {
         items_[i]->Draw(DrawMenuItemArgs(ctx, cursor, focus_ == i));
