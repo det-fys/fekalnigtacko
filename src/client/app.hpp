@@ -57,6 +57,9 @@ private:
     void DrawChat();
 
     void OpenSettings();
+    void ApplySettings();
+    void ApplyVolume();
+    void ApplySensitivity();
 
     void UpdateStats();
     void DrawStats();
@@ -83,6 +86,8 @@ private:
 
     // settings
     int volume_ = 50;
+    int sens_ = 50;
+    float sensitivity_ = 0.0f;
 
     // stats
     float stats_time_ = 0.0f;

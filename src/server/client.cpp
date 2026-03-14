@@ -85,7 +85,7 @@ bool sv::Client::ProcessLoginMsg(net::InMessage& msg)
     // check ver
     if (ver != FEKAL_VERSION)
     {
-        SendChat(std::format("^f55špatná verze {}, server je na verzi {}", ver, FEKAL_VERSION));
+        SendChat(std::format("^f55máš nahovno verzi {}, server je na {}", ver, FEKAL_VERSION));
         return false;
     }
 

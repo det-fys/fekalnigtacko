@@ -12,12 +12,7 @@ App::App() :
 {
 	std::cout << "Initializing App..." << std::endl;
 
-#ifndef EMSCRIPTEN
-	audiomaster_.SetMasterVolume(1.0f);
-#else
-	audiomaster_.SetMasterVolume(2.0f);
-#endif
-
+	ApplySettings();
 	AddChatMessage("Test!");
 }
 
@@ -141,7 +136,11 @@ void App::Input(game::PlayerInputType in, bool pressed, bool repeated)
 {
 	if (in == game::IN_MENU && pressed)
 	{
-		OpenSettings();
+		if (!menu_)
+			OpenSettings();
+		else
+			menu_.reset();
+
 		return;
 	}
 
@@ -159,10 +158,8 @@ void App::Input(game::PlayerInputType in, bool pressed, bool repeated)
 
 void App::MouseMove(const glm::vec2& delta)
 {
-	float sensitivity = 0.002f; // Sensitivity factor for mouse movement
-
-	float delta_yaw = -delta.x * sensitivity;
-	float delta_pitch = -delta.y * sensitivity;
+	float delta_yaw = -delta.x * sensitivity_;
+	float delta_pitch = -delta.y * sensitivity_;
 
 	if (session_)
 		session_->ProcessMouseMove(delta_yaw, delta_pitch);
@@ -210,10 +207,10 @@ void App::DrawChat()
 	}
 }
 
-static void AddSlider(gui::Menu& menu, std::string text, int& value, int min, int max)
+static void AddSlider(gui::Menu& menu, std::string text, int& value, int min, int max, std::function<void()> changed)
 {
 	auto& slider = menu.Add<gui::SelectMenuItem>(std::move(text));
-	auto on_switch = [&slider, &value, min, max] (int v) {
+	auto on_switch = [&slider, &value, min, max, changed] (int v) {
 		value += v;
 		
 		// clamp
@@ -223,6 +220,7 @@ static void AddSlider(gui::Menu& menu, std::string text, int& value, int min, in
 			value = max;
 
 		slider.SetSelectionText(std::to_string(value));
+		changed();
 	};
 
 	slider.SetSwitchCallback(on_switch);
@@ -233,10 +231,39 @@ void App::OpenSettings()
 {
 	menu_ = std::make_unique<gui::Menu>();
 
-	AddSlider(*menu_, "jak moc to řve", volume_, 0, 100);
+	AddSlider(*menu_, "jak moc to řve", volume_, 0, 100, [this]{
+		ApplyVolume();
+	});
 	
+	AddSlider(*menu_, "agresivita krysy", sens_, 0, 100, [this]{
+		ApplySensitivity();
+	});
+
 	auto& ok = menu_->Add<gui::ButtonMenuItem>("0k");
 	ok.SetClickCallback([this] { menu_.reset(); });
+}
+
+void App::ApplySettings()
+{
+	ApplyVolume();
+	ApplySensitivity();
+}
+
+void App::ApplyVolume()
+{
+	float vol_f = static_cast<float>(volume_) / 50.0f;
+
+#ifndef EMSCRIPTEN
+	audiomaster_.SetMasterVolume(vol_f);
+#else
+	audiomaster_.SetMasterVolume(2.0f * vol_f);
+#endif
+}
+
+void App::ApplySensitivity()
+{
+	float f = static_cast<float>(sens_) / 100.0f;
+	sensitivity_ = glm::mix(0.0005f, 0.0035f, f);
 }
 
 #define COL_LABEL "^ccc"
