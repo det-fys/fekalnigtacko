@@ -15,12 +15,36 @@
             height: 100%;
             background: black;
             color: aqua;
+            font-family: Verdana, Geneva, Tahoma, sans-serif;
+            text-align: center;
         }
 
         canvas {
             display: block;
             width: 100vw;
             height: 100vh;
+        }
+
+        #vyplnitmeno{
+            font-size: 100pt;
+            color: red;
+            font-weight: bold;
+            margin: 0;
+            margin-bottom: 100px;
+        }
+
+        #okbut
+        {
+            font-size: 20pt;
+            font-weight: bold;
+            padding: 10pt;
+            margin: 10pt;
+        }
+
+        #name, #url
+        {
+            font-size: 150%;
+            margin: 10pt;
         }
     </style>
 </head>
@@ -32,9 +56,11 @@
         <h1>fekální gtačko</h1>
 
         <form>
-            kdo <input type="text" name="name" id="name"><br>
-            kam <input type="text" name="url" id="url"><br>
-            <input type="button" value="0k" onclick="ok()">
+            kdo <input type="text" name="name" id="name" placeholder="vyplnit"><br>
+            <p id="vyplnitmeno" style="display:none">^ vyplnit</p>
+            
+            kam <input type="text" name="url" id="url" value="ws://deadfish.cz:11200/ws"><br>
+            <input id="okbut" type="button" value="0k" onclick="ok()">
         </form>
     </div>
 
@@ -76,14 +102,34 @@
             const name = document.getElementById("name").value;
             const url = document.getElementById("url").value;
         
-            Module.ccall("SetName", name);
-            Module.ccall("SetUrl", url);
+            if (name == "") {
+                document.getElementById("vyplnitmeno").style = "";
+                return;
+            }
+
+            localStorage.setItem("fg_name", name);
+            localStorage.setItem("fg_url", url);
+
+            Module.ccall("SetName", null, ["string"], [name]);
+            Module.ccall("SetUrl", null, ["string"], [url]);
 
             document.getElementById("loginform").style = "display:none";
             document.getElementById("canvas").style = "";
 
-            Module.ccall("RunMain");
+            Module.ccall("RunMain", null, [], []);
         }
+
+        function loadConfig() 
+        {
+            const saved_name = localStorage.getItem("fg_name");
+            const saved_url = localStorage.getItem("fg_url");
+            if (saved_name != null)
+                document.getElementById("name").value = saved_name;
+            if (saved_url != null)
+                document.getElementById("url").value = saved_url;
+        }
+
+        loadConfig();
     </script>
 
     {{{ SCRIPT }}}

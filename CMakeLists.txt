@@ -219,6 +219,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
         "-sUSE_WEBGL2=1"
         "-sNO_DISABLE_EXCEPTION_CATCHING=1"
         "-sALLOW_MEMORY_GROWTH=1"
+        "-sEXPORTED_FUNCTIONS=_RunMain,_SetName,_SetUrl"
+        "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
         "--shell-file" "${CMAKE_SOURCE_DIR}/shell.html"
         "--preload-file" "${CMAKE_SOURCE_DIR}/assets/@/"
         )
