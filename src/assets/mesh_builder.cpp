@@ -4,13 +4,13 @@
 
 #include "utils/bufferput.hpp"
 
-assets::MeshBuilder::MeshBuilder(gfx::MeshFlags mflags) : mflags_(mflags) {}
+assets::MeshBuilder::MeshBuilder(gfx::MeshFlags mflags) : mflags_(mflags)
+{
+    mesh_ = std::make_shared<Mesh>();
+}
 
 void assets::MeshBuilder::BeginSurface(gfx::SurfaceFlags sflags, const std::string& name, std::shared_ptr<const gfx::Texture> texture)
 {
-    if (!mesh_)
-        mesh_ = std::make_shared<Mesh>();
-
     FinalizeSurface();
 
     gfx::Surface surface;
