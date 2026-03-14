@@ -19,6 +19,7 @@ enum CharacterInputType
     CIN_LEFT,
     CIN_RIGHT,
     CIN_JUMP,
+    CIN_SPRINT,
 };
 
 struct CapsuleShape

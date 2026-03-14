@@ -14,6 +14,7 @@ namespace game
 		IN_RIGHT,
 		IN_JUMP,
 		IN_CROUCH,
+		IN_SPRINT,
 		IN_USE,
 		IN_ATTACK,
 		IN_DEBUG1,

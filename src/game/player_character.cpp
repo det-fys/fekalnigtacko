@@ -92,6 +92,11 @@ void game::PlayerCharacter::UpdateInputs()
     {
         c_in |= 1 << CIN_JUMP;
     }
+    
+    if (in & (1 << IN_SPRINT))
+    {
+        c_in |= 1 << CIN_SPRINT;
+    }
 
     if (vehicle_)
     {

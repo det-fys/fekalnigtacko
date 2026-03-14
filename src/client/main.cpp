@@ -145,6 +145,7 @@ static const std::map<SDL_Scancode, game::PlayerInputType> s_inputmap = {
     { SDL_SCANCODE_A, game::IN_LEFT },
     { SDL_SCANCODE_D, game::IN_RIGHT },
     { SDL_SCANCODE_SPACE, game::IN_JUMP },
+    { SDL_SCANCODE_LSHIFT, game::IN_SPRINT },
     { SDL_SCANCODE_LCTRL, game::IN_CROUCH },
     { SDL_SCANCODE_E, game::IN_USE },
     { SDL_SCANCODE_F3, game::IN_DEBUG1 },
