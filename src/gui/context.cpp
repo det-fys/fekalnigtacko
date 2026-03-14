@@ -182,7 +182,7 @@ void gui::Context::DrawText(std::string_view text, const glm::vec2& pos, uint32_
                 else if (cp >= 'a' && cp <= 'f')
                     ch = cp - 'a' + 10;
                 else
-                    break;
+                    ch = 0;
 
                 curr_color |= (ch << 16);
                 curr_color |= (ch << 20);
