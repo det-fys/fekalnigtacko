@@ -18,7 +18,7 @@ namespace game
 
 static const char* GetRandomCarModel()
 {
-    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat"};
+    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat", "cow_static"};
     return vehicles[rand() % (sizeof(vehicles) / sizeof(vehicles[0]))];
 }
 
@@ -52,7 +52,7 @@ game::OpenWorld::OpenWorld() : World("openworld")
 
     constexpr size_t in_row = 20;
 
-    for (size_t i = 0; i < 1500; ++i)
+    for (size_t i = 0; i < 100; ++i)
     {
         Schedule(i * 40, [this, i] {
             size_t col = i % in_row;
