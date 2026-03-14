@@ -1,7 +1,5 @@
 #include "game.hpp"
 
-#include <format>
-
 #include "player.hpp"
 #include "openworld.hpp"
 
@@ -26,13 +24,13 @@ void game::Game::PlayerJoined(Player& player)
     player.SetWorld(default_world_);
 
     players_.insert(&player);
-    BroadcastChat(std::format("{}^r se připoojil jupí jupí jupííí", player.GetName()));
+    BroadcastChat(player.GetName() + "^r se připoojil jupí jupí jupííí");
 }
 
 void game::Game::PlayerLeft(Player& player)
 {
     players_.erase(&player);
-    BroadcastChat(std::format("{}^r se vodpojil zmrd", player.GetName()));
+    BroadcastChat(player.GetName() + "^r se vodpojil zmrd");
 }
 
 bool game::Game::PlayerInput(Player& player, PlayerInputType type, bool enabled)

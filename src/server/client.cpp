@@ -1,7 +1,5 @@
 #include "client.hpp"
 
-#include <format>
-
 #include "server.hpp"
 #include "utils/validate.hpp"
 #include "utils/version.hpp"
@@ -85,7 +83,7 @@ bool sv::Client::ProcessLoginMsg(net::InMessage& msg)
     // check ver
     if (ver != FEKAL_VERSION)
     {
-        SendChat(std::format("^f55máš nahovno verzi {}, server je na {}", ver, FEKAL_VERSION));
+        SendChat("^f55máš nahovno verzi " + std::to_string(ver) + ", server je na " + std::to_string(FEKAL_VERSION));
         return false;
     }
 
