@@ -119,7 +119,7 @@ void game::OpenWorld::DestructibleDestroyed(net::ObjNum num, std::unique_ptr<Map
 {
     auto& destroyed_obj = Spawn<DestroyedObject>(std::move(col));
 
-    Schedule(10000, [this, num] {
+    Schedule(120000, [this, num] {
         RespawnObj(num);
     });
 }
