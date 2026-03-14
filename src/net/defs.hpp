@@ -55,7 +55,7 @@ enum MessageType : uint8_t
     MSG_COUNT,
 };
 
-using PlayerName = FixedStr<24>;
+using PlayerName = FixedStr<64>;
 using MapName = FixedStr<32>;
 using ModelName = FixedStr<64>;
 using ChatMessage = FixedStr<1024>;
@@ -130,5 +130,9 @@ using ObjNum = uint16_t;
 using ObjCount = ObjNum;
 
 using NumTexels = uint16_t;
+
+// version
+
+using Version = uint32_t;
 
 } // namespace net

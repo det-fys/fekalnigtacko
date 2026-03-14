@@ -28,7 +28,9 @@ public:
     void SetWorld(std::shared_ptr<World> world);
 
     void SetCamera(net::EntNum entnum);
-    void SendChat(const std::string text);
+    void SendChat(const std::string& text);
+
+    const std::string& GetName() const { return name_; }
 
     PlayerInputFlags GetInput() const { return in_; }
     float GetViewYaw() const { return view_yaw_; }

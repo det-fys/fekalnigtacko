@@ -86,15 +86,29 @@ bool sv::WSServer::PollEvent(WSEvent& out_event)
 void sv::WSServer::Send(WSConnId conn_id, std::string data)
 {
     std::lock_guard<std::mutex> lock(mtx_);
-
+    
     auto it = id2conn_.find(conn_id);
     if (it == id2conn_.end())
     {
         std::cerr << "attempted to send message to unknown conn ID " << conn_id << std::endl;
         return;
     }
-
+    
     (*it->second).send_binary(std::move(data));
+}
+
+void sv::WSServer::Close(WSConnId conn_id)
+{
+    std::lock_guard<std::mutex> lock(mtx_);
+
+    auto it = id2conn_.find(conn_id);
+    if (it == id2conn_.end())
+    {
+        std::cerr << "attempted to close unknown conn ID " << conn_id << std::endl;
+        return;
+    }
+    
+    (*it->second).close();
 }
 
 void sv::WSServer::Exit()

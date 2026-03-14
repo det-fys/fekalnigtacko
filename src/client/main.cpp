@@ -28,10 +28,19 @@
 #include "app.hpp"
 #include "gl.hpp"
 
+static std::string s_username;
+static std::string s_url;
+
 static SDL_Window *s_window = nullptr;
 static SDL_GLContext s_context = nullptr;
 static bool s_quit = false;
 static std::unique_ptr<App> s_app;
+
+struct ClientConfig
+{
+    std::string username;
+    std::string url;
+};
 
 static void ThrowSDLError(const std::string& message)
 {
@@ -66,7 +75,7 @@ static void InitSDL()
 
 	std::cout << "Creating SDL window..." << std::endl;
     s_window =
-        SDL_CreateWindow("PortalGame", 100, 100, 640, 480,
+        SDL_CreateWindow("Fekalni gtacko", 100, 100, 640, 480,
                          SDL_WINDOW_SHOWN /* | SDL_WINDOW_MAXIMIZED */| SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (!s_window)
     {
@@ -384,7 +393,10 @@ static void Frame()
 }
 
 static void Main() {
-    if (!WSInit(WS_URL))
+    if (s_url.empty())
+        s_url = WS_URL;
+
+    if (!WSInit(s_url.c_str()))
         return;
 
     InitSDL();
@@ -401,8 +413,10 @@ static void Main() {
 
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
+
     s_app = std::make_unique<App>();
-    s_app->AddChatMessagePrefix("WebSocket", "připojování na " + std::string(WS_URL));
+    s_app->SetUserName(s_username);
+    s_app->AddChatMessagePrefix("WebSocket", "připojování na " + s_url);
 
 #ifdef EMSCRIPTEN
     emscripten_set_main_loop(Frame, 0, true);
@@ -429,7 +443,7 @@ static void Main() {
             std::this_thread::sleep_for(t_next - t_now);
         }
     }
-        
+
     s_app.reset();
 
     ShutdownGL();
@@ -439,7 +453,10 @@ static void Main() {
 #endif // EMSCRIPTEN
 }
 
-int main(int argc, char *argv[])
+extern "C"
+{
+
+void RunMain()
 {
     try {
         Main();
@@ -447,8 +464,35 @@ int main(int argc, char *argv[])
     catch (const std::exception& e) {
         std::cerr << "[ERROR] " << e.what() << std::endl;
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", e.what(), nullptr);
-        return EXIT_FAILURE;
     }
-
-	return EXIT_SUCCESS;
 }
+
+void SetName(const char* name)
+{
+    s_username = name;
+}
+
+void SetUrl(const char* url)
+{
+    s_url = url;
+}
+
+}
+
+#ifndef EMSCRIPTEN
+
+int main(int argc, char *argv[])
+{
+    SetName("random guvno");
+    RunMain();
+	return 0;
+}
+
+#else
+
+int main(int argc, char *argv[])
+{
+
+}
+
+#endif

@@ -173,7 +173,7 @@ void game::OpenWorld::CreatePlayerCharacter(Player& player)
     RemovePlayerCharacter(player);
 
     auto& character = SpawnRandomCharacter<PlayerCharacter>(*this, player);
-    character.SetNametag("player (" + std::to_string(character.GetEntNum()) + ")");
+    // character.SetNametag("player (" + std::to_string(character.GetEntNum()) + ")");
     character.SetPosition({100.0f, 100.0f, 5.0f});
 
     player_characters_[&player] = &character;

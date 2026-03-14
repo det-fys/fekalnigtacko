@@ -5,6 +5,8 @@ game::PlayerCharacter::PlayerCharacter(World& world, OpenWorld& openworld, Playe
 {
     EnablePhysics(true);
     VehicleChanged();
+
+    SetNametag(player.GetName());
 }
 
 void game::PlayerCharacter::Update()

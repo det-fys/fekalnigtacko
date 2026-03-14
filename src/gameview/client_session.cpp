@@ -5,13 +5,14 @@
 // #include <glm/gtx/common.hpp>
 
 #include "vehicleview.hpp"
+#include "utils/version.hpp"
 
 game::view::ClientSession::ClientSession(App& app) : app_(app)
 {
 	// send login
 	auto msg = BeginMsg(net::MSG_ID);
-	net::PlayerName name;
-	msg.Write(name);
+    msg.Write<net::Version>(FEKAL_VERSION);
+	msg.Write(net::PlayerName(app.GetUserName()));
 }
 
 bool game::view::ClientSession::ProcessMessage(net::InMessage& msg)

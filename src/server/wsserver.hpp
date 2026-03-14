@@ -50,7 +50,7 @@ public:
 
     bool PollEvent(WSEvent& out_event);
     void Send(WSConnId conn_id, std::string data);
-    // void Close(WSConnId conn_id);
+    void Close(WSConnId conn_id);
 
     void Exit();
 

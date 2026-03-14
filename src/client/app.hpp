@@ -34,6 +34,9 @@ public:
     void SetTime(float time) { time_ = time; }
     void SetViewportSize(int width, int height) { viewport_size_ = {width, height}; }
 
+    void SetUserName(const std::string& username) { username_ = username; }
+    const std::string& GetUserName() const { return username_; }
+
     void Input(game::PlayerInputType in, bool pressed, bool repeated);
     void MouseMove(const glm::vec2& delta);
 
@@ -71,6 +74,7 @@ private:
 
     audio::Master audiomaster_;
 
+    std::string username_;
     std::unique_ptr<game::view::ClientSession> session_;
 
     std::deque<ChatMessage> chat_;

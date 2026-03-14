@@ -61,6 +61,11 @@ void sv::Server::Send(Client& client, std::string msg)
     ws_.Send(client.GetConnId(), std::move(msg));
 }
 
+void sv::Server::Disconnect(Client& client)
+{
+    ws_.Close(client.GetConnId());
+}
+
 void sv::Server::PollWSEvents()
 {
     WSEvent event;
@@ -98,9 +103,10 @@ void sv::Server::HandleWSConnect(WSConnId conn)
 void sv::Server::HandleWSMessage(WSConnId conn, const std::string& data)
 {
     net::InMessage msg(data.data(), data.size());
-    if (!clients_.at(conn)->ProcessMessage(msg))
+    auto& client = clients_.at(conn);
+    if (!client->ProcessMessage(msg))
     {
-        // TODO: disconnect
+        client->Disconnect();
     }    
 }
 

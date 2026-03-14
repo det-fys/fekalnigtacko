@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>PortalGame</title>
+    <title>Fekalni gtacko</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
     <style>
@@ -14,6 +14,7 @@
             overflow: hidden;
             height: 100%;
             background: black;
+            color: aqua;
         }
 
         canvas {
@@ -25,15 +26,30 @@
 </head>
 
 <body>
-    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" style="display:none"></canvas>
+
+    <div id="loginform">
+        <h1>fekální gtačko</h1>
+
+        <form>
+            kdo <input type="text" name="name" id="name"><br>
+            kam <input type="text" name="url" id="url"><br>
+            <input type="button" value="0k" onclick="ok()">
+        </form>
+    </div>
 
     <script>
+        var inited = false;
+
         var Module = {
             preRun: [],
             postRun: [],
             canvas: (function() {
             return document.getElementById('canvas');
-            })()
+            })(),
+            onRuntimeInitialized: function() {
+                inited = true;
+            }
         };
 
         // Resize canvas to fit the window and inform SDL (via Emscripten)
@@ -51,6 +67,23 @@
 
         window.addEventListener('resize', resizeCanvas);
         window.addEventListener('load', resizeCanvas);
+
+        function ok()
+        {
+            if (!inited)
+                return;
+
+            const name = document.getElementById("name").value;
+            const url = document.getElementById("url").value;
+        
+            Module.ccall("SetName", name);
+            Module.ccall("SetUrl", url);
+
+            document.getElementById("loginform").style = "display:none";
+            document.getElementById("canvas").style = "";
+
+            Module.ccall("RunMain");
+        }
     </script>
 
     {{{ SCRIPT }}}

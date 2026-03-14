@@ -21,6 +21,8 @@ public:
 
     void Send(Client& client, std::string msg);
 
+    void Disconnect(Client& client);
+
     game::Game& GetGame() { return game_; }
 
     int64_t GetTime() const { return time_; }

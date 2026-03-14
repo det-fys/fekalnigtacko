@@ -65,7 +65,7 @@ void game::Player::SetCamera(net::EntNum entnum)
     msg.Write(entnum);
 }
 
-void game::Player::SendChat(const std::string text)
+void game::Player::SendChat(const std::string& text)
 {
     auto msg = BeginMsg(net::MSG_CHAT);
     net::ChatMessage chatm = text;

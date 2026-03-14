@@ -28,7 +28,9 @@ public:
 
     void Update();
 
-    // void Disconnect(const std::string& reason);
+    void SendChat(const std::string& text);
+
+    void Disconnect();
 
     WSConnId GetConnId() const { return id_; }
     ClientState GetState() const { return state_; }
@@ -38,6 +40,8 @@ public:
 
 private:
     void Send(std::string msg);
+
+    bool ProcessLoginMsg(net::InMessage& msg);
 
 private:
     Server& server_;
