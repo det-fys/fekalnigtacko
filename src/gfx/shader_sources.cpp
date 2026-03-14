@@ -226,7 +226,7 @@ LIGHT_MATRICES_GLSL
 COMPUTE_LIGHTS_GLSL
 R"GLSL(
 
-uniform sampler3D u_deform_tex;
+uniform mediump sampler3D u_deform_tex;
 uniform mat3 u_deform_info;
 
 out vec2 v_uv;
