@@ -91,6 +91,9 @@ class Model:
     materials: dict[str, Surface]
     make_col_trimesh: bool
     make_convex_hull: bool
+    cols: list[tuple[str, Transform, float, float]]
+    centerofmass: tuple[float, float, float]|None
+    params: list[tuple[str, str]]
 
     def __init__(self, skeleton=None):
         self.skeleton = skeleton
@@ -99,6 +102,9 @@ class Model:
         self.materials = {}
         self.make_col_trimesh = False
         self.make_convex_hull = False
+        self.cols = []
+        self.centerofmass = None
+        self.params = []
 
     def add_vertex(self, vertex: Vertex) -> int:
         if vertex in self.vertex_map:
@@ -480,8 +486,19 @@ class Exporter:
             if model.make_convex_hull:
                 f.write("makeconvexhull\n")
 
+            if model.centerofmass is not None:
+                x, y, z = model.centerofmass
+                f.write(f"centerofmass {x:.3f} {y:.3f} {z:.3f}\n")
+
+            for col in model.cols:
+                coltype, trans, sy, sz = col
+                f.write(f"col {coltype} {self.transform_str(trans)} {sy:.6f} {sz:.6f}\n")
+
             if model.skeleton is not None:
                 f.write(f"skeleton {model.skeleton.name}\n")
+
+            for param_name, param_value in model.params:
+                f.write(f"param {param_name} {param_value}\n")
 
             for v in model.vertices:
                 color_str = f" {v.color[0]} {v.color[1]} {v.color[2]}" if v.color else ""
@@ -604,10 +621,24 @@ class Exporter:
                     model.make_convex_hull = True
 
         for obj in col.objects:
-            type, _, _ = self.extract_name(obj.name)
+            type, obj_name, obj_params = self.extract_name(obj.name)
 
             if type == "M":
                 self.add_mesh_to_model(obj, model)
+            elif type == "COL":
+                t, r, s = obj.matrix_world.decompose()
+                trans = Transform((t.x, t.y, t.z), (r.x, r.y, r.z, r.w), s.x)
+
+                if obj_name == "box":
+                    model.cols.append(("box", trans, s.y, s.z))
+            elif type == "COM":
+                trans = self.get_obj_transform(obj)
+                model.centerofmass = trans.position
+            elif type == "P":
+                if not "V" in obj_params:
+                    continue
+
+                model.params.append((obj_name, obj_params["V"]))
 
         mdl_filepath = os.path.join(self.out_path, f"{name}.mdl")
         self.export_mdl(model, mdl_filepath)
