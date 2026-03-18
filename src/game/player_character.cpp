@@ -1,7 +1,7 @@
 #include "player_character.hpp"
 #include "openworld.hpp"
 
-game::PlayerCharacter::PlayerCharacter(World& world, OpenWorld& openworld, Player& player) : Super(world),  world_(openworld), player_(player)
+game::PlayerCharacter::PlayerCharacter(World& world, Player& player) : Super(world), player_(player)
 {
     EnablePhysics(true);
     VehicleChanged();
@@ -39,11 +39,10 @@ void game::PlayerCharacter::ProcessInput(PlayerInputType type, bool enabled)
         {
             if (!vehicle_)
             {
-                auto use_target_opt = world_.GetBestUseTarget(GetRootTransform().position);
-                if (use_target_opt)
+                auto use_target = world_.GetBestUseTarget(GetRootTransform().position);
+                if (use_target)
                 {
-                    auto& [usable, use_target] = *use_target_opt;
-                    usable.Use(*this, use_target.id);
+                    use_target->usable->Use(*this, use_target->id);
                 }
             }
             else

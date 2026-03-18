@@ -5,7 +5,7 @@
 #include <array>
 #include <iostream>
 
-game::NpcCharacter::NpcCharacter(World& world, OpenWorld& openworld) : Super(world) {
+game::NpcCharacter::NpcCharacter(World& world) : Super(world) {
     VehicleChanged();
 }
 

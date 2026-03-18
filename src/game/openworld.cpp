@@ -124,42 +124,10 @@ void game::OpenWorld::DestructibleDestroyed(net::ObjNum num, std::unique_ptr<Map
     });
 }
 
-std::optional<std::pair<game::Usable&, const game::UseTarget&>> game::OpenWorld::GetBestUseTarget(const glm::vec3& pos) const
-{
-    std::optional<std::pair<Usable*, const UseTarget*>> best_target;
-    float best_dist = std::numeric_limits<float>::max();
-
-    // TODO: spatial query
-    for (const auto& [entnum, ent] : GetEntities())
-    {
-        auto usable = dynamic_cast<Usable*>(ent.get());
-        if (!usable)
-            continue;
-
-        for (const auto& target : usable->GetUseTargets())
-        {
-            glm::vec3 pos_world = ent->GetRoot().matrix * glm::vec4(target.position, 1.0f);
-
-            float dist = glm::distance(pos, pos_world);
-            if (dist < 3.0f && dist < best_dist)
-            {
-                best_dist = dist;
-                best_target = std::make_pair(usable, &target);
-            }
-        }
-    }
-
-    if (best_target)
-        return std::make_pair(std::ref(*best_target->first), *best_target->second);
-    else
-        return std::nullopt;
-
-}
-
 template <class T, typename... TArgs>
 static T& SpawnRandomCharacter(game::OpenWorld& world, TArgs&&... args)
 {
-    auto& character = world.Spawn<T>(world, std::forward<TArgs>(args)...);
+    auto& character = world.Spawn<T>(std::forward<TArgs>(args)...);
 
     // add clothes
     character.AddClothes("tshirt", GetRandomColor());

@@ -8,6 +8,7 @@
 #include "entity.hpp"
 #include "net/defs.hpp"
 #include "player_input.hpp"
+#include "usable.hpp"
 
 namespace game
 {
@@ -47,6 +48,8 @@ public:
     Entity* GetEntity(net::EntNum entnum);
 
     void RespawnObj(net::ObjNum objnum);
+
+    const UseTarget* GetBestUseTarget(const glm::vec3& pos) const;
 
     const assets::Map& GetMap() const { return map_.GetMap(); }
     const std::string& GetMapName() const { return map_.GetName(); }

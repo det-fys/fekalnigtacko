@@ -27,8 +27,6 @@ public:
 
     virtual void DestructibleDestroyed(net::ObjNum num, std::unique_ptr<MapObjectCollision> col) override;
 
-    std::optional<std::pair<Usable&, const UseTarget&>> GetBestUseTarget(const glm::vec3& pos) const;
-
 private:
     void CreatePlayerCharacter(Player& player);
     void RemovePlayerCharacter(Player& player);

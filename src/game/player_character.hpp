@@ -13,7 +13,7 @@ class PlayerCharacter : public ControllableCharacter
 public:
     using Super = ControllableCharacter;
 
-    PlayerCharacter(World& world, OpenWorld& openworld, Player& player);
+    PlayerCharacter(World& world, Player& player);
 
     virtual void Update() override;
 
@@ -26,7 +26,6 @@ private:
     void UpdateUseTarget();
 
 private:
-    OpenWorld& world_;
     Player& player_;
 };
 

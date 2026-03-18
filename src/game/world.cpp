@@ -96,6 +96,34 @@ void game::World::RespawnObj(net::ObjNum objnum)
     }
 }
 
+const game::UseTarget* game::World::GetBestUseTarget(const glm::vec3& pos) const
+{
+    const UseTarget* best_target = nullptr;
+    float best_dist = std::numeric_limits<float>::max();
+
+    // TODO: spatial query
+    for (const auto& [entnum, ent] : GetEntities())
+    {
+        auto usable = dynamic_cast<Usable*>(ent.get());
+        if (!usable)
+            continue;
+
+        for (const auto& target : usable->GetUseTargets())
+        {
+            glm::vec3 pos_world = ent->GetRoot().matrix * glm::vec4(target.position, 1.0f);
+
+            float dist = glm::distance(pos, pos_world);
+            if (dist < 3.0f && dist < best_dist)
+            {
+                best_dist = dist;
+                best_target = &target;
+            }
+        }
+    }
+
+    return best_target;
+}
+
 void game::World::HandleContacts()
 {
     auto& bt_world = GetBtWorld();

@@ -13,7 +13,7 @@ class NpcCharacter : public ControllableCharacter
 public:
     using Super = ControllableCharacter;
 
-    NpcCharacter(World& world, OpenWorld& openworld);
+    NpcCharacter(World& world);
 
     virtual void VehicleChanged() override;
 

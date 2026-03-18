@@ -68,10 +68,7 @@ void game::DrivableVehicle::InitSeats()
         seat.position = trans->position;
         seats_.emplace_back(seat);
 
-        UseTarget use_target{};
-        use_target.id = seats_.size() - 1;
-        use_target.position = seat.position;
-        use_target.desc = "vlízt do " + GetModelName() + " (místo " + std::to_string(use_target.id) + ")";
-        use_targets_.emplace_back(use_target);
+        uint32_t id = seats_.size() - 1;
+        use_targets_.emplace_back(this, id, seat.position, "vlízt do " + GetModelName() + " (místo " + std::to_string(id) + ")");
     }
 }
