@@ -183,6 +183,9 @@ bool game::view::WorldView::ProcessUpdateEntsMsg(net::InMessage& msg)
     if (!msg.Read(count))
         return false;
 
+    if (count > ents_.size())
+        return false; // wanna update more than we have
+
     net::EntNum current = 0;
     auto it = ents_.begin();
 
