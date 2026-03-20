@@ -36,6 +36,14 @@ static glm::vec3 GetRandomColor()
     return color;
 }
 
+static uint32_t GetRandomColor24()
+{
+    uint8_t r,g,b;
+    r = rand() % 256;
+    g = rand() % 256;
+    b = rand() % 256;
+    return (b << 16) | (g << 8) | r;
+}
 
 game::OpenWorld::OpenWorld() : World("openworld")
 {
@@ -47,7 +55,14 @@ game::OpenWorld::OpenWorld() : World("openworld")
         SpawnBot();
     }
 
-    auto& veh = Spawn<game::DrivableVehicle>("twingo", glm::vec3{1.0f, 0.8f, 0.1f});
+    // initial twingo
+    VehicleTuning twingo_tuning;
+    twingo_tuning.model = "twingo";
+    twingo_tuning.primary_color = 0x0077FF;
+    twingo_tuning.wheels_idx = 1; // enkei
+    twingo_tuning.wheel_color = 0x00FF00;
+
+    auto& veh = Spawn<game::DrivableVehicle>(twingo_tuning);
     veh.SetPosition({110.0f, 100.0f, 5.0f});
 
     constexpr size_t in_row = 20;
@@ -59,7 +74,7 @@ game::OpenWorld::OpenWorld() : World("openworld")
             size_t row = i / in_row;
             glm::vec3 pos(62.0f + static_cast<float>(col) * 4.0f, 165.0f + static_cast<float>(row) * 7.0f, 7.0f);
 
-            auto& veh = Spawn<game::DrivableVehicle>(GetRandomCarModel(), GetRandomColor());
+            auto& veh = SpawnRandomVehicle();
             veh.SetPosition(pos);
         });
     }
@@ -157,29 +172,32 @@ void game::OpenWorld::RemovePlayerCharacter(Player& player)
     }
 }
 
-static game::DrivableVehicle& SpawnRandomVehicle(game::World& world)
+game::DrivableVehicle& game::OpenWorld::SpawnRandomVehicle()
 {
-    auto roads = world.GetMap().GetGraph("roads");
+    game::VehicleTuning tuning;
+    tuning.model = GetRandomCarModel();
+    tuning.primary_color = GetRandomColor24();
 
-    if (!roads)
-    {
-        throw std::runtime_error("SpawnRandomVehicle: no roads graph in map");
-    }
-
-    size_t start_node = rand() % roads->nodes.size();
-    // auto color = glm::vec3{0.3f, 0.3f, 0.3f};
-    auto color = GetRandomColor();
-    auto& vehicle = world.Spawn<game::DrivableVehicle>(GetRandomCarModel(), color);
+    auto& vehicle = Spawn<game::DrivableVehicle>(tuning);
     // vehicle.SetNametag("bot (" + std::to_string(vehicle.GetEntNum()) + ")");
-    vehicle.SetPosition(roads->nodes[start_node].position + glm::vec3{0.0f, 0.0f, 5.0f});
 
     return vehicle;
 }
 
 void game::OpenWorld::SpawnBot()
 {
-    auto& vehicle = SpawnRandomVehicle(*this);
-    auto& driver = SpawnRandomCharacter<NpcCharacter>(*this);
+    auto roads = GetMap().GetGraph("roads");
 
+    if (!roads)
+    {
+        throw std::runtime_error("SpawnBot: no roads graph in map");
+    }
+
+    size_t start_node = rand() % roads->nodes.size();
+
+    auto& vehicle = SpawnRandomVehicle();
+    vehicle.SetPosition(roads->nodes[start_node].position + glm::vec3{0.0f, 0.0f, 5.0f});
+
+    auto& driver = SpawnRandomCharacter<NpcCharacter>(*this);
     driver.SetVehicle(&vehicle, 0);
 }

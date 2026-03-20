@@ -2,8 +2,7 @@
 #include "player_character.hpp"
 #include "utils/random.hpp"
 
-game::DrivableVehicle::DrivableVehicle(World& world, std::string model_name, const glm::vec3& color)
-    : Vehicle(world, std::move(model_name), color)
+game::DrivableVehicle::DrivableVehicle(World& world, const VehicleTuning& tuning) : Vehicle(world, tuning)
 {
     InitSeats();
 }

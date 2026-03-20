@@ -135,4 +135,8 @@ using NumTexels = uint16_t;
 
 using Version = uint32_t;
 
+// tuning
+
+using TuningPartIdx = uint8_t;
+
 } // namespace net

@@ -13,6 +13,9 @@ namespace game::view
 
 struct VehicleWheelViewInfo
 {
+    std::shared_ptr<const assets::Model> model;
+    glm::vec4 color;
+
     TransformNode node;
     float steering = 0.0f;
     float z_offset = 0.0f;
@@ -43,6 +46,7 @@ public:
 private:
     void InitMesh();
 
+    bool ReadTuning(net::InMessage& msg);
     bool ReadState(net::InMessage* msg);
 
     bool ReadDeformSync(net::InMessage& msg);

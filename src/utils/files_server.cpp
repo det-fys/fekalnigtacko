@@ -1,6 +1,7 @@
 #include "files.hpp"
 
 #include <fstream>
+#include <filesystem>
 
 std::string fs::ReadFileAsString(const std::string& path)
 {
@@ -21,4 +22,9 @@ std::istringstream fs::ReadFileAsStream(const std::string& path)
 {
     std::string content = ReadFileAsString(path);
     return std::istringstream(content);
+}
+
+bool fs::FileExists(const std::string& path)
+{
+    return std::filesystem::exists(path);
 }

@@ -31,3 +31,13 @@ std::istringstream fs::ReadFileAsStream(const std::string& path)
     std::string content = ReadFileAsString(path);
     return std::istringstream(content);
 }
+
+bool fs::FileExists(const std::string& path)
+{
+    SDL_RWops *rw = SDL_RWFromFile(path.c_str(), "rb");
+    if (!rw)
+        return false;
+
+    SDL_RWclose(rw);
+    return true;
+}

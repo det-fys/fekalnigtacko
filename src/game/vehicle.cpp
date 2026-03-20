@@ -13,10 +13,9 @@ static std::shared_ptr<const assets::VehicleModel> LoadVehicleModelByName(const 
     return assets::CacheManager::GetVehicleModel("data/" + model_name + ".veh");
 }
 
-game::Vehicle::Vehicle(World& world, std::string model_name, const glm::vec3& color)
-    : Entity(world, net::ET_VEHICLE), model_name_(model_name), model_(LoadVehicleModelByName(model_name)),
-      motion_(root_.local),
-      color_(color)
+game::Vehicle::Vehicle(World& world, const VehicleTuning& tuning)
+    : Entity(world, net::ET_VEHICLE), tuning_(tuning), model_(LoadVehicleModelByName(tuning.model)),
+      motion_(root_.local)
 {
     root_.local.position.z = 10.0f;
 
@@ -37,8 +36,8 @@ game::Vehicle::Vehicle(World& world, std::string model_name, const glm::vec3& co
     collision::SetObjectInfo(body_.get(), collision::OT_ENTITY, collision::OF_NOTIFY_CONTACT, this);
 
     // setup vehicle
-    btRaycastVehicle::btVehicleTuning tuning;
-    vehicle_ = std::make_unique<collision::RaycastVehicle>(tuning, body_.get(), &world_.GetVehicleRaycaster());
+    btRaycastVehicle::btVehicleTuning bt_tuning;
+    vehicle_ = std::make_unique<collision::RaycastVehicle>(bt_tuning, body_.get(), &world_.GetVehicleRaycaster());
     vehicle_->setCoordinateSystem(0, 2, 1);
 
     // setup wheels
@@ -76,7 +75,7 @@ game::Vehicle::Vehicle(World& world, std::string model_name, const glm::vec3& co
 
         btVector3 wheel_pos(wheeldef.position.x, wheeldef.position.y, wheeldef.position.z + wheel_z_offset_);
         auto& wi = vehicle_->addWheel(wheel_pos, wheelDirectionCS0, wheelAxleCS, suspensionRestLength, wheelRadius,
-                                      tuning, is_front);
+                                      bt_tuning, is_front);
 
         wi.m_suspensionStiffness = suspensionStiffness;
 
@@ -126,10 +125,9 @@ void game::Vehicle::SendInitData(Player& player, net::OutMessage& msg) const
 {
     Super::SendInitData(player, msg);
 
-    net::ModelName name(model_name_);
-    msg.Write(name);
-    net::WriteRGB(msg, color_); // primary color
-
+    msg.Write(net::ModelName(tuning_.model));
+    WriteTuning(msg);
+    
     // write state against default
     static const VehicleSyncState default_state;
     size_t fields_pos = msg.Reserve<VehicleSyncFieldFlags>();
@@ -552,4 +550,13 @@ void game::Vehicle::SendDeformMsg(const net::PositionQ& pos, const net::Position
     auto msg = BeginEntMsg(net::EMSG_DEFORM);
     net::WritePositionQ(msg, pos);
     net::WritePositionQ(msg, deform);
+}
+
+void game::Vehicle::WriteTuning(net::OutMessage& msg) const
+{
+    net::WriteRGB(msg, tuning_.primary_color);
+
+    // wheels
+    msg.Write<net::TuningPartIdx>(tuning_.wheels_idx);
+    net::WriteRGB(msg, tuning_.wheel_color);
 }

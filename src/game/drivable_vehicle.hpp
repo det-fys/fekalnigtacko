@@ -16,7 +16,7 @@ struct VehicleSeat
 class DrivableVehicle : public Vehicle, public Usable
 {
 public:
-    DrivableVehicle(World& world, std::string model_name, const glm::vec3& color);
+    DrivableVehicle(World& world, const VehicleTuning& tuning);
 
     virtual void Use(PlayerCharacter& character, uint32_t target_id) override;
 

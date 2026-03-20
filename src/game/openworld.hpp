@@ -4,6 +4,7 @@
 #include "vehicle.hpp"
 #include "character.hpp"
 #include "usable.hpp"
+#include "drivable_vehicle.hpp"
 
 #include <optional>
 
@@ -31,6 +32,7 @@ private:
     void CreatePlayerCharacter(Player& player);
     void RemovePlayerCharacter(Player& player);
     
+    game::DrivableVehicle& SpawnRandomVehicle();
     void SpawnBot();
 
 private:

@@ -18,6 +18,8 @@ set(COMMON_SOURCES
     "src/assets/model.cpp"
     "src/assets/skeleton.hpp"
     "src/assets/skeleton.cpp"
+    "src/assets/vehicle_tuning_list.hpp"
+    "src/assets/vehicle_tuning_list.cpp"
     "src/assets/vehiclemdl.hpp"
     "src/assets/vehiclemdl.cpp"
     "src/collision/dynamicsworld.hpp"

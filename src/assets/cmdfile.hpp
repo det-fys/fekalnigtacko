@@ -21,4 +21,6 @@ inline void ParseTransform(std::istringstream& iss, Transform& trans)
     iss >> trans.scale;
 }
 
+std::string ParseString(std::istringstream& iss);
+
 } // namespace assets

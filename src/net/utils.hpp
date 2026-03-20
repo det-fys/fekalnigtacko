@@ -126,6 +126,25 @@ inline bool ReadRGB(InMessage& msg, glm::vec3& color)
     return msg.Read<ColorQ>(color.r) && msg.Read<ColorQ>(color.g) && msg.Read<ColorQ>(color.b);
 }
 
+// COLOR 24bit
+inline void WriteRGB(OutMessage& msg, uint32_t color)
+{
+    msg.Write<uint8_t>(color & 0xFF);
+    msg.Write<uint8_t>((color >> 8) & 0xFF);
+    msg.Write<uint8_t>((color >> 16) & 0xFF);
+}
+
+inline bool ReadRGB(InMessage& msg, uint32_t& color)
+{
+    uint8_t r, g, b;
+    if (!msg.Read(r) || !msg.Read(g) || !msg.Read(b))
+        return false;
+
+    color = (b << 16) | (g << 8) | r;
+    return true;
+}
+
+
 // DELTA
 template <std::unsigned_integral T> requires (sizeof(T) == 1)
 inline void WriteDelta(OutMessage& msg, T previous, T current)

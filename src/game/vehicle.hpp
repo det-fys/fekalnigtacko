@@ -10,6 +10,7 @@
 #include "world.hpp"
 #include "vehicle_sync.hpp"
 #include "deform_grid.hpp"
+#include "vehicle_tuning.hpp"
 
 namespace game
 {
@@ -37,7 +38,7 @@ class Vehicle : public Entity
 public:
     using Super = Entity;
 
-    Vehicle(World& world, std::string model_name, const glm::vec3& color);
+    Vehicle(World& world, const VehicleTuning& tuning);
 
     virtual void Update() override;
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
@@ -55,9 +56,8 @@ public:
 
     void SetSteering(bool analog, float value = 0.0f);
 
-    const std::string& GetModelName() const { return model_name_; }
+    const std::string& GetModelName() const { return tuning_.model; }
     const std::shared_ptr<const assets::VehicleModel>& GetModel() const { return model_; }
-    const glm::vec3& GetColor() const { return color_; }
 
     virtual ~Vehicle();
 
@@ -74,10 +74,11 @@ private:
     void Deform(const glm::vec3& pos, const glm::vec3& deform, float radius);
     void SendDeformMsg(const net::PositionQ& pos, const net::PositionQ& deform);
 
+    void WriteTuning(net::OutMessage& msg) const;
+
 private:
-    std::string model_name_;
+    VehicleTuning tuning_;
     std::shared_ptr<const assets::VehicleModel> model_;
-    glm::vec3 color_;
 
     collision::MotionState motion_;
     std::unique_ptr<btRigidBody> body_;

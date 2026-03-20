@@ -12,8 +12,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
     : EntityView(world, msg)
 {
     net::ModelName modelname;
-    glm::vec3 color;
-    if (!msg.Read(modelname) || !net::ReadRGB(msg, color))
+    if (!msg.Read(modelname))
         throw EntityInitError();
 
     model_ = assets::CacheManager::GetVehicleModel("data/" + std::string(modelname) + ".veh");
@@ -28,14 +27,9 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
         wheels_[i].node.parent = &root_;
     }
     
-    color_ = glm::vec4(color, 1.0f);
+    if (!ReadTuning(msg) || !ReadState(&msg) || !ReadDeformSync(msg))
+        throw EntityInitError();
     
-    if (!ReadState(&msg))
-        throw EntityInitError();
-
-    if (!ReadDeformSync(msg))
-        throw EntityInitError();
-
     // init the other transform to identical
     root_trans_[0] = root_trans_[1];
     root_.local = root_trans_[0];
@@ -139,13 +133,14 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
     const auto& wheels = model_->GetWheels();
     for (size_t i = 0; i < wheels.size(); ++i)
     {
-        const auto& mesh = *wheels[i].model->GetMesh();
+        const auto& mesh = *wheels_[i].model->GetMesh();
 
         for (const auto& surface : mesh.surfaces)
         {
             gfx::DrawSurfaceCmd cmd;
             cmd.surface = &surface;
             cmd.matrices = &wheels_[i].node.matrix;
+            cmd.color = &wheels_[i].color;
             args.dlist.AddSurface(cmd);
         }
     }
@@ -187,6 +182,35 @@ void game::view::VehicleView::InitMesh()
     // }
 
     deform_->tex->SetData(deform_->grid.GetData());
+}
+
+bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
+{
+    uint32_t color, wheel_color;
+    net::TuningPartIdx wheel_idx;
+
+    const auto& tuninglist = model_->GetTuningList();
+
+    if (!net::ReadRGB(msg, color))
+        return false;
+
+    color_ = glm::unpackUnorm4x8(color);
+
+    // wheels
+    if (!msg.Read(wheel_idx) || !net::ReadRGB(msg, wheel_color))
+        return false;
+
+    auto wheelmodel = wheel_idx < tuninglist.wheels.size() ? assets::CacheManager::GetModel("data/" + tuninglist.wheels[wheel_idx].model + ".mdl") : nullptr;
+    glm::vec3 wheelcolor = glm::unpackUnorm4x8(wheel_color);
+
+    for (size_t i = 0; i < wheels_.size(); ++i)
+    {
+        auto& wheel = wheels_[i];
+        wheel.model = wheelmodel ? wheelmodel : model_->GetWheels()[i].model;
+        wheel.color = glm::vec4(wheelcolor, 1.0f);
+    }
+
+    return true;
 }
 
 bool game::view::VehicleView::ReadState(net::InMessage* msg)

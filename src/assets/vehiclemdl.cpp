@@ -48,6 +48,9 @@ std::shared_ptr<const assets::VehicleModel> assets::VehicleModel::LoadFromFile(c
         }
     });
 
+    // tuning list
+    veh->tuninglist_ = VehicleTuningList::LoadFromFile(filename + ".tun");
+
     return veh;
 }
 
