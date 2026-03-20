@@ -18,7 +18,7 @@ namespace game
 
 static const char* GetRandomCarModel()
 {
-    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat", "cow_static"};
+    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat", "cow_static", "pig_static"};
     return vehicles[rand() % (sizeof(vehicles) / sizeof(vehicles[0]))];
 }
 
