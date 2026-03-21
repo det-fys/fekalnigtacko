@@ -10,9 +10,11 @@
 namespace assets
 {
 
-void LoadCMDFile(const std::string& filename,
-                 const std::function<void(const std::string& command, std::istringstream& iss)>& handler);
+using CmdCallback = std::function<bool(const std::string& command, std::istringstream& iss)>;
+using CmdCallbackVoid = std::function<void(const std::string& command, std::istringstream& iss)>;
 
+void LoadCMDStream(std::istream& is, CmdCallback handler);
+void LoadCMDFile(const std::string& filename, CmdCallbackVoid handler);
 
 inline void ParseTransform(std::istringstream& iss, Transform& trans)
 {

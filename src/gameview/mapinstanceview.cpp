@@ -6,13 +6,36 @@
 
 game::view::MapInstanceView::MapInstanceView(const std::string& map_name) 
 {
-    map_ = assets::CacheManager::GetMap("data/" + map_name + ".map");
+    loader_ = std::make_unique<assets::MapLoader>("data/" + map_name + ".map");
+}
 
+void game::view::MapInstanceView::LoadNext()
+{
+    if (IsLoaded())
+        return;
+
+    if (loader_->Next())
+        return;
+
+    // just loaded
+    map_ = loader_->GetMap();
     objs_visible_.resize(map_->GetStaticObjects().size(), true);
+    loader_.reset();
+}
+
+int game::view::MapInstanceView::GetLoadingPercent() const
+{
+    if (!loader_)
+        return 100;
+
+    return loader_->GetPercent();
 }
 
 void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args) const
 {
+    if (!map_)
+        return;
+
     const auto& basemodel = map_->GetBaseModel();
 
     if (!basemodel || !basemodel->GetMesh())
@@ -40,8 +63,10 @@ void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args) const
 void game::view::MapInstanceView::EnableObj(net::ObjNum num, bool enable)
 {
     size_t i = static_cast<size_t>(num);
+
+    // map may be not loaded yet, in that case make the visible flag fit
     if (i >= objs_visible_.size())
-        return;
+        objs_visible_.resize(i + 1, true);
 
     objs_visible_[i] = enable;
 }

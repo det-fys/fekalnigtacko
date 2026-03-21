@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #include "game/transform_node.hpp"
 #include "model.hpp"
@@ -66,6 +67,46 @@ private:
     std::vector<Chunk> chunks_;
     std::vector<MapStaticObject> objs_;
     std::map<std::string, MapGraph> graphs_;
+
+    friend class MapLoader;
+};
+
+enum MapLoadingState
+{
+    ML_INIT,
+    ML_READ_MODELS,
+    ML_LOAD_BASEMODEL,
+    ML_LOAD_MODELS,
+    ML_STRUCTS,
+    ML_FINISHED,
+};
+
+class MapLoader
+{
+public:
+    MapLoader(const std::string& filename);
+
+    bool Next();
+    int GetPercent() const;
+
+    std::shared_ptr<const Map> GetMap() const;
+
+private:
+    void ReadModels();
+    void LoadBaseModel();
+    bool LoadNextModel();
+    void LoadStructs();
+    
+private:
+    std::istringstream map_iss_;
+
+    MapLoadingState state_ = ML_INIT;
+
+    std::string basemodel_name_;
+    std::vector<std::string> model_names_;
+    std::vector<std::shared_ptr<const Model>> models_;
+
+    std::shared_ptr<Map> map_;
 };
 
 } // namespace assets

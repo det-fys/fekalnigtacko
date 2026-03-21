@@ -6,6 +6,7 @@
 #include "characterview.hpp"
 #include "vehicleview.hpp"
 #include "client_session.hpp"
+#include "draw_args.hpp"
 
 game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) : 
     session_(session), audiomaster_(session_.GetAudioMaster()), map_("openworld")
@@ -68,6 +69,9 @@ void game::view::WorldView::Update(const UpdateInfo& info)
 {
     time_ = info.time;
 
+    if (!map_.IsLoaded())
+        map_.LoadNext();
+
     for (const auto& [entnum, ent] : ents_)
     {
         ent->TryUpdate(info);
@@ -76,6 +80,14 @@ void game::view::WorldView::Update(const UpdateInfo& info)
 
 void game::view::WorldView::Draw(const DrawArgs& args) const
 {
+    if (!map_.IsLoaded())
+    {
+        DrawLoadingScreen(args);
+        return;
+    }
+
+    args.env.clear_color = glm::vec3(0.5f, 0.7f, 1.0f);
+
     map_.Draw(args);
 
     for (const auto& [entnum, ent] : ents_)
@@ -117,6 +129,22 @@ game::view::EntityView* game::view::WorldView::GetEntity(net::EntNum entnum)
         return it->second.get();
 
     return nullptr;
+}
+
+void game::view::WorldView::DrawLoadingScreen(const DrawArgs& args) const
+{
+    float margin = 50.0f;
+    glm::vec2 size(400.0f, 15.0f);
+    glm::vec2 pos(margin, args.screen_size.y - margin - size.y);
+
+    int loaded_percent = map_.GetLoadingPercent();
+    float loaded = static_cast<float>(loaded_percent) * 0.01f;
+
+    args.gui.DrawRect(pos, pos + size, 0x77FFFFFF);
+    args.gui.DrawRect(pos, pos + glm::vec2(size.x * loaded, size.y), 0xFF00FFFF);
+
+    std::string load_text = std::to_string(loaded_percent) + "%";
+    args.gui.DrawTextAligned(load_text, pos + glm::vec2(size.x + 50.0f, size.y * 0.5f), glm::vec2(-0.5f, -0.5f));
 }
 
 bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)

@@ -3,67 +3,66 @@
 #include <memory>
 #include <span>
 
-#include "shader.hpp"
 #include "draw_list.hpp"
+#include "shader.hpp"
 
 namespace gfx
 {
-	struct DrawListParams
-	{
-        glm::vec3 cam_pos;
-		glm::mat4 view_proj;
-		size_t screen_width = 0;
-		size_t screen_height = 0;
-	};
 
-	struct MeshShader
-	{
-		std::unique_ptr<Shader> shader;
+struct DrawListEnvironmentParams
+{
+    glm::vec3 clear_color;    
+};
 
-		// cached state to avoid redundant uniform updates which are expensive especially on WebGL
-		bool global_setup = false;
-		glm::vec4 color = glm::vec4(-1.0f); // invalid to force initial setup
-		int flags = 0;
-	};
+struct DrawListParams
+{
+    DrawListEnvironmentParams env;
+    glm::vec3 cam_pos;
+    glm::mat4 view_proj;
+    size_t screen_width = 0;
+    size_t screen_height = 0;
+};
 
-	class Renderer
-	{
-	public:
-		Renderer();
+struct MeshShader
+{
+    std::unique_ptr<Shader> shader;
 
-		void Begin(size_t width, size_t height);
+    // cached state to avoid redundant uniform updates which are expensive especially on WebGL
+    bool global_setup = false;
+    glm::vec4 color = glm::vec4(-1.0f); // invalid to force initial setup
+    int flags = 0;
+};
 
-		void ClearColor(const glm::vec3& color);
-		void ClearDepth();
+class Renderer
+{
+public:
+    Renderer();
+    void DrawList(gfx::DrawList& list, const DrawListParams& params);
 
-		void DrawList(gfx::DrawList& list, const DrawListParams& params);
+private:
+    void SetupBeamVA();
 
-	private:
-		void SetupBeamVA();
+    void InvalidateShaders();
+    void InvalidateMeshShader(MeshShader& mshader);
+    void SetupMeshShader(MeshShader& mshader, const DrawListParams& params);
 
-		void InvalidateShaders();
-		void InvalidateMeshShader(MeshShader& mshader);
-		void SetupMeshShader(MeshShader& mshader, const DrawListParams& params);
+    void DrawSurfaceList(std::span<DrawSurfaceCmd> queue, const DrawListParams& params);
+    void DrawBeamList(std::span<DrawBeamCmd> queue, const DrawListParams& params);
+    void DrawHudList(std::span<DrawHudCmd> queue, const DrawListParams& params);
 
-		void DrawSurfaceList(std::span<DrawSurfaceCmd> queue, const DrawListParams& params);
-		void DrawBeamList(std::span<DrawBeamCmd> queue, const DrawListParams& params);
-		void DrawHudList(std::span<DrawHudCmd> queue, const DrawListParams& params);
+private:
+    MeshShader mesh_shader_;
+    MeshShader skel_mesh_shader_;
+    MeshShader deform_mesh_shader_;
+    std::unique_ptr<Shader> solid_shader_;
 
-	private:
-		MeshShader mesh_shader_;
-		MeshShader skel_mesh_shader_;
-		MeshShader deform_mesh_shader_;
-		std::unique_ptr<Shader> solid_shader_;
+    std::unique_ptr<BufferObject> beam_segments_vbo_;
+    std::unique_ptr<VertexArray> beam_va_;
+    std::unique_ptr<Shader> beam_shader_;
 
-		std::unique_ptr<BufferObject> beam_segments_vbo_;
-		std::unique_ptr<VertexArray> beam_va_;
-		std::unique_ptr<Shader> beam_shader_;
+    std::unique_ptr<Shader> hud_shader_;
 
-		std::unique_ptr<Shader> hud_shader_;
+    const Shader* current_shader_ = nullptr;
+};
 
-		const Shader* current_shader_ = nullptr;
-
-
-	};
-
-}
+} // namespace gfx

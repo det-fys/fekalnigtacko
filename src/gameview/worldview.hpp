@@ -33,6 +33,8 @@ public:
     audio::Master& GetAudioMaster() const { return audiomaster_; }
 
 private:
+    void DrawLoadingScreen(const DrawArgs& args) const;
+
     // msg handlers
     bool ProcessEntSpawnMsg(net::InMessage& msg);
     bool ProcessEntMsgMsg(net::InMessage& msg);

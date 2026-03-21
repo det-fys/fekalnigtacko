@@ -182,7 +182,7 @@ void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListPar
 
     // glm::mat4 fake_view_proj = glm::perspective(glm::radians(30.0f), aspect, 0.1f, 3000.0f) * view;
 
-    game::view::DrawArgs draw_args(dlist, gui, params.view_proj, eye, glm::ivec2(params.screen_width, params.screen_height), 500.0f);
+    game::view::DrawArgs draw_args(dlist, params.env, gui, params.view_proj, eye, glm::ivec2(params.screen_width, params.screen_height), 500.0f);
     world_->Draw(draw_args);
 
     glm::mat4 camera_world = glm::inverse(view);

@@ -38,16 +38,12 @@ void App::Frame()
 		session_->Update(updinfo);
 	}
 
-
-	renderer_.Begin(viewport_size_.x, viewport_size_.y);
-	renderer_.ClearColor(glm::vec3(0.5f, 0.7f, 1.0f));
-	renderer_.ClearDepth();
-
-	dlist_.Clear();
-	gfx::DrawListParams params;
+    gfx::DrawListParams params{};
 	params.screen_width = viewport_size_.x;
 	params.screen_height = viewport_size_.y;
+    params.env.clear_color = glm::vec3(0.1f);
 	
+	dlist_.Clear();
 	gui_.Begin();
 
 	// draw session

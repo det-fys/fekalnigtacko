@@ -28,8 +28,131 @@ static AABB3 TransformAABB(const AABB3& aabb, const glm::mat4& mat)
 
 std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& filename)
 {
-    auto map = std::make_shared<Map>();
+    MapLoader loader(filename);
+    while (loader.Next()) {}
+    return loader.GetMap();
+}
 
+const assets::MapGraph* assets::Map::GetGraph(const std::string& name) const
+{
+    auto it = graphs_.find(name);
+    if (it != graphs_.end())
+        return &it->second;
+    return nullptr;
+}
+
+// MapLoader
+
+assets::MapLoader::MapLoader(const std::string& filename) 
+    : map_iss_(fs::ReadFileAsStream(filename)), map_(std::make_shared<Map>())
+{
+}
+
+bool assets::MapLoader::Next()
+{
+    switch (state_)
+    {
+    case ML_INIT:
+        state_ = ML_READ_MODELS;
+        return true;
+
+    case ML_READ_MODELS:
+        ReadModels();
+        state_ = ML_LOAD_BASEMODEL;
+        return true;
+
+    case ML_LOAD_BASEMODEL:
+        LoadBaseModel();
+        state_ = ML_LOAD_MODELS;
+        return true;
+
+    case ML_LOAD_MODELS:
+        if (LoadNextModel())
+            return true;
+
+        state_ = ML_STRUCTS;
+        return true;
+
+    case ML_STRUCTS:
+        LoadStructs();
+        state_ = ML_FINISHED;
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+int assets::MapLoader::GetPercent() const
+{
+    switch (state_)
+    {
+    case ML_INIT:
+    case ML_READ_MODELS:
+        return 0;
+
+    case ML_LOAD_BASEMODEL:
+        return 10;
+
+    case ML_LOAD_MODELS:
+        return 60 + models_.size() * 30 / model_names_.size();
+
+    case ML_STRUCTS:
+        return 90;
+
+    default:
+        return 100;
+    }
+}
+
+std::shared_ptr<const assets::Map> assets::MapLoader::GetMap() const
+{
+    if (state_ != ML_FINISHED)
+        return nullptr;
+
+    return map_;
+}
+
+void assets::MapLoader::ReadModels()
+{
+    LoadCMDStream(map_iss_, [&](const std::string& command, std::istringstream& iss) {
+        if (command == "basemodel")
+        {
+            iss >> basemodel_name_;
+        }
+        else if (command == "model")
+        {
+            std::string model_name;
+            iss >> model_name;
+            model_names_.emplace_back(std::move(model_name));
+        }
+        else if (command == "endmodels")
+        {
+            return false;
+        }
+
+        return true;
+    });
+}
+
+void assets::MapLoader::LoadBaseModel()
+{
+    map_->basemodel_ = CacheManager::GetModel("data/" + basemodel_name_ + ".mdl");
+}
+
+bool assets::MapLoader::LoadNextModel()
+{
+    if (models_.size() >= model_names_.size())
+        return false;
+
+    const auto& model_name = model_names_[models_.size()];
+    models_.push_back(assets::CacheManager::GetModel("data/" + model_name + ".mdl"));
+    
+    return true;
+}
+
+void assets::MapLoader::LoadStructs()
+{
     MapGraph* graph = nullptr;
     std::vector<std::tuple<size_t, size_t>> graph_edges;
 
@@ -49,24 +172,20 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
 
     Chunk* chunk = nullptr;
 
-    LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
-        if (command == "basemodel")
-        {
-            std::string model_name;
-            iss >> model_name;
-
-            map->basemodel_ = CacheManager::GetModel("data/" + model_name + ".mdl");
-        }
-        else if (command == "static")
+    LoadCMDStream(map_iss_, [&](const std::string& command, std::istringstream& iss) {
+        if (command == "static")
         {
             if (!chunk)
                 throw std::runtime_error("static in map without chunk");
 
             MapStaticObject obj;
-            std::string model_name;
-            iss >> model_name;
+            size_t model_idx;
+            iss >> model_idx;
 
-            obj.model = assets::CacheManager::GetModel("data/" + model_name + ".mdl");
+            if (model_idx >= models_.size())
+                throw std::runtime_error("static in map with out of range model idx");
+
+            obj.model = models_[model_idx];
 
             glm::vec3 angles;
 
@@ -87,18 +206,18 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
                 }
             }
 
-            map->objs_.push_back(std::move(obj));
+            map_->objs_.push_back(std::move(obj));
             chunk->num_objs++;
         }
         else if (command == "chunk")
         {
             glm::ivec2 coord;
-            chunk = &map->chunks_.emplace_back();
+            chunk = &map_->chunks_.emplace_back();
             iss >> coord.x >> coord.y;
             iss >> chunk->aabb.min.x >> chunk->aabb.min.y >> chunk->aabb.min.z;
             iss >> chunk->aabb.max.x >> chunk->aabb.max.y >> chunk->aabb.max.z;
 
-            chunk->first_obj = map->objs_.size();
+            chunk->first_obj = map_->objs_.size();
         }
         else if (command == "surface")
         {
@@ -110,10 +229,10 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
                 throw std::runtime_error("surface in map without chunk");
 
 #ifdef CLIENT
-            if (!map->basemodel_)
+            if (!map_->basemodel_)
                 throw std::runtime_error("surface in map with no basemodel");
 
-            auto mesh = map->basemodel_->GetMesh();
+            auto mesh = map_->basemodel_->GetMesh();
 
             if (!mesh)
                 throw std::runtime_error("surface in map with no basemodel mesh");
@@ -138,7 +257,7 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
             std::string graph_name;
             iss >> graph_name;
 
-            graph = &map->graphs_[graph_name];
+            graph = &map_->graphs_[graph_name];
             graph_edges.clear();
         }
         else if (command == "n")
@@ -162,18 +281,11 @@ std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& 
 
             graph_edges.emplace_back(from_idx, to_idx);
         }
+
+        return true;
     });
 
     if (graph)
         ProcessGraph();
 
-    return map;
-}
-
-const assets::MapGraph* assets::Map::GetGraph(const std::string& name) const
-{
-    auto it = graphs_.find(name);
-    if (it != graphs_.end())
-        return &it->second;
-    return nullptr;
 }
