@@ -28,7 +28,7 @@ public:
     bool ProcessMsg(net::MessageType type, net::InMessage& msg);
     void Update();
 
-    void SetWorld(std::shared_ptr<World> world);
+    void SetWorld(World* world);
 
     void SetCamera(net::EntNum entnum);
     void SendChat(const std::string& text);
@@ -63,7 +63,7 @@ private:
     Game& game_;
     std::string name_;
 
-    std::shared_ptr<World> world_ = nullptr;
+    World* world_ = nullptr;
     World* known_world_ = nullptr;
     std::set<net::EntNum> known_ents_;
 

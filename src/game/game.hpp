@@ -34,11 +34,13 @@ public:
 private:
     void BroadcastChat(const std::string& text);
 
+    void MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld* new_world, const glm::vec3& pos, float yaw);
+
     EnterableWorld* FindPlayerWorld(Player& player) const;
 
 private:
     std::shared_ptr<OpenWorld> openworld_;
-
+    std::shared_ptr<EnterableWorld> testworld_;
 
     std::vector<World*> all_worlds_; // for common update etc.
     std::map<Player*, PlayerGameInfo> players_;

@@ -1,12 +1,27 @@
 #include "game.hpp"
 
-#include "player.hpp"
 #include "openworld.hpp"
+#include "player.hpp"
+
+static constexpr glm::vec3 openworld_spawn(100.0f, 100.0f, 5.0f);
+static constexpr glm::vec3 test_spawn(0.0f, 0.0f, 5.0f);
+
+static uint32_t GetRandomColor24()
+{
+    uint8_t r, g, b;
+    r = rand() % 256;
+    g = rand() % 256;
+    b = rand() % 256;
+    return (b << 16) | (g << 8) | r;
+}
 
 game::Game::Game()
 {
     openworld_ = std::make_shared<OpenWorld>();
     all_worlds_.push_back(openworld_.get());
+
+    testworld_ = std::make_shared<EnterableWorld>("testarena");
+    all_worlds_.push_back(testworld_.get());
 }
 
 void game::Game::Update()
@@ -29,12 +44,16 @@ void game::Game::PlayerJoined(Player& player)
 {
     BroadcastChat(player.GetName() + "^r se připoojil jupí jupí jupííí");
 
-    players_.insert({ &player, PlayerGameInfo(player) });
+    players_.insert({&player, PlayerGameInfo(player)});
     auto& player_info = players_.at(&player);
     player_info.world = openworld_.get();
-    player.SetWorld(openworld_);
+    player.SetWorld(openworld_.get());
 
-    openworld_->InsertPlayer(player, glm::vec3(100.0f, 100.0f, 5.0f), 0.0f);
+    CharacterTuning tuning{};
+    tuning.clothes.push_back({"tshirt", GetRandomColor24()});
+    tuning.clothes.push_back({"shorts", GetRandomColor24()});
+
+    openworld_->InsertPlayer(player, tuning, openworld_spawn, 0.0f);
 }
 
 void game::Game::PlayerViewAnglesChanged(Player& player, float yaw, float pitch)
@@ -46,9 +65,34 @@ void game::Game::PlayerViewAnglesChanged(Player& player, float yaw, float pitch)
 
 void game::Game::PlayerInput(Player& player, PlayerInputType type, bool enabled)
 {
-    auto world = FindPlayerWorld(player);
-    if (world)
-        world->PlayerInput(player, type, enabled);
+    switch (type)
+    {
+    case IN_DEBUG2: {
+        if (!enabled)
+            return;
+
+        auto& player_info = players_.at(&player);
+
+        if (player_info.world == openworld_.get())
+        {
+            MovePlayerToWorld(player_info, testworld_.get(), test_spawn, 0.0f);
+        }
+        else
+        {
+            MovePlayerToWorld(player_info, openworld_.get(), openworld_spawn, 0.0f);
+        }
+
+        break;
+    }
+
+    default: {
+        auto world = FindPlayerWorld(player);
+        if (world)
+            world->PlayerInput(player, type, enabled);
+
+        break;
+    }
+    }
 }
 
 void game::Game::PlayerLeft(Player& player)
@@ -68,6 +112,13 @@ void game::Game::BroadcastChat(const std::string& text)
     {
         player->SendChat(text);
     }
+}
+
+void game::Game::MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld* new_world, const glm::vec3& pos,
+                                   float yaw)
+{
+    player_info.world->MovePlayerToWorld(player_info.player, *new_world, pos, yaw);
+    player_info.world = new_world;
 }
 
 game::EnterableWorld* game::Game::FindPlayerWorld(Player& player) const

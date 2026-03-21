@@ -95,7 +95,7 @@ int assets::MapLoader::GetPercent() const
         return 10;
 
     case ML_LOAD_MODELS:
-        return 60 + models_.size() * 30 / model_names_.size();
+        return 60 + (model_names_.size() > 0 ? (models_.size() * 30 / model_names_.size()) : 30);
 
     case ML_STRUCTS:
         return 90;

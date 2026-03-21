@@ -30,10 +30,10 @@ bool game::Player::ProcessMsg(net::MessageType type, net::InMessage& msg)
 
 void game::Player::Update()
 {
-    if (world_.get() != known_world_)
+    if (world_ != known_world_)
     {
         SendWorldMsg();
-        known_world_ = world_.get();
+        known_world_ = world_;
         known_ents_.clear();
     }
 
@@ -44,12 +44,12 @@ void game::Player::Update()
     }
 }
 
-void game::Player::SetWorld(std::shared_ptr<World> world)
+void game::Player::SetWorld(World* world)
 {
     if (world == world_)
         return;
 
-    world_ = std::move(world);
+    world_ = world;
 }
 
 void game::Player::SetCamera(net::EntNum entnum)

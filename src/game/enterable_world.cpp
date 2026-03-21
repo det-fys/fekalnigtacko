@@ -1,20 +1,11 @@
 #include "enterable_world.hpp"
 #include "player_character.hpp"
 
-static uint32_t GetRandomColor24()
-{
-    uint8_t r,g,b;
-    r = rand() % 256;
-    g = rand() % 256;
-    b = rand() % 256;
-    return (b << 16) | (g << 8) | r;
-}
-
 game::EnterableWorld::EnterableWorld(std::string mapname) : World(std::move(mapname)) {}
 
-void game::EnterableWorld::InsertPlayer(Player& player, const glm::vec3& pos, float yaw)
+game::PlayerCharacter& game::EnterableWorld::InsertPlayer(Player& player, const CharacterTuning& tuning, const glm::vec3& pos, float yaw)
 {
-    CreatePlayerCharacter(player, pos, yaw);
+    return CreatePlayerCharacter(player, tuning, pos, yaw);
 }
 
 void game::EnterableWorld::PlayerInput(Player& player, PlayerInputType type, bool enabled)
@@ -35,11 +26,6 @@ void game::EnterableWorld::PlayerInput(Player& player, PlayerInputType type, boo
             else
                 character->SetPosition({100.0f, 100.0f, 5.0f});
         }
-        break;
-
-    case IN_DEBUG2:
-        if (enabled)
-            CreatePlayerCharacter(player, glm::vec3(100.0f, 100.0f, 5.0f), 0.0f);
         break;
 
     default:
@@ -65,13 +51,21 @@ void game::EnterableWorld::RemovePlayer(Player& player)
     RemovePlayerCharacter(player);
 }
 
-game::PlayerCharacter& game::EnterableWorld::CreatePlayerCharacter(Player& player, const glm::vec3& position, float yaw)
+game::PlayerCharacter& game::EnterableWorld::MovePlayerToWorld(Player& player, EnterableWorld& new_world, const glm::vec3& pos, float yaw)
+{
+    auto old_character = player_characters_.at(&player);
+    auto& tuning = old_character->GetTuning();
+    RemovePlayer(player);
+
+    player.SetWorld(&new_world);
+    auto& new_character = new_world.InsertPlayer(player, tuning, pos, yaw);
+
+    return new_character;
+}
+
+game::PlayerCharacter& game::EnterableWorld::CreatePlayerCharacter(Player& player, const CharacterTuning& tuning, const glm::vec3& position, float yaw)
 {
     RemovePlayerCharacter(player);
-
-    CharacterTuning tuning{};
-    tuning.clothes.push_back({ "tshirt", GetRandomColor24() });
-    tuning.clothes.push_back({ "shorts", GetRandomColor24() });
 
     auto& character = Spawn<PlayerCharacter>(player, tuning);
     character.SetPosition(position);
