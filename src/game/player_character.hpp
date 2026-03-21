@@ -20,12 +20,16 @@ public:
 
     void ProcessInput(PlayerInputType type, bool enabled);
 
+    void DetachFromPlayer();
+
+    Player* GetPlayer() const { return player_; }
+
 private:
     void UpdateInputs();
     void UpdateUseTarget();
 
 private:
-    Player& player_;
+    Player* player_;
 };
 
 

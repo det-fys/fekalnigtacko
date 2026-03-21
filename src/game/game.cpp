@@ -2,9 +2,10 @@
 
 #include "openworld.hpp"
 #include "player.hpp"
+#include "player_character.hpp"
 
-static constexpr glm::vec3 openworld_spawn(100.0f, 100.0f, 5.0f);
-static constexpr glm::vec3 test_spawn(0.0f, 0.0f, 5.0f);
+static constexpr glm::vec3 openworld_spawn(100.0f, 100.0f, 1.0f);
+static constexpr glm::vec3 test_spawn(0.0f, 0.0f, 1.0f);
 
 static uint32_t GetRandomColor24()
 {
@@ -75,11 +76,11 @@ void game::Game::PlayerInput(Player& player, PlayerInputType type, bool enabled)
 
         if (player_info.world == openworld_.get())
         {
-            MovePlayerToWorld(player_info, testworld_.get(), test_spawn, 0.0f);
+            MovePlayerToWorld(player_info, testworld_.get(), test_spawn, 0.0f, true);
         }
         else
         {
-            MovePlayerToWorld(player_info, openworld_.get(), openworld_spawn, 0.0f);
+            MovePlayerToWorld(player_info, openworld_.get(), openworld_spawn, 0.0f, true);
         }
 
         break;
@@ -115,9 +116,24 @@ void game::Game::BroadcastChat(const std::string& text)
 }
 
 void game::Game::MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld* new_world, const glm::vec3& pos,
-                                   float yaw)
+                                   float yaw, bool with_vehicle)
 {
-    player_info.world->MovePlayerToWorld(player_info.player, *new_world, pos, yaw);
+    auto& player = player_info.player;
+    auto& world = *player_info.world;
+
+    DrivableVehicle* vehicle = nullptr;
+
+    if (with_vehicle)
+    {
+        auto character = world.GetPlayerCharacter(player);
+        vehicle = character->GetVehicle();
+    }
+
+    if (vehicle)
+        world.MoveVehicleToWorld(*vehicle, *new_world, pos, yaw);
+    else
+        world.MovePlayerToWorld(player, *new_world, pos, yaw);
+
     player_info.world = new_world;
 }
 

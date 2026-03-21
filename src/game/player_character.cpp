@@ -1,7 +1,7 @@
 #include "player_character.hpp"
 #include "world.hpp"
 
-game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const CharacterTuning& tuning) : Super(world, tuning), player_(player)
+game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const CharacterTuning& tuning) : Super(world, tuning), player_(&player)
 {
     EnablePhysics(true);
     VehicleChanged();
@@ -18,13 +18,16 @@ void game::PlayerCharacter::Update()
 
 void game::PlayerCharacter::VehicleChanged()
 {
+    if (!player_)
+        return;
+
     if (vehicle_)
     {
-        player_.SetCamera(vehicle_->GetEntNum());
+        player_->SetCamera(vehicle_->GetEntNum());
     }
     else
     {
-        player_.SetCamera(GetEntNum());
+        player_->SetCamera(GetEntNum());
     }
 
     UpdateInputs();
@@ -59,9 +62,14 @@ void game::PlayerCharacter::ProcessInput(PlayerInputType type, bool enabled)
     }
 }
 
+void game::PlayerCharacter::DetachFromPlayer()
+{
+    player_ = nullptr;
+}
+
 void game::PlayerCharacter::UpdateInputs()
 {
-    auto in = player_.GetInput();
+    auto in = player_ ? player_->GetInput() : 0;
     CharacterInputFlags c_in = 0;
     VehicleInputFlags v_in = 0;
 

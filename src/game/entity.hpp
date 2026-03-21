@@ -24,6 +24,8 @@ public:
     net::EntNum GetEntNum() const { return entnum_; }
     net::EntType GetViewType() const { return viewtype_; }
 
+    World& GetWorld() const { return world_; }
+
     virtual void SendInitData(Player& player, net::OutMessage& msg) const;
 
     virtual void Update();

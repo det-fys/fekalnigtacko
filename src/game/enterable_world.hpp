@@ -1,13 +1,14 @@
 #pragma once
 
 #include "world.hpp"
-#include "drivable_vehicle.hpp"
 
 namespace game
 {
 
 class Player;
 class PlayerCharacter;
+class CharacterTuning;
+class DrivableVehicle;
 
 class EnterableWorld : public World
 {
@@ -22,6 +23,9 @@ public:
 
     // moves
     PlayerCharacter& MovePlayerToWorld(Player& player, EnterableWorld& new_world, const glm::vec3& pos, float yaw);
+    void MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& new_world, const glm::vec3& pos, float yaw);
+
+    PlayerCharacter* GetPlayerCharacter(Player& player);
 
 private:
     PlayerCharacter& CreatePlayerCharacter(Player& player, const CharacterTuning& tuning, const glm::vec3& position, float yaw);

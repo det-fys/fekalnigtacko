@@ -22,6 +22,9 @@ public:
 
     bool SetPassenger(uint32_t seat_idx, ControllableCharacter* character);
 
+    size_t GetNumSeats() const { return seats_.size(); }
+    ControllableCharacter* GetPassenger(size_t idx) const { return seats_[idx].occupant; }
+
     ~DrivableVehicle() override;
 
 private:

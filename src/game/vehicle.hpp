@@ -58,6 +58,7 @@ public:
 
     const std::string& GetModelName() const { return tuning_.model; }
     const std::shared_ptr<const assets::VehicleModel>& GetModel() const { return model_; }
+    const VehicleTuning& GetTuning() const { return tuning_; }
 
     virtual ~Vehicle();
 
