@@ -1,5 +1,5 @@
 #include "player_character.hpp"
-#include "openworld.hpp"
+#include "world.hpp"
 
 game::PlayerCharacter::PlayerCharacter(World& world, Player& player) : Super(world), player_(player)
 {

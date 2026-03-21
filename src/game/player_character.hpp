@@ -2,11 +2,10 @@
 
 #include "drivable_vehicle.hpp"
 #include "player.hpp"
+#include "world.hpp"
 
 namespace game
 {
-
-class OpenWorld;
 
 class PlayerCharacter : public ControllableCharacter
 {

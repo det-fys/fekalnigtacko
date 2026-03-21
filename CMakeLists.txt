@@ -130,6 +130,8 @@ set(SERVER_ONLY_SOURCES
     "src/game/destroyed_object.cpp"
     "src/game/drivable_vehicle.hpp"
     "src/game/drivable_vehicle.cpp"
+    "src/game/enterable_world.hpp"
+    "src/game/enterable_world.cpp"
     "src/game/entity.hpp"
     "src/game/entity.cpp"
     "src/game/game.hpp"

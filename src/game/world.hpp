@@ -37,13 +37,7 @@ public:
     virtual void Update(int64_t delta_time);
     void FinishFrame();
 
-    // events
-    virtual void PlayerJoined(Player& player) {}
-    virtual void PlayerInput(Player& player, PlayerInputType type, bool enabled) {}
-    virtual void PlayerViewAnglesChanged(Player& player, float yaw, float pitch) {}
-    virtual void PlayerLeft(Player& player) {}
-
-    virtual void DestructibleDestroyed(net::ObjNum num, std::unique_ptr<MapObjectCollision> col) {}
+    virtual void DestructibleDestroyed(net::ObjNum num, std::unique_ptr<MapObjectCollision> col);
 
     Entity* GetEntity(net::EntNum entnum);
 

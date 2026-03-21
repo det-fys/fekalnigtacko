@@ -45,10 +45,8 @@ static uint32_t GetRandomColor24()
     return (b << 16) | (g << 8) | r;
 }
 
-game::OpenWorld::OpenWorld() : World("openworld")
+game::OpenWorld::OpenWorld() : EnterableWorld("openworld")
 {
-    srand(time(NULL));
-
     // spawn bots
     for (size_t i = 0; i < 100; ++i)
     {
@@ -81,64 +79,6 @@ game::OpenWorld::OpenWorld() : World("openworld")
 
 }
 
-void game::OpenWorld::Update(int64_t delta_time)
-{
-    World::Update(delta_time);
-
-}
-
-void game::OpenWorld::PlayerJoined(Player& player)
-{
-    CreatePlayerCharacter(player);
-}
-
-void game::OpenWorld::PlayerInput(Player& player, PlayerInputType type, bool enabled)
-{
-    auto character = player_characters_.at(&player);
-
-    switch (type)
-    {
-    case IN_DEBUG1:
-        if (enabled)
-        {
-            if (character->GetVehicle())
-                character->GetVehicle()->SetPosition({100.0f, 100.0f, 5.0f});
-            else
-                character->SetPosition({100.0f, 100.0f, 5.0f});
-        }
-        break;
-
-    case IN_DEBUG2:
-        if (enabled)
-            CreatePlayerCharacter(player);
-        break;
-
-    default:
-        character->ProcessInput(type, enabled);
-        break;
-    }
-}
-
-void game::OpenWorld::PlayerViewAnglesChanged(Player& player, float yaw, float pitch)
-{
-    auto character = player_characters_.at(&player);
-    character->SetForwardYaw(yaw);
-}
-
-void game::OpenWorld::PlayerLeft(Player& player)
-{
-    RemovePlayerCharacter(player);
-}
-
-void game::OpenWorld::DestructibleDestroyed(net::ObjNum num, std::unique_ptr<MapObjectCollision> col)
-{
-    auto& destroyed_obj = Spawn<DestroyedObject>(std::move(col));
-
-    Schedule(120000, [this, num] {
-        RespawnObj(num);
-    });
-}
-
 template <class T, typename... TArgs>
 static T& SpawnRandomCharacter(game::OpenWorld& world, TArgs&&... args)
 {
@@ -149,27 +89,6 @@ static T& SpawnRandomCharacter(game::OpenWorld& world, TArgs&&... args)
     character.AddClothes("shorts", GetRandomColor());
 
     return character;
-}
-
-void game::OpenWorld::CreatePlayerCharacter(Player& player)
-{
-    RemovePlayerCharacter(player);
-
-    auto& character = SpawnRandomCharacter<PlayerCharacter>(*this, player);
-    // character.SetNametag("player (" + std::to_string(character.GetEntNum()) + ")");
-    character.SetPosition({100.0f, 100.0f, 5.0f});
-
-    player_characters_[&player] = &character;
-}
-
-void game::OpenWorld::RemovePlayerCharacter(Player& player)
-{
-    auto it = player_characters_.find(&player);
-    if (it != player_characters_.end())
-    {
-        it->second->Remove();
-        player_characters_.erase(it);
-    }
 }
 
 game::DrivableVehicle& game::OpenWorld::SpawnRandomVehicle()

@@ -5,43 +5,76 @@
 
 game::Game::Game()
 {
-    default_world_ = std::make_shared<OpenWorld>();
-
+    openworld_ = std::make_shared<OpenWorld>();
+    all_worlds_.push_back(openworld_.get());
 }
 
 void game::Game::Update()
 {
-    default_world_->Update(40);
+    for (auto world : all_worlds_)
+    {
+        world->Update(40);
+    }
 }
 
 void game::Game::FinishFrame()
 {
-    default_world_->FinishFrame();
+    for (auto world : all_worlds_)
+    {
+        world->FinishFrame();
+    }
 }
 
 void game::Game::PlayerJoined(Player& player)
 {
-    player.SetWorld(default_world_);
-
-    players_.insert(&player);
     BroadcastChat(player.GetName() + "^r se připoojil jupí jupí jupííí");
+
+    players_.insert({ &player, PlayerGameInfo(player) });
+    auto& player_info = players_.at(&player);
+    player_info.world = openworld_.get();
+    player.SetWorld(openworld_);
+
+    openworld_->InsertPlayer(player, glm::vec3(100.0f, 100.0f, 5.0f), 0.0f);
+}
+
+void game::Game::PlayerViewAnglesChanged(Player& player, float yaw, float pitch)
+{
+    auto world = FindPlayerWorld(player);
+    if (world)
+        world->PlayerViewAnglesChanged(player, yaw, pitch);
+}
+
+void game::Game::PlayerInput(Player& player, PlayerInputType type, bool enabled)
+{
+    auto world = FindPlayerWorld(player);
+    if (world)
+        world->PlayerInput(player, type, enabled);
 }
 
 void game::Game::PlayerLeft(Player& player)
 {
-    players_.erase(&player);
-    BroadcastChat(player.GetName() + "^r se vodpojil zmrd");
-}
+    auto world = FindPlayerWorld(player);
+    if (world)
+        world->RemovePlayer(player);
 
-bool game::Game::PlayerInput(Player& player, PlayerInputType type, bool enabled)
-{
-    return false; // not handled here
+    players_.erase(&player);
+
+    BroadcastChat(player.GetName() + "^r se vodpojil zmrd");
 }
 
 void game::Game::BroadcastChat(const std::string& text)
 {
-    for (auto player : players_)
+    for (auto& [player, info] : players_)
     {
         player->SendChat(text);
     }
+}
+
+game::EnterableWorld* game::Game::FindPlayerWorld(Player& player) const
+{
+    auto it = players_.find(&player);
+    if (it == players_.end())
+        return nullptr;
+
+    return it->second.world;
 }

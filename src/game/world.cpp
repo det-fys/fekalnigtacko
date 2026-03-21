@@ -6,6 +6,7 @@
 #include "assets/cache.hpp"
 #include "utils/allocnum.hpp"
 #include "collision/object_info.hpp"
+#include "destroyed_object.hpp"
 
 game::World::World(std::string mapname) : Scheduler(time_ms_), map_(*this, std::move(mapname))
 {
@@ -76,6 +77,15 @@ void game::World::FinishFrame()
         ent->FinalizeFrame();
     }
 
+}
+
+void game::World::DestructibleDestroyed(net::ObjNum num, std::unique_ptr<MapObjectCollision> col)
+{
+    auto& destroyed_obj = Spawn<DestroyedObject>(std::move(col));
+
+    Schedule(120000, [this, num] {
+        RespawnObj(num);
+    });
 }
 
 game::Entity* game::World::GetEntity(net::EntNum entnum)

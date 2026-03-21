@@ -1,20 +1,23 @@
 #pragma once
 
 #include <set>
+#include <memory>
+
+#include <glm/glm.hpp>
 
 #include "net/defs.hpp"
 #include "net/inmessage.hpp"
 #include "net/msg_producer.hpp"
+#include "utils/defs.hpp"
 
 #include "player_input.hpp"
-#include "game.hpp"
 
 namespace game
 {
 
+class Game;
 class World;
 class Entity;
-class Vehicle;
 
 class Player : public net::MsgProducer
 {

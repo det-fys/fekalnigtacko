@@ -1,14 +1,22 @@
 #pragma once
 
 #include <map>
-#include <set>
 
-#include "world.hpp"
+#include "enterable_world.hpp"
+#include "openworld.hpp"
 
 namespace game
 {
 
 class Player;
+
+struct PlayerGameInfo
+{
+    Player& player;
+    EnterableWorld* world = nullptr;
+
+    PlayerGameInfo(Player& player) : player(player) {}
+};
 
 class Game
 {
@@ -19,15 +27,21 @@ public:
     void FinishFrame();
 
     void PlayerJoined(Player& player);
+    void PlayerViewAnglesChanged(Player& player, float yaw, float pitch);
+    void PlayerInput(Player& player, PlayerInputType type, bool enabled);
     void PlayerLeft(Player& player);
-    bool PlayerInput(Player& player, PlayerInputType type, bool enabled);
 
 private:
     void BroadcastChat(const std::string& text);
 
+    EnterableWorld* FindPlayerWorld(Player& player) const;
+
 private:
-    std::shared_ptr<World> default_world_;
-    std::set<Player*> players_;
+    std::shared_ptr<OpenWorld> openworld_;
+
+
+    std::vector<World*> all_worlds_; // for common update etc.
+    std::map<Player*, PlayerGameInfo> players_;
 
 };
 

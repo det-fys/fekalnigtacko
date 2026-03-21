@@ -17,6 +17,8 @@ void sv::Server::Run()
 {
     using namespace std::chrono_literals;
 
+    srand(time(NULL));
+
     auto t_start = std::chrono::steady_clock::now();
     auto t_next = t_start;
     auto t_prev = t_start;

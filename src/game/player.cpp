@@ -6,6 +6,7 @@
 #include <glm/gtx/norm.hpp>
 
 #include "world.hpp"
+#include "game.hpp"
 
 game::Player::Player(Game& game, std::string name) : game_(game), name_(std::move(name))
 {
@@ -48,13 +49,7 @@ void game::Player::SetWorld(std::shared_ptr<World> world)
     if (world == world_)
         return;
 
-    if (world_)
-        world_->PlayerLeft(*this);
-
     world_ = std::move(world);
-
-    if (world_)
-        world_->PlayerJoined(*this);
 }
 
 void game::Player::SetCamera(net::EntNum entnum)
@@ -74,7 +69,6 @@ void game::Player::SendChat(const std::string& text)
 
 game::Player::~Player()
 {
-    SetWorld(nullptr);
     game_.PlayerLeft(*this);
 }
 
@@ -247,9 +241,7 @@ bool game::Player::ProcessViewAnglesMsg(net::InMessage& msg)
     view_yaw_ = yaw_q.Decode();
     view_pitch_ = pitch_q.Decode();
     
-    if (world_)
-        world_->PlayerViewAnglesChanged(*this, view_yaw_, view_pitch_);
-        
+    game_.PlayerViewAnglesChanged(*this, view_yaw_, view_pitch_);    
     return true;
 }
 
@@ -260,10 +252,6 @@ void game::Player::Input(PlayerInputType type, bool enabled)
     else
         in_ &= ~(1 << type);
 
-    if (!game_.PlayerInput(*this, type, enabled))
-    {
-        if (world_)
-            world_->PlayerInput(*this, type, enabled);
-    }
+    game_.PlayerInput(*this, type, enabled);
 }
 
