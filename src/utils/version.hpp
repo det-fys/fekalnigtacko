@@ -1,3 +1,3 @@
 #pragma once
 
-#define FEKAL_VERSION 2026032001
+#define FEKAL_VERSION 2026032101
