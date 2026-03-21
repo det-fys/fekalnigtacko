@@ -21,10 +21,6 @@ public:
     virtual void PlayerViewAnglesChanged(Player& player, float yaw, float pitch);
     virtual void RemovePlayer(Player& player);
 
-    // moves
-    PlayerCharacter& MovePlayerToWorld(Player& player, EnterableWorld& new_world, const glm::vec3& pos, float yaw);
-    void MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& new_world, const glm::vec3& pos, float yaw);
-
     PlayerCharacter* GetPlayerCharacter(Player& player);
 
 private:

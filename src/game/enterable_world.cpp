@@ -53,52 +53,6 @@ void game::EnterableWorld::RemovePlayer(Player& player)
     RemovePlayerCharacter(player);
 }
 
-game::PlayerCharacter& game::EnterableWorld::MovePlayerToWorld(Player& player, EnterableWorld& new_world, const glm::vec3& pos, float yaw)
-{
-    auto old_character = player_characters_.at(&player);
-    auto& tuning = old_character->GetTuning();
-    RemovePlayer(player);
-
-    player.SetWorld(&new_world);
-    auto& new_character = new_world.InsertPlayer(player, tuning, pos, yaw);
-
-    return new_character;
-}
-
-void game::EnterableWorld::MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& new_world, const glm::vec3& pos,
-                                              float yaw)
-{
-    if (&vehicle.GetWorld() != this)
-        throw std::runtime_error("Attempt to move vehicle from other world");
-
-    auto& tuning = vehicle.GetTuning();
-    auto& new_vehicle = new_world.Spawn<DrivableVehicle>(tuning);
-    new_vehicle.SetPosition(pos);
-    // TODO: yaw
-
-    // move passengers
-    size_t num_seats = vehicle.GetNumSeats();
-    for (size_t i = 0; i < num_seats; ++i)
-    {
-        auto passenger = vehicle.GetPassenger(i);
-        if (!passenger)
-            continue; // empty seat
-
-        auto player_passenger = dynamic_cast<PlayerCharacter*>(passenger);
-        if (!player_passenger)
-            continue; // not player but npc, will be ejected automatically upon vehicle deletion
-
-        auto player = player_passenger->GetPlayer();
-        if (!player)
-            continue; // moved already or sth
-
-        auto& new_character = MovePlayerToWorld(*player, new_world, glm::vec3(0.0f), 0.0f);
-        new_character.SetVehicle(&new_vehicle, i);
-    }
-
-    vehicle.Remove();
-}
-
 game::PlayerCharacter* game::EnterableWorld::GetPlayerCharacter(Player& player)
 {
     auto it = player_characters_.find(&player);
@@ -122,10 +76,16 @@ game::PlayerCharacter& game::EnterableWorld::CreatePlayerCharacter(Player& playe
 
 void game::EnterableWorld::RemovePlayerCharacter(Player& player)
 {
-    auto character = GetPlayerCharacter(player);
+    auto it = player_characters_.find(&player);
+    if (it == player_characters_.end())
+        return;
+
+    auto character = it->second;
     if (character)
     {
         character->DetachFromPlayer();
         character->Remove();
     }
+
+    player_characters_.erase(it);
 }

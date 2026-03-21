@@ -115,6 +115,57 @@ void game::Game::BroadcastChat(const std::string& text)
     }
 }
 
+game::PlayerCharacter& game::Game::MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld& new_world,
+                                                     const glm::vec3& pos, float yaw)
+{
+    auto& player = player_info.player;
+    auto& old_world = *player_info.world;
+
+    auto old_character = old_world.GetPlayerCharacter(player); 
+    auto& tuning = old_character->GetTuning();
+    old_world.RemovePlayer(player);
+
+    player.SetWorld(&new_world);
+    auto& new_character = new_world.InsertPlayer(player, tuning, pos, yaw);
+
+    player_info.world = &new_world;
+
+    return new_character;
+}
+
+void game::Game::MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& new_world, const glm::vec3& pos,
+                                    float yaw)
+{
+    auto& tuning = vehicle.GetTuning();
+    auto& new_vehicle = new_world.Spawn<DrivableVehicle>(tuning);
+    new_vehicle.SetPosition(pos);
+    // TODO: yaw
+
+    // move passengers
+    size_t num_seats = vehicle.GetNumSeats();
+    for (size_t i = 0; i < num_seats; ++i)
+    {
+        auto passenger = vehicle.GetPassenger(i);
+        if (!passenger)
+            continue; // empty seat
+
+        auto player_passenger = dynamic_cast<PlayerCharacter*>(passenger);
+        if (!player_passenger)
+            continue; // not player but npc, will be ejected automatically upon vehicle deletion
+
+        auto player = player_passenger->GetPlayer();
+        if (!player)
+            continue; // moved already or sth
+
+        auto& player_info = GetPlayerInfo(*player);
+
+        auto& new_character = MovePlayerToWorld(player_info, new_world, glm::vec3(0.0f), 0.0f);
+        new_character.SetVehicle(&new_vehicle, i);
+    }
+
+    vehicle.Remove();
+}
+
 void game::Game::MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld* new_world, const glm::vec3& pos,
                                    float yaw, bool with_vehicle)
 {
@@ -130,11 +181,16 @@ void game::Game::MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld* 
     }
 
     if (vehicle)
-        world.MoveVehicleToWorld(*vehicle, *new_world, pos, yaw);
+        MoveVehicleToWorld(*vehicle, *new_world, pos, yaw);
     else
-        world.MovePlayerToWorld(player, *new_world, pos, yaw);
+        MovePlayerToWorld(player_info, *new_world, pos, yaw);
 
     player_info.world = new_world;
+}
+
+game::PlayerGameInfo& game::Game::GetPlayerInfo(Player& player)
+{
+    return players_.at(&player);
 }
 
 game::EnterableWorld* game::Game::FindPlayerWorld(Player& player) const

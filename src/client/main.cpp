@@ -204,6 +204,7 @@ static void PollEvents()
 #ifndef NDEBUG
 #define USE_LOCAL_SERVER
 #endif
+#define USE_LOCAL_SERVER
 
 #ifdef USE_LOCAL_SERVER
 #define WS_URL "ws://127.0.0.1:11200/ws"

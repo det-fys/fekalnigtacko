@@ -34,8 +34,12 @@ public:
 private:
     void BroadcastChat(const std::string& text);
 
+    PlayerCharacter& MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld& new_world, const glm::vec3& pos, float yaw);
+    void MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& new_world, const glm::vec3& pos, float yaw);
+
     void MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld* new_world, const glm::vec3& pos, float yaw, bool with_vehicle = false);
 
+    PlayerGameInfo& GetPlayerInfo(Player& player);
     EnterableWorld* FindPlayerWorld(Player& player) const;
 
 private:
