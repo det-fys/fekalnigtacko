@@ -48,7 +48,7 @@ private:
 private:
     ClientSession& session_;
     
-    MapInstanceView map_;
+    std::unique_ptr<MapInstanceView> map_;
     std::map<net::EntNum, std::unique_ptr<EntityView>> ents_;
     
     float time_ = 0.0f;

@@ -9,11 +9,13 @@
 #include "draw_args.hpp"
 
 game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) : 
-    session_(session), audiomaster_(session_.GetAudioMaster()), map_("openworld")
+    session_(session), audiomaster_(session_.GetAudioMaster())
 {
     net::MapName mapname;
     if (!msg.Read(mapname))
         throw EntityInitError();
+
+    map_ = std::make_unique<MapInstanceView>(std::string(mapname));
 
     // init destroyed objs
     net::ObjCount objcount;
@@ -26,7 +28,7 @@ game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) :
         if (!msg.Read(objnum))
             throw EntityInitError();
 
-        map_.EnableObj(objnum, false);
+        map_->EnableObj(objnum, false);
     }
 
     // cache common snds and stuff
@@ -69,8 +71,8 @@ void game::view::WorldView::Update(const UpdateInfo& info)
 {
     time_ = info.time;
 
-    if (!map_.IsLoaded())
-        map_.LoadNext();
+    if (!map_->IsLoaded())
+        map_->LoadNext();
 
     for (const auto& [entnum, ent] : ents_)
     {
@@ -80,7 +82,7 @@ void game::view::WorldView::Update(const UpdateInfo& info)
 
 void game::view::WorldView::Draw(const DrawArgs& args) const
 {
-    if (!map_.IsLoaded())
+    if (!map_->IsLoaded())
     {
         DrawLoadingScreen(args);
         return;
@@ -88,7 +90,7 @@ void game::view::WorldView::Draw(const DrawArgs& args) const
 
     args.env.clear_color = glm::vec3(0.5f, 0.7f, 1.0f);
 
-    map_.Draw(args);
+    map_->Draw(args);
 
     for (const auto& [entnum, ent] : ents_)
     {
@@ -137,7 +139,7 @@ void game::view::WorldView::DrawLoadingScreen(const DrawArgs& args) const
     glm::vec2 size(400.0f, 15.0f);
     glm::vec2 pos(margin, args.screen_size.y - margin - size.y);
 
-    int loaded_percent = map_.GetLoadingPercent();
+    int loaded_percent = map_->GetLoadingPercent();
     float loaded = static_cast<float>(loaded_percent) * 0.01f;
 
     args.gui.DrawRect(pos, pos + size, 0x77FFFFFF);
@@ -267,7 +269,7 @@ bool game::view::WorldView::ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, b
     if (!msg.Read(objnum))
         return false;
 
-    map_.EnableObj(objnum, enable);
+    map_->EnableObj(objnum, enable);
     return true;
 }
 
