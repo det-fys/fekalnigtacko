@@ -35,6 +35,8 @@ void game::Player::Update()
         SendWorldMsg();
         known_world_ = world_;
         known_ents_.clear();
+
+        return; // send updates next frame
     }
 
     if (world_)
