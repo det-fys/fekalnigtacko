@@ -5,7 +5,7 @@
 #include <array>
 #include <iostream>
 
-game::NpcCharacter::NpcCharacter(World& world) : Super(world) {
+game::NpcCharacter::NpcCharacter(World& world, const CharacterTuning& tuning) : Super(world, tuning) {
     VehicleChanged();
 }
 

@@ -6,6 +6,7 @@
 #include "character_anim_state.hpp"
 #include "character_sync.hpp"
 #include "entity.hpp"
+#include "character_tuning.hpp"
 
 namespace game
 {
@@ -20,25 +21,6 @@ enum CharacterInputType
     CIN_RIGHT,
     CIN_JUMP,
     CIN_SPRINT,
-};
-
-struct CapsuleShape
-{
-    float radius;
-    float height;
-
-    CapsuleShape(float radius, float height) : radius(radius), height(height) {}
-};
-
-struct CharacterInfo
-{
-    CapsuleShape shape = CapsuleShape(0.3f, 0.75f);
-};
-
-struct CharacterClothes
-{
-    std::string name;
-    glm::vec3 color;
 };
 
 class CharacterPhysicsController
@@ -65,10 +47,12 @@ class Character : public Entity
 public:
     using Super = Entity;
 
-    Character(World& world, const CharacterInfo& info);
+    Character(World& world, const CharacterTuning& tuning);
 
     virtual void Update() override;
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
+
+    const CharacterTuning& GetTuning() const { return tuning_; }
 
     void EnablePhysics(bool enable);
 
@@ -79,8 +63,6 @@ public:
     void SetYaw(float yaw) { yaw_ = yaw; }
 
     void SetPosition(const glm::vec3& position);
-
-    void AddClothes(std::string name, const glm::vec3& color);
 
     void SetMainAnim(const std::string& anim_name);
 
@@ -100,7 +82,7 @@ private:
     assets::AnimIdx GetAnim(const std::string& name) const;
 
 private:
-    CapsuleShape shape_;
+    CharacterTuning tuning_;
 
     // glm::vec3 position_ = glm::vec3(0.0f);
     // glm::vec3 velocity_ = glm::vec3(0.0f);
@@ -121,8 +103,6 @@ private:
 
     CharacterSyncState sync_[2];
     size_t sync_current_ = 0;
-
-    std::vector<CharacterClothes> clothes_;
 };
 
 } // namespace game

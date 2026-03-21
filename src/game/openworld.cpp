@@ -79,18 +79,6 @@ game::OpenWorld::OpenWorld() : EnterableWorld("openworld")
 
 }
 
-template <class T, typename... TArgs>
-static T& SpawnRandomCharacter(game::OpenWorld& world, TArgs&&... args)
-{
-    auto& character = world.Spawn<T>(std::forward<TArgs>(args)...);
-
-    // add clothes
-    character.AddClothes("tshirt", GetRandomColor());
-    character.AddClothes("shorts", GetRandomColor());
-
-    return character;
-}
-
 game::DrivableVehicle& game::OpenWorld::SpawnRandomVehicle()
 {
     game::VehicleTuning tuning;
@@ -117,6 +105,10 @@ void game::OpenWorld::SpawnBot()
     auto& vehicle = SpawnRandomVehicle();
     vehicle.SetPosition(roads->nodes[start_node].position + glm::vec3{0.0f, 0.0f, 5.0f});
 
-    auto& driver = SpawnRandomCharacter<NpcCharacter>(*this);
+    CharacterTuning npc_tuning;
+    npc_tuning.clothes.push_back({ "tshirt", GetRandomColor24() });
+    npc_tuning.clothes.push_back({ "shorts", GetRandomColor24() });
+
+    auto& driver = Spawn<NpcCharacter>(npc_tuning);
     driver.SetVehicle(&vehicle, 0);
 }

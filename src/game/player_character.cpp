@@ -1,7 +1,7 @@
 #include "player_character.hpp"
 #include "world.hpp"
 
-game::PlayerCharacter::PlayerCharacter(World& world, Player& player) : Super(world), player_(player)
+game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const CharacterTuning& tuning) : Super(world, tuning), player_(player)
 {
     EnablePhysics(true);
     VehicleChanged();

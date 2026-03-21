@@ -13,7 +13,7 @@ class NpcCharacter : public ControllableCharacter
 public:
     using Super = ControllableCharacter;
 
-    NpcCharacter(World& world);
+    NpcCharacter(World& world, const CharacterTuning& tuning);
 
     virtual void VehicleChanged() override;
 

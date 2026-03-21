@@ -1,7 +1,7 @@
 #include "controllable_character.hpp"
 #include "drivable_vehicle.hpp"
 
-game::ControllableCharacter::ControllableCharacter(World& world) : Character(world, CharacterInfo{}) {}
+game::ControllableCharacter::ControllableCharacter(World& world, const CharacterTuning& tuning) : Character(world, tuning) {}
 
 void game::ControllableCharacter::SetVehicle(DrivableVehicle* vehicle, uint32_t seat)
 {

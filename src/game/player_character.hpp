@@ -12,7 +12,7 @@ class PlayerCharacter : public ControllableCharacter
 public:
     using Super = ControllableCharacter;
 
-    PlayerCharacter(World& world, Player& player);
+    PlayerCharacter(World& world, Player& player, const CharacterTuning& tuning);
 
     virtual void Update() override;
 

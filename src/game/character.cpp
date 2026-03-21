@@ -4,10 +4,10 @@
 #include "utils/math.hpp"
 #include "world.hpp"
 
-game::Character::Character(World& world, const CharacterInfo& info)
-    : Super(world, net::ET_CHARACTER), shape_(info.shape), bt_shape_(shape_.radius, shape_.height)
+game::Character::Character(World& world, const CharacterTuning& tuning)
+    : Super(world, net::ET_CHARACTER), tuning_(tuning), bt_shape_(tuning_.shape.radius, tuning_.shape.height)
 {
-    z_offset_ = shape_.height * 0.5f + shape_.radius - 0.05f;
+    z_offset_ = tuning_.shape.height * 0.5f + tuning_.shape.radius - 0.05f;
 
     sk_ = SkeletonInstance(assets::CacheManager::GetSkeleton("data/human.sk"), &root_);
     animstate_.idle_anim_idx = GetAnim("idle");
@@ -53,8 +53,8 @@ void game::Character::SendInitData(Player& player, net::OutMessage& msg) const
     Super::SendInitData(player, msg);
 
     // write clothes
-    msg.Write<net::NumClothes>(clothes_.size());
-    for (const auto& clothes : clothes_)
+    msg.Write<net::NumClothes>(tuning_.clothes.size());
+    for (const auto& clothes : tuning_.clothes)
     {
         msg.Write(net::ClothesName(clothes.name));
         net::WriteRGB(msg, clothes.color);
@@ -118,11 +118,6 @@ void game::Character::SetPosition(const glm::vec3& position)
 {
     root_.local.position = position;
     SyncControllerTransform();
-}
-
-void game::Character::AddClothes(std::string name, const glm::vec3& color)
-{
-    clothes_.emplace_back(std::move(name), color);
 }
 
 void game::Character::SetMainAnim(const std::string& anim_name)

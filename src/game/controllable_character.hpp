@@ -12,7 +12,7 @@ class ControllableCharacter : public Character
 public:
     using Super = Character;
     
-    ControllableCharacter(World& world);
+    ControllableCharacter(World& world, const CharacterTuning& tuning);
     
     void SetVehicle(DrivableVehicle* vehicle, uint32_t seat);
     

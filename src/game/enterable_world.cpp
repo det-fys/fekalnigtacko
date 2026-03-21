@@ -1,18 +1,13 @@
 #include "enterable_world.hpp"
 #include "player_character.hpp"
 
-static glm::vec3 GetRandomColor()
+static uint32_t GetRandomColor24()
 {
-    glm::vec3 color;
-    // shittiest way to do it
-    for (int i = 0; i < 3; ++i)
-    {
-        net::ColorQ qcol;
-        qcol.value = rand() % 256;
-        color[i] = qcol.Decode();
-    }
-
-    return color;
+    uint8_t r,g,b;
+    r = rand() % 256;
+    g = rand() % 256;
+    b = rand() % 256;
+    return (b << 16) | (g << 8) | r;
 }
 
 game::EnterableWorld::EnterableWorld(std::string mapname) : World(std::move(mapname)) {}
@@ -74,11 +69,11 @@ game::PlayerCharacter& game::EnterableWorld::CreatePlayerCharacter(Player& playe
 {
     RemovePlayerCharacter(player);
 
-    auto& character = Spawn<PlayerCharacter>(player);
-    character.AddClothes("tshirt", GetRandomColor());
-    character.AddClothes("shorts", GetRandomColor());
+    CharacterTuning tuning{};
+    tuning.clothes.push_back({ "tshirt", GetRandomColor24() });
+    tuning.clothes.push_back({ "shorts", GetRandomColor24() });
 
-    // character.SetNametag("player (" + std::to_string(character.GetEntNum()) + ")");
+    auto& character = Spawn<PlayerCharacter>(player, tuning);
     character.SetPosition(position);
     character.SetYaw(yaw);
 
