@@ -52,6 +52,8 @@ public:
     virtual void Update() override;
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
 
+    virtual void Attach(net::EntNum parentnum) override;
+
     const CharacterTuning& GetTuning() const { return tuning_; }
 
     void EnablePhysics(bool enable);

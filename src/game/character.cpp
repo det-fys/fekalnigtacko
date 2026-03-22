@@ -67,6 +67,18 @@ void game::Character::SendInitData(Player& player, net::OutMessage& msg) const
     msg.WriteAt(fields_pos, fields);
 }
 
+void game::Character::Attach(net::EntNum parentnum)
+{
+    Super::Attach(parentnum);
+
+    // remake these if already updated
+    if (IsUpToDate())
+    {
+        UpdateSyncState();
+        SendUpdateMsg();
+    }
+}
+
 void game::Character::EnablePhysics(bool enable)
 {
     if (enable && !controller_)

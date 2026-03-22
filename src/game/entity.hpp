@@ -29,8 +29,8 @@ public:
     virtual void SendInitData(Player& player, net::OutMessage& msg) const;
 
     virtual void Update();
+    bool IsUpToDate() const { return up_to_date_; }
     bool TryUpdate(); // if not already updated
-    int64_t GetUpdateTime() const { return upd_time_; }
  
     std::span<const char> GetUpdateMsg() const { return update_msg_buf_; }
 
@@ -38,7 +38,7 @@ public:
 
     void SetNametag(const std::string& nametag);
      
-    void Attach(net::EntNum parentnum);
+    virtual void Attach(net::EntNum parentnum);
     net::EntNum GetParentNum() const { return parentnum_; }
 
     void PlaySound(const std::string& name, float volume = 1.0f, float pitch = 1.0f);
@@ -78,8 +78,8 @@ protected:
     bool removed_ = false;
 
 private:
-    int64_t upd_time_ = -1;
-    
+    bool up_to_date_ = false;
+
     std::vector<char> update_msg_buf_;
 
     std::string nametag_;

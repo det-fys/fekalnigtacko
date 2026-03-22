@@ -12,7 +12,7 @@ void game::Entity::SendInitData(Player& player, net::OutMessage& msg) const
 
 void game::Entity::Update()
 {
-    upd_time_ = world_.GetTime();
+    up_to_date_ = true;
 
     // ensure parent is updated
     parent_ = nullptr;
@@ -32,8 +32,7 @@ void game::Entity::Update()
 
 bool game::Entity::TryUpdate()
 {
-    int64_t time = world_.GetTime();
-    if (time == upd_time_)
+    if (IsUpToDate())
         return false;
 
     Update();
@@ -44,6 +43,7 @@ void game::Entity::FinalizeFrame()
 {
     ResetMsg();
     DiscardUpdateMsg();
+    up_to_date_ = false;
 }
 
 void game::Entity::SetNametag(const std::string& nametag)
