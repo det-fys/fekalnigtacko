@@ -27,9 +27,19 @@ public:
 private:
     void UpdateInputs();
     void UpdateUseTarget();
+    void UseChanged(bool enabled);
+    void SendUseTargetInfo();
 
 private:
     Player* player_;
+
+    // use target
+    const UseTarget* use_target_ = nullptr;
+    bool use_enabled_ = false;
+    float use_delay_ = 0.0f;
+    const char* use_error_ = nullptr;
+    bool using_ = false; // not drugs lol
+    float use_progress_ = 0.0f;
 };
 
 

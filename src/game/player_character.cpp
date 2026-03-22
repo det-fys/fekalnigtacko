@@ -7,13 +7,14 @@ game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const Chara
     VehicleChanged();
 
     SetNametag(player.GetName());
+
+    SendUseTargetInfo();
 }
 
 void game::PlayerCharacter::Update()
 {
-    Super::Update();
-
     UpdateUseTarget();
+    Super::Update();
 }
 
 void game::PlayerCharacter::VehicleChanged()
@@ -38,23 +39,7 @@ void game::PlayerCharacter::ProcessInput(PlayerInputType type, bool enabled)
     switch (type)
     {
     case IN_USE:
-        if (enabled)
-        {
-            if (!vehicle_)
-            {
-                UseTargetQueryResult res;
-                auto use_target = world_.GetBestUseTarget(*this, res);
-                if (use_target)
-                {
-                    use_target->usable->Use(*this, use_target->id);
-                }
-            }
-            else
-            {
-                SetVehicle(nullptr, 0);
-            }
-
-        }
+        UseChanged(enabled);
         break;
 
     default:
@@ -123,4 +108,72 @@ void game::PlayerCharacter::UpdateInputs()
     }
 }
 
-void game::PlayerCharacter::UpdateUseTarget() {}
+void game::PlayerCharacter::UpdateUseTarget()
+{
+    UseTargetQueryResult res{};
+    auto new_use_target = world_.GetBestUseTarget(*this, res);
+
+    if (new_use_target != use_target_ || res.enabled != use_enabled_ || res.error_text != use_error_ || res.delay != use_delay_)
+    {
+        use_target_ = new_use_target;
+        use_enabled_ = res.enabled;
+        use_delay_ = res.delay;
+        use_error_ = res.error_text;
+        use_progress_ = 0.0f;
+        using_ = false;
+        
+        SendUseTargetInfo();
+    }
+
+    if (use_target_ && using_)
+    {
+        use_progress_ += 0.04f;
+        if (use_progress_ >= use_delay_)
+        {
+            using_ = false;
+            use_progress_ = 0.0f;
+            use_target_->usable->Use(*this, use_target_->id);
+        }
+    }
+
+}
+
+void game::PlayerCharacter::UseChanged(bool enabled)
+{
+    if (!use_target_)
+    {
+        if (vehicle_ && enabled)
+            SetVehicle(nullptr, 0);// no use target and in vehicle -> exit
+
+        return;
+    }
+
+    use_progress_ = 0.0f;
+    bool change = using_ != enabled;
+    using_ = enabled;
+
+    if (change)
+        SendUseTargetInfo();
+
+}
+
+void game::PlayerCharacter::SendUseTargetInfo()
+{
+    if (!player_)
+        return;
+
+    if (!use_target_)
+    {
+        player_->SendChat("už nejde nic použít");
+        return;
+    }
+
+    std::string msg = "[E] " + use_target_->desc;
+
+    if (using_)
+    {
+        msg += " (zbývá " + std::to_string(use_delay_ - use_progress_) + ")";
+    }
+
+    player_->SendChat(msg);
+}

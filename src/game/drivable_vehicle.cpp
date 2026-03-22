@@ -19,7 +19,7 @@ bool game::DrivableVehicle::QueryUseTarget(PlayerCharacter& character, uint32_t 
     res.error_text = nullptr;
     
     bool seat_occupied = seats_[target_id].occupant != nullptr;
-    res.delay = seat_occupied ? 2.0f : 0.0f;
+    res.delay = seat_occupied ? 2.0f : 0.25f;
 
     return true;
 }
