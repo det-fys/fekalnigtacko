@@ -21,8 +21,9 @@ void gui::UseTargetHud::Draw(Context& ctx) const
         return;
 
     bool active = start_time_ != end_time_;
+    uint32_t text_color = (!error_text_.empty()) ? 0xFFCCCCCC : (active ? 0xFF00FFFF : 0xFFFFFFFF);
 
-    const float spacing = 20.0f;
+    const float spacing = 10.0f;
     glm::vec2 key_size(30.0f);
     glm::vec2 text_size = ctx.MeasureText(text_);
     float total_width = key_size.x + spacing + text_size.x;
@@ -52,13 +53,13 @@ void gui::UseTargetHud::Draw(Context& ctx) const
     
     // draw key text
     static constexpr std::string_view key_text = "E";
-    ctx.DrawTextAligned(key_text, bg_p0 + key_size * 0.5f, glm::vec2(-0.5f, -0.5f));
+    ctx.DrawTextAligned(key_text, bg_p0 + key_size * 0.5f, glm::vec2(-0.5f, -0.5f), text_color);
     
     x += key_size.x + spacing;
 
     // draw text
     glm::vec2 text_p(x, center_y - text_size.y * 0.5f);
-    ctx.DrawText(text_, text_p);
+    ctx.DrawText(text_, text_p, text_color);
     
     x += text_size.x + spacing;
     
@@ -66,7 +67,7 @@ void gui::UseTargetHud::Draw(Context& ctx) const
     if (!error_text_.empty())
     {
         glm::vec2 error_text_p(x, center_y - error_size.y * 0.5f);
-        ctx.DrawText(error_text_, error_text_p);
+        ctx.DrawText(error_text_, error_text_p, 0xFF7777FF);
     
         x += error_size.x + spacing;
     }
