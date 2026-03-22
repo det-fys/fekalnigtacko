@@ -71,8 +71,28 @@ game::DrivableVehicle::~DrivableVehicle()
     }
 }
 
+static char HexChar(uint32_t val)
+{
+    if (val < 10)
+        return '0' + val;
+    
+    return 'a' + (val - 10);
+}
+
+static std::string GetColorTextPrefix(uint32_t color)
+{
+    std::string res = "^000";
+    res[1] = HexChar((color >> 4) & 0xF);
+    res[2] = HexChar((color >> 12) & 0xF);
+    res[3] = HexChar((color >> 20) & 0xF);
+    return res;
+}
+
 void game::DrivableVehicle::InitSeats()
 {
+    uint32_t color = GetTuning().primary_color;
+    std::string prefix = "vlízt do " + GetColorTextPrefix(color) + GetModelName() + "^r";
+
     const auto& veh = *GetModel();
     for (char c = '0'; c <= '9'; ++c)
     {
@@ -82,9 +102,10 @@ void game::DrivableVehicle::InitSeats()
 
         VehicleSeat seat{};
         seat.position = trans->position;
+        seat.position.z += 1.0f; // the original pos is for animated character which is under vehicle
         seats_.emplace_back(seat);
 
         uint32_t id = seats_.size() - 1;
-        use_targets_.emplace_back(this, id, seat.position, "vlízt do " + GetModelName() + " (místo " + std::to_string(id) + ")");
+        use_targets_.emplace_back(this, id, seat.position, prefix + " (místo " + std::to_string(id + 1) + ")");
     }
 }
