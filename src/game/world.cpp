@@ -134,7 +134,7 @@ struct UseTargetAabbCallback : public btBroadphaseAabbCallback
             glm::vec3 pos_world = matrix * glm::vec4(target.position, 1.0f);
 
             float dist = glm::distance(pos, pos_world);
-            if (dist < 3.0f && dist < best_dist)
+            if (dist < 2.0f && dist < best_dist)
             {
                 if (!usable->QueryUseTarget(character, target.id, best_res))
                     continue;
