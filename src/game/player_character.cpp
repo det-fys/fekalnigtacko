@@ -125,7 +125,7 @@ void game::PlayerCharacter::UpdateUseTarget()
         SendUseTargetInfo();
     }
 
-    if (use_target_ && using_)
+    if (use_target_ && use_enabled_ && using_)
     {
         use_progress_ += 0.04f;
         if (use_progress_ >= use_delay_)
@@ -149,6 +149,10 @@ void game::PlayerCharacter::UseChanged(bool enabled)
     }
 
     use_progress_ = 0.0f;
+
+    if (!use_enabled_)
+        return;
+
     bool change = using_ != enabled;
     using_ = enabled;
 
