@@ -44,7 +44,7 @@ void App::Frame()
     params.env.clear_color = glm::vec3(0.1f);
 	
 	dlist_.Clear();
-	gui_.Begin();
+	gui_.Begin(viewport_size_);
 
 	// draw session
 	if (session_)

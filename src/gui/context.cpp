@@ -10,11 +10,13 @@ gui::Context::Context(gfx::DrawList& dlist, std::shared_ptr<const Font> default_
     white_tex_ = assets::CacheManager::GetTexture("data/white.png");
 }
 
-void gui::Context::Begin()
+void gui::Context::Begin(const glm::vec2& viewport_size)
 {
     vertices_.clear();
     indices_.clear();
     ranges_.clear();
+
+    viewport_size_ = viewport_size;
 }
 
 void gui::Context::DrawRect(const glm::vec2& p0, const glm::vec2& p1, uint32_t color)

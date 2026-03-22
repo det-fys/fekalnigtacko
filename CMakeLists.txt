@@ -118,6 +118,8 @@ set(CLIENT_ONLY_SOURCES
     "src/gui/font.cpp"
     "src/gui/menu.hpp"
     "src/gui/menu.cpp"
+    "src/gui/use_target_hud.hpp"
+    "src/gui/use_target_hud.cpp"
     "src/utils/files.cpp"
 )
 

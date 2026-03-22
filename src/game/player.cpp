@@ -69,6 +69,14 @@ void game::Player::SendChat(const std::string& text)
     msg.Write(chatm);
 }
 
+void game::Player::SetUseTarget(const std::string& text, const std::string& error_text, float delay)
+{
+    auto msg = BeginMsg(net::MSG_USETARGET);
+    msg.Write(net::UseTargetName(text));
+    msg.Write(net::UseTargetName(error_text));
+    msg.Write<net::UseDelayQ>(delay);
+}
+
 game::Player::~Player()
 {
     game_.PlayerLeft(*this);

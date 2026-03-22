@@ -32,7 +32,7 @@ class Context
 public:
     Context(gfx::DrawList& dlist, std::shared_ptr<const Font> default_font);
 
-    void Begin();
+    void Begin(const glm::vec2& viewport_size);
 
     void DrawRect(const glm::vec2& p0, const glm::vec2& p1, uint32_t color);
 
@@ -43,6 +43,8 @@ public:
     void Render();
 
     const std::shared_ptr<const Font>& GetFont() const { return font_; }
+
+    const glm::vec2& GetViewportSize() const { return viewport_size_; }
     
 private:
     void BeginTexture(const gfx::Texture* texture);
@@ -61,7 +63,7 @@ private:
     std::vector<uint32_t> indices_;
     std::vector<GuiRange> ranges_;
 
-    
+    glm::vec2 viewport_size_ = glm::vec2(1.0f);
 };
 
 

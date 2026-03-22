@@ -164,16 +164,13 @@ void game::PlayerCharacter::SendUseTargetInfo()
 
     if (!use_target_)
     {
-        player_->SendChat("už nejde nic použít");
+        player_->SetUseTarget(std::string(), std::string(), 0.0f);
         return;
     }
 
-    std::string msg = "[E] " + use_target_->desc;
+    std::string error_text;
+    if (use_error_)
+        error_text = use_error_;
 
-    if (using_)
-    {
-        msg += " (zbývá " + std::to_string(use_delay_ - use_progress_) + ")";
-    }
-
-    player_->SendChat(msg);
+    player_->SetUseTarget(use_target_->desc, error_text, using_ ? use_delay_ - use_progress_ : 0.0f);
 }

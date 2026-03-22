@@ -7,7 +7,7 @@
 #include "vehicleview.hpp"
 #include "utils/version.hpp"
 
-game::view::ClientSession::ClientSession(App& app) : app_(app)
+game::view::ClientSession::ClientSession(App& app) : app_(app), use_target_hud_(app.GetTime())
 {
 	// send login
 	auto msg = BeginMsg(net::MSG_ID);
@@ -45,6 +45,9 @@ bool game::view::ClientSession::ProcessSingleMessage(net::MessageType type, net:
 
     case net::MSG_CHAT:
         return ProcessChatMsg(msg);
+
+    case net::MSG_USETARGET:
+        return ProcessUseTargetMsg(msg);
 
     default:
         // try pass the msg to world
@@ -97,6 +100,8 @@ void game::view::ClientSession::Draw(gfx::DrawList& dlist, gfx::DrawListParams& 
     {
         DrawWorld(dlist, params, gui);
     }
+
+    use_target_hud_.Draw(gui);
 }
 
 void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) const
@@ -163,6 +168,18 @@ bool game::view::ClientSession::ProcessChatMsg(net::InMessage& msg)
         return false;
 
     app_.AddChatMessagePrefix("Server", chatm);
+    return true;
+}
+
+bool game::view::ClientSession::ProcessUseTargetMsg(net::InMessage& msg)
+{
+    net::UseTargetName text, error_text;
+    float delay;
+
+    if (!msg.Read(text) || !msg.Read(error_text) || !msg.Read<net::UseDelayQ>(delay))
+        return false;
+
+    use_target_hud_.SetData(text, error_text, delay);
     return true;
 }
 

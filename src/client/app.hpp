@@ -40,7 +40,7 @@ public:
     void Input(game::PlayerInputType in, bool pressed, bool repeated);
     void MouseMove(const glm::vec2& delta);
 
-    float GetTime() const { return time_; }
+    const float& GetTime() const { return time_; }
     float GetDeltaTime() const { return delta_time_; }
 
     game::view::ClientSession* GetSession() { return session_.get(); }

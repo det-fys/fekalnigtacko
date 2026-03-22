@@ -34,6 +34,9 @@ enum MessageType : uint8_t
     // CAM <EntNum>
     MSG_CAM,
 
+    // USETARGET ...
+    MSG_USETARGET,
+
     /*~~~~~~~~ Entity ~~~~~~~~*/
     // ENTSPAWN <EntNum> <EntType> data...
     MSG_ENTSPAWN,
@@ -132,11 +135,13 @@ using ObjCount = ObjNum;
 using NumTexels = uint16_t;
 
 // version
-
 using Version = uint32_t;
 
 // tuning
-
 using TuningPartIdx = uint8_t;
+
+// use target
+using UseTargetName = FixedStr<128>;
+using UseDelayQ = Quantized<uint8_t, 0, 10>;
 
 } // namespace net

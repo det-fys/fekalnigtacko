@@ -32,6 +32,7 @@ public:
 
     void SetCamera(net::EntNum entnum);
     void SendChat(const std::string& text);
+    void SetUseTarget(const std::string& text, const std::string& error_text, float delay);
 
     const std::string& GetName() const { return name_; }
 

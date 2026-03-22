@@ -10,6 +10,7 @@
 #include "net/inmessage.hpp"
 #include "net/msg_producer.hpp"
 #include "game/player_input.hpp"
+#include "gui/use_target_hud.hpp"
 
 class App;
 
@@ -39,6 +40,7 @@ private:
     bool ProcessWorldMsg(net::InMessage& msg);
     bool ProcessCameraMsg(net::InMessage& msg);
     bool ProcessChatMsg(net::InMessage& msg);
+    bool ProcessUseTargetMsg(net::InMessage& msg);
 
     void DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui);
     
@@ -56,6 +58,8 @@ private:
     net::ViewYawQ view_yaw_q_;
     net::ViewPitchQ view_pitch_q_;
     float last_send_time_ = 0.0f;
+
+    gui::UseTargetHud use_target_hud_;
 };
 
 } // namespace game::view

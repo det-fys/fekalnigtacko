@@ -26,6 +26,7 @@ public:
 
 private:
     void UpdateInputs();
+    
     void UpdateUseTarget();
     void UseChanged(bool enabled);
     void SendUseTargetInfo();
