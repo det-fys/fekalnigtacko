@@ -87,7 +87,7 @@ glm::vec2 gui::Context::MeasureText(std::string_view text)
 
     glm::vec2 cursor(0.0f);
 
-    while (cp = DecodeUTF8Codepoint(p, end))
+    while ((cp = DecodeUTF8Codepoint(p, end)))
     {
         if (cp == ' ')
         {
@@ -151,7 +151,7 @@ void gui::Context::DrawText(std::string_view text, const glm::vec2& pos, uint32_
 
     uint32_t curr_color = color;
 
-    while (cp = DecodeUTF8Codepoint(p, end))
+    while ((cp = DecodeUTF8Codepoint(p, end)))
     {
         if (cp == ' ')
         {
