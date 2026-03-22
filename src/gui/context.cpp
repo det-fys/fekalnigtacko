@@ -83,7 +83,7 @@ glm::vec2 gui::Context::MeasureText(std::string_view text)
 
     uint32_t cp = 0;
     const float line_height = font_->GetLineHeight();
-    float space_size = line_height * 0.3f;
+    float space_size = glm::floor(line_height * 0.3f);
 
     glm::vec2 cursor(0.0f);
 
@@ -142,7 +142,7 @@ void gui::Context::DrawText(std::string_view text, const glm::vec2& pos, uint32_
 
     uint32_t cp = 0;
     const float line_height = font_->GetLineHeight() * scale;
-    float space_size = line_height * 0.3f;
+    float space_size = glm::floor(line_height * 0.3f);
 
     glm::vec2 cursor = pos;
 
