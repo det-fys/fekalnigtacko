@@ -146,6 +146,9 @@ void gui::Context::DrawText(std::string_view text, const glm::vec2& pos, uint32_
 
     glm::vec2 cursor = pos;
 
+    if (scale == 1.0f)
+        cursor = glm::floor(cursor);
+
     uint32_t curr_color = color;
 
     while (cp = DecodeUTF8Codepoint(p, end))
