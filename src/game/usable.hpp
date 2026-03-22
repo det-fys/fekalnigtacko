@@ -12,7 +12,7 @@ class Usable;
 struct UseTarget
 {
     Usable* usable;
-    uint32_t id = 0;
+    uint32_t id;
     glm::vec3 position;
     std::string desc;
 
@@ -22,17 +22,29 @@ struct UseTarget
     }
 };
 
+struct UseTargetQueryResult
+{
+    bool enabled;
+    const char* error_text;
+    float delay;
+};
+
 class PlayerCharacter;
 
 class Usable
 {
 public:
-    const std::vector<UseTarget>& GetUseTargets() const { return use_targets_; }
+    Usable(const glm::mat4& ws_matrix) : matrix_(ws_matrix) {}
 
+    const std::vector<UseTarget>& GetUseTargets() const { return use_targets_; }
+    const glm::mat4& GetWSTransformMatrix() const { return matrix_; }
+    
+    virtual bool QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res) = 0;
     virtual void Use(PlayerCharacter& character, uint32_t target_id) = 0;
 
 protected:
     std::vector<UseTarget> use_targets_;
+    const glm::mat4& matrix_;
 };
 
 } // namespace game

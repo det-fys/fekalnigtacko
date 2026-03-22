@@ -2,9 +2,26 @@
 #include "player_character.hpp"
 #include "utils/random.hpp"
 
-game::DrivableVehicle::DrivableVehicle(World& world, const VehicleTuning& tuning) : Vehicle(world, tuning)
+game::DrivableVehicle::DrivableVehicle(World& world, const VehicleTuning& tuning) : Vehicle(world, tuning), Usable(GetRoot().matrix)
 {
     InitSeats();
+
+    // make body usable
+    collision::AddObjectFlags(&GetBtBody(), collision::OF_USABLE);
+}
+
+bool game::DrivableVehicle::QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res)
+{
+    if (character.GetVehicle())
+        return false; // already in vehicle
+
+    res.enabled = true;
+    res.error_text = nullptr;
+    
+    bool seat_occupied = seats_[target_id].occupant != nullptr;
+    res.delay = seat_occupied ? 2.0f : 0.0f;
+
+    return true;
 }
 
 void game::DrivableVehicle::Use(PlayerCharacter& character, uint32_t target_id)

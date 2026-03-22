@@ -19,6 +19,7 @@ enum ObjectFlag : ObjectFlags
 {
     OF_DESTRUCTIBLE = 0x01,
     OF_NOTIFY_CONTACT = 0x02,
+    OF_USABLE = 0x04,
 };
 
 struct ContactInfo
@@ -45,12 +46,16 @@ inline void SetObjectInfo(btCollisionObject* obj, ObjectType type, ObjectFlags f
     obj->setUserPointer(callback);
 }
 
+inline void AddObjectFlags(btCollisionObject* obj, ObjectFlags flags)
+{
+    obj->setUserIndex2(static_cast<int>(static_cast<ObjectFlags>(obj->getUserIndex2())) | flags);
+}
+
 inline void GetObjectInfo(const btCollisionObject* obj, ObjectType& type, ObjectFlags& flags, ObjectCallback*& callback)
 {
     type = static_cast<ObjectType>(obj->getUserIndex());
     flags = static_cast<ObjectFlags>(obj->getUserIndex2());
     callback = static_cast<ObjectCallback*>(obj->getUserPointer());
 }
-
 
 }

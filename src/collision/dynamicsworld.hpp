@@ -17,6 +17,7 @@ public:
     
     btDynamicsWorld& GetBtWorld() { return bt_world_; }
     const btDynamicsWorld& GetBtWorld() const { return bt_world_; }
+    btDbvtBroadphase& GetBtBroadphase() { return bt_broadphase_; }
     btVehicleRaycaster& GetVehicleRaycaster() { return bt_veh_raycaster_; }
 
 private:

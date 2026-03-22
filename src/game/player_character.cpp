@@ -42,7 +42,8 @@ void game::PlayerCharacter::ProcessInput(PlayerInputType type, bool enabled)
         {
             if (!vehicle_)
             {
-                auto use_target = world_.GetBestUseTarget(GetRootTransform().position);
+                UseTargetQueryResult res;
+                auto use_target = world_.GetBestUseTarget(*this, res);
                 if (use_target)
                 {
                     use_target->usable->Use(*this, use_target->id);

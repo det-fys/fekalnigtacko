@@ -43,7 +43,7 @@ public:
 
     void RespawnObj(net::ObjNum objnum);
 
-    const UseTarget* GetBestUseTarget(const glm::vec3& pos) const;
+    const UseTarget* GetBestUseTarget(game::PlayerCharacter& character, UseTargetQueryResult& res);
 
     const assets::Map& GetMap() const { return map_.GetMap(); }
     const std::string& GetMapName() const { return map_.GetName(); }

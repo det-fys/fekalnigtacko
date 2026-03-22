@@ -1,16 +1,15 @@
 #include "world.hpp"
 
-#include <stdexcept>
 #include <iostream>
+#include <stdexcept>
 
 #include "assets/cache.hpp"
-#include "utils/allocnum.hpp"
 #include "collision/object_info.hpp"
 #include "destroyed_object.hpp"
+#include "utils/allocnum.hpp"
+#include "player_character.hpp"
 
-game::World::World(std::string mapname) : Scheduler(time_ms_), map_(*this, std::move(mapname))
-{
-}
+game::World::World(std::string mapname) : Scheduler(time_ms_), map_(*this, std::move(mapname)) {}
 
 void game::World::SendInitData(Player& player, net::OutMessage& msg)
 {
@@ -45,7 +44,7 @@ void game::World::RegisterEntity(std::unique_ptr<Entity> ent)
 
 void game::World::Update(int64_t delta_time)
 {
-    time_ms_ += delta_time; 
+    time_ms_ += delta_time;
     float delta_s = static_cast<float>(delta_time) * 0.001f;
     // GetBtWorld().stepSimulation(delta_s, 1, delta_s);
     GetBtWorld().stepSimulation(delta_s, 2, delta_s * 0.5f);
@@ -64,7 +63,6 @@ void game::World::Update(int64_t delta_time)
         else
             ++it;
     }
-
 }
 
 void game::World::FinishFrame()
@@ -76,16 +74,13 @@ void game::World::FinishFrame()
     {
         ent->FinalizeFrame();
     }
-
 }
 
 void game::World::DestructibleDestroyed(net::ObjNum num, std::unique_ptr<MapObjectCollision> col)
 {
     auto& destroyed_obj = Spawn<DestroyedObject>(std::move(col));
 
-    Schedule(120000, [this, num] {
-        RespawnObj(num);
-    });
+    Schedule(120000, [this, num] { RespawnObj(num); });
 }
 
 game::Entity* game::World::GetEntity(net::EntNum entnum)
@@ -106,32 +101,63 @@ void game::World::RespawnObj(net::ObjNum objnum)
     }
 }
 
-const game::UseTarget* game::World::GetBestUseTarget(const glm::vec3& pos) const
+struct UseTargetAabbCallback : public btBroadphaseAabbCallback
 {
-    const UseTarget* best_target = nullptr;
+    game::PlayerCharacter& character;
+    glm::vec3 pos;
+    const game::UseTarget* best_target = nullptr;
     float best_dist = std::numeric_limits<float>::max();
+    game::UseTargetQueryResult& best_res;
 
-    // TODO: spatial query
-    for (const auto& [entnum, ent] : GetEntities())
+    UseTargetAabbCallback(game::PlayerCharacter& character, game::UseTargetQueryResult& res) : character(character), pos(character.GetRoot().GetGlobalPosition()), best_res(res) {}
+
+    virtual bool process(const btBroadphaseProxy* proxy)
     {
-        auto usable = dynamic_cast<Usable*>(ent.get());
+        auto obj = reinterpret_cast<const btCollisionObject*>(proxy->m_clientObject);
+
+        collision::ObjectType type;
+        collision::ObjectFlags flags;
+        collision::ObjectCallback* obj_cb;
+        collision::GetObjectInfo(obj, type, flags, obj_cb);
+
+        if ((flags & collision::OF_USABLE) == 0 || !obj_cb)
+            return true;
+        
+        auto usable = dynamic_cast<game::Usable*>(obj_cb);
         if (!usable)
-            continue;
+            return true;
+
+        auto& matrix = usable->GetWSTransformMatrix();
 
         for (const auto& target : usable->GetUseTargets())
         {
-            glm::vec3 pos_world = ent->GetRoot().matrix * glm::vec4(target.position, 1.0f);
+            glm::vec3 pos_world = matrix * glm::vec4(target.position, 1.0f);
 
             float dist = glm::distance(pos, pos_world);
             if (dist < 3.0f && dist < best_dist)
             {
+                if (!usable->QueryUseTarget(character, target.id, best_res))
+                    continue;
+
                 best_dist = dist;
                 best_target = &target;
             }
         }
-    }
 
-    return best_target;
+        return true;
+    }
+};
+
+const game::UseTarget* game::World::GetBestUseTarget(game::PlayerCharacter& character, game::UseTargetQueryResult& res)
+{
+    const float radius = 5.0f;
+    
+    UseTargetAabbCallback cb(character, res);
+    btVector3 min(cb.pos.x - radius, cb.pos.y - radius, cb.pos.z - radius);
+    btVector3 max(cb.pos.x + radius, cb.pos.y + radius, cb.pos.z + radius);
+
+    GetBtBroadphase().aabbTest(min, max, cb);
+    return cb.best_target;
 }
 
 void game::World::HandleContacts()
@@ -143,7 +169,8 @@ void game::World::HandleContacts()
     static std::vector<net::ObjNum> to_destroy;
     to_destroy.clear();
 
-    auto ProcessContact = [&](btRigidBody* body, btRigidBody* other_body, const btVector3& pos, const btVector3& normal, float impulse) {
+    auto ProcessContact = [&](btRigidBody* body, btRigidBody* other_body, const btVector3& pos, const btVector3& normal,
+                              float impulse) {
         collision::ObjectType type;
         collision::ObjectFlags flags;
         collision::ObjectCallback* cb;
@@ -163,11 +190,11 @@ void game::World::HandleContacts()
             auto col = dynamic_cast<MapObjectCollision*>(cb);
             if (!col)
                 return;
-                           
+
             if (impulse > col->GetDestroyThreshold())
             {
                 to_destroy.push_back(col->GetNum());
-                other_body->applyCentralImpulse(-normal * impulse * 0.5f);        
+                other_body->applyCentralImpulse(-normal * impulse * 0.5f);
             }
 
             return;

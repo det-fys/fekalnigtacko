@@ -77,6 +77,9 @@ private:
 
     void WriteTuning(net::OutMessage& msg) const;
 
+protected:
+    btRigidBody& GetBtBody() { return *body_; }
+
 private:
     VehicleTuning tuning_;
     std::shared_ptr<const assets::VehicleModel> model_;

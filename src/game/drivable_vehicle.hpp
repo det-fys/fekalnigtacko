@@ -16,8 +16,11 @@ struct VehicleSeat
 class DrivableVehicle : public Vehicle, public Usable
 {
 public:
+    using Super = Vehicle;
+
     DrivableVehicle(World& world, const VehicleTuning& tuning);
 
+    virtual bool QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res) override;
     virtual void Use(PlayerCharacter& character, uint32_t target_id) override;
 
     bool SetPassenger(uint32_t seat_idx, ControllableCharacter* character);
