@@ -60,7 +60,7 @@
             <p id="vyplnitmeno" style="display:none">^ vyplnit</p>
             
             kam <input type="text" name="url" id="url" value="ws://deadfish.cz:11200/ws"><br>
-            <input id="okbut" type="button" value="0k" onclick="ok()">
+            <input id="okbut" type="button" value="probíhá získávání" onclick="ok()" disabled>
         </form>
     </div>
 
@@ -75,6 +75,9 @@
             })(),
             onRuntimeInitialized: function() {
                 inited = true;
+                const okbut = document.getElementById("okbut");
+                okbut.value = "0k";
+                okbut.disabled = false;
             }
         };
 
@@ -130,6 +133,7 @@
         }
 
         loadConfig();
+        document.getElementById("okbut").disabled = true;
     </script>
 
     {{{ SCRIPT }}}
