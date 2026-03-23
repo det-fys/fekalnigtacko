@@ -217,6 +217,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
         "-sNO_DISABLE_EXCEPTION_CATCHING=1"
     )
 
+    target_compile_definitions(${MAIN_NAME} PRIVATE EMSCRIPTEN)
+
     target_link_options(${MAIN_NAME} PRIVATE 
         "-lwebsocket.js"
         "-lopenal"
