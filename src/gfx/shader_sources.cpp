@@ -9,7 +9,7 @@
 #else 
 #define GLSL_VERSION \
     "#version 300 es\n" \
-    "precision mediump float;\n" \
+    "precision highp float;\n" \
     "\n"
 #endif
 
