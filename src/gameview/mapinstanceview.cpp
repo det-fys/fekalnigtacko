@@ -1,10 +1,10 @@
 #include "mapinstanceview.hpp"
-#include "assets/cache.hpp"
+#include "collision/dynamicsworld.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
-game::view::MapInstanceView::MapInstanceView(const std::string& map_name) 
+game::view::MapInstanceView::MapInstanceView(collision::DynamicsWorld& world, const std::string& map_name) : world_(world)
 {
     loader_ = std::make_unique<assets::MapLoader>("data/" + map_name + ".map");
 }
@@ -19,8 +19,9 @@ void game::view::MapInstanceView::LoadNext()
 
     // just loaded
     map_ = loader_->GetMap();
-    objs_visible_.resize(map_->GetStaticObjects().size(), true);
     loader_.reset();
+    
+    InitObjsAndCollisions();
 }
 
 int game::view::MapInstanceView::GetLoadingPercent() const
@@ -69,10 +70,37 @@ void game::view::MapInstanceView::EnableObj(net::ObjNum num, bool enable)
         objs_visible_.resize(i + 1, true);
 
     objs_visible_[i] = enable;
+
+    if (i < obj_cols_.size())
+    {
+        obj_cols_[i]->SetEnabled(enable);
+    }
+}
+
+void game::view::MapInstanceView::InitObjsAndCollisions()
+{
+    // add basemodel col
+    const auto& basemodel = map_->GetBaseModel();
+    if (basemodel)
+    {
+        Transform identity;
+        basemodel_col_ = std::make_unique<MapObjectCollisionView>(world_, basemodel, identity);
+        basemodel_col_->SetEnabled(true);
+    }
+
+    auto& objs = map_->GetStaticObjects();
+    objs_visible_.resize(objs.size(), true);
+    obj_cols_.resize(objs.size());
+
+    for (size_t i = 0; i < objs.size(); ++i)
+    {
+        obj_cols_[i] = std::make_unique<MapObjectCollisionView>(world_, objs[i].model, objs[i].node.local);
+        obj_cols_[i]->SetEnabled(objs_visible_[i]);
+    }
 }
 
 void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, const assets::Mesh& basemesh,
-                                            const assets::Chunk& chunk) const 
+                                            const assets::Chunk& chunk) const
 {
     for (const auto& surface_range : chunk.surfaces)
     {
@@ -116,4 +144,55 @@ void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, co
             args.dlist.AddSurface(cmd);
         }
     }
+}
+
+game::view::MapObjectCollisionView::MapObjectCollisionView(collision::DynamicsWorld& world,
+                                                           std::shared_ptr<const assets::Model> model,
+                                                           const Transform& trans) :
+    world_(world), model_(std::move(model))
+{
+    auto cshape = model_->GetColShape();
+    auto cmesh = model_->GetColMesh();
+
+    btVector3 local_inertia(0, 0, 0);
+
+    if (cshape)
+    {
+        body_ = std::make_unique<btRigidBody>(
+            btRigidBody::btRigidBodyConstructionInfo(0.0f, nullptr, cshape, local_inertia));
+    }
+    else if (cmesh)
+    {
+        body_ = std::make_unique<btRigidBody>(
+            btRigidBody::btRigidBodyConstructionInfo(0.0f, nullptr, cmesh->GetShape(), local_inertia));
+    }
+
+    auto offset_trans = trans;
+    offset_trans.position += trans.rotation * model_->GetColOffset();
+
+    body_->setWorldTransform(offset_trans.ToBtTransform());
+}
+
+void game::view::MapObjectCollisionView::SetEnabled(bool enabled)
+{
+    if (enabled == enabled_)
+        return;
+
+    auto& bt_world = world_.GetBtWorld();
+
+    if (enabled)
+    {
+        bt_world.addRigidBody(body_.get());
+    }
+    else
+    {
+        bt_world.removeRigidBody(body_.get());
+    }
+
+    enabled_ = enabled;
+}
+
+game::view::MapObjectCollisionView::~MapObjectCollisionView()
+{
+    SetEnabled(false); // delete from world if there
 }

@@ -15,7 +15,7 @@ game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) :
     if (!msg.Read(mapname))
         throw EntityInitError();
 
-    map_ = std::make_unique<MapInstanceView>(std::string(mapname));
+    map_ = std::make_unique<MapInstanceView>(*this, std::string(mapname));
 
     // init destroyed objs
     net::ObjCount objcount;
