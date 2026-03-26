@@ -37,6 +37,9 @@ enum MessageType : uint8_t
     // USETARGET ...
     MSG_USETARGET,
 
+    // REMOTEMENU ... 
+    MSG_REMOTEMENU,
+
     /*~~~~~~~~ Entity ~~~~~~~~*/
     // ENTSPAWN <EntNum> <EntType> data...
     MSG_ENTSPAWN,
@@ -143,5 +146,25 @@ using TuningPartIdx = uint8_t;
 // use target
 using UseTargetName = FixedStr<128>;
 using UseDelayQ = Quantized<uint8_t, 0, 10>;
+
+// remote menu
+
+enum MenuMessageType
+{
+    MMSG_CREATE,
+    MMSG_UPDATE,
+    MMSG_ITEM_UPDATE_TEXT,
+    MMSG_ITEM_UPDATE_SELECTION,
+    MMSG_CLOSE,
+};
+
+using MenuId = uint8_t;
+
+using MenuItemId = uint8_t;
+using MenuItemCount = MenuItemId;
+
+using MenuItemText = FixedStr<64>;
+using MenuItemSelection = FixedStr<64>;
+
 
 } // namespace net
