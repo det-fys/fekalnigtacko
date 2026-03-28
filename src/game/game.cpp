@@ -86,6 +86,10 @@ void game::Game::PlayerInput(Player& player, PlayerInputType type, bool enabled)
         break;
     }
 
+    case IN_DEBUG3:
+        DisplayTestMenu(player);
+        break;
+
     default: {
         auto world = FindPlayerWorld(player);
         if (world)
@@ -200,4 +204,37 @@ game::EnterableWorld* game::Game::FindPlayerWorld(Player& player) const
         return nullptr;
 
     return it->second.world;
+}
+
+void game::Game::DisplayTestMenu(Player& player)
+{
+    if (player.HasOpenMenu())
+        return;
+
+    auto& menu = player.DisplayMenu("test");
+
+    auto& btn_echo = menu.AddItem(RM_BUTTON, "echo");
+    btn_echo.SetOnClick([&player] {
+        player.SendChat("echo test");
+    });
+
+    auto& btn_bc = menu.AddItem(RM_BUTTON, "broadcast");
+    btn_bc.SetOnClick([this, &player] {
+        BroadcastChat(player.GetName() + "^r mele hovna");
+    });
+
+    int test = 0;
+    auto& sel_test = menu.AddItem(RM_SELECT, "výběr");
+    sel_test.SetOnSelect([test, &sel_test] (int dir) mutable {
+        test += dir;
+        sel_test.SetSelection(std::to_string(test));
+    });
+    sel_test.SetSelection(std::to_string(test));
+
+
+    auto& btn_close = menu.AddItem(RM_BUTTON, "zavřít");
+    btn_close.SetOnClick([&menu, &player] {
+        player.CloseMenu(menu);
+    });
+
 }

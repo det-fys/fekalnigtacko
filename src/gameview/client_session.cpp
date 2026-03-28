@@ -4,15 +4,16 @@
 #include <iostream>
 // #include <glm/gtx/common.hpp>
 
-#include "vehicleview.hpp"
 #include "utils/version.hpp"
+#include "utils.hpp"
+#include "vehicleview.hpp"
 
 game::view::ClientSession::ClientSession(App& app) : app_(app), use_target_hud_(app.GetTime())
 {
-	// send login
-	auto msg = BeginMsg(net::MSG_ID);
+    // send login
+    auto msg = BeginMsg(net::MSG_ID);
     msg.Write<net::Version>(FEKAL_VERSION);
-	msg.Write(net::PlayerName(app.GetUserName()));
+    msg.Write(net::PlayerName(app.GetUserName()));
 }
 
 bool game::view::ClientSession::ProcessMessage(net::InMessage& msg)
@@ -49,6 +50,9 @@ bool game::view::ClientSession::ProcessSingleMessage(net::MessageType type, net:
     case net::MSG_USETARGET:
         return ProcessUseTargetMsg(msg);
 
+    case net::MSG_REMOTEMENU:
+        return ProcessMenuMsg(msg);
+
     default:
         // try pass the msg to world
         if (world_ && world_->ProcessMsg(type, msg))
@@ -60,13 +64,13 @@ bool game::view::ClientSession::ProcessSingleMessage(net::MessageType type, net:
 
 void game::view::ClientSession::Input(game::PlayerInputType in, bool pressed, bool repeated)
 {
-
+    if (pressed && ProcessMenuInput(in))
+        return;
 
     if (repeated)
         return;
 
     SendInput(in, pressed);
-
 }
 
 void game::view::ClientSession::ProcessMouseMove(float delta_yaw, float delta_pitch)
@@ -102,6 +106,8 @@ void game::view::ClientSession::Draw(gfx::DrawList& dlist, gfx::DrawListParams& 
     }
 
     use_target_hud_.Draw(gui);
+
+    DrawMenus(gui);
 }
 
 void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) const
@@ -115,7 +121,7 @@ void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) con
         if (ent)
         {
             start += ent->GetRoot().GetGlobalPosition();
-        
+
             if (dynamic_cast<const VehicleView*>(ent))
                 distance = 8.0f;
         }
@@ -129,7 +135,7 @@ void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) con
 
     glm::vec3 end = start - dir * distance;
 
-    //start.z -= 0.5f; // shift this a bit to make it better when occluded
+    // start.z -= 0.5f; // shift this a bit to make it better when occluded
     eye = world_->CameraSweep(start, end);
     view = glm::lookAt(eye, eye + dir, glm::vec3(0, 0, 1));
 }
@@ -183,6 +189,39 @@ bool game::view::ClientSession::ProcessUseTargetMsg(net::InMessage& msg)
     return true;
 }
 
+bool game::view::ClientSession::ProcessMenuMsg(net::InMessage& msg)
+{
+    net::MenuId id;
+    net::MenuMessageType type;
+
+    if (!msg.Read(id) || !msg.Read(type))
+        return false;
+
+    switch (type)
+    {
+    case net::MMSG_CREATE: {
+        if (FindMenu(id))
+            return false;
+
+        remote_menus_.push_back(std::make_unique<RemoteMenuView>(*this, id));
+        return true;
+    }
+
+    case net::MMSG_CLOSE: {
+        std::erase_if(remote_menus_, [id](auto& menu) { return menu->GetId() == id; });
+        return true;
+    }
+
+    default: {
+        auto menu = FindMenu(id);
+        if (!menu)
+            return false;
+
+        return menu->ProcessMessage(type, msg);
+    }
+    }
+}
+
 void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui)
 {
     // glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f,
@@ -199,7 +238,8 @@ void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListPar
 
     // glm::mat4 fake_view_proj = glm::perspective(glm::radians(30.0f), aspect, 0.1f, 3000.0f) * view;
 
-    game::view::DrawArgs draw_args(dlist, params.env, gui, params.view_proj, eye, glm::ivec2(params.screen_width, params.screen_height), 500.0f);
+    game::view::DrawArgs draw_args(dlist, params.env, gui, params.view_proj, eye,
+                                   glm::ivec2(params.screen_width, params.screen_height), 500.0f);
     world_->Draw(draw_args);
 
     glm::mat4 camera_world = glm::inverse(view);
@@ -209,10 +249,10 @@ void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListPar
 void game::view::ClientSession::SendInput(game::PlayerInputType type, bool enable)
 {
     auto msg = BeginMsg(net::MSG_IN);
-	uint8_t val = type;
-	if (enable)
-		val |= 128;
-	msg.Write(val);
+    uint8_t val = type;
+    if (enable)
+        val |= 128;
+    msg.Write(val);
 }
 
 void game::view::ClientSession::SendViewAngles(float time)
@@ -235,4 +275,38 @@ void game::view::ClientSession::SendViewAngles(float time)
     view_yaw_q_.value = yaw_q.value;
     view_pitch_q_.value = pitch_q.value;
     last_send_time_ = time;
+}
+
+void game::view::ClientSession::DrawMenus(gui::Context& gui) const
+{
+    if (remote_menus_.empty())
+        return;
+
+    auto& top_menu = *remote_menus_.back();
+    top_menu.Draw(gui, glm::vec2(20.0f, 100.0f));
+
+}
+
+bool game::view::ClientSession::ProcessMenuInput(game::PlayerInputType in)
+{
+    if (remote_menus_.empty())
+        return false;
+
+    gui::MenuInput mi;
+    if (!InputToMenuInput(in, mi))
+        return false;
+
+    remote_menus_.back()->Input(mi);
+    return true;
+}
+
+game::view::RemoteMenuView* game::view::ClientSession::FindMenu(net::MenuId id) const
+{
+    for (auto& menu : remote_menus_)
+    {
+        if (menu->GetId() == id)
+            return menu.get();
+    }
+
+    return nullptr;
 }

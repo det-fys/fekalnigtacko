@@ -42,6 +42,8 @@ private:
     PlayerGameInfo& GetPlayerInfo(Player& player);
     EnterableWorld* FindPlayerWorld(Player& player) const;
 
+    void DisplayTestMenu(Player& player);
+
 private:
     std::shared_ptr<OpenWorld> openworld_;
     std::shared_ptr<EnterableWorld> testworld_;

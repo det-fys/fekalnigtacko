@@ -24,9 +24,10 @@ struct DrawMenuItemArgs
 {
     Context& ctx;
     glm::vec2 pos;
+    glm::vec2 size;
     bool focused;
 
-    DrawMenuItemArgs(Context& ctx, const glm::vec2& pos, bool focused) : ctx(ctx), pos(pos), focused(focused) {}
+    DrawMenuItemArgs(Context& ctx) : ctx(ctx) {}
 };
 
 class Menu
@@ -43,16 +44,31 @@ public:
         return item_ref;
     }
     
+    void Clear();
+
     void Draw(Context& ctx, const glm::vec2& pos) const;
     void Input(MenuInput in);
 
+    void SetTitle(std::string title);
+    void SetItemSize(const glm::vec2& itemsize) { itemsize_ = itemsize;  }
+    
+    size_t GetFocusedItemIndex() const { return focus_; }
+    
+    size_t GetNumItems() const { return items_.size(); }
+    MenuItem& GetItem(size_t idx) const { return *items_[idx]; }
+    
     glm::vec2 MeasureSize() const;
+
+protected:
+    virtual void OnFocusChanged() {}
 
 private:
     void SwitchFocus(int dir);
 
 private:
+    std::string title_;
     std::vector<std::unique_ptr<MenuItem>> items_;
+    glm::vec2 itemsize_ = glm::vec2(300.0f, 40.0f);
     size_t focus_ = 0;
 
 };
@@ -73,7 +89,7 @@ public:
     virtual ~MenuItem() = default;
 
 protected:
-    glm::vec2 size_;
+    glm::vec2 size_ = glm::vec2(0.0f);
 
 };
 
@@ -88,6 +104,8 @@ public:
     virtual void Input(MenuInput in) override;
 
     void SetClickCallback(std::function<void()> click_cb);
+
+    void SetText(std::string text) { text_ = std::move(text); }
 
     virtual ~ButtonMenuItem() = default;
 

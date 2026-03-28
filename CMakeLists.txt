@@ -84,6 +84,8 @@ set(CLIENT_ONLY_SOURCES
     "src/gameview/entityview.cpp"
     "src/gameview/mapinstanceview.hpp"
     "src/gameview/mapinstanceview.cpp"
+    "src/gameview/remote_menu_view.hpp"
+    "src/gameview/remote_menu_view.cpp"
     "src/gameview/simple_entity_view.hpp"
     "src/gameview/simple_entity_view.cpp"
     "src/gameview/skinning_ubo.hpp"

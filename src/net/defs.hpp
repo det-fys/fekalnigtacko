@@ -23,6 +23,9 @@ enum MessageType : uint8_t
     // VIEWANGLES <ViewYawQ> <ViewPitchQ>
     MSG_VIEWANGLES,
 
+    // MENUACTION <MenuId> <MenuActionType> ... 
+    MSG_MENUACTION,
+
     /*~~~~~~~~ Session ~~~~~~~~*/
     // CHAT <ChatMessage>
     MSG_CHAT,
@@ -37,7 +40,7 @@ enum MessageType : uint8_t
     // USETARGET ...
     MSG_USETARGET,
 
-    // REMOTEMENU ... 
+    // REMOTEMENU <MenuId> <MenuMessageType> ...
     MSG_REMOTEMENU,
 
     /*~~~~~~~~ Entity ~~~~~~~~*/
@@ -159,12 +162,24 @@ enum MenuMessageType
 };
 
 using MenuId = uint8_t;
+using MenuTitle = FixedStr<64>;
 
 using MenuItemId = uint8_t;
 using MenuItemCount = MenuItemId;
 
 using MenuItemText = FixedStr<64>;
 using MenuItemSelection = FixedStr<64>;
+
+// menu actions
+
+enum MenuActionType
+{
+    MA_CLICK,
+    MA_SELECT,
+    MA_HOVER,
+};
+
+using MenuSelectDir = uint8_t; // 0=left, 1=right
 
 
 } // namespace net

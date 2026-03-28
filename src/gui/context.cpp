@@ -96,6 +96,7 @@ glm::vec2 gui::Context::MeasureText(std::string_view text)
         }
         else if (cp == '\n')
         {
+            size.x = glm::max(size.x, cursor.x);
             cursor.x = 0.0f;
             cursor.y += line_height;
             continue;
@@ -122,9 +123,9 @@ glm::vec2 gui::Context::MeasureText(std::string_view text)
             continue; // Dont even have "missing" glyph, font is shit
 
         cursor.x += glyph->advance;
-        size.x = glm::max(size.x, cursor.x);
     }
 
+    size.x = glm::max(size.x, cursor.x);
     size.y = cursor.y + line_height;
 
     return size;

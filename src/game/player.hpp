@@ -12,6 +12,8 @@
 
 #include "player_input.hpp"
 
+#include "remote_menu.hpp"
+
 namespace game
 {
 
@@ -34,6 +36,10 @@ public:
     void SendChat(const std::string& text);
     void SetUseTarget(const std::string& text, const std::string& error_text, float delay);
 
+    RemoteMenu& DisplayMenu(std::string title);
+    void CloseMenu(const RemoteMenu& menu);
+    bool HasOpenMenu() const { return (bool)remote_menu_; }
+
     const std::string& GetName() const { return name_; }
 
     PlayerInputFlags GetInput() const { return in_; }
@@ -44,6 +50,7 @@ public:
 
 private:
     // world sync
+    void SyncWorld();
     void SendWorldMsg();
     void SendWorldUpdateMsg();
 
@@ -56,9 +63,13 @@ private:
     // msg handlers
     bool ProcessInputMsg(net::InMessage& msg);
     bool ProcessViewAnglesMsg(net::InMessage& msg);
+    bool ProcessMenuActionMsg(net::InMessage& msg);
 
     // events
     void Input(PlayerInputType type, bool enabled);
+
+    // menu sync
+    void SendMenuMsgs();
 
 private:
     Game& game_;
@@ -73,6 +84,11 @@ private:
 
     net::EntNum cam_ent_ = 0;
     glm::vec3 cull_pos_ = glm::vec3(0.0f);
+
+    // menus
+    // TODO: allow more menus
+    net::MenuId menu_id_ = 0;
+    std::unique_ptr<RemoteMenu> remote_menu_;
 };
 
 }

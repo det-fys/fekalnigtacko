@@ -6,6 +6,7 @@
 #include "net/outmessage.hpp"
 #include "assets/cache.hpp"
 #include "gameview/worldview.hpp"
+#include "gameview/utils.hpp"
 
 App::App() :
 	gui_(dlist_, assets::CacheManager::GetFont("data/comic32.font"))
@@ -64,7 +65,7 @@ void App::Frame()
 	if (menu_)
 	{
 		auto menu_size = menu_->MeasureSize();
-		menu_->Draw(gui_, glm::vec2(viewport_size_) - menu_size - 10.0f);
+		menu_->Draw(gui_, (glm::vec2(viewport_size_) - menu_size) * 0.5f);
 	}
 
 	gui_.Render();
@@ -113,20 +114,6 @@ void App::Disconnected(const std::string& reason)
 	// close session
 	session_.reset();
 }
-
-static bool InputToMenuInput(game::PlayerInputType in, gui::MenuInput& mi)
-{
-	switch (in)
-	{
-		case game::IN_FORWARD: mi = gui::MI_UP; return true;
-		case game::IN_BACKWARD: mi = gui::MI_DOWN; return true;
-		case game::IN_LEFT: mi = gui::MI_LEFT; return true;
-		case game::IN_RIGHT: mi = gui::MI_RIGHT; return true;
-		case game::IN_JUMP: mi = gui::MI_ENTER; return true;
-		case game::IN_CROUCH: mi = gui::MI_BACK; return true;
-		default: return false;
-	}
-};
 
 void App::Input(game::PlayerInputType in, bool pressed, bool repeated)
 {
@@ -215,7 +202,7 @@ static void AddSlider(gui::Menu& menu, std::string text, int& value, int min, in
 		else if (value > max)
 			value = max;
 
-		slider.SetSelectionText(std::to_string(value));
+		slider.SetSelectionText(std::to_string(value) + " %");
 		changed();
 	};
 
@@ -226,6 +213,7 @@ static void AddSlider(gui::Menu& menu, std::string text, int& value, int min, in
 void App::OpenSettings()
 {
 	menu_ = std::make_unique<gui::Menu>();
+	menu_->SetTitle("nastavení");
 
 	AddSlider(*menu_, "jak moc to řve", volume_, 0, 100, [this]{
 		ApplyVolume();

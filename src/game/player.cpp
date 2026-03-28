@@ -23,6 +23,9 @@ bool game::Player::ProcessMsg(net::MessageType type, net::InMessage& msg)
     case net::MSG_VIEWANGLES:
         return ProcessViewAnglesMsg(msg);
 
+    case net::MSG_MENUACTION:
+        return ProcessMenuActionMsg(msg);
+
     default:
         return false;
     }
@@ -30,20 +33,8 @@ bool game::Player::ProcessMsg(net::MessageType type, net::InMessage& msg)
 
 void game::Player::Update()
 {
-    if (world_ != known_world_)
-    {
-        SendWorldMsg();
-        known_world_ = world_;
-        known_ents_.clear();
-
-        return; // send updates next frame
-    }
-
-    if (world_)
-    {
-        SendWorldUpdateMsg();
-        SyncEntities();
-    }
+    SyncWorld();
+    SendMenuMsgs();
 }
 
 void game::Player::SetWorld(World* world)
@@ -77,9 +68,56 @@ void game::Player::SetUseTarget(const std::string& text, const std::string& erro
     msg.Write<net::UseDelayQ>(delay);
 }
 
+game::RemoteMenu& game::Player::DisplayMenu(std::string title)
+{
+    if (remote_menu_)
+        throw std::runtime_error("cannot display multiple menus atm");
+
+    net::MenuId id = ++menu_id_;
+    remote_menu_ = std::make_unique<RemoteMenu>(id, std::move(title));
+    
+    // send msg
+    auto msg = BeginMsg(net::MSG_REMOTEMENU);
+    msg.Write(id);
+    msg.Write(net::MMSG_CREATE);
+    
+    return *remote_menu_;
+}
+
+void game::Player::CloseMenu(const RemoteMenu& menu)
+{
+    if (&menu != remote_menu_.get())
+        return;
+
+    // send msg
+    auto msg = BeginMsg(net::MSG_REMOTEMENU);
+    msg.Write(menu.GetId());
+    msg.Write(net::MMSG_CLOSE);
+
+    remote_menu_.reset();
+}
+
 game::Player::~Player()
 {
     game_.PlayerLeft(*this);
+}
+
+void game::Player::SyncWorld()
+{
+    if (world_ != known_world_)
+    {
+        SendWorldMsg();
+        known_world_ = world_;
+        known_ents_.clear();
+
+        return; // send updates next frame
+    }
+
+    if (world_)
+    {
+        SendWorldUpdateMsg();
+        SyncEntities();
+    }
 }
 
 void game::Player::SendWorldMsg()
@@ -255,6 +293,20 @@ bool game::Player::ProcessViewAnglesMsg(net::InMessage& msg)
     return true;
 }
 
+bool game::Player::ProcessMenuActionMsg(net::InMessage& msg)
+{
+    net::MenuId id;
+    net::MenuActionType type;
+
+    if (!msg.Read(id) || !msg.Read(type))
+        return false;
+
+    if (!remote_menu_ || remote_menu_->GetId() != id)
+        return true; // not illegal, might be just a late message
+
+    return remote_menu_->ProcessActionMsg(msg, type);
+}
+
 void game::Player::Input(PlayerInputType type, bool enabled)
 {
     if (enabled)
@@ -265,3 +317,20 @@ void game::Player::Input(PlayerInputType type, bool enabled)
     game_.PlayerInput(*this, type, enabled);
 }
 
+void game::Player::SendMenuMsgs()
+{
+    if (!remote_menu_)
+        return;
+
+    remote_menu_->Update();
+    auto menu_msg = remote_menu_->GetMsg();
+
+    if (menu_msg.empty())
+        return;
+
+    auto msg = BeginMsg();
+    msg.Write(menu_msg);
+
+    remote_menu_->ResetMsg();
+
+}

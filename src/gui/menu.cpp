@@ -4,17 +4,36 @@
 
 // Menu
 
+static constexpr float menu_title_height = 50.0f;
+
+void gui::Menu::Clear()
+{
+    items_.clear();
+    focus_ = 0;
+}
+
 void gui::Menu::Draw(Context& ctx, const glm::vec2& pos) const
 {
     // background
     auto size = MeasureSize();
-    ctx.DrawRect(pos, pos + size, 0x55000000);
+    ctx.DrawRect(pos, pos + size, 0x88000000);
+    
+    // draw title
+    glm::vec2 title_size(size.x, menu_title_height);
+    ctx.DrawRect(pos, pos + title_size, 0x55000000);
+    ctx.DrawTextAligned(title_, pos + title_size * 0.5f, glm::vec2(-0.5f));
 
-    glm::vec2 cursor = pos;
+    // draw items
+    DrawMenuItemArgs args(ctx);
+    args.size = itemsize_;
+    args.pos.x = pos.x;
+
     for (size_t i = 0; i < items_.size(); ++i)
     {
-        items_[i]->Draw(DrawMenuItemArgs(ctx, cursor, focus_ == i));
-        cursor.y += items_[i]->GetSize().y;
+        args.focused = focus_ == i;
+        args.pos.y = pos.y + menu_title_height + static_cast<float>(i) * itemsize_.y;
+
+        items_[i]->Draw(args);
     }
 }
 
@@ -37,18 +56,14 @@ void gui::Menu::Input(MenuInput in)
     }
 }
 
+void gui::Menu::SetTitle(std::string title)
+{
+    title_ = std::move(title);
+}
+
 glm::vec2 gui::Menu::MeasureSize() const
 {
-    glm::vec2 size(0.0f);
-
-    for (const auto& item : items_)
-    {
-        const auto& itemsize = item->GetSize();
-        size.x = glm::max(size.x, itemsize.x);
-        size.y += itemsize.y;
-    }
-
-    return size;
+    return glm::vec2(itemsize_.x, menu_title_height + itemsize_.y * static_cast<float>(items_.size()));
 }
 
 void gui::Menu::SwitchFocus(int dir)
@@ -56,7 +71,17 @@ void gui::Menu::SwitchFocus(int dir)
     if (items_.empty())
         return;
 
-    focus_ = (focus_ + items_.size() + dir) % items_.size();
+    size_t old_focus = focus_;
+
+    if (items_.empty())
+        focus_ = 0;
+    else
+        focus_ = (focus_ + items_.size() + dir) % items_.size();
+
+    if (focus_ != old_focus)
+    {
+        OnFocusChanged();
+    }
 }
 
 // ButtonMenuItem
@@ -64,13 +89,12 @@ void gui::Menu::SwitchFocus(int dir)
 gui::ButtonMenuItem::ButtonMenuItem(std::string text)
     : text_(std::move(text))
 {
-    size_ = glm::vec2(300.0f, 30.0f);
 }
 
 void gui::ButtonMenuItem::Draw(const DrawMenuItemArgs& args) const
 {
     Super::Draw(args);
-    glm::vec2 center = args.pos + glm::vec2(0.0f, size_.y * 0.5f);
+    glm::vec2 center = args.pos + glm::vec2(10.0f, args.size.y * 0.5f);
     args.ctx.DrawTextAligned(text_, center, glm::vec2(0.0f, -0.5f), args.focused ? COLOR_FOCUSED : COLOR_INACTIVE);
 }
 
@@ -96,12 +120,30 @@ void gui::SelectMenuItem::Draw(const DrawMenuItemArgs& args) const
 {
     Super::Draw(args);
 
-    char buffer[128];
-    size_t len = snprintf(buffer, sizeof(buffer), "< %s >", select_text_.c_str());
+    auto text_size = args.ctx.MeasureText(select_text_);
 
-    glm::vec2 center_right = args.pos + glm::vec2(size_.x, size_.y * 0.5f);
-    args.ctx.DrawTextAligned(std::string_view(buffer, len), center_right, glm::vec2(-1.0f, -0.5f),
-                             args.focused ? COLOR_FOCUSED : COLOR_INACTIVE);
+    glm::vec2 cursor = args.pos + glm::vec2(args.size.x - 10.0f, args.size.y * 0.5f);
+    cursor.y -= text_size.y * 0.5f; // centered
+
+    uint32_t text_color = args.focused ? COLOR_FOCUSED : COLOR_INACTIVE;
+    uint32_t arrow_color = 0xFFFFFFFF;
+
+    float arrow_width = 0.0f;
+    if (args.focused)
+    {
+        arrow_width = args.ctx.MeasureText("<").x;
+        cursor.x -= arrow_width;
+        args.ctx.DrawText(">", cursor, arrow_color);
+    }
+    
+    cursor.x -= text_size.x;
+    args.ctx.DrawText(select_text_, cursor, text_color);
+    
+    if (args.focused)
+    {
+        cursor.x -= arrow_width;
+        args.ctx.DrawText("<", cursor, arrow_color);
+    }
 }
 
 void gui::SelectMenuItem::Input(MenuInput in)

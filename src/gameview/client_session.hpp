@@ -11,6 +11,7 @@
 #include "net/msg_producer.hpp"
 #include "game/player_input.hpp"
 #include "gui/use_target_hud.hpp"
+#include "remote_menu_view.hpp"
 
 class App;
 
@@ -41,11 +42,16 @@ private:
     bool ProcessCameraMsg(net::InMessage& msg);
     bool ProcessChatMsg(net::InMessage& msg);
     bool ProcessUseTargetMsg(net::InMessage& msg);
+    bool ProcessMenuMsg(net::InMessage& msg);
 
     void DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui);
     
     void SendInput(game::PlayerInputType type, bool enable);
     void SendViewAngles(float time);
+
+    void DrawMenus(gui::Context& gui) const;
+    bool ProcessMenuInput(game::PlayerInputType in);
+    RemoteMenuView* FindMenu(net::MenuId id) const;
 
 private:
     App& app_;
@@ -60,6 +66,8 @@ private:
     float last_send_time_ = 0.0f;
 
     gui::UseTargetHud use_target_hud_;
+
+    std::vector<std::unique_ptr<RemoteMenuView>> remote_menus_;
 };
 
 } // namespace game::view

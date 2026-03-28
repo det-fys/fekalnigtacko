@@ -6,6 +6,7 @@
 #include "net/defs.hpp"
 #include "net/msg_producer.hpp"
 #include "net/outmessage.hpp"
+#include "net/inmessage.hpp"
 
 namespace game
 {
@@ -54,17 +55,27 @@ private:
 class RemoteMenu : public net::MsgProducer
 {
 public:
-    RemoteMenu(net::MenuId id);
+    RemoteMenu(net::MenuId id, std::string title);
 
     RemoteMenuItem& AddItem(RemoteMenuItemType type, std::string text);
+
+    net::MenuId GetId() const { return id_; }
+
+    bool ProcessActionMsg(net::InMessage& msg, net::MenuActionType type);
 
     void Update();
 
 private:
     net::OutMessage BeginMenuMsg(net::MenuMessageType type);
 
+    // action handlers
+    bool ProcessClickMsg(net::InMessage& msg);
+    bool ProcessSelectMsg(net::InMessage& msg);
+    bool ProcessHoverMsg(net::InMessage& msg);
+
 private:
     net::MenuId id_;
+    std::string title_;
     bool synced_ = false;
     bool items_synced_ = false;
     std::vector<std::unique_ptr<RemoteMenuItem>> items_;
