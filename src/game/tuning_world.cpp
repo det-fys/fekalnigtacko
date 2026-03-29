@@ -46,6 +46,11 @@ void game::TuningWorld::OnPlayerLeaving(Player& player)
     Reset();
 }
 
+const std::string& game::TuningWorld::GetOccupantName() const
+{
+    return player_->GetName();
+}
+
 void game::TuningWorld::Setup()
 {
     tuning_ = vehicle_->GetTuning();

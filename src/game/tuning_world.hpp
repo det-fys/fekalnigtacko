@@ -21,7 +21,7 @@ public:
     virtual void OnPlayerLeaving(Player& player);
 
     bool IsOccupied() const { return player_ != nullptr; }
-    const std::string& GetOccupantName() const { return player_->GetName(); }
+    const std::string& GetOccupantName() const;
 
 private:
     void Setup();
