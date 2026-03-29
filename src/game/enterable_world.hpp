@@ -21,6 +21,10 @@ public:
     virtual void PlayerViewAnglesChanged(Player& player, float yaw, float pitch);
     virtual void RemovePlayer(Player& player);
 
+    virtual void OnVehicleJoined(DrivableVehicle& vehicle) {}
+
+    virtual void OnPlayerLeaving(Player& player) {}
+
     PlayerCharacter* GetPlayerCharacter(Player& player);
 
 private:

@@ -45,6 +45,8 @@ bool game::view::VehicleView::ProcessMsg(net::EntMsgType type, net::InMessage& m
     {
     case net::EMSG_DEFORM:
         return ProcessDeformMsg(msg);
+    case net::EMSG_TUNING:
+        return ReadTuning(msg);
     default:
         return Super::ProcessMsg(type, msg);
     }

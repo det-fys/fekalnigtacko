@@ -201,6 +201,14 @@ void game::Vehicle::SetSteering(bool analog, float value)
     target_steering_ = value;
 }
 
+void game::Vehicle::SetTuning(const VehicleTuning& tuning)
+{
+    tuning_ = tuning;
+
+    auto msg = BeginEntMsg(net::EMSG_TUNING);
+    WriteTuning(msg);
+}
+
 game::Vehicle::~Vehicle()
 {
     auto& bt_world = world_.GetBtWorld();

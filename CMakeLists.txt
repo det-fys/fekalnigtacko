@@ -154,6 +154,8 @@ set(SERVER_ONLY_SOURCES
     "src/game/remote_menu.cpp"
     "src/game/simple_entity.hpp"
     "src/game/simple_entity.cpp"
+    "src/game/tuning_world.hpp"
+    "src/game/tuning_world.cpp"
     "src/game/usable.hpp"
     "src/game/vehicle.hpp"
     "src/game/vehicle.cpp"

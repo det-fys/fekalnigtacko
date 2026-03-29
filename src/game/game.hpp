@@ -3,6 +3,7 @@
 #include <map>
 
 #include "enterable_world.hpp"
+#include "tuning_world.hpp"
 #include "openworld.hpp"
 
 namespace game
@@ -31,6 +32,8 @@ public:
     void PlayerInput(Player& player, PlayerInputType type, bool enabled);
     void PlayerLeft(Player& player);
 
+    void MovePlayerToWorld(Player& player, EnterableWorld& world, bool with_vehicle, const glm::vec3& pos, float yaw);
+
 private:
     void BroadcastChat(const std::string& text);
 
@@ -43,10 +46,12 @@ private:
     EnterableWorld* FindPlayerWorld(Player& player) const;
 
     void DisplayTestMenu(Player& player);
+    void MovePlayerToTuning(Player& player);
 
 private:
     std::shared_ptr<OpenWorld> openworld_;
     std::shared_ptr<EnterableWorld> testworld_;
+    std::shared_ptr<TuningWorld> garage_;
 
     std::vector<World*> all_worlds_; // for common update etc.
     std::map<Player*, PlayerGameInfo> players_;

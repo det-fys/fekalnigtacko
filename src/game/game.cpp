@@ -5,7 +5,7 @@
 #include "player_character.hpp"
 
 static constexpr glm::vec3 openworld_spawn(100.0f, 100.0f, 1.0f);
-static constexpr glm::vec3 test_spawn(0.0f, 0.0f, 1.0f);
+static constexpr glm::vec3 test_spawn(0.0f, 0.0f, 0.1f);
 
 static uint32_t GetRandomColor24()
 {
@@ -23,6 +23,9 @@ game::Game::Game()
 
     testworld_ = std::make_shared<EnterableWorld>("testarena");
     all_worlds_.push_back(testworld_.get());
+    
+    garage_ = std::make_shared<TuningWorld>(*this, *openworld_, glm::vec3(0.0f), 0.0f, "garage");
+    all_worlds_.push_back(garage_.get());
 }
 
 void game::Game::Update()
@@ -72,16 +75,18 @@ void game::Game::PlayerInput(Player& player, PlayerInputType type, bool enabled)
         if (!enabled)
             return;
 
-        auto& player_info = players_.at(&player);
+        // auto& player_info = players_.at(&player);
 
-        if (player_info.world == openworld_.get())
-        {
-            MovePlayerToWorld(player_info, testworld_.get(), test_spawn, 0.0f, true);
-        }
-        else
-        {
-            MovePlayerToWorld(player_info, openworld_.get(), openworld_spawn, 0.0f, true);
-        }
+        // if (player_info.world == openworld_.get())
+        // {
+        //     MovePlayerToWorld(player_info, testworld_.get(), test_spawn, 0.0f, true);
+        // }
+        // else
+        // {
+        //     MovePlayerToWorld(player_info, openworld_.get(), openworld_spawn, 0.0f, true);
+        // }
+
+        MovePlayerToTuning(player);
 
         break;
     }
@@ -104,11 +109,23 @@ void game::Game::PlayerLeft(Player& player)
 {
     auto world = FindPlayerWorld(player);
     if (world)
+        world->OnPlayerLeaving(player);
+    
+    // find again as may have changed
+    world = FindPlayerWorld(player);
+    if (world)
         world->RemovePlayer(player);
 
     players_.erase(&player);
 
     BroadcastChat(player.GetName() + "^r se vodpojil zmrd");
+}
+
+void game::Game::MovePlayerToWorld(Player& player, EnterableWorld& world, bool with_vehicle, const glm::vec3& pos,
+                                   float yaw)
+{
+    auto& player_info = GetPlayerInfo(player);
+    MovePlayerToWorld(player_info, &world, pos, yaw, true);
 }
 
 void game::Game::BroadcastChat(const std::string& text)
@@ -168,6 +185,8 @@ void game::Game::MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& ne
     }
 
     vehicle.Remove();
+
+    new_world.OnVehicleJoined(new_vehicle);
 }
 
 void game::Game::MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld* new_world, const glm::vec3& pos,
@@ -237,4 +256,37 @@ void game::Game::DisplayTestMenu(Player& player)
         player.CloseMenu(menu);
     });
 
+}
+
+void game::Game::MovePlayerToTuning(Player& player)
+{
+    auto& player_info = GetPlayerInfo(player);
+    
+    if (player_info.world != openworld_.get())
+        return;
+
+    if (garage_->IsOccupied())
+    {
+        player.SendChat("bohužel tam teď oxiduje nějakej píčus " + garage_->GetOccupantName() + "^r!");
+        return;
+    }
+
+    auto character = player_info.world->GetPlayerCharacter(player);
+    if (!character)
+        return;
+
+    auto vehicle = character->GetVehicle();
+    if (!vehicle)
+    {
+        player.SendChat("nemáš vehikl!!!");
+        return;
+    }
+
+    if (vehicle->GetPassenger(0) != character)
+    {
+        player.SendChat("nejsi ridič!!");
+        return;
+    }
+
+    MovePlayerToWorld(player_info, garage_.get(), glm::vec3(0.0f), 0.0f, true);
 }

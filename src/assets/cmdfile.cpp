@@ -42,6 +42,12 @@ std::string assets::ParseString(std::istringstream& iss)
 
     str = str.substr(1);
 
+    if (str.ends_with('"'))
+    {
+        str.pop_back();
+        return str;
+    }
+
     while (iss)
     {
         std::string tmp;

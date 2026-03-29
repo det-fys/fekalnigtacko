@@ -100,6 +100,7 @@ enum EntMsgType : uint8_t
     // EMSG_UPDATE, // deprecated
     EMSG_PLAYSOUND,
     EMSG_DEFORM,
+    EMSG_TUNING,
 };
 
 using PositionElemQ = Quantized<uint32_t, -10000, 10000, 1>;
