@@ -125,7 +125,7 @@ void game::Game::MovePlayerToWorld(Player& player, EnterableWorld& world, bool w
                                    float yaw)
 {
     auto& player_info = GetPlayerInfo(player);
-    MovePlayerToWorld(player_info, &world, pos, yaw, true);
+    MovePlayerToWorld(player_info, &world, pos, yaw, with_vehicle);
 }
 
 void game::Game::BroadcastChat(const std::string& text)
