@@ -20,7 +20,7 @@ game::Vehicle::Vehicle(World& world, const VehicleTuning& tuning)
     root_.local.position.z = 10.0f;
 
     // setup chassis rigidbody
-    float mass = 1300.0f;
+    float mass = 1000.0f;
 
     btCollisionShape* shape = model_->GetModel()->GetColShape();
     if (!shape)
@@ -46,7 +46,7 @@ game::Vehicle::Vehicle(World& world, const VehicleTuning& tuning)
     btVector3 wheelDirectionCS0(0, 0, -1);
     btVector3 wheelAxleCS(1, 0, 0);
 
-    wheel_z_offset_ = 0.5f;
+    wheel_z_offset_ = 0.2f;
 
     const auto& wheels = model_->GetWheels();
 
@@ -59,19 +59,22 @@ game::Vehicle::Vehicle(World& world, const VehicleTuning& tuning)
     {
         float wheelRadius = wheeldef.radius;
 
-        float friction = 3.0f; // 5.0f;
+        float friction = 2.2f; // 5.0f;
         float suspensionStiffness = 50.0f;
         // float suspensionDamping = 2.3f;
         // float suspensionCompression = 4.4f;
-        float suspensionRestLength = 0.6f;
-        float rollInfluence = 0.01f;
+        float suspensionRestLength = 0.3f;
+        float rollInfluence = 0.3f;
 
-        float maxSuspensionForce = 100000.0f;
-        float maxSuspensionTravelCm = 5000.0f;
+        float maxSuspensionForce = 90000.0f;
+        float maxSuspensionTravelCm = 15.0f;
 
-        float k = 0.2;
+        float k = 0.2f;
 
         const bool is_front = !(wheeldef.type & assets::WHEEL_REAR);
+
+        if (!is_front)
+            friction *= 1.5f;
 
         btVector3 wheel_pos(wheeldef.position.x, wheeldef.position.y, wheeldef.position.z + wheel_z_offset_);
         auto& wi = vehicle_->addWheel(wheel_pos, wheelDirectionCS0, wheelAxleCS, suspensionRestLength, wheelRadius,
@@ -240,8 +243,8 @@ void game::Vehicle::ProcessInput()
     // float steeringIncrement = .04 * 60;
     // float steeringClamp = .5;
     // float maxEngineForce = 7000;
-    float maxEngineForce = 4500;
-    float maxBreakingForce = 300;
+    float maxEngineForce = 3200;
+    float maxBreakingForce = 400;
 
     float speed = vehicle_->getCurrentSpeedKmHour();
     if (glm::abs(speed) > 200.0f)
@@ -338,11 +341,11 @@ void game::Vehicle::ProcessInput()
             steering_ = -steeringClamp;
     }
 
-    vehicle_->applyEngineForce(engineForce, 2);
-    vehicle_->applyEngineForce(engineForce, 3);
+    vehicle_->applyEngineForce(engineForce, 0);
+    vehicle_->applyEngineForce(engineForce, 1);
 
-    vehicle_->setBrake(breakingForce * 0.5, 0);
-    vehicle_->setBrake(breakingForce * 0.5, 1);
+    vehicle_->setBrake(breakingForce * 0.1f, 0);
+    vehicle_->setBrake(breakingForce * 0.1f, 1);
     vehicle_->setBrake(breakingForce, 2);
     vehicle_->setBrake(breakingForce, 3);
 
