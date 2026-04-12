@@ -55,7 +55,7 @@ private:
 private:
     std::shared_ptr<const assets::VehicleModel> model_;
     assets::Mesh mesh_;
-    glm::vec4 color_;
+    glm::vec4 colors_[4];
 
     game::VehicleSyncState sync_;
     std::vector<VehicleWheelViewInfo> wheels_;

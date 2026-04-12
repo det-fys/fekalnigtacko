@@ -2,7 +2,6 @@
 
 #include "model.hpp"
 #include "utils/transform.hpp"
-#include "vehicle_tuning_list.hpp"
 
 namespace assets
 {
@@ -36,13 +35,11 @@ public:
     const std::shared_ptr<const Model>& GetModel() const { return basemodel_; } 
     const std::vector<VehicleWheel>& GetWheels() const { return wheels_; }
     const Transform* GetLocation(const std::string& name) const;
-    const VehicleTuningList& GetTuningList() const { return *tuninglist_; }
 
 private:
     std::shared_ptr<const Model> basemodel_;
     std::vector<VehicleWheel> wheels_;
     std::map<std::string, Transform> locations_;
-    std::unique_ptr<const VehicleTuningList> tuninglist_;
 
 
 };

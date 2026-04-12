@@ -21,7 +21,7 @@ void game::NpcCharacter::VehicleChanged()
     {
         roads_ = world_.GetMap().GetGraph("roads");
 
-        seg_start_ = GetVehicle()->GetPosition();
+        seg_start_ = GetVehicle()->GetRootTransform().position;
         
         size_t start_node = 0;
         float min_dist = std::numeric_limits<float>().infinity();
@@ -87,8 +87,10 @@ void game::NpcCharacter::VehicleThink()
     if (!IsDriver() || !GetVehicle() || !roads_)
         return;
 
-    glm::vec3 pos = GetVehicle()->GetPosition();
-    glm::quat rot = GetVehicle()->GetRotation();
+    const auto& vehicle_trans = GetVehicle()->GetRootTransform();
+
+    const glm::vec3& pos = vehicle_trans.position;
+    const glm::quat& rot = vehicle_trans.rotation;
     glm::vec3 forward = rot * glm::vec3{0.0f, 1.0f, 0.0f};
 
     // glm::vec3 target = s->roads.nodes[s->node].position;

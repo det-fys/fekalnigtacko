@@ -5,9 +5,13 @@
 game::DrivableVehicle::DrivableVehicle(World& world, const VehicleTuning& tuning) : Vehicle(world, tuning), Usable(GetRoot().matrix)
 {
     InitSeats();
+    OnPhysicsChanged();
+}
 
+void game::DrivableVehicle::OnPhysicsChanged()
+{
     // make body usable
-    collision::AddObjectFlags(&GetBtBody(), collision::OF_USABLE);
+    collision::AddObjectFlags(&GetPhysics()->GetBtBody(), collision::OF_USABLE);
 }
 
 bool game::DrivableVehicle::QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res)
@@ -90,7 +94,7 @@ static std::string GetColorTextPrefix(uint32_t color)
 
 void game::DrivableVehicle::InitSeats()
 {
-    uint32_t color = GetTuning().primary_color;
+    uint32_t color = GetTuningResult().colors[0];
     std::string prefix = "vlízt do " + GetColorTextPrefix(color) + GetModelName() + "^r";
 
     const auto& veh = *GetModel();

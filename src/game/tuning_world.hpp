@@ -26,9 +26,7 @@ public:
 private:
     void Setup();
 
-    void UpdateTuningVals();
-    void UpdateTuning();
-    
+    void AddTuningGroupSelect(game::RemoteMenu& menu, const VehicleTuningGroup& group);
     void DisplayTuningMenu();
 
     void Reset();
@@ -42,16 +40,12 @@ private:
      // active player
     Player* player_ = nullptr;
     DrivableVehicle* vehicle_ = nullptr;
-    const assets::VehicleTuningList* tuning_list_ = nullptr;
+    const VehicleTuningList* tuning_list_ = nullptr;
     
     game::RemoteMenu* menu_ = nullptr;
 
     VehicleTuning tuning_;
 
-
-    glm::u8vec3 tun_primary_color_;
-    size_t tun_wheel_idx_;
-    glm::u8vec3 tun_wheel_color_;
 
 };
 

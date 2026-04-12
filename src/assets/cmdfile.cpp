@@ -8,12 +8,12 @@ void assets::LoadCMDStream(std::istream& is, CmdCallback handler)
         return;
 
     while (std::getline(is, line))
-    {
+    {        
+        // skip whitespace
+        line.erase(0, line.find_first_not_of(" \t\r\n"));
+        
         if (line.empty() || line[0] == '#') // Skip empty lines and comments
             continue;
-
-        // skip whitespace
-        line.erase(0, line.find_first_not_of(" \t"));
 
         std::istringstream iss(line);
         iss >> command;

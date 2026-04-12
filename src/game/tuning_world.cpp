@@ -1,7 +1,6 @@
 #include "tuning_world.hpp"
 #include "player_character.hpp"
 #include "utils/colors.hpp"
-#include "assets/vehicle_tuning_list.hpp"
 #include "game.hpp"
 
 game::TuningWorld::TuningWorld(Game& game, EnterableWorld& exit_world, const glm::vec3& exit_pos, float exit_yaw, std::string mapname) : 
@@ -32,7 +31,7 @@ void game::TuningWorld::OnVehicleJoined(DrivableVehicle& vehicle)
         throw std::runtime_error("vehicle joined to tuning without ACTIVE player driver??");
         
     vehicle_ = &vehicle;
-    tuning_list_ = &vehicle.GetModel()->GetTuningList();
+    tuning_list_ = vehicle.GetTuningList().get();
     player_ = player;
 
     Setup();
@@ -54,73 +53,133 @@ const std::string& game::TuningWorld::GetOccupantName() const
 void game::TuningWorld::Setup()
 {
     tuning_ = vehicle_->GetTuning();
-    UpdateTuningVals();
+    // UpdateTuningVals();
     DisplayTuningMenu();
 }
 
-void game::TuningWorld::UpdateTuningVals()
-{
-    tun_primary_color_ = ColorU32ToU8Vec3(tuning_.primary_color);
+// void game::TuningWorld::UpdateTuningVals()
+// {
+//     tun_primary_color_ = ColorU32ToU8Vec3(tuning_.primary_color);
 
-    tun_wheel_idx_ = tuning_.wheels_idx;
-    tun_wheel_color_ = ColorU32ToU8Vec3(tuning_.wheel_color);
-}
+//     tun_wheel_idx_ = tuning_.wheels_idx;
+//     tun_wheel_color_ = ColorU32ToU8Vec3(tuning_.wheel_color);
+// }
 
-void game::TuningWorld::UpdateTuning()
-{
-    tuning_.primary_color = ColorU8Vec3ToU32(tun_primary_color_);
+// void game::TuningWorld::UpdateTuning()
+// {
+//     tuning_.primary_color = ColorU8Vec3ToU32(tun_primary_color_);
 
-    tuning_.wheels_idx = tun_wheel_idx_;
-    tuning_.wheel_color = ColorU8Vec3ToU32(tun_wheel_color_);
+//     tuning_.wheels_idx = tun_wheel_idx_;
+//     tuning_.wheel_color = ColorU8Vec3ToU32(tun_wheel_color_);
 
-    vehicle_->SetTuning(tuning_);
-}
+//     vehicle_->SetTuning(tuning_);
+// }
 
-static void AddColorChannelSlider(game::RemoteMenu& menu, uint8_t& ch, std::string name, std::function<void()> on_change)
-{
-    auto& slider = menu.AddItem(game::RM_SELECT, std::move(name));
+// static void AddColorChannelSlider(game::RemoteMenu& menu, uint8_t& ch, std::string name, std::function<void()> on_change)
+// {
+//     auto& slider = menu.AddItem(game::RM_SELECT, std::move(name));
     
-    auto on_select = [&slider, &ch, on_change = std::move(on_change)] (int dir) {
-        int new_val = ch + dir * 5;
-        if (new_val < 0)
-            ch = 0;
-        else if (new_val > 255)
-            ch = 255;
-        else
-            ch = new_val;
+//     auto on_select = [&slider, &ch, on_change = std::move(on_change)] (int dir) {
+//         int new_val = ch + dir * 5;
+//         if (new_val < 0)
+//             ch = 0;
+//         else if (new_val > 255)
+//             ch = 255;
+//         else
+//             ch = new_val;
 
-        slider.SetSelection(std::to_string(ch));
-        on_change();
+//         slider.SetSelection(std::to_string(ch));
+//         on_change();
+//     };
+    
+//     on_select(0);
+//     slider.SetOnSelect(on_select);
+// }
+
+// static void AddColorSliders(game::RemoteMenu& menu, glm::u8vec3& color, std::string name, std::function<void()> on_change)
+// {
+//     AddColorChannelSlider(menu, color.r, name + " ^f00R", on_change);
+//     AddColorChannelSlider(menu, color.g, name + " ^0f0G", on_change);
+//     AddColorChannelSlider(menu, color.b, name + " ^00fB", on_change);
+// }
+
+// static void AddWheelTypeSlider(game::RemoteMenu& menu, const assets::VehicleTuningList& tuning_list, size_t& idx, std::function<void()> on_change)
+// {
+//     auto& slider = menu.AddItem(game::RM_SELECT, "kola");
+    
+//     auto on_select = [&slider, &idx, &tuning_list, on_change = std::move(on_change)] (int dir) {
+//         auto& wheels = tuning_list.wheels;
+
+//         if (dir < 0 && idx == 0)
+//             return;
+
+//         if (dir > 0 && (idx + 1) >= wheels.size())
+//             return;
+
+//         idx += dir;
+
+//         slider.SetSelection(tuning_list.wheels[idx].displayname);
+//         on_change();
+//     };
+    
+//     on_select(0);
+//     slider.SetOnSelect(on_select);
+// }
+
+
+void game::TuningWorld::AddTuningGroupSelect(game::RemoteMenu& menu, const VehicleTuningGroup& group)
+{
+    size_t num_parts = group.parts.size();
+    if (num_parts == 0)
+        return;
+
+    struct SliderState
+    {
+        const VehicleTuningGroup* group;
+        int idx = 0;
+        std::vector<std::string> ids;
     };
-    
-    on_select(0);
-    slider.SetOnSelect(on_select);
-}
 
-static void AddColorSliders(game::RemoteMenu& menu, glm::u8vec3& color, std::string name, std::function<void()> on_change)
-{
-    AddColorChannelSlider(menu, color.r, name + " ^f00R", on_change);
-    AddColorChannelSlider(menu, color.g, name + " ^0f0G", on_change);
-    AddColorChannelSlider(menu, color.b, name + " ^00fB", on_change);
-}
+    std::string current_part;
 
-static void AddWheelTypeSlider(game::RemoteMenu& menu, const assets::VehicleTuningList& tuning_list, size_t& idx, std::function<void()> on_change)
-{
-    auto& slider = menu.AddItem(game::RM_SELECT, "kola");
-    
-    auto on_select = [&slider, &idx, &tuning_list, on_change = std::move(on_change)] (int dir) {
-        auto& wheels = tuning_list.wheels;
+    auto current_it = tuning_.parts.find(group.id);
+    if (current_it != tuning_.parts.end())
+    {
+        current_part = current_it->second;
+    }
 
-        if (dir < 0 && idx == 0)
-            return;
+    auto state = std::make_shared<SliderState>();
+    state->group = &group;
 
-        if (dir > 0 && (idx + 1) >= wheels.size())
-            return;
+    state->ids.reserve(num_parts);
+    size_t i = 0;
+    for (const auto& part : group.parts)
+    {
+        state->ids.push_back(part.first);
+        
+        if (part.first == current_part)
+            state->idx = i;
+        
+        ++i;
+    }
 
-        idx += dir;
+    auto& slider = menu.AddItem(game::RM_SELECT, group.displayname);
 
-        slider.SetSelection(tuning_list.wheels[idx].displayname);
-        on_change();
+    auto on_select = [&slider, this, state](int dir) mutable {
+        if (dir < 0 && state->idx == 0)
+            state->idx = state->ids.size() - 1;
+        else if (dir > 0 && (state->idx + 1) >= state->ids.size())
+            state->idx = 0;
+        else
+            state->idx += dir;
+
+        auto& part_id = state->ids[state->idx];
+        tuning_.parts[state->group->id] = part_id;
+        slider.SetSelection(state->group->parts.at(part_id).displayname);
+
+        if (dir != 0)
+            vehicle_->SetTuning(tuning_);
+
     };
     
     on_select(0);
@@ -133,14 +192,19 @@ void game::TuningWorld::DisplayTuningMenu()
     auto& menu = player_->DisplayMenu("tuning");
     menu_ = &menu;
 
-    auto on_change =  [this] { UpdateTuning(); };
+    // auto on_change =  [this] { UpdateTuning(); };
 
-    AddColorSliders(menu, tun_primary_color_, "primární", on_change);
+    // AddColorSliders(menu, tun_primary_color_, "primární", on_change);
 
-    if (!tuning_list_->wheels.empty())
+    // if (!tuning_list_->wheels.empty())
+    // {
+    //     AddWheelTypeSlider(menu, *tuning_list_, tun_wheel_idx_, on_change);
+    //     AddColorSliders(menu, tun_wheel_color_, "kola", on_change);
+    // }
+
+    for (const auto& group : tuning_list_->groups)
     {
-        AddWheelTypeSlider(menu, *tuning_list_, tun_wheel_idx_, on_change);
-        AddColorSliders(menu, tun_wheel_color_, "kola", on_change);
+        AddTuningGroupSelect(menu, group);
     }
 
     auto& exit_btn = menu.AddItem(RM_BUTTON, "vylézt");

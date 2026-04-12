@@ -20,6 +20,8 @@ public:
 
     DrivableVehicle(World& world, const VehicleTuning& tuning);
 
+    virtual void OnPhysicsChanged() override;
+    
     virtual bool QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res) override;
     virtual void Use(PlayerCharacter& character, uint32_t target_id) override;
 

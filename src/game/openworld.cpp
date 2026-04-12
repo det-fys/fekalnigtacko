@@ -56,9 +56,10 @@ game::OpenWorld::OpenWorld() : EnterableWorld("openworld")
     // initial twingo
     VehicleTuning twingo_tuning;
     twingo_tuning.model = "twingo";
-    twingo_tuning.primary_color = 0x0077FF;
-    twingo_tuning.wheels_idx = 1; // enkei
-    twingo_tuning.wheel_color = 0x00FF00;
+    twingo_tuning.parts["primarycolor"] = "orange";
+    // twingo_tuning.primary_color = 0x0077FF;
+    // twingo_tuning.wheels_idx = 1; // enkei
+    // twingo_tuning.wheel_color = 0x00FF00;
 
     auto& veh = Spawn<game::DrivableVehicle>(twingo_tuning);
     veh.SetPosition({110.0f, 100.0f, 5.0f});
@@ -83,10 +84,22 @@ game::DrivableVehicle& game::OpenWorld::SpawnRandomVehicle()
 {
     game::VehicleTuning tuning;
     tuning.model = GetRandomCarModel();
-    tuning.primary_color = GetRandomColor24();
+    // tuning.primary_color = GetRandomColor24();
 
     auto& vehicle = Spawn<game::DrivableVehicle>(tuning);
     // vehicle.SetNametag("bot (" + std::to_string(vehicle.GetEntNum()) + ")");
+
+    auto& tuning_list = vehicle.GetTuningList();
+    auto& colors = tuning_list->groups[0].parts;
+
+    size_t random_color = rand() % colors.size();
+
+    auto item = colors.begin();
+    std::advance( item, random_color);
+
+    tuning.parts["primarycolor"] = item->second.id;
+
+    vehicle.SetTuning(tuning);
 
     return vehicle;
 }

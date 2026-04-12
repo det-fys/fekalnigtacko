@@ -6,11 +6,11 @@
 #include "assets/vehiclemdl.hpp"
 #include "collision/motionstate.hpp"
 #include "collision/raycastvehicle.hpp"
-#include "entity.hpp"
-#include "world.hpp"
-#include "vehicle_sync.hpp"
 #include "deform_grid.hpp"
+#include "entity.hpp"
+#include "vehicle_sync.hpp"
 #include "vehicle_tuning.hpp"
+#include "world.hpp"
 
 namespace game
 {
@@ -33,6 +33,26 @@ enum VehicleInputType
     VIN_HANDBRAKE,
 };
 
+class VehiclePhysics
+{
+public:
+    VehiclePhysics(collision::DynamicsWorld& world, Transform& transform, collision::ObjectCallback& obj_cb,
+                   const assets::VehicleModel& model, const VehicleTuningContext& tuning);
+
+    DELETE_COPY_MOVE(VehiclePhysics)
+
+    btRigidBody& GetBtBody() { return *body_; }
+    collision::RaycastVehicle& GetBtVehicle() { return *vehicle_; }
+
+    ~VehiclePhysics();
+
+private:
+    collision::DynamicsWorld& world_;
+    collision::MotionState motion_;
+    std::unique_ptr<btRigidBody> body_;
+    std::unique_ptr<collision::RaycastVehicle> vehicle_;
+};
+
 class Vehicle : public Entity
 {
 public:
@@ -48,10 +68,8 @@ public:
     void SetInput(VehicleInputType type, bool enable);
     void SetInputs(VehicleInputFlags inputs) { in_ = inputs; }
 
-    glm::vec3 GetPosition() const;
     void SetPosition(const glm::vec3& pos);
 
-    glm::quat GetRotation() const;
     float GetSpeed() const;
 
     void SetSteering(bool analog, float value = 0.0f);
@@ -60,16 +78,17 @@ public:
 
     const std::string& GetModelName() const { return tuning_.model; }
     const std::shared_ptr<const assets::VehicleModel>& GetModel() const { return model_; }
+    
     const VehicleTuning& GetTuning() const { return tuning_; }
-
-    virtual ~Vehicle();
+    const std::shared_ptr<const VehicleTuningList>& GetTuningList() const { return tuninglist_; }
+    const VehicleTuningContext& GetTuningResult() const { return tuning_ctx_; }
 
 private:
     void ProcessInput();
     void UpdateCrash();
     void UpdateWheels();
     void UpdateSyncState();
-    
+
     VehicleSyncFieldFlags WriteState(net::OutMessage& msg, const VehicleSyncState& base) const;
     void SendUpdateMsg();
 
@@ -77,26 +96,28 @@ private:
     void Deform(const glm::vec3& pos, const glm::vec3& deform, float radius);
     void SendDeformMsg(const net::PositionQ& pos, const net::PositionQ& deform);
 
+    void ApplyTuning(const VehicleTuning& tuning);
+
     void WriteTuning(net::OutMessage& msg) const;
 
 protected:
-    btRigidBody& GetBtBody() { return *body_; }
+    VehiclePhysics* GetPhysics() { return physics_.get(); }
+    virtual void OnPhysicsChanged() {}
 
 private:
     VehicleTuning tuning_;
     std::shared_ptr<const assets::VehicleModel> model_;
+    std::shared_ptr<const VehicleTuningList> tuninglist_;
 
-    collision::MotionState motion_;
-    std::unique_ptr<btRigidBody> body_;
-    std::unique_ptr<collision::RaycastVehicle> vehicle_;
+    VehicleTuningContext tuning_ctx_;
+
+    std::unique_ptr<VehiclePhysics> physics_;
 
     float steering_ = 0.0f;
     bool steering_analog_ = false;
     float target_steering_ = 0.0f;
-    float wheel_z_offset_ = 0.0f;
 
-    size_t num_wheels_ = 0;
-    std::array<VehicleWheelState, MAX_WHEELS> wheels_;
+    std::vector<VehicleWheelState> wheels_;
 
     VehicleFlags flags_ = VF_NONE;
     VehicleSyncState sync_[2];

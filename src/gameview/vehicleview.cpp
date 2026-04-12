@@ -128,7 +128,7 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
         gfx::DrawSurfaceCmd cmd;
         cmd.surface = &surface;
         cmd.matrices = &root_.matrix;
-        cmd.color = &color_;
+        cmd.color = &colors_[0];
         args.dlist.AddSurface(cmd);
     }
 
@@ -188,28 +188,29 @@ void game::view::VehicleView::InitMesh()
 
 bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
 {
-    uint32_t color, wheel_color;
-    net::TuningPartIdx wheel_idx;
+    // read colors
+    for (size_t i = 0; i < 4; ++i)
+    {
+        uint32_t color;
 
-    const auto& tuninglist = model_->GetTuningList();
+        if (!net::ReadRGB(msg, color))
+            return false;
 
-    if (!net::ReadRGB(msg, color))
-        return false;
+        colors_[i] = glm::unpackUnorm4x8(color);
+    }
 
-    color_ = glm::unpackUnorm4x8(color);
-
-    // wheels
-    if (!msg.Read(wheel_idx) || !net::ReadRGB(msg, wheel_color))
-        return false;
-
-    auto wheelmodel = wheel_idx < tuninglist.wheels.size() ? assets::CacheManager::GetModel("data/" + tuninglist.wheels[wheel_idx].model + ".mdl") : nullptr;
-    glm::vec3 wheelcolor = glm::unpackUnorm4x8(wheel_color);
-
+    // read wheel models
     for (size_t i = 0; i < wheels_.size(); ++i)
     {
-        auto& wheel = wheels_[i];
-        wheel.model = wheelmodel ? wheelmodel : model_->GetWheels()[i].model;
-        wheel.color = glm::vec4(wheelcolor, 1.0f);
+        net::ModelName wheelmodel_fixed;
+
+        if (!msg.Read(wheelmodel_fixed))
+            return false;
+
+        std::string wheel_model_name = wheelmodel_fixed;
+
+        wheels_[i].model = !wheel_model_name.empty() ? assets::CacheManager::GetModel("data/" + wheel_model_name + ".mdl") : model_->GetWheels()[i].model;
+        wheels_[i].color = colors_[1]; // TODO: dynamic?;
     }
 
     return true;
