@@ -272,12 +272,54 @@ void game::Vehicle::ProcessInput()
         }
     }
 
-
     if (glm::abs(engineForce) > 0)
         flags_ |= VF_ACCELERATING;
 
     if (glm::abs(breakingForce) > 0)
         flags_ |= VF_BREAKING;
+
+    const bool can_roll = wheels_on_ground_ <= (wheels_.size() / 2);
+
+    if (can_roll)
+        ++can_roll_frames_;
+    else
+        can_roll_frames_ = 0;
+
+
+    const bool roll_left = in_left || (steering_analog_ && target_steering_ < -0.1f);
+    const bool roll_right = in_right || (steering_analog_ && target_steering_ > 0.1f);
+
+    // check if airborne and apply roll if right/left pressed
+    if (can_roll_frames_ >= 50 && (roll_left || roll_right))
+    {
+        btVector3 ang_vel = physics_->GetBtBody().getAngularVelocity();
+
+        const float max_vel = 5.0f;
+
+        btTransform trans = physics_->GetBtBody().getWorldTransform();
+        btQuaternion quat = trans.getRotation();
+        glm::quat rot_quat(quat.getW(), quat.getX(), quat.getY(), quat.getZ());
+        glm::vec3 local_up_world = rot_quat * glm::vec3(0.0f, 0.0f, 1.0f);
+        float roll_factor = glm::clamp(1.0f - local_up_world.z, 0.0f, 1.0f);
+        glm::vec3 local_roll(0.0f, 0.5f * roll_factor, 0.0f);
+        glm::vec3 local_ang_vel = glm::inverse(rot_quat) * glm::vec3(ang_vel.x(), ang_vel.y(), ang_vel.z());
+
+        if (glm::abs(local_ang_vel.y) < max_vel)
+        {
+            glm::vec3 world_roll = rot_quat * local_roll;
+            glm::vec3 new_ang_vel = glm::vec3(ang_vel.x(), ang_vel.y(), ang_vel.z());
+
+            if (roll_left)
+                new_ang_vel -= world_roll;
+            
+                if (roll_right)
+                new_ang_vel += world_roll;
+
+            ang_vel = btVector3(new_ang_vel.x, new_ang_vel.y, new_ang_vel.z);
+        }
+
+        physics_->GetBtBody().setAngularVelocity(ang_vel);
+    }
 }
 
 void game::Vehicle::UpdateCrash()
@@ -324,12 +366,17 @@ void game::Vehicle::UpdateWheels()
 {
     auto& vehicle = physics_->GetBtVehicle();
 
+    wheels_on_ground_ = 0;
+
     for (size_t i = 0; i < wheels_.size(); ++i)
     {
         auto& bt_wheel = vehicle.getWheelInfo(i);
         wheels_[i].speed = -(bt_wheel.m_rotation - wheels_[i].rotation) * 25.0f;
         wheels_[i].rotation = bt_wheel.m_rotation;
         wheels_[i].z_offset = tuning_ctx_.wheels[i].z_offset - bt_wheel.m_raycastInfo.m_suspensionLength;
+        
+        if (bt_wheel.m_raycastInfo.m_isInContact)
+            ++wheels_on_ground_;
     }
 }
 

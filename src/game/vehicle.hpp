@@ -131,6 +131,10 @@ private:
     size_t no_crash_frames_ = 0;
 
     std::unique_ptr<DeformGrid> deformgrid_;
+
+    size_t wheels_on_ground_ = 0;
+    size_t can_roll_frames_ = 0;
+
 };
 
 } // namespace game
