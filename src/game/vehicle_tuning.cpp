@@ -158,7 +158,7 @@ std::unique_ptr<const game::VehicleTuningList> game::VehicleTuningList::LoadFrom
     auto process_command = [&](const std::string& command, std::istringstream& iss) {
         if (command == "group")
         {
-            VehicleTuningGroup group;
+            VehicleTuningGroup group{};
             iss >> group.id;
             group.displayname = assets::ParseString(iss);
 
@@ -172,13 +172,26 @@ std::unique_ptr<const game::VehicleTuningList> game::VehicleTuningList::LoadFrom
             if (!current_group)
                 throw std::runtime_error("tuning list: part without active group");
 
-            VehicleTuningPart part;
+            VehicleTuningPart part{};
             iss >> part.id >> part.price;
             part.displayname = assets::ParseString(iss);
 
             current_part = &(current_group->parts[part.id] = std::move(part));
 
             return true;
+        }
+        else if (command == "stock")
+        {
+            if (!current_group)
+                throw std::runtime_error("tuning list: stock without active group");
+
+            std::string part_id;
+            iss >> part_id;
+            auto part_it = current_group->parts.find(part_id);
+            if (part_it == current_group->parts.end())
+                throw std::runtime_error("tuning list: stock references unknown part " + part_id);
+
+            part_it->second.stock = true;
         }
         else if (command == "default")
         {

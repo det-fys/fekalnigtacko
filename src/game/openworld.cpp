@@ -90,14 +90,36 @@ game::DrivableVehicle& game::OpenWorld::SpawnRandomVehicle()
     // vehicle.SetNametag("bot (" + std::to_string(vehicle.GetEntNum()) + ")");
 
     auto& tuning_list = vehicle.GetTuningList();
-    auto& colors = tuning_list->groups[0].parts;
 
-    size_t random_color = rand() % colors.size();
+    // make random tuning 
+    std::vector<std::string> suitable_part_ids;
+    for (const auto& group : tuning_list->groups)
+    {
+        suitable_part_ids.clear();
 
-    auto item = colors.begin();
-    std::advance( item, random_color);
+        bool add_nonstock = rand() % 100 < 3;
 
-    tuning.parts["primarycolor"] = item->second.id;
+        for (const auto& part : group.parts)
+        {
+            if (part.second.stock || add_nonstock)
+                suitable_part_ids.push_back(part.first);
+        }
+        
+        if (suitable_part_ids.empty())
+            continue;
+
+        size_t random_part = rand() % suitable_part_ids.size();
+        tuning.parts[group.id] = suitable_part_ids[random_part];
+    }
+
+    // auto& colors = tuning_list->groups[0].parts;
+
+    // size_t random_color = rand() % colors.size();
+
+    // auto item = colors.begin();
+    // std::advance( item, random_color);
+
+    // tuning.parts["primarycolor"] = item->second.id;
 
     vehicle.SetTuning(tuning);
 
