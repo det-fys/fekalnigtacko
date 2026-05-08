@@ -15,6 +15,7 @@ void game::NpcCharacter::VehicleChanged()
     path_.clear();
     gas_ = false;
     stuck_counter_ = 0;
+    vehicle_state_ = NVT_NORMAL;
     speed_limit_ = 0.0f;
 
     if (GetVehicle() && IsDriver())
@@ -86,6 +87,22 @@ void game::NpcCharacter::VehicleThink()
 {
     if (!IsDriver() || !GetVehicle() || !roads_)
         return;
+
+    if (vehicle_state_ == NVT_REVERSING)
+    {
+        if (reversing_frames_ > 0)
+        {
+            --reversing_frames_;
+        }
+        else
+        {
+            vehicle_state_ = NVT_NORMAL;
+            stuck_counter_ = 0;
+            vehicle_->SetInput(game::VIN_BACKWARD, false);
+        }
+        return;
+    }
+
 
     const auto& vehicle_trans = GetVehicle()->GetRootTransform();
 
@@ -203,8 +220,14 @@ void game::NpcCharacter::VehicleThink()
             //    BotThink(s);
             //});
 
-            GetVehicle()->SetInputs(0); // stop
-            is_driver_ = false; // TODO: fix 
+            vehicle_->SetSteering(true, -angle); // try turn away while reversing
+            vehicle_->SetInputs(0); // stop
+            vehicle_->SetInput(game::VIN_BACKWARD, true);
+            vehicle_state_ = NVT_REVERSING;
+            reversing_frames_ = 50; // reverse for 50 frames
+
+            // GetVehicle()->SetInputs(0); // stop
+            // is_driver_ = false; // TODO: fix 
             return;
         }
     }
