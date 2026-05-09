@@ -294,7 +294,7 @@ void game::Vehicle::ProcessInput()
     {
         btVector3 ang_vel = physics_->GetBtBody().getAngularVelocity();
 
-        const float max_vel = 5.0f;
+        const float max_vel = 1.0f;
 
         btTransform trans = physics_->GetBtBody().getWorldTransform();
         btQuaternion quat = trans.getRotation();
@@ -316,9 +316,9 @@ void game::Vehicle::ProcessInput()
                 new_ang_vel += world_roll;
 
             ang_vel = btVector3(new_ang_vel.x, new_ang_vel.y, new_ang_vel.z);
+            physics_->GetBtBody().setAngularVelocity(ang_vel);
         }
 
-        physics_->GetBtBody().setAngularVelocity(ang_vel);
     }
 }
 
@@ -333,7 +333,7 @@ void game::Vehicle::UpdateCrash()
     }
     else
     {
-        if (crash_intensity_ > 1000.0f)
+        if (crash_intensity_ > 300.0f)
         {
             float volume = RandomFloat(0.9f, 1.2f);
             float pitch = RandomFloat(1.0f, 1.3f);
@@ -355,7 +355,7 @@ void game::Vehicle::UpdateCrash()
             }
 
             PlaySound("crash", volume, pitch);
-            no_crash_frames_ = 7 + rand() % 10;
+            no_crash_frames_ = 3 + rand() % 10;
         }
     }
 

@@ -38,7 +38,7 @@ private:
     std::shared_ptr<const assets::Model> model_;
     net::ObjNum num_;
     std::unique_ptr<btRigidBody> body_;
-    float destr_th_ = 10.0f;
+    float destr_th_ = 1.0f;
 };
 
 class MapInstance
