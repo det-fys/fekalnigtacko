@@ -9,7 +9,11 @@ namespace game
 class OpenWorld : public EnterableWorld
 {
 public:
+    using Super = EnterableWorld;
+
     OpenWorld();
+
+    virtual void Update(int64_t delta_time) override;
 
 private: 
     game::DrivableVehicle& SpawnRandomVehicle();
@@ -17,6 +21,7 @@ private:
 
 private:
     std::vector<NpcCharacter*> npcs_;
+    float daytime_offset_ = 0.0f;
 };
 
 }

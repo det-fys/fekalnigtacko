@@ -38,12 +38,18 @@ game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) :
     Cache(assets::CacheManager::GetSound("data/breakwood.snd"));
     Cache(assets::CacheManager::GetSound("data/cardoor.snd"));
     Cache(assets::CacheManager::GetSound("data/crash.snd"));
+
+    env_ = std::make_unique<WorldEnv>();
+    env_->SetDayTime(12.0f);
 }
 
 bool game::view::WorldView::ProcessMsg(net::MessageType type, net::InMessage& msg)
 {
     switch (type)
     {
+    case net::MSG_ENV:
+        return ProcessEnvMsg(msg);
+
     case net::MSG_ENTSPAWN:
         return ProcessEntSpawnMsg(msg);
 
@@ -78,6 +84,8 @@ void game::view::WorldView::Update(const UpdateInfo& info)
     {
         ent->TryUpdate(info);
     }
+
+    UpdateEnv();
 }
 
 void game::view::WorldView::Draw(const DrawArgs& args) const
@@ -88,7 +96,7 @@ void game::view::WorldView::Draw(const DrawArgs& args) const
         return;
     }
 
-    args.env.clear_color = glm::vec3(0.5f, 0.7f, 1.0f);
+    DrawEnv(args);
 
     map_->Draw(args);
 
@@ -147,6 +155,53 @@ void game::view::WorldView::DrawLoadingScreen(const DrawArgs& args) const
 
     std::string load_text = std::to_string(loaded_percent) + "%";
     args.gui.DrawTextAligned(load_text, pos + glm::vec2(size.x + 50.0f, size.y * 0.5f), glm::vec2(-0.5f, -0.5f));
+}
+
+void game::view::WorldView::UpdateEnv()
+{
+    if (!env_)
+        return;
+
+    env_->SetDayTime(glm::mix(daytime0_, daytime1_, glm::clamp(GetTime() - env_msg_time_, 0.0f, 1.0f)));
+}
+
+void game::view::WorldView::DrawEnv(const DrawArgs& args) const
+{
+    if (env_)
+    {
+        env_->Draw(args);
+        return;
+    }
+
+    // args.env.clear_color = glm::vec3(0.5f, 0.7f, 1.0f);
+    
+    args.env.clear_color = glm::vec3(0.1f, 0.15f, 0.3f);
+    args.env.ambient_light = glm::vec3(0.4f, 0.4f, 0.4f);
+    args.env.sun_color = glm::vec3(0.5f, 0.8f, 1.0f) * 0.4f;
+    args.env.sun_direction = glm::normalize(glm::vec3(1.0f, 1.0f, -1.0f));
+
+
+}
+
+bool game::view::WorldView::ProcessEnvMsg(net::InMessage& msg)
+{
+    float new_daytime;
+
+    if (!msg.Read<net::DayTimeQ>(new_daytime))
+        return false;
+
+    if (!env_)
+        return true;
+
+    env_msg_time_ = GetTime();
+    daytime0_ = env_->GetDayTime();
+    daytime1_ = new_daytime;
+
+    if (daytime1_ < daytime0_)
+        daytime0_ -= 24.0f;
+
+
+    return true;
 }
 
 bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)

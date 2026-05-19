@@ -5,3 +5,4 @@
 
 #define SHF_CULL_ALPHA 1
 #define SHF_BACKGROUND 2
+#define SHF_UNLIT 4

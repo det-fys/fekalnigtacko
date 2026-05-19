@@ -13,6 +13,10 @@ static const char* const s_uni_names[] = {
     "u_camera",             // SU_CAMERA
     "u_deform_tex",         // SU_DEFORM_TEX
     "u_deform_info",        // SU_DEFORM_INFO
+    "u_ambient_light",      // SU_AMBIENT_LIGHT
+    "u_sun_color",          // SU_SUN_COLOR
+    "u_sun_direction",      // SU_SUN_DIRECTION
+    "u_fog",                // SU_FOG
 };
 
 // Vytvori shader z daneho zdroje

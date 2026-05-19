@@ -26,6 +26,8 @@ enum SurfaceFlag : SurfaceFlags
     SF_BLEND_ADDITIVE = 0x04, // use additive blending instead of opacity
     SF_OBJECT_COLOR = 0x08,   // use object color for background instead of alpha culling
     SF_DEFORM_GRID = 0x10,    // use deform grid
+    SF_UNLIT = 0x20,          // dont apply lighting
+    SF_OBJECT_COLOR_MULT = 0x40, // object color multiplies instead of acting as background
 };
 
 struct Surface

@@ -9,6 +9,7 @@
 #include "collision/dynamicsworld.hpp"
 #include "entityview.hpp"
 #include "mapinstanceview.hpp"
+#include "worldenv.hpp"
 
 namespace game::view
 {
@@ -35,7 +36,11 @@ public:
 private:
     void DrawLoadingScreen(const DrawArgs& args) const;
 
+    void UpdateEnv();
+    void DrawEnv(const DrawArgs& args) const;
+
     // msg handlers
+    bool ProcessEnvMsg(net::InMessage& msg);
     bool ProcessEntSpawnMsg(net::InMessage& msg);
     bool ProcessEntMsgMsg(net::InMessage& msg);
     bool ProcessUpdateEntsMsg(net::InMessage& msg);
@@ -50,9 +55,14 @@ private:
     
     std::unique_ptr<MapInstanceView> map_;
     std::map<net::EntNum, std::unique_ptr<EntityView>> ents_;
-    
+    std::unique_ptr<WorldEnv> env_;
+
     float time_ = 0.0f;
     
+    float daytime0_ = 0.0f;
+    float daytime1_ = 0.0f;
+    float env_msg_time_ = 0.0f;
+
     audio::Master& audiomaster_;
 
     std::vector<std::any> cache_;

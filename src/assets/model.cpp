@@ -107,6 +107,11 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                 {
                     CLIENT_ONLY(sflags |= gfx::SF_OBJECT_COLOR;)
                 }
+                else if (flag == "+ocolor_mult")
+                {
+                    CLIENT_ONLY(sflags |= gfx::SF_OBJECT_COLOR;)
+                    CLIENT_ONLY(sflags |= gfx::SF_OBJECT_COLOR_MULT;)
+                }
                 else if (flag == "+blend")
                 {
                     std::string blend_str;
@@ -117,6 +122,10 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                         if (blend_str == "additive")
                             sflags |= gfx::SF_BLEND_ADDITIVE;
                     )
+                }
+                else if (flag == "+unlit")
+                {
+                    CLIENT_ONLY(sflags |= gfx::SF_UNLIT;)
                 }
             }
 

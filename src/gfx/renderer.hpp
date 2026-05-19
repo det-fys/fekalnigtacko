@@ -11,7 +11,11 @@ namespace gfx
 
 struct DrawListEnvironmentParams
 {
-    glm::vec3 clear_color;    
+    glm::vec3 clear_color;
+    glm::vec3 ambient_light;
+    glm::vec3 sun_color;
+    glm::vec3 sun_direction;
+    glm::vec4 fog; // alpha = distance
 };
 
 struct DrawListParams

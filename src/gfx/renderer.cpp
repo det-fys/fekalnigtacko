@@ -117,6 +117,12 @@ void gfx::Renderer::SetupMeshShader(MeshShader& mshader, const DrawListParams& p
 
 	glUniformMatrix4fv(shader.U(gfx::SU_VIEW_PROJ), 1, GL_FALSE, &params.view_proj[0][0]);
 
+	// setup lighting
+	glUniform3fv(shader.U(gfx::SU_AMBIENT_LIGHT), 1, &params.env.ambient_light[0]);
+	glUniform3fv(shader.U(gfx::SU_SUN_COLOR), 1, &params.env.sun_color[0]);
+	glUniform3fv(shader.U(gfx::SU_SUN_DIRECTION), 1, &params.env.sun_direction[0]);
+	glUniform4fv(shader.U(gfx::SU_FOG), 1, &params.env.fog[0]);
+
 	mshader.global_setup = true;
 }
 
@@ -188,7 +194,9 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		const bool twosided_flag = surface->sflags & SF_2SIDED;
 		const bool blend_flag = surface->sflags & SF_BLEND;
 		const bool object_color_flag = surface->sflags & SF_OBJECT_COLOR;
+		const bool object_color_mult_flag = surface->sflags & SF_OBJECT_COLOR_MULT;
 		const bool deform_flag = surface->sflags & SF_DEFORM_GRID;
+		const bool unlit_flag = surface->sflags & SF_UNLIT;
 
 		// sync 2sided
 		if (last_twosided != twosided_flag)
@@ -223,10 +231,19 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		if (object_color_flag && cmd.color)
 		{
 			// use object color and disable alpha cull
-			shflags &= ~SHF_CULL_ALPHA;
-			shflags |= SHF_BACKGROUND;
+			
+			if (!object_color_mult_flag)
+			{
+				shflags &= ~SHF_CULL_ALPHA;
+				shflags |= SHF_BACKGROUND;
+			}
+
 			color = glm::vec4(*cmd.color);
 		}
+
+		// check unlit
+		if (unlit_flag)
+			shflags |= SHF_UNLIT;
 
 		// sync blending
 		if (blend_flag != last_blend)

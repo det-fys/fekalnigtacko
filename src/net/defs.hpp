@@ -34,6 +34,9 @@ enum MessageType : uint8_t
     // CHWORLD <MapName>
     MSG_CHWORLD,
 
+    // ENV <DayTimeQ>
+    MSG_ENV,
+
     // CAM <EntNum>
     MSG_CAM,
 
@@ -75,6 +78,9 @@ constexpr long long PI_D = 78256779;
 
 using ViewYawQ = Quantized<uint16_t, 0, 2 * PI_N, PI_D>;
 using ViewPitchQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
+
+// env
+using DayTimeQ = Quantized<uint16_t, 0, 24>;
 
 // entities
 using EntNum = uint16_t;
@@ -181,6 +187,5 @@ enum MenuActionType
 };
 
 using MenuSelectDir = uint8_t; // 0=left, 1=right
-
 
 } // namespace net

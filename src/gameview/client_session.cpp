@@ -228,7 +228,9 @@ void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListPar
     // 0.0f, 1.0f));
     float aspect = static_cast<float>(params.screen_width) / static_cast<float>(params.screen_height);
 
-    glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 3000.0f);
+    const float farplane = 3000.0f;
+
+    glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, farplane);
     glm::vec3 eye;
     glm::mat4 view;
     GetViewInfo(eye, view);
@@ -239,7 +241,7 @@ void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListPar
     // glm::mat4 fake_view_proj = glm::perspective(glm::radians(30.0f), aspect, 0.1f, 3000.0f) * view;
 
     game::view::DrawArgs draw_args(dlist, params.env, gui, params.view_proj, eye,
-                                   glm::ivec2(params.screen_width, params.screen_height), 500.0f);
+                                   glm::ivec2(params.screen_width, params.screen_height), farplane, 500.0f);
     world_->Draw(draw_args);
 
     glm::mat4 camera_world = glm::inverse(view);

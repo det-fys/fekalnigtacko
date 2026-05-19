@@ -90,6 +90,8 @@ set(CLIENT_ONLY_SOURCES
     "src/gameview/skinning_ubo.cpp"
     "src/gameview/vehicleview.hpp"
     "src/gameview/vehicleview.cpp"
+    "src/gameview/worldenv.hpp"
+    "src/gameview/worldenv.cpp"
     "src/gameview/worldview.hpp"
     "src/gameview/worldview.cpp"
     "src/gfx/buffer_object.cpp"

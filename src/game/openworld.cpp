@@ -78,6 +78,16 @@ game::OpenWorld::OpenWorld() : EnterableWorld("openworld")
         });
     }
 
+    daytime_offset_ = static_cast<float>(rand() % 24);
+
+}
+
+void game::OpenWorld::Update(int64_t delta_time)
+{
+    Super::Update(delta_time);
+
+    const float timespeed = 0.05f;
+    SetDayTime(static_cast<float>(GetTime()) * 0.001f * timespeed + daytime_offset_); 
 }
 
 game::DrivableVehicle& game::OpenWorld::SpawnRandomVehicle()

@@ -116,6 +116,7 @@ void game::Player::SyncWorld()
     if (world_)
     {
         SendWorldUpdateMsg();
+        SendEnv();
         SyncEntities();
     }
 }
@@ -125,6 +126,8 @@ void game::Player::SendWorldMsg()
     MSGDEBUG(std::cout << "seding CHWORLD" << std::endl;)
     auto msg = BeginMsg(net::MSG_CHWORLD);
     world_->SendInitData(*this, msg);
+
+    last_env_time_ = 0; // reset after world changed
 }
 
 void game::Player::SendWorldUpdateMsg()
@@ -134,6 +137,17 @@ void game::Player::SendWorldUpdateMsg()
 
     auto msg = BeginMsg(); // no CMD here, included in world payload
     msg.Write(world_->GetMsg());
+}
+
+void game::Player::SendEnv()
+{
+    if (!world_ || last_env_time_ + 1000 > world_->GetTime())
+        return;
+
+    last_env_time_ = world_->GetTime();
+
+    auto msg = BeginMsg(net::MSG_ENV);
+    msg.Write<net::DayTimeQ>(world_->GetDayTime());
 }
 
 void game::Player::SyncEntities()

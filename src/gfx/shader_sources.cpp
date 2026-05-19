@@ -19,6 +19,9 @@
 #define SHADER_DEFS \
     "#define MAX_LIGHTS " STRINGIFY(SD_MAX_LIGHTS) "\n" \
     "#define MAX_BONES " STRINGIFY(SD_MAX_BONES) "\n" \
+    "#define SHF_CULL_ALPHA " STRINGIFY(SHF_CULL_ALPHA) "\n" \
+    "#define SHF_BACKGROUND " STRINGIFY(SHF_BACKGROUND) "\n" \
+    "#define SHF_UNLIT " STRINGIFY(SHF_UNLIT) "\n" \
     "\n"
 
 #define SHADER_HEADER \
@@ -32,6 +35,12 @@
 
 #define LIGHT_MATRICES_GLSL R"GLSL(
     uniform vec3 u_ambient_light;
+    uniform vec3 u_sun_direction;
+    uniform vec3 u_sun_color;
+    uniform vec4 u_fog;
+
+    uniform int u_flags;
+
     uniform int u_num_lights;
     uniform vec3 u_light_positions[MAX_LIGHTS];
     uniform vec4 u_light_colors_rs[MAX_LIGHTS]; // rgb = color, a = radius
@@ -39,13 +48,18 @@
 
 #define COMPUTE_LIGHTS_GLSL R"GLSL(
 // Example sun values (can later be uniforms)
-vec3 u_sun_direction = normalize(vec3(0.3, 0.5, -0.8)); // direction from which sunlight comes
-vec3 u_sun_color = vec3(1.0, 0.95, 0.7) * 0.9;              // warm sunlight color
+//vec3 u_sun_direction = normalize(vec3(0.3, 0.5, -0.8)); // direction from which sunlight comes
+//vec3 u_sun_color = vec3(1.0, 0.95, 0.7) * 0.9;              // warm sunlight color
+
+//uniform vec3 u_ambient_light;
 
 vec3 ComputeLights(in vec3 sector_pos, in vec3 sector_normal)
 {
+    if ((u_flags & SHF_UNLIT) > 0)
+        return vec3(1.0);
+
     // Base ambient
-    vec3 color = vec3(0.5, 0.5, 0.5) * 0.9; // u_ambient_light
+    vec3 color = u_ambient_light; //vec3(0.5, 0.5, 0.5) * 0.9; // u_ambient_light
 
     // Sunlight contribution
     float sun_dot = max(dot(sector_normal, -u_sun_direction), 0.0);
@@ -107,9 +121,6 @@ R"GLSL(
 in vec2 v_uv;
 in vec3 v_color;
 
-#define SHF_CULL_ALPHA 1
-#define SHF_BACKGROUND 2
-
 uniform sampler2D u_tex;
 uniform vec4 u_color;
 uniform int u_flags;
@@ -119,15 +130,19 @@ layout (location = 0) out vec4 o_color;
 void main() {
     o_color = vec4(texture(u_tex, v_uv));
     
+    if ((u_flags & SHF_BACKGROUND) > 0)
+    {
+        o_color = mix(u_color, o_color, o_color.a);
+    }
+    else
+    {
+        o_color *= u_color;
+    }
+
     if ((u_flags & SHF_CULL_ALPHA) > 0)
     {
         if (o_color.a < 0.5)
             discard;
-    }
-    else if ((u_flags & SHF_BACKGROUND) > 0)
-    {
-        // blend with bg
-        o_color = mix(u_color, o_color, o_color.a);
     }
     
     o_color.rgb *= v_color; // Apply vertex color
@@ -183,9 +198,6 @@ R"GLSL(
 in vec2 v_uv;
 in vec3 v_color;
 
-#define SHF_CULL_ALPHA 1
-#define SHF_BACKGROUND 2
-
 uniform sampler2D u_tex;
 uniform vec4 u_color;
 uniform int u_flags;
@@ -195,15 +207,19 @@ layout (location = 0) out vec4 o_color;
 void main() {
     o_color = vec4(texture(u_tex, v_uv));
     
+    if ((u_flags & SHF_BACKGROUND) > 0)
+    {
+        o_color = mix(u_color, o_color, o_color.a);
+    }
+    else
+    {
+        o_color *= u_color;
+    }
+
     if ((u_flags & SHF_CULL_ALPHA) > 0)
     {
         if (o_color.a < 0.5)
             discard;
-    }
-    else if ((u_flags & SHF_BACKGROUND) > 0)
-    {
-        // blend with bg
-        o_color = mix(u_color, o_color, o_color.a);
     }
     
     o_color.rgb *= v_color; // Apply vertex color
@@ -253,9 +269,6 @@ R"GLSL(
 in vec2 v_uv;
 in vec3 v_color;
 
-#define SHF_CULL_ALPHA 1
-#define SHF_BACKGROUND 2
-
 uniform sampler2D u_tex;
 uniform vec4 u_color;
 uniform int u_flags;
@@ -265,15 +278,19 @@ layout (location = 0) out vec4 o_color;
 void main() {
     o_color = vec4(texture(u_tex, v_uv));
     
+    if ((u_flags & SHF_BACKGROUND) > 0)
+    {
+        o_color = mix(u_color, o_color, o_color.a);
+    }
+    else
+    {
+        o_color *= u_color;
+    }
+
     if ((u_flags & SHF_CULL_ALPHA) > 0)
     {
         if (o_color.a < 0.5)
             discard;
-    }
-    else if ((u_flags & SHF_BACKGROUND) > 0)
-    {
-        // blend with bg
-        o_color = mix(u_color, o_color, o_color.a);
     }
     
     o_color.rgb *= v_color; // Apply vertex color

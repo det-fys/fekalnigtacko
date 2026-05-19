@@ -53,6 +53,7 @@ private:
     void SyncWorld();
     void SendWorldMsg();
     void SendWorldUpdateMsg();
+    void SendEnv();
 
     // entities sync
     void SyncEntities();
@@ -78,6 +79,7 @@ private:
     World* world_ = nullptr;
     World* known_world_ = nullptr;
     std::set<net::EntNum> known_ents_;
+    int64_t last_env_time_ = 0;
 
     PlayerInputFlags in_ = 0;
     float view_yaw_ = 0.0f, view_pitch_ = 0.0f;

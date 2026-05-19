@@ -49,6 +49,8 @@ public:
     const std::string& GetMapName() const { return map_.GetName(); }
     const std::map<net::EntNum, std::unique_ptr<Entity>>& GetEntities() const { return ents_; }
     const int64_t& GetTime() const { return time_ms_; }
+    float GetDayTime() const { return daytime_; }
+    void SetDayTime(float daytime) { daytime_ = glm::mod(daytime, 24.0f); }
 
     virtual ~World() = default;
 
@@ -68,6 +70,7 @@ private:
     net::EntNum last_entnum_ = 0;
 
     int64_t time_ms_ = 0;
+    float daytime_ = 12.0f;
 };
 
 } // namespace game
