@@ -74,7 +74,7 @@ public:
 
     void SetSteering(bool analog, float value = 0.0f);
 
-    void SetTuning(const VehicleTuning& tuning);
+    virtual void SetTuning(const VehicleTuning& tuning);
 
     const std::string& GetModelName() const { return tuning_.model; }
     const std::shared_ptr<const assets::VehicleModel>& GetModel() const { return model_; }

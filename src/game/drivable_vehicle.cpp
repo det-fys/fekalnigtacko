@@ -8,6 +8,12 @@ game::DrivableVehicle::DrivableVehicle(World& world, const VehicleTuning& tuning
     OnPhysicsChanged();
 }
 
+void game::DrivableVehicle::SetTuning(const VehicleTuning& tuning)
+{
+    Super::SetTuning(tuning);
+    UpdateUseTargetNames(); // to update vehicle color in usetarget names
+}
+
 void game::DrivableVehicle::OnPhysicsChanged()
 {
     // make body usable
@@ -94,9 +100,6 @@ static std::string GetColorTextPrefix(uint32_t color)
 
 void game::DrivableVehicle::InitSeats()
 {
-    uint32_t color = GetTuningResult().colors[0];
-    std::string prefix = "vlízt do " + GetColorTextPrefix(color) + GetModelName() + "^r";
-
     const auto& veh = *GetModel();
     for (char c = '0'; c <= '9'; ++c)
     {
@@ -110,6 +113,19 @@ void game::DrivableVehicle::InitSeats()
         seats_.emplace_back(seat);
 
         uint32_t id = seats_.size() - 1;
-        use_targets_.emplace_back(this, id, seat.position, prefix + " (místo " + std::to_string(id + 1) + ")");
+        use_targets_.emplace_back(this, id, seat.position, std::string());
+    }
+
+    UpdateUseTargetNames();
+}
+
+void game::DrivableVehicle::UpdateUseTargetNames()
+{
+    uint32_t color = GetTuningResult().colors[0];
+    std::string prefix = "vlízt do " + GetColorTextPrefix(color) + GetModelName() + "^r";
+
+    for (auto& target : use_targets_)
+    {
+        target.desc = prefix + " (místo " + std::to_string(target.id + 1) + ")";
     }
 }

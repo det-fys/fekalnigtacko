@@ -20,6 +20,8 @@ public:
 
     DrivableVehicle(World& world, const VehicleTuning& tuning);
 
+    virtual void SetTuning(const VehicleTuning& tuning) override;
+
     virtual void OnPhysicsChanged() override;
     
     virtual bool QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res) override;
@@ -34,6 +36,7 @@ public:
 
 private:
     void InitSeats();
+    void UpdateUseTargetNames();
 
 private:
     std::vector<VehicleSeat> seats_;
