@@ -1,8 +1,20 @@
 #include "entity.hpp"
 
 #include "world.hpp"
+#include "player.hpp"
 
-game::Entity::Entity(World& world, net::EntType viewtype) : Scheduler(world.GetTime()), world_(world), entnum_(world.GetNewEntnum()), viewtype_(viewtype) {}
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/norm.hpp>
+
+
+game::Entity::Entity(World& world, net::EntType viewtype) : Scheduler(world.GetTime()), world_(world), entnum_(world.GetNewEntnum()), viewtype_(viewtype)
+{
+    if (viewtype == net::ET_NONE)
+    {
+        visible_ = false;
+    }
+
+}
 
 void game::Entity::SendInitData(Player& player, net::OutMessage& msg) const
 {
@@ -67,6 +79,18 @@ void game::Entity::PlaySound(const std::string& name, float volume, float pitch)
     msg.Write(net::SoundName(name));
     msg.Write<net::SoundVolumeQ>(volume);
     msg.Write<net::SoundPitchQ>(pitch);
+}
+
+bool game::Entity::IsVisibleTo(const Player& player) const
+{
+    if (!visible_)
+        return false;
+
+    // max distance check
+    if (glm::distance2(root_.GetGlobalPosition(), player.GetCullPos()) > (max_distance_ * max_distance_))
+        return false;
+
+    return true;
 }
 
 void game::Entity::WriteNametag(net::OutMessage& msg) const

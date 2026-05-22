@@ -18,14 +18,8 @@ static uint32_t GetRandomColor24()
 
 game::Game::Game()
 {
-    openworld_ = std::make_shared<OpenWorld>();
-    all_worlds_.push_back(openworld_.get());
-
-    testworld_ = std::make_shared<EnterableWorld>("testarena");
-    all_worlds_.push_back(testworld_.get());
-    
-    garage_ = std::make_shared<TuningWorld>(*this, *openworld_, glm::vec3(0.0f), 0.0f, "garage");
-    all_worlds_.push_back(garage_.get());
+    openworld_ = std::make_shared<OpenWorld>(*this);
+    AddWorld(openworld_.get());
 }
 
 void game::Game::Update()
@@ -42,6 +36,11 @@ void game::Game::FinishFrame()
     {
         world->FinishFrame();
     }
+}
+
+void game::Game::AddWorld(World* world)
+{
+    all_worlds_.push_back(world);
 }
 
 void game::Game::PlayerJoined(Player& player)
@@ -71,29 +70,29 @@ void game::Game::PlayerInput(Player& player, PlayerInputType type, bool enabled)
 {
     switch (type)
     {
-    case IN_DEBUG2: {
-        if (!enabled)
-            return;
+    // case IN_DEBUG2: {
+    //     if (!enabled)
+    //         return;
 
-        // auto& player_info = players_.at(&player);
+    //     // auto& player_info = players_.at(&player);
 
-        // if (player_info.world == openworld_.get())
-        // {
-        //     MovePlayerToWorld(player_info, testworld_.get(), test_spawn, 0.0f, true);
-        // }
-        // else
-        // {
-        //     MovePlayerToWorld(player_info, openworld_.get(), openworld_spawn, 0.0f, true);
-        // }
+    //     // if (player_info.world == openworld_.get())
+    //     // {
+    //     //     MovePlayerToWorld(player_info, testworld_.get(), test_spawn, 0.0f, true);
+    //     // }
+    //     // else
+    //     // {
+    //     //     MovePlayerToWorld(player_info, openworld_.get(), openworld_spawn, 0.0f, true);
+    //     // }
 
-        MovePlayerToTuning(player);
+    //     MovePlayerToTuning(player);
 
-        break;
-    }
+    //     break;
+    // }
 
-    case IN_DEBUG3:
-        DisplayTestMenu(player);
-        break;
+    // case IN_DEBUG3:
+    //     // DisplayTestMenu(player);
+    //     break;
 
     default: {
         auto world = FindPlayerWorld(player);
@@ -223,70 +222,4 @@ game::EnterableWorld* game::Game::FindPlayerWorld(Player& player) const
         return nullptr;
 
     return it->second.world;
-}
-
-void game::Game::DisplayTestMenu(Player& player)
-{
-    if (player.HasOpenMenu())
-        return;
-
-    auto& menu = player.DisplayMenu("test");
-
-    auto& btn_echo = menu.AddItem(RM_BUTTON, "echo");
-    btn_echo.SetOnClick([&player] {
-        player.SendChat("echo test");
-    });
-
-    auto& btn_bc = menu.AddItem(RM_BUTTON, "broadcast");
-    btn_bc.SetOnClick([this, &player] {
-        BroadcastChat(player.GetName() + "^r mele hovna");
-    });
-
-    int test = 0;
-    auto& sel_test = menu.AddItem(RM_SELECT, "výběr");
-    sel_test.SetOnSelect([test, &sel_test] (int dir) mutable {
-        test += dir;
-        sel_test.SetSelection(std::to_string(test));
-    });
-    sel_test.SetSelection(std::to_string(test));
-
-
-    auto& btn_close = menu.AddItem(RM_BUTTON, "zavřít");
-    btn_close.SetOnClick([&menu, &player] {
-        player.CloseMenu(menu);
-    });
-
-}
-
-void game::Game::MovePlayerToTuning(Player& player)
-{
-    auto& player_info = GetPlayerInfo(player);
-    
-    if (player_info.world != openworld_.get())
-        return;
-
-    if (garage_->IsOccupied())
-    {
-        player.SendChat("bohužel tam teď oxiduje nějakej píčus " + garage_->GetOccupantName() + "^r!");
-        return;
-    }
-
-    auto character = player_info.world->GetPlayerCharacter(player);
-    if (!character)
-        return;
-
-    auto vehicle = character->GetVehicle();
-    if (!vehicle)
-    {
-        player.SendChat("nemáš vehikl!!!");
-        return;
-    }
-
-    if (vehicle->GetPassenger(0) != character)
-    {
-        player.SendChat("nejsi ridič!!");
-        return;
-    }
-
-    MovePlayerToWorld(player_info, garage_.get(), glm::vec3(0.0f), 0.0f, true);
 }

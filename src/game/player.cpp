@@ -249,14 +249,7 @@ void game::Player::SyncEntities()
 
 bool game::Player::ShouldSeeEntity(const Entity& entity) const
 {
-    // max distance check
-    float max_dist = entity.GetMaxDistance();
-    if (glm::distance2(entity.GetRoot().GetGlobalPosition(), cull_pos_) > (max_dist * max_dist))
-        return false;
-
-    // TODO: custom callback
-
-    return true;
+    return entity.IsVisibleTo(*this);
 }
 
 void game::Player::SendInitEntity(const Entity& entity)

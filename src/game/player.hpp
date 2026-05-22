@@ -46,6 +46,8 @@ public:
     float GetViewYaw() const { return view_yaw_; }
     float GetViewPitch() const { return view_pitch_; }
 
+    const glm::vec3 GetCullPos() const { return cull_pos_; }
+
     ~Player();
 
 private:

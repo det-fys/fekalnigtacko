@@ -333,7 +333,7 @@ void game::Vehicle::UpdateCrash()
     }
     else
     {
-        if (crash_intensity_ > 300.0f)
+        if (crash_intensity_ > 1000.0f)
         {
             float volume = RandomFloat(0.9f, 1.2f);
             float pitch = RandomFloat(1.0f, 1.3f);
@@ -355,7 +355,7 @@ void game::Vehicle::UpdateCrash()
             }
 
             PlaySound("crash", volume, pitch);
-            no_crash_frames_ = 3 + rand() % 10;
+            no_crash_frames_ = 7 + rand() % 10;
         }
     }
 

@@ -44,6 +44,8 @@ public:
 
 protected:
     std::vector<UseTarget> use_targets_;
+
+private:
     const glm::mat4& matrix_;
 };
 

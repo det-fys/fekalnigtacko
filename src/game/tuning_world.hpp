@@ -20,6 +20,8 @@ public:
     virtual void OnVehicleJoined(DrivableVehicle& vehicle);
     virtual void OnPlayerLeaving(Player& player);
 
+    void SetOnExit(std::function<void()> cb) { exit_cb_ = cb; }
+
     bool IsOccupied() const { return player_ != nullptr; }
     const std::string& GetOccupantName() const;
 
@@ -45,6 +47,8 @@ private:
     game::RemoteMenu* menu_ = nullptr;
 
     VehicleTuning tuning_;
+
+    std::function<void()> exit_cb_;
 
 
 };

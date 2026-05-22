@@ -4,11 +4,13 @@
 
 #include "player.hpp"
 #include "vehicle.hpp"
-
 #include "player_character.hpp"
 #include "npc_character.hpp"
 #include "drivable_vehicle.hpp"
 #include "destroyed_object.hpp"
+#include "marker.hpp"
+#include "tuning_world.hpp"
+#include "game.hpp"
 
 namespace game
 {
@@ -45,7 +47,7 @@ static uint32_t GetRandomColor24()
     return (b << 16) | (g << 8) | r;
 }
 
-game::OpenWorld::OpenWorld() : EnterableWorld("openworld")
+game::OpenWorld::OpenWorld(Game& game) : EnterableWorld("openworld"), game_(game)
 {
     // spawn bots
     for (size_t i = 0; i < 100; ++i)
@@ -80,6 +82,8 @@ game::OpenWorld::OpenWorld() : EnterableWorld("openworld")
 
     daytime_offset_ = static_cast<float>(rand() % 24);
 
+    CreateTuningGarage(glm::vec3(0.0f, 0.0f, 0.0f), 0.0f);
+
 }
 
 void game::OpenWorld::Update(int64_t delta_time)
@@ -88,6 +92,17 @@ void game::OpenWorld::Update(int64_t delta_time)
 
     const float timespeed = 0.05f;
     SetDayTime(static_cast<float>(GetTime()) * 0.001f * timespeed + daytime_offset_); 
+}
+
+void game::OpenWorld::PlayerInput(Player& player, PlayerInputType type, bool enabled)
+{
+    if (type == IN_DEBUG2 && enabled)
+    {
+        RecoverPlayer(player);
+        return;
+    }
+
+    Super::PlayerInput(player, type, enabled);
 }
 
 game::DrivableVehicle& game::OpenWorld::SpawnRandomVehicle()
@@ -156,4 +171,132 @@ void game::OpenWorld::SpawnBot()
 
     auto& driver = Spawn<NpcCharacter>(npc_tuning);
     driver.SetVehicle(&vehicle, 0);
+}
+
+void game::OpenWorld::CreateTuningGarage(const glm::vec3& position, float yaw)
+{
+    auto garage = std::make_shared<TuningWorld>(game_, *this, position, yaw, "garage");
+    game_.AddWorld(garage.get());
+
+    MarkerInfo marker_info{};
+    marker_info.position = position;
+    marker_info.type = MARKER_VEHICLE;
+    marker_info.color = 0x884400;
+    marker_info.icon = "tuning";
+
+    auto& marker = Spawn<Marker>(marker_info);
+    marker.SetUseTarget("vject do tunírny", 
+        [garage](PlayerCharacter& character, UseTargetQueryResult& res) {
+            
+            auto player = character.GetPlayer();          
+            auto vehicle = character.GetVehicle();
+            
+            if (!vehicle)
+            {
+                res.enabled = false;
+                res.error_text = "nemáš vehikl";
+                return true;
+            }
+
+            if (vehicle->GetPassenger(0) != &character)
+            {
+                return false; // not driver
+            }
+
+            if (garage->IsOccupied())
+            {
+                res.enabled = false;
+                res.error_text = "někdo tam už oxiduje";
+                return true;
+            }
+
+            res.enabled = true;
+            res.error_text = nullptr;
+            res.delay = 0.2f;
+            return true;
+        },
+        [this, garage, &marker](PlayerCharacter& character) {
+            auto player = character.GetPlayer();
+            game_.MovePlayerToWorld(*player, *garage, true, glm::vec3(0.0f), 0.0f);
+            marker.SetNametag(player->GetName());
+        }
+    );
+
+    garage->SetOnExit([&marker]() {
+        marker.SetNametag(std::string());
+    });
+}
+
+void game::OpenWorld::RecoverPlayer(Player& player)
+{
+    auto character = GetPlayerCharacter(player);
+    if (!character)
+        return;
+
+    auto vehicle = character->GetVehicle();
+
+    if (!vehicle)
+    {
+        auto pos = character->GetRoot().GetGlobalPosition();
+        glm::vec3 recovery;
+        if (GetRecoveryPosition(pos, recovery))
+        {
+            character->SetPosition(recovery);
+        }
+        else
+        {
+            player.SendChat("nejsi pod zemí");
+        }
+        return;
+    }
+
+    if (vehicle->GetPassenger(0) != character)
+        return; // not driver
+
+    auto pos = vehicle->GetRoot().GetGlobalPosition();
+    glm::vec3 recovery;
+    if (GetRecoveryPosition(pos, recovery))
+    {
+        vehicle->SetPosition(recovery);
+    }
+    else
+    {
+        player.SendChat("nejsi pod zemí");
+    }
+}
+
+static bool RecoveryRaycast(btCollisionWorld& bt_world, const glm::vec3& pos, glm::vec3& hit)
+{
+    btVector3 bt_from(pos.x, pos.y, 100.0f);
+    btVector3 bt_to(pos.x, pos.y, -100.0f);
+    btCollisionWorld::ClosestRayResultCallback cb(bt_from, bt_to);
+    bt_world.rayTest(bt_from, bt_to, cb);
+
+    if (!cb.hasHit())
+        return false;
+
+    hit = glm::vec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
+    return true;
+}
+
+bool game::OpenWorld::GetRecoveryPosition(const glm::vec3& current, glm::vec3& recovery)
+{
+    glm::vec3 start = current;
+    start = glm::max(start, glm::vec3(-2500.0f, -2500.0f, -1000.0f));
+    start = glm::min(start, glm::vec3(3400.0f, 3100.0f, 1000.0f));
+
+    if (!RecoveryRaycast(GetBtWorld(), start, recovery))
+    {
+        recovery = glm::vec3(0.0f, 0.0f, 5.0f);
+        return true;
+
+    }
+
+    if (recovery.z - 5.0f < current.z)
+    {
+        return false; // already above ground
+    }
+
+    recovery.z += 5.0f;
+    return true;
 }

@@ -93,6 +93,7 @@ enum EntType : uint8_t
     ET_SIMPLE,
     ET_CHARACTER,
     ET_VEHICLE,
+    ET_MARKER,
     
     ET_COUNT,
 };

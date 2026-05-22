@@ -5,6 +5,7 @@
 #include "simple_entity_view.hpp"
 #include "characterview.hpp"
 #include "vehicleview.hpp"
+#include "markerview.hpp"
 #include "client_session.hpp"
 #include "draw_args.hpp"
 
@@ -230,6 +231,10 @@ bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)
     
         case net::ET_VEHICLE:
             entslot = std::make_unique<VehicleView>(*this, msg);
+            break;
+
+        case net::ET_MARKER:
+            entslot = std::make_unique<MarkerView>(*this, msg);
             break;
 
         default:

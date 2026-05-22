@@ -136,9 +136,11 @@ struct UseTargetAabbCallback : public btBroadphaseAabbCallback
             float dist = glm::distance(pos, pos_world);
             if (dist < 2.0f && dist < best_dist)
             {
-                if (!usable->QueryUseTarget(character, target.id, best_res))
+                game::UseTargetQueryResult res{};
+                if (!usable->QueryUseTarget(character, target.id, res))
                     continue;
 
+                best_res = res;
                 best_dist = dist;
                 best_target = &target;
             }

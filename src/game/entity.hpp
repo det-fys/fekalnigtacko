@@ -49,6 +49,7 @@ public:
     const TransformNode& GetRoot() const { return root_; }
     const Transform& GetRootTransform() const { return root_.local; }
 
+    bool IsVisibleTo(const Player& player) const;
     float GetMaxDistance() const { return max_distance_; }
 
     virtual ~Entity() = default;
@@ -73,6 +74,7 @@ protected:
     TransformNode root_;
     Entity* parent_ = nullptr;
 
+    bool visible_ = true;
     float max_distance_ = 700.0f;
 
     bool removed_ = false;

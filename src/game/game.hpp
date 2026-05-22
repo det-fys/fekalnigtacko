@@ -27,6 +27,8 @@ public:
     void Update();
     void FinishFrame();
 
+    void AddWorld(World* world);
+
     void PlayerJoined(Player& player);
     void PlayerViewAnglesChanged(Player& player, float yaw, float pitch);
     void PlayerInput(Player& player, PlayerInputType type, bool enabled);
@@ -44,9 +46,6 @@ private:
 
     PlayerGameInfo& GetPlayerInfo(Player& player);
     EnterableWorld* FindPlayerWorld(Player& player) const;
-
-    void DisplayTestMenu(Player& player);
-    void MovePlayerToTuning(Player& player);
 
 private:
     std::shared_ptr<OpenWorld> openworld_;

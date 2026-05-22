@@ -219,6 +219,9 @@ void game::TuningWorld::Reset()
     {
         player_->CloseMenu(*menu_);
         game_.MovePlayerToWorld(*player_, exit_world_, true, exit_pos_, exit_yaw_);
+
+        if (exit_cb_)
+            exit_cb_();
     }
 
     player_ = nullptr;
