@@ -5,6 +5,7 @@
 #include "assets/skeleton.hpp"
 #include "surface.hpp"
 #include "uniform_buffer.hpp"
+#include "surface_render_flags.hpp"
 
 namespace gfx
 {
@@ -18,6 +19,7 @@ struct DrawSurfaceCmd
     uint32_t count = 0;                  // num triangles
     float dist = 0.0f;                   // distance to camera - for transparnt sorting
     const UniformBuffer<glm::mat4>* skinning = nullptr; // skinning matrices for skeletal meshes
+    SurfaceRenderFlags rflags = 0;
 };
 
 struct DrawBeamCmd

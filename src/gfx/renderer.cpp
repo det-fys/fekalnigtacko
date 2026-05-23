@@ -14,9 +14,6 @@
 
 gfx::Renderer::Renderer()
 {
-    ShaderSources::MakeShader(mesh_shader_.shader, SS_MESH_VERT, SS_MESH_FRAG);
-    ShaderSources::MakeShader(skel_mesh_shader_.shader, SS_SKEL_MESH_VERT, SS_SKEL_MESH_FRAG);
-    ShaderSources::MakeShader(deform_mesh_shader_.shader, SS_DEFORM_MESH_VERT, SS_DEFORM_MESH_FRAG);
     ShaderSources::MakeShader(solid_shader_, SS_SOLID_VERT, SS_SOLID_FRAG);
     ShaderSources::MakeShader(hud_shader_, SS_HUD_VERT, SS_HUD_FRAG);
     ShaderSources::MakeShader(beam_shader_, SS_BEAM_VERT, SS_BEAM_FRAG);
@@ -89,20 +86,32 @@ void gfx::Renderer::SetupBeamVA()
 
 void gfx::Renderer::InvalidateShaders()
 {
-	InvalidateMeshShader(mesh_shader_);
-	InvalidateMeshShader(skel_mesh_shader_);
-	InvalidateMeshShader(deform_mesh_shader_);
+	// invalidate surface shaders
+	for (auto& [flags, sshader] : surface_shaders_)
+	{
+		InvalidateSurfaceShader(sshader);
+	}
 }
 
-void gfx::Renderer::InvalidateMeshShader(MeshShader& mshader)
+gfx::SurfaceShader& gfx::Renderer::GetSurfaceShader(SurfaceRenderFlags flags)
 {
-	mshader.global_setup = false;
-	mshader.color = glm::vec4(-1.0f); // invalidate color
+	auto it = surface_shaders_.find(flags);
+
+	// not yet generated
+	if (it == surface_shaders_.end())
+	{
+		SurfaceShader& sshader = surface_shaders_[flags];
+		sshader.shader = CreateSurfaceShader(flags, sshader.iflags);
+
+		return sshader;
+	}
+
+	return it->second;
 }
 
-void gfx::Renderer::SetupMeshShader(MeshShader& mshader, const DrawListParams& params)
+void gfx::Renderer::SetupSurfaceShader(SurfaceShader& sshader, const DrawListParams& params)
 {
-	const Shader& shader = *mshader.shader;
+	const Shader& shader = *sshader.shader;
 
 	if (current_shader_ != &shader)
 	{
@@ -110,7 +119,7 @@ void gfx::Renderer::SetupMeshShader(MeshShader& mshader, const DrawListParams& p
 		current_shader_ = &shader;
 	}
 
-	if (mshader.global_setup)
+	if (sshader.global_setup)
 	{
 		return; // Global uniforms are already set up
 	}
@@ -118,23 +127,65 @@ void gfx::Renderer::SetupMeshShader(MeshShader& mshader, const DrawListParams& p
 	glUniformMatrix4fv(shader.U(gfx::SU_VIEW_PROJ), 1, GL_FALSE, &params.view_proj[0][0]);
 
 	// setup lighting
-	glUniform3fv(shader.U(gfx::SU_AMBIENT_LIGHT), 1, &params.env.ambient_light[0]);
-	glUniform3fv(shader.U(gfx::SU_SUN_COLOR), 1, &params.env.sun_color[0]);
-	glUniform3fv(shader.U(gfx::SU_SUN_DIRECTION), 1, &params.env.sun_direction[0]);
-	glUniform4fv(shader.U(gfx::SU_FOG), 1, &params.env.fog[0]);
+	if (sshader.iflags & SIF_LIGHTING_DATA)
+	{
+		glUniform3fv(shader.U(gfx::SU_AMBIENT_LIGHT), 1, &params.env.ambient_light[0]);
+		glUniform3fv(shader.U(gfx::SU_SUN_COLOR), 1, &params.env.sun_color[0]);
+		glUniform3fv(shader.U(gfx::SU_SUN_DIRECTION), 1, &params.env.sun_direction[0]);
+		// glUniform4fv(shader.U(gfx::SU_FOG), 1, &params.env.fog[0]);
+	}
 
-	mshader.global_setup = true;
+	sshader.global_setup = true;
+}
+
+void gfx::Renderer::InvalidateSurfaceShader(SurfaceShader& sshader)
+{
+	sshader.global_setup = false;
+	sshader.color = glm::vec4(-1.0f); // invalidate color
 }
 
 void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawListParams& params)
 {
+	// determine render flags
+	for (auto& cmd : list)
+	{
+		if (cmd.surface->sflags & SF_BLEND)
+			cmd.rflags |= SRF_BLEND;
+
+		if (cmd.surface->texture)
+			cmd.rflags |= SRF_TEXTURE;
+
+		if ((cmd.surface->mflags & MF_SKELETAL) && cmd.skinning)
+			cmd.rflags |= SRF_SKELETAL;
+
+		if ((cmd.surface->sflags & SF_DEFORM_GRID) && cmd.surface->deform_tex)
+			cmd.rflags |= SRF_DEFORM;
+
+		if ((cmd.surface->sflags & SF_UNLIT) == 0)
+			cmd.rflags |= SRF_LIT;
+
+		if (cmd.color)
+		{
+			if (cmd.surface->sflags & SF_OBJECT_COLOR_MULT)
+				cmd.rflags |= SRF_OBJECT_COLOR;
+			else if (cmd.surface->sflags & SF_OBJECT_COLOR)
+				cmd.rflags |= SRF_OBJECT_COLOR | SRF_OBJECT_COLOR_BACKGROUND;
+		}
+
+		if (cmd.surface->sflags & SF_2SIDED)
+			cmd.rflags |= SRF_2SIDED;
+
+		if (cmd.surface->sflags & SF_BLEND_ADDITIVE)
+			cmd.rflags |= SRF_BLEND_ADDITIVE;
+
+		if ((cmd.surface->sflags & (SF_BLEND | SF_OBJECT_COLOR)) == 0)
+			cmd.rflags |= SRF_CULL_ALPHA;
+	}
+
 	// sort the list to minimize state changes
 	std::ranges::sort(list, [](const DrawSurfaceCmd& a, const DrawSurfaceCmd& b) {
-		const Surface* sa = a.surface;
-		const Surface* sb = b.surface;
-
-		const bool blend_a = sa->sflags & SF_BLEND;
-		const bool blend_b = sb->sflags & SF_BLEND;
+		const bool blend_a = a.rflags & SRF_BLEND;
+		const bool blend_b = b.rflags & SRF_BLEND;
 		
 		if (blend_a != blend_b)
 			return blend_b; // opaque first
@@ -144,8 +195,14 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 			return a.dist > b.dist; // do not optimize blended, sort by distance instead
 		}
 
-		if (sa == sb)
+		if (a.surface == b.surface)
 			return false;
+
+		if (auto cmp = a.rflags <=> b.rflags; cmp != 0)
+			return cmp < 0;
+
+		const auto sa = a.surface;
+		const auto sb = a.surface;
 
 		if (auto cmp = sa->texture <=> sb->texture; cmp != 0)
 			return cmp < 0;
@@ -162,12 +219,14 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 	glActiveTexture(GL_TEXTURE0); // for all future bindings
 
 	// cache to eliminate fake state changes
+	SurfaceShader* sshader = nullptr;
 	const gfx::Texture* last_texture = nullptr;
 	const gfx::VertexArray* last_vao = nullptr;
     const gfx::UniformBuffer<glm::mat4>* last_skin = nullptr;
 	const DeformTexture* last_deform = nullptr;
+
 	InvalidateShaders();
-	
+
 	// enable depth test
 	glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -175,80 +234,76 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 	// reset face culling
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
-	bool last_twosided = false;
 
 	// reset blending
 	glDisable(GL_BLEND);
 	glDepthMask(GL_TRUE);
-	bool last_blend = false;
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // set to opacity blending default
-	bool last_blend_additive = false;
+
+	SurfaceRenderFlags last_rflags = 0;
 	
 	for (const DrawSurfaceCmd& cmd : list)
 	{
 		const Surface* surface = cmd.surface;
 
-		// mesh flags
-		const bool skeletal_flag = surface->mflags & MF_SKELETAL;
-		// surface flags
-		const bool twosided_flag = surface->sflags & SF_2SIDED;
-		const bool blend_flag = surface->sflags & SF_BLEND;
-		const bool object_color_flag = surface->sflags & SF_OBJECT_COLOR;
-		const bool object_color_mult_flag = surface->sflags & SF_OBJECT_COLOR_MULT;
-		const bool deform_flag = surface->sflags & SF_DEFORM_GRID;
-		const bool unlit_flag = surface->sflags & SF_UNLIT;
+		// // mesh flags
+		// const bool skeletal_flag = surface->mflags & MF_SKELETAL;
+		// // surface flags
+		//const bool twosided_flag = cmd.rflags & SRF_2SIDED;
+		// const bool blend_flag = surface->sflags & SF_BLEND;
+		// const bool object_color_flag = surface->sflags & SF_OBJECT_COLOR;
+		// const bool object_color_mult_flag = surface->sflags & SF_OBJECT_COLOR_MULT;
+		// const bool deform_flag = surface->sflags & SF_DEFORM_GRID;
+		// const bool unlit_flag = surface->sflags & SF_UNLIT;
+
+		SurfaceRenderFlags rflags_diff = last_rflags ^ cmd.rflags;
 
 		// sync 2sided
-		if (last_twosided != twosided_flag)
+		if (rflags_diff & SRF_2SIDED)
 		{
-			if (twosided_flag)
+			if (cmd.rflags & SRF_2SIDED)
 				glDisable(GL_CULL_FACE);
 			else
 				glEnable(GL_CULL_FACE);
-
-			last_twosided = twosided_flag;
 		}
 
-		// select shader
-		MeshShader& mshader = skeletal_flag ? skel_mesh_shader_ : (deform_flag ? deform_mesh_shader_ : mesh_shader_);
-		SetupMeshShader(mshader, params);
+		// setup shader
+		SurfaceRenderFlags last_shader_rflags = last_rflags & SRF__SHADER;
+		SurfaceRenderFlags shader_rflags = cmd.rflags & SRF__SHADER;
+
+		if (last_shader_rflags != shader_rflags || !sshader)
+		{
+			sshader = &GetSurfaceShader(shader_rflags);
+			SetupSurfaceShader(*sshader, params);
+		}
+
+		auto shader = sshader->shader.get();
 
 		// set model matrix
 		if (cmd.matrices)
 		{
-			glUniformMatrix4fv(mshader.shader->U(SU_MODEL), 1, GL_FALSE, &cmd.matrices[0][0][0]);
+			glUniformMatrix4fv(shader->U(SU_MODEL), 1, GL_FALSE, &cmd.matrices[0][0][0]);
 		}
 		else
 		{ // use identity if no matrix provided
 			static const glm::mat4 identity(1.0f);
-			glUniformMatrix4fv(mshader.shader->U(SU_MODEL), 1, GL_FALSE, &identity[0][0]);
+			glUniformMatrix4fv(shader->U(SU_MODEL), 1, GL_FALSE, &identity[0][0]);
 		}
 
-		// set color
-		int shflags = SHF_CULL_ALPHA;
-
-		glm::vec4 color = glm::vec4(1.0f);
-		if (object_color_flag && cmd.color)
+		// sync color
+		if (sshader->iflags & SIF_OBJECT_COLOR)
 		{
-			// use object color and disable alpha cull
-			
-			if (!object_color_mult_flag)
+			if (sshader->color != *cmd.color)
 			{
-				shflags &= ~SHF_CULL_ALPHA;
-				shflags |= SHF_BACKGROUND;
+				glUniform4fv(shader->U(SU_COLOR), 1, &(*cmd.color)[0]);
+				sshader->color = *cmd.color;
 			}
-
-			color = glm::vec4(*cmd.color);
 		}
-
-		// check unlit
-		if (unlit_flag)
-			shflags |= SHF_UNLIT;
 
 		// sync blending
-		if (blend_flag != last_blend)
+		if (rflags_diff & SRF_BLEND)
 		{
-			if (blend_flag)
+			if (cmd.rflags & SRF_BLEND)
 			{
 				glEnable(GL_BLEND);
 				glDepthMask(GL_FALSE);
@@ -258,43 +313,19 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 				glDisable(GL_BLEND);
 				glDepthMask(GL_TRUE);
 			}
-
-			last_blend = blend_flag;
 		}
 
 		// sync blending type
-		if (blend_flag)
+		if ((cmd.rflags & SRF_BLEND) && (rflags_diff & SRF_BLEND_ADDITIVE))
 		{
-			shflags &= ~SHF_CULL_ALPHA;
-
-			const bool blend_additive = surface->sflags & SF_BLEND_ADDITIVE;
-			if (blend_additive != last_blend_additive)
-			{
-				if (blend_additive)
-					glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-				else
-					glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			}
-
-			last_blend_additive = blend_additive;
-		}
-		
-		// sync cull_alpha
-		if (mshader.flags != shflags)
-		{
-			glUniform1i(mshader.shader->U(SU_FLAGS), shflags);
-			mshader.flags = shflags;
-		}
-
-		// sync color
-		if (mshader.color != color)
-		{
-			glUniform4fv(mshader.shader->U(SU_COLOR), 1, &color[0]);
-			mshader.color = color;
+			if (cmd.rflags & SRF_BLEND_ADDITIVE)
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+			else
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		}
 
 		// bind texture
-		if (last_texture != surface->texture.get())
+		if ((sshader->iflags & SIF_COLOR_TEXTURE) && last_texture != surface->texture.get())
 		{
 			GLuint tex_id = surface->texture ? surface->texture->GetId() : 0;
 			glActiveTexture(GL_TEXTURE0);
@@ -303,14 +334,14 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		}
 		
 		// bind skinning UBO
-		if (cmd.skinning && last_skin != cmd.skinning)
+		if ((sshader->iflags & SIF_SKELETAL_DATA) && last_skin != cmd.skinning)
 		{
 			glBindBufferBase(GL_UNIFORM_BUFFER, 0, cmd.skinning->GetId());
             last_skin = cmd.skinning;
 		}
 		
 		// bind deform texture
-		if (deform_flag && surface->deform_tex.get() != last_deform)
+		if ((sshader->iflags & SIF_DEFORM_DATA) && surface->deform_tex.get() != last_deform)
 		{
 			const auto& deform_tex = *surface->deform_tex;
 			GLuint tex_id = deform_tex.GetId();
@@ -324,7 +355,7 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 			deform_info_mat[0] = deform_info.min;
 			deform_info_mat[1] = deform_info.max;
 			deform_info_mat[2] = glm::vec3(deform_info.max_offset, 0.0f, 0.0f);
-			glUniformMatrix3fv(mshader.shader->U(SU_DEFORM_INFO), 1, GL_FALSE, &deform_info_mat[0][0]);
+			glUniformMatrix3fv(shader->U(SU_DEFORM_INFO), 1, GL_FALSE, &deform_info_mat[0][0]);
 		}
 
 		// bind VAO
@@ -340,6 +371,8 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		// draw
 		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(num_tris * 3U), GL_UNSIGNED_INT,
 			(void*)(first_tri * 3U * sizeof(GLuint)));
+
+		last_rflags = cmd.rflags;
 	}
 
 	// reset this as it is rare and other stuff might not reset this

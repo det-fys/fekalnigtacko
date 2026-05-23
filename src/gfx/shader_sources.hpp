@@ -7,15 +7,6 @@ namespace gfx
 {
 	enum ShaderSource
 	{
-		SS_MESH_VERT,
-		SS_MESH_FRAG,
-
-		SS_SKEL_MESH_VERT,
-		SS_SKEL_MESH_FRAG,
-
-		SS_DEFORM_MESH_VERT,
-		SS_DEFORM_MESH_FRAG,
-
 		SS_SOLID_VERT,
 		SS_SOLID_FRAG,
 

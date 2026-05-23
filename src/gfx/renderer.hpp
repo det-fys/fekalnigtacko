@@ -5,6 +5,7 @@
 
 #include "draw_list.hpp"
 #include "shader.hpp"
+#include "surface_shader.hpp"
 
 namespace gfx
 {
@@ -27,14 +28,14 @@ struct DrawListParams
     size_t screen_height = 0;
 };
 
-struct MeshShader
+struct SurfaceShader
 {
     std::unique_ptr<Shader> shader;
+    SurfaceShaderInputFlags iflags;
 
     // cached state to avoid redundant uniform updates which are expensive especially on WebGL
     bool global_setup = false;
     glm::vec4 color = glm::vec4(-1.0f); // invalid to force initial setup
-    int flags = 0;
 };
 
 class Renderer
@@ -47,17 +48,17 @@ private:
     void SetupBeamVA();
 
     void InvalidateShaders();
-    void InvalidateMeshShader(MeshShader& mshader);
-    void SetupMeshShader(MeshShader& mshader, const DrawListParams& params);
+
+    SurfaceShader& GetSurfaceShader(SurfaceRenderFlags flags);
+    void SetupSurfaceShader(SurfaceShader& sshader, const DrawListParams& params);
+    void InvalidateSurfaceShader(SurfaceShader& sshader);
 
     void DrawSurfaceList(std::span<DrawSurfaceCmd> queue, const DrawListParams& params);
     void DrawBeamList(std::span<DrawBeamCmd> queue, const DrawListParams& params);
     void DrawHudList(std::span<DrawHudCmd> queue, const DrawListParams& params);
 
 private:
-    MeshShader mesh_shader_;
-    MeshShader skel_mesh_shader_;
-    MeshShader deform_mesh_shader_;
+    std::map<SurfaceRenderFlags, SurfaceShader> surface_shaders_;
     std::unique_ptr<Shader> solid_shader_;
 
     std::unique_ptr<BufferObject> beam_segments_vbo_;
