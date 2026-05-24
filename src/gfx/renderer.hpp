@@ -35,7 +35,7 @@ struct SurfaceShader
 
     // cached state to avoid redundant uniform updates which are expensive especially on WebGL
     bool global_setup = false;
-    glm::vec4 color = glm::vec4(-1.0f); // invalid to force initial setup
+    const glm::vec4* color = nullptr;
 };
 
 class Renderer
@@ -53,6 +53,8 @@ private:
     void SetupSurfaceShader(SurfaceShader& sshader, const DrawListParams& params);
     void InvalidateSurfaceShader(SurfaceShader& sshader);
 
+    void CreateLightGrid(std::span<DrawLightCmd> lights);
+
     void DrawSurfaceList(std::span<DrawSurfaceCmd> queue, const DrawListParams& params);
     void DrawBeamList(std::span<DrawBeamCmd> queue, const DrawListParams& params);
     void DrawHudList(std::span<DrawHudCmd> queue, const DrawListParams& params);
@@ -68,6 +70,11 @@ private:
     std::unique_ptr<Shader> hud_shader_;
 
     const Shader* current_shader_ = nullptr;
+
+    constexpr static size_t LIGHT_GRID_CELL_LIGHTS = SD_MAX_LIGHTS;
+    std::map<uint32_t, LightArray<LIGHT_GRID_CELL_LIGHTS>> light_grid_;
+
+    size_t frame_ = 0;
 };
 
 } // namespace gfx

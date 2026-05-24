@@ -28,6 +28,7 @@ enum SurfaceFlag : SurfaceFlags
     SF_DEFORM_GRID = 0x10,    // use deform grid
     SF_UNLIT = 0x20,          // dont apply lighting
     SF_OBJECT_COLOR_MULT = 0x40, // object color multiplies instead of acting as background
+    SF_MULTICOLOR = 0x80,     // multiple color slots encoded in alpha
 };
 
 struct Surface

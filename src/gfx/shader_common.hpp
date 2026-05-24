@@ -20,6 +20,7 @@
 #define SHADER_DEFS \
     "#define MAX_LIGHTS " STRINGIFY(SD_MAX_LIGHTS) "\n" \
     "#define MAX_BONES " STRINGIFY(SD_MAX_BONES) "\n" \
+    "#define MAX_COLORS " STRINGIFY(SD_MAX_COLORS) "\n" \
     "\n"
 
 #define SHADER_HEADER \

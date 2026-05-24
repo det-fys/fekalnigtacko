@@ -44,6 +44,7 @@ void game::Vehicle::Update()
     UpdateCrash();
     ProcessInput();
     UpdateWheels();
+    UpdateLights();
 
     sync_current_ = 1 - sync_current_;
     UpdateSyncState();
@@ -177,23 +178,38 @@ void game::Vehicle::ProcessInput()
     const bool in_left = in_ & (1 << VIN_LEFT);
     const bool in_right = in_ & (1 << VIN_RIGHT);
 
+    bool active_braking = false;
+    bool active_gas = false;
+
     if (in_forward)
     {
         if (speed < -1)
+        {
             breakingForce = maxBreakingForce;
+            active_braking = true;
+        }
         else
+        {
             engineForce = maxEngineForce;
+            active_gas = true;
+        }
     }
     if (in_backward)
     {
         if (speed > 1)
+        {
             breakingForce = maxBreakingForce;
+            active_braking = true;
+        }
         else
+        {
             engineForce = -maxEngineForce / 2;
+            active_gas = true;
+        }
     }
 
     // idle breaking
-    if (!in_forward && !in_backward)
+    if (!active_braking && !active_gas)
     {
         breakingForce = 20.0f;
     }
@@ -272,11 +288,14 @@ void game::Vehicle::ProcessInput()
         }
     }
 
-    if (glm::abs(engineForce) > 0)
+    if (active_gas)
         flags_ |= VF_ACCELERATING;
 
-    if (glm::abs(breakingForce) > 0)
-        flags_ |= VF_BREAKING;
+    if (active_braking)
+        flags_ |= VF_BRAKING;
+        
+    if (active_gas && engineForce < 0.0f)
+        flags_ |= VF_REVERSING;
 
     const bool can_roll = wheels_on_ground_ <= (wheels_.size() / 2);
 
@@ -378,6 +397,14 @@ void game::Vehicle::UpdateWheels()
         if (bt_wheel.m_raycastInfo.m_isInContact)
             ++wheels_on_ground_;
     }
+}
+
+void game::Vehicle::UpdateLights()
+{
+    if (lights_on_)
+        flags_ |= VF_LIGHTS_ON;
+
+    // TODO: orange lights
 }
 
 void game::Vehicle::UpdateSyncState()

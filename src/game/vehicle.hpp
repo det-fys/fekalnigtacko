@@ -74,6 +74,9 @@ public:
 
     void SetSteering(bool analog, float value = 0.0f);
 
+    void SetLightsOn(bool lights_on) { lights_on_ = lights_on; }
+    bool GetLightsOn() const { return lights_on_; }
+
     virtual void SetTuning(const VehicleTuning& tuning);
 
     const std::string& GetModelName() const { return tuning_.model; }
@@ -87,6 +90,7 @@ private:
     void ProcessInput();
     void UpdateCrash();
     void UpdateWheels();
+    void UpdateLights();
     void UpdateSyncState();
 
     VehicleSyncFieldFlags WriteState(net::OutMessage& msg, const VehicleSyncState& base) const;
@@ -134,6 +138,8 @@ private:
 
     size_t wheels_on_ground_ = 0;
     size_t can_roll_frames_ = 0;
+
+    bool lights_on_ = false;
 
 };
 

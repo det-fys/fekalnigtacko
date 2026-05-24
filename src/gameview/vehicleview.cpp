@@ -4,6 +4,7 @@
 #include "net/utils.hpp"
 #include "worldview.hpp"
 #include "utils/random.hpp"
+#include "utils/math.hpp"
 
 #include <iostream>
 #include <ranges>
@@ -18,6 +19,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
     model_ = assets::CacheManager::GetVehicleModel("data/" + std::string(modelname) + ".veh");
     mesh_ = *model_->GetModel()->GetMesh();
     InitMesh();
+    InitHeadlights();
     
     auto& modelwheels = model_->GetWheels();
     wheels_.resize(modelwheels.size());
@@ -117,6 +119,8 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
             mesh_.surfaces[idx].texture = assets::CacheManager::GetTexture("data/carbrokenwindows.png");
         }
     }
+
+    UpdateLights(info.delta_time);
 }
 
 void game::view::VehicleView::Draw(const DrawArgs& args)
@@ -129,6 +133,7 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
         cmd.surface = &surface;
         cmd.matrices = &root_.matrix;
         cmd.color = &colors_[0];
+        cmd.num_colors = SD_MAX_COLORS;
         args.dlist.AddSurface(cmd);
     }
 
@@ -156,6 +161,29 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
 
         args.dlist.AddBeam(start, end, 0xFFFFFF00, 0.01f);
         args.dlist.AddBeam(end, end2, 0xFFFF00FF, 0.01f);
+    }
+
+    // headlights
+    if (headlights_factor_ >= 0.01f)
+    {
+        // light
+        auto light_pos = world_.CameraSweep(root_.GetGlobalPosition(), root_.matrix * glm::vec4(0.0f, 7.0f, 0.0f, 1.0f));
+        args.dlist.AddLight(light_pos, glm::vec3(1.0f, 1.0f, 1.0f) * headlights_factor_, 5.0f);
+
+        // cones
+        for (size_t i = 0; i < num_headlights; ++i)
+        {
+            auto& cone_surfaces = light_cone_mdl_->GetMesh()->surfaces;
+            
+            for (const auto& surface : cone_surfaces)
+            {
+                gfx::DrawSurfaceCmd cmd;
+                cmd.surface = &surface;
+                cmd.matrices = &light_cone_node_[i].matrix;
+                cmd.color = &headlight_cone_color_;
+                args.dlist.AddSurface(cmd);
+            }
+        }
     }
 }
 
@@ -188,6 +216,8 @@ void game::view::VehicleView::InitMesh()
 
 bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
 {
+    glm::vec4 recv_colors[4];
+
     // read colors
     for (size_t i = 0; i < 4; ++i)
     {
@@ -196,7 +226,7 @@ bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
         if (!net::ReadRGB(msg, color))
             return false;
 
-        colors_[i] = glm::unpackUnorm4x8(color);
+        recv_colors[i] = glm::unpackUnorm4x8(color);
     }
 
     // read wheel models
@@ -210,8 +240,11 @@ bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
         std::string wheel_model_name = wheelmodel_fixed;
 
         wheels_[i].model = !wheel_model_name.empty() ? assets::CacheManager::GetModel("data/" + wheel_model_name + ".mdl") : model_->GetWheels()[i].model;
-        wheels_[i].color = colors_[1]; // TODO: dynamic?;
+        wheels_[i].color = recv_colors[1]; // TODO: dynamic?;
     }
+
+    colors_[VCS_PRIMARY] = recv_colors[0]; // primary
+    colors_[VCS_SECONDARY] = recv_colors[0]; // secondary
 
     return true;
 }
@@ -345,4 +378,53 @@ bool game::view::VehicleView::ProcessDeformMsg(net::InMessage& msg)
     return true;
 
 
+}
+
+void game::view::VehicleView::InitHeadlights()
+{
+    for (size_t i = 0; i < 2; ++i)
+    {
+        std::string loc_name = std::string("headlight") + static_cast<char>('0' + i);
+        auto loc = model_->GetLocation(loc_name);
+
+        if (!loc)
+            break;
+
+        if (!light_cone_mdl_)
+        {
+            light_cone_mdl_ = assets::CacheManager::GetModel("data/headlightcone.mdl");
+        }
+
+        light_cone_node_[i].parent = &root_;
+        light_cone_node_[i].local.position = loc->position;
+
+        ++num_headlights;
+    }
+}
+
+void game::view::VehicleView::UpdateLights(float delta_t)
+{
+    float max_delta = delta_t * 10.0f;
+
+    MoveToward(headlights_factor_, (flags_ & VF_LIGHTS_ON) ? 1.0f : 0.0f, max_delta);
+    MoveToward(braking_lights_factor_, (flags_ & VF_BRAKING) ? 1.0f : 0.0f, max_delta);
+    MoveToward(orange_lights_factor_, (flags_ & VF_ORANGE_LIGHTS_ON) ? 1.0f : 0.0f, max_delta);
+    MoveToward(reverse_light_factor_, (flags_ & VF_REVERSING) ? 1.0f : 0.0f, max_delta);
+
+    colors_[VCS_HEADLIGHTS] = glm::vec4(1.0f, 1.0f, 1.0f, headlights_factor_);
+    colors_[VCS_REAR_LIGHTS] = glm::vec4(1.0f, 1.0f, 1.0f, headlights_factor_ * 0.5f + braking_lights_factor_ * 1.0f);
+    colors_[VCS_BRAKING_LIGHTS] = glm::vec4(1.0f, 1.0f, 1.0f, braking_lights_factor_);
+    colors_[VCS_ORANGE_LIGHTS] = glm::vec4(1.0f, 1.0f, 1.0f, orange_lights_factor_);
+    colors_[VCS_REVERSE_LIGHT] = glm::vec4(1.0f, 1.0f, 1.0f, reverse_light_factor_);
+
+    if (headlights_factor_ < 0.01f)
+        return;
+
+    float intensity = headlights_factor_ * 0.2f;
+    headlight_cone_color_ = glm::vec4(intensity, intensity, intensity, 1.0f);
+
+    for (size_t i = 0; i < num_headlights; ++i)
+    {
+        light_cone_node_[i].UpdateMatrix();
+    }
 }

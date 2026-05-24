@@ -23,11 +23,14 @@ gfx::Renderer::Renderer()
 
 void gfx::Renderer::DrawList(gfx::DrawList& list, const DrawListParams& params)
 {
+	++frame_;
+
     current_shader_ = nullptr;
     glViewport(0, 0, params.screen_width, params.screen_height);
     glClearColor(params.env.clear_color.r, params.env.clear_color.g, params.env.clear_color.b, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	CreateLightGrid(list.lights);
 	DrawSurfaceList(list.surfaces, params);
 	DrawBeamList(list.beams, params);
     DrawHudList(list.huds, params);
@@ -141,7 +144,47 @@ void gfx::Renderer::SetupSurfaceShader(SurfaceShader& sshader, const DrawListPar
 void gfx::Renderer::InvalidateSurfaceShader(SurfaceShader& sshader)
 {
 	sshader.global_setup = false;
-	sshader.color = glm::vec4(-1.0f); // invalidate color
+    sshader.color = nullptr;
+}
+
+static glm::u32vec3 GetLightCellCoords(const glm::vec3& pos)
+{
+	// grid cell size = 20m
+	// grid size = 1000x1000x1000
+	return glm::clamp(glm::u32vec3(glm::floor(pos * 0.05f) + 500.0f), 0U, 1000U);
+}
+
+static uint32_t HashLightGridPosition(const glm::u32vec3& coords)
+{
+    return (coords.x << 20) | (coords.y << 10); // | coords.z;
+}
+
+void gfx::Renderer::CreateLightGrid(std::span<DrawLightCmd> lights)
+{
+	light_grid_.clear();
+
+	for (const auto& light : lights)
+	{
+		auto coords = GetLightCellCoords(light.position);
+
+		for (uint32_t x = coords.x - 1; x <= coords.x + 1; ++x)
+		{
+			for (uint32_t y = coords.y - 1; y <= coords.y + 1; ++y)
+			{
+				auto hash = HashLightGridPosition(glm::u32vec3(x, y, 0));
+				auto& cell = light_grid_[hash];
+				
+				if (cell.num_lights >= LIGHT_GRID_CELL_LIGHTS)
+					continue;
+		
+				cell.positions[cell.num_lights] = light.position;
+				cell.colors_rs[cell.num_lights] = glm::vec4(light.color, light.radius);
+		
+				++cell.num_lights;
+			}
+		}
+	}
+
 }
 
 void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawListParams& params)
@@ -170,6 +213,8 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 				cmd.rflags |= SRF_OBJECT_COLOR;
 			else if (cmd.surface->sflags & SF_OBJECT_COLOR)
 				cmd.rflags |= SRF_OBJECT_COLOR | SRF_OBJECT_COLOR_BACKGROUND;
+			else if (cmd.surface->sflags & SF_MULTICOLOR)
+				cmd.rflags |= SRF_MULTICOLOR;
 		}
 
 		if (cmd.surface->sflags & SF_2SIDED)
@@ -224,6 +269,7 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 	const gfx::VertexArray* last_vao = nullptr;
     const gfx::UniformBuffer<glm::mat4>* last_skin = nullptr;
 	const DeformTexture* last_deform = nullptr;
+	size_t last_numlights = -1;
 
 	InvalidateShaders();
 
@@ -245,17 +291,6 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 	for (const DrawSurfaceCmd& cmd : list)
 	{
 		const Surface* surface = cmd.surface;
-
-		// // mesh flags
-		// const bool skeletal_flag = surface->mflags & MF_SKELETAL;
-		// // surface flags
-		//const bool twosided_flag = cmd.rflags & SRF_2SIDED;
-		// const bool blend_flag = surface->sflags & SF_BLEND;
-		// const bool object_color_flag = surface->sflags & SF_OBJECT_COLOR;
-		// const bool object_color_mult_flag = surface->sflags & SF_OBJECT_COLOR_MULT;
-		// const bool deform_flag = surface->sflags & SF_DEFORM_GRID;
-		// const bool unlit_flag = surface->sflags & SF_UNLIT;
-
 		SurfaceRenderFlags rflags_diff = last_rflags ^ cmd.rflags;
 
 		// sync 2sided
@@ -279,24 +314,32 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 
 		auto shader = sshader->shader.get();
 
+		static const glm::mat4 identity(1.0f);
+		const glm::mat4* model = &identity;
+
 		// set model matrix
 		if (cmd.matrices)
 		{
-			glUniformMatrix4fv(shader->U(SU_MODEL), 1, GL_FALSE, &cmd.matrices[0][0][0]);
+			model = &cmd.matrices[0];
 		}
-		else
-		{ // use identity if no matrix provided
-			static const glm::mat4 identity(1.0f);
-			glUniformMatrix4fv(shader->U(SU_MODEL), 1, GL_FALSE, &identity[0][0]);
-		}
+
+		glUniformMatrix4fv(shader->U(SU_MODEL), 1, GL_FALSE, &(*model)[0][0]);
 
 		// sync color
 		if (sshader->iflags & SIF_OBJECT_COLOR)
 		{
-			if (sshader->color != *cmd.color)
+			if (sshader->color != cmd.color)
 			{
 				glUniform4fv(shader->U(SU_COLOR), 1, &(*cmd.color)[0]);
-				sshader->color = *cmd.color;
+				sshader->color = cmd.color;
+			}
+		}
+		else if (sshader->iflags & SIF_MULTICOLOR_DATA)
+		{
+			if (sshader->color != cmd.color && cmd.num_colors > 0)
+			{
+				glUniform4fv(shader->U(SU_COLOR), cmd.num_colors, &(*cmd.color)[0]);
+				sshader->color = cmd.color;
 			}
 		}
 
@@ -322,6 +365,37 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 			else
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		}
+
+		// sync lights
+		if ((cmd.rflags & SRF_LIT))
+		{
+			auto center = glm::vec3((*model)[3]);
+			auto it = light_grid_.find(HashLightGridPosition(GetLightCellCoords(center)));
+			
+			size_t numlights = 0;
+
+			if (it != light_grid_.end())
+			{
+				numlights = it->second.num_lights;
+			}
+
+			if (numlights == 0)
+			{
+				if (last_numlights > 0)
+				{
+					glUniform1i(shader->U(SU_NUMLIGHTS), 0);
+				}
+			}
+			else
+			{
+				auto& lights = it->second;
+				glUniform1i(shader->U(SU_NUMLIGHTS), numlights);
+				glUniform3fv(shader->U(SU_LIGHT_POSITIONS), numlights, &lights.positions[0][0]);
+				glUniform4fv(shader->U(SU_LIGHT_COLORS_RS), numlights, &lights.colors_rs[0][0]);
+			}
+
+			last_numlights = numlights;
 		}
 
 		// bind texture
@@ -517,3 +591,4 @@ void gfx::Renderer::DrawHudList(std::span<DrawHudCmd> queue, const DrawListParam
 		glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(count), GL_UNSIGNED_INT, (void*)(first * sizeof(GLuint)));
 	}
 }
+

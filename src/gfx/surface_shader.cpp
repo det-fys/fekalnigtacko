@@ -76,6 +76,26 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
 
         input_flags |= SIF_OBJECT_COLOR;
     }
+    else if (flags & SRF_MULTICOLOR)
+    {
+        frag_uniforms += "uniform vec4 u_color[MAX_COLORS];\n";
+        frag_main += R"GLSL(
+            int color_slot = clamp(int(o_color.a * 9.0), 0, MAX_COLORS);
+            o_color.a = 1.0;
+
+            float emis = 0.0;
+            
+            if (color_slot < MAX_COLORS)
+            {
+                vec4 color = u_color[color_slot];
+                o_color.rgb *= color.rgb;
+                emis = color.a;
+            }
+
+        )GLSL";
+
+        input_flags |= SIF_MULTICOLOR_DATA;
+    }
 
     // alpha culling
     if (flags & SRF_CULL_ALPHA)
@@ -119,8 +139,8 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
                     if (dist2 < light_radius * light_radius) {
                         float dist = sqrt(dist2);
                         float attenuation = 1.0 - (dist / light_radius);
-                        float dot_term = max(dot(sector_normal, normalize(to_light)), 0.0);
-                        color += light_color * dot_term * attenuation;
+                        //float dot_term = max(dot(sector_normal, normalize(to_light)), 0.0);
+                        color += light_color * attenuation;
                     }
                 }
 
@@ -179,7 +199,16 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
         input_flags |= SIF_DEFORM_DATA;
     }
 
-    frag_main += "o_color.rgb *= v_color;";
+    if (flags & SRF_MULTICOLOR)
+    {
+        frag_main += "o_color.rgb *= mix(v_color, vec3(1.5), emis);";
+    }
+    else
+    {
+        frag_main += "o_color.rgb *= v_color;";
+    }
+
+
     vert_main = vert_pos_calc + vert_main;
 
     std::string vertex_src = SHADER_HEADER + vert_attributes + vert_uniforms + vert_outs + vert_funcs + "\nvoid main() {\n" + vert_main + "\n}\n";

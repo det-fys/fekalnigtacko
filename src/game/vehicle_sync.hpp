@@ -13,10 +13,13 @@ using VehicleFlags = uint8_t;
 
 enum VehicleFlag : VehicleFlags
 {
-    VF_NONE,
-    VF_ACCELERATING = 0x01,
-    VF_BREAKING = 0x02,
-    VF_BROKENWINDOWS = 0x04,
+    VF_NONE = 0,
+    VF_ACCELERATING = 1,
+    VF_BRAKING = 2,
+    VF_BROKENWINDOWS = 4,
+    VF_LIGHTS_ON = 8,
+    VF_REVERSING = 16,
+    VF_ORANGE_LIGHTS_ON = 32,
 };
 
 struct VehicleSyncState

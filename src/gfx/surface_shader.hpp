@@ -17,7 +17,7 @@ enum SurfaceShaderInputFlag : SurfaceShaderInputFlags
     SIF_LIGHTING_DATA = 4,
     SIF_SKELETAL_DATA = 8,
     SIF_DEFORM_DATA = 16,
-
+    SIF_MULTICOLOR_DATA = 32,
 };
 
 std::unique_ptr<Shader> CreateSurfaceShader(SurfaceRenderFlags flags, SurfaceShaderInputFlags& input_flags);

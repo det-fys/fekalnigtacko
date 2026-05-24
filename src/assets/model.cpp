@@ -112,6 +112,10 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                     CLIENT_ONLY(sflags |= gfx::SF_OBJECT_COLOR;)
                     CLIENT_ONLY(sflags |= gfx::SF_OBJECT_COLOR_MULT;)
                 }
+                else if (flag == "+multicolor")
+                {
+                    CLIENT_ONLY(sflags |= gfx::SF_MULTICOLOR;)
+                }
                 else if (flag == "+blend")
                 {
                     std::string blend_str;

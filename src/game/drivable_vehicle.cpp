@@ -61,11 +61,21 @@ bool game::DrivableVehicle::SetPassenger(uint32_t seat_idx, ControllableCharacte
 
     seat_info.occupant = character;
 
-    if (seat_idx == 0 && !character)
+    if (seat_idx == 0)
     {
-        // clear inputs
-        SetInputs(0);
-        SetSteering(false, 0.0f);
+        if (character)
+        {
+            SetLightsOn(true);
+        }
+        else
+        {
+            SetLightsOn(false);
+
+            // clear inputs
+            SetInputs(0);
+            SetSteering(false, 0.0f);
+        }
+
     }
 
     return true;

@@ -78,7 +78,7 @@ std::shared_ptr<gfx::Texture> gfx::Texture::LoadFromFile(const std::string& file
 
 	std::shared_ptr<Texture> texture;
 	try {
-		texture = std::make_shared<Texture>(width, height, data, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, false, true);
+		texture = std::make_shared<Texture>(width, height, data, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, false, false);
 	}
 	catch (const std::exception& e) {
 		stbi_image_free(data);

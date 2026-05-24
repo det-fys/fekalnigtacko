@@ -17,6 +17,9 @@ static const char* const s_uni_names[] = {
     "u_sun_color",          // SU_SUN_COLOR
     "u_sun_direction",      // SU_SUN_DIRECTION
     "u_fog",                // SU_FOG
+    "u_num_lights",
+    "u_light_positions",
+    "u_light_colors_rs",
 };
 
 // Vytvori shader z daneho zdroje
