@@ -428,21 +428,21 @@ static void Main() {
 #endif
     SDL_GL_SetSwapInterval(0);
 
-    auto frame_dur = std::chrono::milliseconds(5);
+    //auto frame_dur = std::chrono::milliseconds(0);
     
     while (!s_quit)
     {
-        auto t_start = std::chrono::steady_clock::now();
+        //auto t_start = std::chrono::steady_clock::now();
         
         Frame();
     
-        auto t_next = t_start + frame_dur;
-        auto t_now = std::chrono::steady_clock::now();
+        //auto t_next = t_start + frame_dur;
+        //auto t_now = std::chrono::steady_clock::now();
         
-        if (t_now < t_next)
-        {
-            std::this_thread::sleep_for(t_next - t_now);
-        }
+        //if (t_now < t_next)
+        //{
+            //std::this_thread::sleep_for(t_next - t_now);
+        //}
     }
 
     s_app.reset();
