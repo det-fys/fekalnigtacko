@@ -2,6 +2,7 @@
 #include <stdexcept>
 
 #include "utils/files.hpp"
+#include "assets/cmdfile.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -76,9 +77,27 @@ std::shared_ptr<gfx::Texture> gfx::Texture::LoadFromFile(const std::string& file
 		throw std::runtime_error("Failed to load texture from file: " + filename);
 	}
 
+	bool mipmaps = true;
+	bool linear = false;
+
+	std::string config_path = filename + ".cfg";
+	if (fs::FileExists(config_path))
+	{
+		assets::LoadCMDFile(config_path, [&](const std::string& command, std::istringstream& iss) {
+			if (command == "nomipmaps")
+			{
+				mipmaps = false;
+			}
+			else if (command == "linear")
+			{
+				linear = true;
+			}
+		});
+	}
+
 	std::shared_ptr<Texture> texture;
 	try {
-		texture = std::make_shared<Texture>(width, height, data, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, false, false);
+		texture = std::make_shared<Texture>(width, height, data, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, linear, mipmaps);
 	}
 	catch (const std::exception& e) {
 		stbi_image_free(data);
