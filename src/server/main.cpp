@@ -5,6 +5,8 @@
 
 int main()
 {
+    srand(time(NULL));
+    
     try
     {
         sv::Server server(11200);
