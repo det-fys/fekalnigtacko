@@ -11,3 +11,5 @@ out/
 .gradle/
 /android/app/src/main/assets/
 *.lnk
+CMakeSettings.json
+todo.txt
