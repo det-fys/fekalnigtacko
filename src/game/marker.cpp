@@ -51,7 +51,7 @@ void game::Marker::SetUseTarget(const std::string& name, MarkerQueryCallback que
     {
         query_obj_ = std::make_unique<btCollisionObject>();
 
-        static btSphereShape query_sphere(1.0f);
+        static btSphereShape query_sphere(0.01f);
         query_obj_->setCollisionShape(&query_sphere);
         query_obj_->setWorldTransform(root_.local.ToBtTransform());
         query_obj_->setCollisionFlags(btCollisionObject::CF_NO_CONTACT_RESPONSE);

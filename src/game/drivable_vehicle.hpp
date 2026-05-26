@@ -20,6 +20,8 @@ public:
 
     DrivableVehicle(World& world, const VehicleTuning& tuning);
 
+    virtual void Update() override;
+
     virtual void SetTuning(const VehicleTuning& tuning) override;
 
     virtual void OnPhysicsChanged() override;

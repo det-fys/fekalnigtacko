@@ -198,6 +198,14 @@ void game::World::HandleContacts()
 
         if (type == collision::OT_MAP_OBJECT && (flags & collision::OF_DESTRUCTIBLE))
         {
+            collision::ObjectType other_type;
+            collision::ObjectFlags other_flags;
+            collision::ObjectCallback* other_cb;
+            collision::GetObjectInfo(other_body, other_type, other_flags, other_cb);
+
+            if ((other_flags & collision::OF_DESTRUCTING) == 0)
+                return;
+
             auto col = dynamic_cast<MapObjectCollision*>(cb);
             if (!col)
                 return;

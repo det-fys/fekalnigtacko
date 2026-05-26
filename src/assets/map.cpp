@@ -41,6 +41,15 @@ const assets::MapGraph* assets::Map::GetGraph(const std::string& name) const
     return nullptr;
 }
 
+std::span<const assets::MapLocation> assets::Map::GetLocations(const std::string& name) const
+{
+    auto it = locations_.find(name);
+    if (it == locations_.end())
+        return std::span<const MapLocation>();
+
+    return it->second;
+}
+
 // MapLoader
 
 assets::MapLoader::MapLoader(const std::string& filename) 
@@ -280,6 +289,13 @@ void assets::MapLoader::LoadStructs()
             iss >> from_idx >> to_idx;
 
             graph_edges.emplace_back(from_idx, to_idx);
+        }
+        else if (command == "loc")
+        {
+            std::string loc_name;
+            iss >> loc_name;
+            Transform& trans = map_->locations_[loc_name].emplace_back().transform;
+            ParseTransform(iss, trans);
         }
 
         return true;

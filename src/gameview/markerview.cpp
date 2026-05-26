@@ -51,7 +51,7 @@ bool game::view::MarkerView::Init(net::InMessage& msg)
 
     if (marker_type_ == MARKER_FOOT || marker_type_ == MARKER_VEHICLE)
     {
-        model_ = assets::CacheManager::GetModel("data/marker.mdl");
+        model_ = assets::CacheManager::GetModel("data/marker_tuning.mdl");
     }
 
     return true;

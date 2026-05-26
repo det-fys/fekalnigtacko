@@ -17,9 +17,10 @@ using ObjectFlags = int;
 
 enum ObjectFlag : ObjectFlags
 {
-    OF_DESTRUCTIBLE = 0x01,
-    OF_NOTIFY_CONTACT = 0x02,
-    OF_USABLE = 0x04,
+    OF_DESTRUCTIBLE = 1,
+    OF_NOTIFY_CONTACT = 2,
+    OF_USABLE = 4,
+    OF_DESTRUCTING = 8,
 };
 
 struct ContactInfo

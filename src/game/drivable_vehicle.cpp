@@ -8,6 +8,15 @@ game::DrivableVehicle::DrivableVehicle(World& world, const VehicleTuning& tuning
     OnPhysicsChanged();
 }
 
+void game::DrivableVehicle::Update()
+{
+    float daytime = world_.GetDayTime();
+    SetLightsOn(seats_[0].occupant && (daytime < 6.0f || daytime > 18.0f));
+
+    Super::Update();
+
+}
+
 void game::DrivableVehicle::SetTuning(const VehicleTuning& tuning)
 {
     Super::SetTuning(tuning);
@@ -63,14 +72,8 @@ bool game::DrivableVehicle::SetPassenger(uint32_t seat_idx, ControllableCharacte
 
     if (seat_idx == 0)
     {
-        if (character)
+        if (!character)
         {
-            SetLightsOn(true);
-        }
-        else
-        {
-            SetLightsOn(false);
-
             // clear inputs
             SetInputs(0);
             SetSteering(false, 0.0f);

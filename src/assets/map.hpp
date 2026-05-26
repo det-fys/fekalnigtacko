@@ -51,6 +51,11 @@ struct MapGraph
     std::vector<size_t> nbs;
 };
 
+struct MapLocation
+{
+    Transform transform;
+};
+
 class Map
 {
 public:
@@ -61,12 +66,14 @@ public:
     const std::vector<Chunk>& GetChunks() const { return chunks_; }
     const std::vector<MapStaticObject>& GetStaticObjects() const { return objs_; }
     const MapGraph* GetGraph(const std::string& name) const;
+    std::span<const MapLocation> GetLocations(const std::string& name) const;
 
 private:
     std::shared_ptr<const Model> basemodel_;
     std::vector<Chunk> chunks_;
     std::vector<MapStaticObject> objs_;
     std::map<std::string, MapGraph> graphs_;
+    std::map<std::string, std::vector<MapLocation>> locations_;
 
     friend class MapLoader;
 };

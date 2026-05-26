@@ -633,7 +633,7 @@ game::VehiclePhysics::VehiclePhysics(collision::DynamicsWorld& world, Transform&
     body_ = std::make_unique<btRigidBody>(rb_info);
     // body_->setActivationState(DISABLE_DEACTIVATION);
 
-    collision::SetObjectInfo(body_.get(), collision::OT_ENTITY, collision::OF_NOTIFY_CONTACT, &obj_cb);
+    collision::SetObjectInfo(body_.get(), collision::OT_ENTITY, collision::OF_NOTIFY_CONTACT | collision::OF_DESTRUCTING, &obj_cb);
 
     // setup vehicle
     btRaycastVehicle::btVehicleTuning bt_tuning;

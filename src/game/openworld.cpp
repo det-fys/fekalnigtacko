@@ -82,7 +82,10 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld("openworld"), game_(game
 
     daytime_offset_ = static_cast<float>(rand() % 24);
 
-    CreateTuningGarage(glm::vec3(0.0f, 0.0f, 0.0f), 0.0f);
+    for (auto locs = GetMap().GetLocations("tuning"); const auto& loc : locs)
+    {
+        CreateTuningGarage(loc.transform.position, glm::eulerAngles(loc.transform.rotation).x);
+    }
 
 }
 
