@@ -90,7 +90,8 @@ void game::OpenWorld::Update(int64_t delta_time)
 {
     Super::Update(delta_time);
 
-    const float timespeed = 0.05f;
+    const float day_seconds_irl = 1800.0f;
+    const float timespeed = 24.0f / day_seconds_irl;
     SetDayTime(static_cast<float>(GetTime()) * 0.001f * timespeed + daytime_offset_); 
 }
 
