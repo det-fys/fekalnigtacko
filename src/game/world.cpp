@@ -108,8 +108,17 @@ struct UseTargetAabbCallback : public btBroadphaseAabbCallback
     const game::UseTarget* best_target = nullptr;
     float best_dist = std::numeric_limits<float>::max();
     game::UseTargetQueryResult& best_res;
+    float radius = 2.0f;
 
-    UseTargetAabbCallback(game::PlayerCharacter& character, game::UseTargetQueryResult& res) : character(character), pos(character.GetRoot().GetGlobalPosition()), best_res(res) {}
+    UseTargetAabbCallback(game::PlayerCharacter& character, game::UseTargetQueryResult& res) : character(character), pos(character.GetRoot().GetGlobalPosition()), best_res(res)
+    {
+        auto vehicle = character.GetVehicle();
+        if (vehicle)
+        {
+            radius = 5.0f;
+            pos = vehicle->GetRoot().GetGlobalPosition();
+        }
+    }
 
     virtual bool process(const btBroadphaseProxy* proxy)
     {
@@ -134,7 +143,7 @@ struct UseTargetAabbCallback : public btBroadphaseAabbCallback
             glm::vec3 pos_world = matrix * glm::vec4(target.position, 1.0f);
 
             float dist = glm::distance(pos, pos_world);
-            if (dist < 2.0f && dist < best_dist)
+            if (dist < radius && dist < best_dist)
             {
                 game::UseTargetQueryResult res{};
                 if (!usable->QueryUseTarget(character, target.id, res))
