@@ -309,7 +309,23 @@ bool game::Player::ProcessMenuActionMsg(net::InMessage& msg)
         return false;
 
     if (!remote_menu_ || remote_menu_->GetId() != id)
-        return true; // not illegal, might be just a late message
+    {
+        // not illegal, might be just a late message
+        // need to skip specific amount of bytes :((((
+        switch (type)
+        {
+        case net::MA_CLICK:
+            return msg.Skip(sizeof(net::MenuItemId));
+        case net::MA_SELECT:
+            return msg.Skip(sizeof(net::MenuItemId) + sizeof(net::MenuSelectDir));
+        case net::MA_HOVER:
+            return msg.Skip(sizeof(net::MenuItemId));
+        case net::MA_EXIT:
+            return true;
+        default:
+            return false;
+        }
+    }
 
     return remote_menu_->ProcessActionMsg(msg, type);
 }

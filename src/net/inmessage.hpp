@@ -131,6 +131,15 @@ public:
         return true;
     }
 
+    bool Skip(size_t count)
+    {
+        if (!CheckAvail(count))
+            return false;
+
+        ptr_ += count;
+        return true;
+    }
+
     bool SubMessage(InMessage& sub, size_t n)
     {
         if (!CheckAvail(n))

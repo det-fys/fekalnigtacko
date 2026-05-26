@@ -52,6 +52,7 @@ public:
     void SetTitle(std::string title);
     void SetItemSize(const glm::vec2& itemsize) { itemsize_ = itemsize;  }
     
+    void SetFocusedItemIndex(size_t idx);
     size_t GetFocusedItemIndex() const { return focus_; }
     
     size_t GetNumItems() const { return items_.size(); }
@@ -61,15 +62,20 @@ public:
 
 protected:
     virtual void OnFocusChanged() {}
+    virtual void OnExit() {}
 
 private:
     void SwitchFocus(int dir);
 
+    void UpdateScroll();
+
 private:
     std::string title_;
     std::vector<std::unique_ptr<MenuItem>> items_;
-    glm::vec2 itemsize_ = glm::vec2(300.0f, 40.0f);
+    glm::vec2 itemsize_ = glm::vec2(400.0f, 35.0f);
     size_t focus_ = 0;
+    size_t max_items_ = 15;
+    size_t scroll_ = 0;
 
 };
 
@@ -106,11 +112,15 @@ public:
     void SetClickCallback(std::function<void()> click_cb);
 
     void SetText(std::string text) { text_ = std::move(text); }
+    void SetText2(std::string text2) { text2_ = std::move(text2); }
 
     virtual ~ButtonMenuItem() = default;
 
-private:
+protected:
     std::string text_;
+    std::string text2_;
+
+private:
     std::function<void()> click_cb_;
 };
 

@@ -10,6 +10,7 @@ void gui::Menu::Clear()
 {
     items_.clear();
     focus_ = 0;
+    UpdateScroll();
 }
 
 void gui::Menu::Draw(Context& ctx, const glm::vec2& pos) const
@@ -23,15 +24,37 @@ void gui::Menu::Draw(Context& ctx, const glm::vec2& pos) const
     ctx.DrawRect(pos, pos + title_size, 0x55000000);
     ctx.DrawTextAligned(title_, pos + title_size * 0.5f, glm::vec2(-0.5f));
 
+    auto res_itemsize = itemsize_;
+
+    // draw scrollbar
+    if (items_.size() > max_items_)
+    {
+        glm::vec2 scrollbar_size(5.0f, size.y - title_size.y);
+        glm::vec2 scrollbar_pos(pos.x + size.x - scrollbar_size.x, pos.y + title_size.y);
+
+        // scrollbar background
+        ctx.DrawRect(scrollbar_pos, scrollbar_pos + scrollbar_size, 0x55000000);
+        
+        // scroll box
+        float y0 = static_cast<float>(scroll_) / static_cast<float>(items_.size());
+        float y1 = y0 + static_cast<float>(max_items_) / static_cast<float>(items_.size());
+        glm::vec2 scrollbox_p0(scrollbar_pos.x, scrollbar_pos.y + y0 * scrollbar_size.y);
+        glm::vec2 scrollbox_p1(scrollbar_pos.x + scrollbar_size.x, scrollbar_pos.y + y1 * scrollbar_size.y);
+        ctx.DrawRect(scrollbox_p0, scrollbox_p1, 0x44FFFFFF);
+
+        res_itemsize.x -= scrollbar_size.x;
+    }
+
     // draw items
     DrawMenuItemArgs args(ctx);
-    args.size = itemsize_;
+    args.size = res_itemsize;
     args.pos.x = pos.x;
 
-    for (size_t i = 0; i < items_.size(); ++i)
+    size_t end = glm::min(items_.size(), scroll_ + max_items_);
+    for (size_t i = scroll_; i < end; ++i)
     {
         args.focused = focus_ == i;
-        args.pos.y = pos.y + menu_title_height + static_cast<float>(i) * itemsize_.y;
+        args.pos.y = pos.y + menu_title_height + static_cast<float>(i - scroll_) * res_itemsize.y;
 
         items_[i]->Draw(args);
     }
@@ -49,6 +72,10 @@ void gui::Menu::Input(MenuInput in)
         SwitchFocus(1);
         break;
 
+    case MI_BACK:
+        OnExit();
+        break;
+
     default:
         if (!items_.empty())
             items_[focus_]->Input(in);
@@ -61,9 +88,18 @@ void gui::Menu::SetTitle(std::string title)
     title_ = std::move(title);
 }
 
+void gui::Menu::SetFocusedItemIndex(size_t idx)
+{
+    if (idx >= items_.size())
+        return;
+
+    focus_ = idx;
+    UpdateScroll();
+}
+
 glm::vec2 gui::Menu::MeasureSize() const
 {
-    return glm::vec2(itemsize_.x, menu_title_height + itemsize_.y * static_cast<float>(items_.size()));
+    return glm::vec2(itemsize_.x, menu_title_height + itemsize_.y * static_cast<float>(glm::min(items_.size(), max_items_)));
 }
 
 void gui::Menu::SwitchFocus(int dir)
@@ -81,7 +117,32 @@ void gui::Menu::SwitchFocus(int dir)
     if (focus_ != old_focus)
     {
         OnFocusChanged();
+        UpdateScroll();
     }
+}
+
+void gui::Menu::UpdateScroll() 
+{
+    const size_t num_items = items_.size();
+
+    if (scroll_ + max_items_ > num_items)
+    {
+        if (num_items > max_items_)
+            scroll_ = num_items - max_items_;
+        else
+            scroll_ = 0;
+    }
+
+    if (focus_ >= scroll_ + max_items_)
+    {
+        scroll_ = focus_ - max_items_ + 1;
+    }
+    else if (focus_ < scroll_)
+    {
+        scroll_ = focus_;
+    }
+
+
 }
 
 // ButtonMenuItem
@@ -94,8 +155,36 @@ gui::ButtonMenuItem::ButtonMenuItem(std::string text)
 void gui::ButtonMenuItem::Draw(const DrawMenuItemArgs& args) const
 {
     Super::Draw(args);
-    glm::vec2 center = args.pos + glm::vec2(10.0f, args.size.y * 0.5f);
-    args.ctx.DrawTextAligned(text_, center, glm::vec2(0.0f, -0.5f), args.focused ? COLOR_FOCUSED : COLOR_INACTIVE);
+
+    uint32_t text_color = args.focused ? COLOR_FOCUSED : COLOR_INACTIVE;
+    uint32_t arrow_color = 0xFFFFFFFF;
+
+    const float padding = 30.0f;
+    glm::vec2 text_pos = args.pos + glm::vec2(padding, args.size.y * 0.5f);
+
+    // text 1
+    auto text_size = args.ctx.MeasureText(text_);
+    args.ctx.DrawText(text_, text_pos + text_size * glm::vec2(0.0f, -0.5f), text_color);
+
+    // text 2
+    if (!text2_.empty())
+    {
+        glm::vec2 text2_pos = args.pos + glm::vec2(args.size.x - padding, args.size.y * 0.5f);
+        args.ctx.DrawTextAligned(text2_, text2_pos, glm::vec2(-1.0f, -0.5f), text_color);
+    }
+
+    // hover arrows
+    if (args.focused)
+    {
+        auto arrow_size = args.ctx.MeasureText("» ");
+
+        // left arrow
+        args.ctx.DrawText("» ", text_pos + arrow_size * glm::vec2(-1.0f, -0.5f), arrow_color);
+        
+        // right arrow
+        glm::vec2 right_arrow_pos(text2_.empty() ? (text_pos.x + text_size.x) : (args.pos.x + args.size.x - padding), text_pos.y);
+        args.ctx.DrawText(" «", right_arrow_pos + arrow_size * glm::vec2(0.0f, -0.5f), arrow_color);
+    }
 }
 
 void gui::ButtonMenuItem::Input(MenuInput in)
@@ -118,15 +207,17 @@ gui::SelectMenuItem::SelectMenuItem(std::string text)
 
 void gui::SelectMenuItem::Draw(const DrawMenuItemArgs& args) const
 {
-    Super::Draw(args);
+    // Super::Draw(args);
+    uint32_t text_color = args.focused ? COLOR_FOCUSED : COLOR_INACTIVE;
+    uint32_t arrow_color = 0xFFFFFFFF;
+
+    glm::vec2 center = args.pos + glm::vec2(10.0f, args.size.y * 0.5f);
+    args.ctx.DrawTextAligned(text_, center, glm::vec2(0.0f, -0.5f), text_color);
 
     auto text_size = args.ctx.MeasureText(select_text_);
 
     glm::vec2 cursor = args.pos + glm::vec2(args.size.x - 10.0f, args.size.y * 0.5f);
     cursor.y -= text_size.y * 0.5f; // centered
-
-    uint32_t text_color = args.focused ? COLOR_FOCUSED : COLOR_INACTIVE;
-    uint32_t arrow_color = 0xFFFFFFFF;
 
     float arrow_width = 0.0f;
     if (args.focused)

@@ -50,9 +50,17 @@ bool game::RemoteMenu::ProcessActionMsg(net::InMessage& msg, net::MenuActionType
         return ProcessSelectMsg(msg);
     case net::MA_HOVER:
         return ProcessHoverMsg(msg);
+    case net::MA_EXIT:
+        return ProcessExitMsg(msg);
     default:
         return false;
     }
+}
+
+void game::RemoteMenu::SetHoveredIdx(int hovered) 
+{
+    hovered_ = hovered;
+    synced_ = false;
 }
 
 void game::RemoteMenu::Update()
@@ -66,6 +74,7 @@ void game::RemoteMenu::Update()
         auto msg = BeginMenuMsg(net::MMSG_UPDATE);
         msg.Write(net::MenuTitle(title_));
         msg.Write<net::MenuItemCount>(items_.size());
+        msg.Write<net::MenuItemId>(hovered_);
         for (auto& item : items_)
         {
             msg.Write(item->type_);
@@ -124,7 +133,7 @@ bool game::RemoteMenu::ProcessClickMsg(net::InMessage& msg)
     if (!msg.Read(id))
         return false;
 
-    if (id > items_.size())
+    if (id >= items_.size())
         return true; // not illegal
 
     auto& cb = items_[id]->on_click_;
@@ -142,7 +151,7 @@ bool game::RemoteMenu::ProcessSelectMsg(net::InMessage& msg)
     if (!msg.Read(id) || !msg.Read(dir))
         return false;
 
-    if (id > items_.size())
+    if (id >= items_.size())
         return true; // not illegal
 
     int idir = dir ? 1 : -1;
@@ -161,7 +170,7 @@ bool game::RemoteMenu::ProcessHoverMsg(net::InMessage& msg)
     if (!msg.Read(id))
         return false;
 
-    if (id > items_.size())
+    if (id >= items_.size())
         return true; // not illegal
 
     if (id == hovered_)
@@ -173,5 +182,12 @@ bool game::RemoteMenu::ProcessHoverMsg(net::InMessage& msg)
     if (cb)
         cb();
 
+    return true;
+}
+
+bool game::RemoteMenu::ProcessExitMsg(net::InMessage& msg)
+{
+    if (on_exit_)
+        on_exit_();
     return true;
 }

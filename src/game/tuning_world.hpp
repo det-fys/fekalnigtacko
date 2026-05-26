@@ -2,6 +2,7 @@
 
 #include "enterable_world.hpp"
 #include "drivable_vehicle.hpp"
+#include "remote_menu.hpp"
 
 namespace game
 {
@@ -29,7 +30,12 @@ private:
     void Setup();
 
     void AddTuningGroupSelect(game::RemoteMenu& menu, const VehicleTuningGroup& group);
-    void DisplayTuningMenu();
+
+    void OpenMainTuningMenu();
+    void OpenGroupMenu(const VehicleTuningGroup& group);
+    std::string GetCurrentPartId(const std::string& group_id);
+    bool GetPartState(const std::string& group_id, const std::string& part_id, std::string* state_text); // mounted?
+    void CloseMenu();
 
     void Reset();
 
@@ -46,7 +52,12 @@ private:
     
     game::RemoteMenu* menu_ = nullptr;
 
+    size_t main_menu_hover_ = 0;
+
     VehicleTuning tuning_;
+    VehicleTuning preview_tuning_;
+
+    RemoteMenuItem* mounted_part_menu_item_ = nullptr;
 
     std::function<void()> exit_cb_;
 

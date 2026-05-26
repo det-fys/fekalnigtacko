@@ -32,6 +32,7 @@ private:
     
 protected:
     void OnFocusChanged() override;
+    void OnExit() override;
 
     net::OutMessage BeginActionMsg(net::MenuActionType type);
     

@@ -24,6 +24,7 @@ class RemoteMenuItem;
 using RemoteMenuClickCallback = std::function<void()>;
 using RemoteMenuHoveredCallback = std::function<void()>;
 using RemoteMenuSelectCallback = std::function<void(int)>;
+using RemoteMenuExitCallback = std::function<void()>;
 
 class RemoteMenuItem
 {
@@ -36,6 +37,7 @@ public:
     void SetOnClick(RemoteMenuClickCallback on_click) { on_click_ = std::move(on_click); }
     void SetOnSelect(RemoteMenuSelectCallback on_select) { on_select_ = std::move(on_select); }
     void SetOnHovered(RemoteMenuHoveredCallback on_hovered) { on_hovered_ = std::move(on_hovered); }
+
 
 private:
     RemoteMenu& menu_;
@@ -63,6 +65,10 @@ public:
 
     bool ProcessActionMsg(net::InMessage& msg, net::MenuActionType type);
 
+    void SetHoveredIdx(int hovered);
+
+    void SetOnExit(RemoteMenuExitCallback on_exit) { on_exit_ = std::move(on_exit); }
+
     void Update();
 
 private:
@@ -72,6 +78,7 @@ private:
     bool ProcessClickMsg(net::InMessage& msg);
     bool ProcessSelectMsg(net::InMessage& msg);
     bool ProcessHoverMsg(net::InMessage& msg);
+    bool ProcessExitMsg(net::InMessage& msg);
 
 private:
     net::MenuId id_;
@@ -79,7 +86,9 @@ private:
     bool synced_ = false;
     bool items_synced_ = false;
     std::vector<std::unique_ptr<RemoteMenuItem>> items_;
-    int hovered_ = -1;
+    int hovered_ = 0;
+
+    RemoteMenuExitCallback on_exit_;
 
     friend class RemoteMenuItem;
 };

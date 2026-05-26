@@ -166,6 +166,7 @@ enum MenuMessageType
     MMSG_UPDATE,
     MMSG_ITEM_UPDATE_TEXT,
     MMSG_ITEM_UPDATE_SELECTION,
+    MMSG_SET_HOVER,
     MMSG_CLOSE,
 };
 
@@ -185,6 +186,7 @@ enum MenuActionType
     MA_CLICK,
     MA_SELECT,
     MA_HOVER,
+    MA_EXIT,
 };
 
 using MenuSelectDir = uint8_t; // 0=left, 1=right

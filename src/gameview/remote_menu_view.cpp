@@ -23,8 +23,9 @@ bool game::view::RemoteMenuView::ProcessUpdateMsg(net::InMessage& msg)
 {
     net::MenuTitle title;
     net::MenuItemCount itemcount;
+    net::MenuItemId hovered_idx;
 
-    if (!msg.Read(title) || !msg.Read(itemcount))
+    if (!msg.Read(title) || !msg.Read(itemcount) || !msg.Read(hovered_idx))
         return false;
 
     SetTitle(title);
@@ -44,6 +45,7 @@ bool game::view::RemoteMenuView::ProcessUpdateMsg(net::InMessage& msg)
             case RM_BUTTON:
             {
                 auto& btn = Add<gui::ButtonMenuItem>(text);
+                btn.SetText2(selection);
                 btn.SetClickCallback([this, i] { OnItemClick(i); });
                 break;
             }
@@ -63,6 +65,7 @@ bool game::view::RemoteMenuView::ProcessUpdateMsg(net::InMessage& msg)
 
     }
 
+    SetFocusedItemIndex(hovered_idx);
 
     return true;
 }
@@ -105,11 +108,18 @@ bool game::view::RemoteMenuView::ProcessItemUpdateSelectionMsg(net::InMessage& m
 
     auto& item = GetItem(idx);
 
-    auto select = dynamic_cast<gui::SelectMenuItem*>(&item);
-    if (!select)
-        return false;
+    if (auto select = dynamic_cast<gui::SelectMenuItem*>(&item); select)
+    {
+        select->SetSelectionText(selection);
+        return true;
+    }
 
-    select->SetSelectionText(selection);
+    if (auto btn = dynamic_cast<gui::ButtonMenuItem*>(&item); btn)
+    {
+        btn->SetText2(selection);
+        return true;
+    }
+
     return true;
 }
 
@@ -133,6 +143,11 @@ void game::view::RemoteMenuView::OnFocusChanged()
 {
     auto msg = BeginActionMsg(net::MA_HOVER);
     msg.Write<net::MenuItemId>(GetFocusedItemIndex());
+}
+
+void game::view::RemoteMenuView::OnExit()
+{
+    BeginActionMsg(net::MA_EXIT);
 }
 
 net::OutMessage game::view::RemoteMenuView::BeginActionMsg(net::MenuActionType type)
