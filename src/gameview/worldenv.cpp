@@ -164,7 +164,8 @@ void game::view::WorldEnv::Draw(const DrawArgs& args)
     args.env.clear_color = glm::mix(kf1->clear_color, kf2->clear_color, t);
     args.env.ambient_light = glm::mix(kf1->ambient_color, kf2->ambient_color, t);
     args.env.sun_color = glm::mix(kf1->sun_color, kf2->sun_color, t);
-    args.env.fog = glm::mix(kf1->fog, kf2->fog, t);
+    // args.env.fog = glm::mix(kf1->fog, kf2->fog, t);
+    args.env.fog = glm::vec4(args.env.clear_color, 0.00001f);
 
     float dist = args.farplane * 0.5f;
 

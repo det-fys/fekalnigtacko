@@ -25,6 +25,7 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
 
     vert_outs = R"GLSL(
         out vec3 v_color;
+        out vec3 v_world_pos;
     )GLSL";
     
     vert_pos_calc = R"GLSL(
@@ -35,10 +36,12 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
     vert_main = R"GLSL(
         gl_Position = u_view_proj * world_pos;
         v_color = a_color.rgb;
+        v_world_pos = world_pos.xyz;
     )GLSL";
 
     frag_ins = R"GLSL(
         in vec3 v_color;
+        in vec3 v_world_pos;
     )GLSL";
 
     frag_main = R"GLSL(
@@ -201,13 +204,28 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
 
     if (flags & SRF_MULTICOLOR)
     {
-        frag_main += "o_color.rgb *= mix(v_color, vec3(1.5), emis);";
+        frag_main += "o_color.rgb *= mix(v_color, vec3(1.5), emis);\n";
     }
     else
     {
-        frag_main += "o_color.rgb *= v_color;";
+        frag_main += "o_color.rgb *= v_color;\n";
     }
 
+    if (flags & SRF_FOG)
+    {
+        frag_uniforms += R"GLSL(
+            uniform vec4 u_fog;
+            uniform vec3 u_camera_pos;
+        )GLSL";
+    
+        frag_main += R"GLSL(
+            float dist = distance(v_world_pos, u_camera_pos);
+            float fog_factor = 1.0 / (1.0 + dist * dist * u_fog.a);
+            o_color.rgb = mix(u_fog.rgb, o_color.rgb, fog_factor);
+        )GLSL";
+
+        input_flags |= SIF_FOG_DATA;
+    }
 
     vert_main = vert_pos_calc + vert_main;
 

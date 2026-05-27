@@ -127,15 +127,20 @@ void gfx::Renderer::SetupSurfaceShader(SurfaceShader& sshader, const DrawListPar
 		return; // Global uniforms are already set up
 	}
 
-	glUniformMatrix4fv(shader.U(gfx::SU_VIEW_PROJ), 1, GL_FALSE, &params.view_proj[0][0]);
+	glUniformMatrix4fv(shader.U(SU_VIEW_PROJ), 1, GL_FALSE, &params.view_proj[0][0]);
 
+	if (sshader.iflags & SIF_FOG_DATA)
+	{
+		glUniform3fv(shader.U(SU_CAMERA_POS), 1, &params.cam_pos[0]);
+		glUniform4fv(shader.U(SU_FOG), 1, &params.env.fog[0]);
+	}
+	
 	// setup lighting
 	if (sshader.iflags & SIF_LIGHTING_DATA)
 	{
-		glUniform3fv(shader.U(gfx::SU_AMBIENT_LIGHT), 1, &params.env.ambient_light[0]);
-		glUniform3fv(shader.U(gfx::SU_SUN_COLOR), 1, &params.env.sun_color[0]);
-		glUniform3fv(shader.U(gfx::SU_SUN_DIRECTION), 1, &params.env.sun_direction[0]);
-		// glUniform4fv(shader.U(gfx::SU_FOG), 1, &params.env.fog[0]);
+		glUniform3fv(shader.U(SU_AMBIENT_LIGHT), 1, &params.env.ambient_light[0]);
+		glUniform3fv(shader.U(SU_SUN_COLOR), 1, &params.env.sun_color[0]);
+		glUniform3fv(shader.U(SU_SUN_DIRECTION), 1, &params.env.sun_direction[0]);
 	}
 
 	sshader.global_setup = true;
@@ -194,6 +199,8 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 	{
 		if (cmd.surface->sflags & SF_BLEND)
 			cmd.rflags |= SRF_BLEND;
+		else
+			cmd.rflags |= SRF_FOG;
 
 		if (cmd.surface->texture)
 			cmd.rflags |= SRF_TEXTURE;

@@ -20,6 +20,7 @@ static const char* const s_uni_names[] = {
     "u_num_lights",
     "u_light_positions",
     "u_light_colors_rs",
+    "u_camera_pos",
 };
 
 // Vytvori shader z daneho zdroje

@@ -25,7 +25,8 @@ namespace gfx
 		SU_NUMLIGHTS,
 		SU_LIGHT_POSITIONS,
 		SU_LIGHT_COLORS_RS,
-	
+		SU_CAMERA_POS,
+
 		SU_COUNT
 	};
 
