@@ -12,6 +12,8 @@ static float game::VehicleTuningContext::* GetCtxVariablePointer(const std::stri
         return &game::VehicleTuningContext::engine_force;
     if (name == "braking_force")
         return &game::VehicleTuningContext::braking_force;
+    if (name == "health")
+        return &game::VehicleTuningContext::health;
 
     throw std::runtime_error("tuning list: invalid variable " + name);
 }
@@ -69,12 +71,36 @@ static bool CheckWheelCond(const game::VehicleWheelTuningContext& wheel_ctx, con
     return true;
 }
 
-static uint32_t ParseColor(uint32_t c)
+static uint32_t FlipColor(uint32_t c)
 {
     auto r = (c >> 16) & 0xFF;
     auto g = (c >> 8) & 0xFF;
     auto b = c & 0xFF;
     return 0xFF000000 | (b << 16) | (g << 8) | r;
+}
+
+static uint32_t ParseColor(const std::string& color_str)
+{
+    if (color_str == "none")
+        return 0;
+
+    uint32_t color = 0;
+
+    for (const auto& c : color_str)
+    {
+        uint32_t v = 0;
+        color <<= 4;
+
+        if (c >= '0' && c <= '9')
+            color += c - '0';
+        else if (c >= 'a' && c <= 'f')
+            color += c - 'a' + 10;
+        else if (c >= 'A' && c <= 'F')
+            color += c - 'A' + 10;
+
+    }
+
+    return FlipColor(color);
 }
 
 static game::VehicleTuningFunction ParseTuningFunction(std::istringstream& iss)
@@ -98,12 +124,13 @@ static game::VehicleTuningFunction ParseTuningFunction(std::istringstream& iss)
     {
         size_t color_idx;
         uint32_t color;
-        iss >> color_idx >> std::hex >> color >> std::dec;
+        std::string color_str;
+        iss >> color_idx >> color_str;
 
         if (color_idx >= 4)
             throw std::runtime_error("tuning list: invalid color index");
 
-        color = ParseColor(color);
+        color = ParseColor(color_str);
 
         return [color_idx, color](game::VehicleTuningContext& ctx) {
             ctx.colors[color_idx] = color;

@@ -34,6 +34,7 @@ struct VehicleTuningContext
     float mass;
     float engine_force;
     float braking_force;
+    float health;
     std::vector<VehicleWheelTuningContext> wheels;
 };
 

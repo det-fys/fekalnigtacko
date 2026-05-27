@@ -168,7 +168,7 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
     {
         // light
         auto light_pos = world_.CameraSweep(root_.GetGlobalPosition(), root_.matrix * glm::vec4(0.0f, 7.0f, 0.0f, 1.0f));
-        args.dlist.AddLight(light_pos, glm::vec3(1.0f, 1.0f, 1.0f) * headlights_factor_, 5.0f);
+        args.dlist.AddLight(light_pos, headlight_color_ * headlights_factor_, 5.0f);
 
         // cones
         for (size_t i = 0; i < num_headlights; ++i)
@@ -244,7 +244,8 @@ bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
     }
 
     colors_[VCS_PRIMARY] = recv_colors[0]; // primary
-    colors_[VCS_SECONDARY] = recv_colors[0]; // secondary
+    colors_[VCS_SECONDARY] =  recv_colors[2]; // secondary
+    headlight_color_ = recv_colors[3];
 
     return true;
 }
@@ -411,7 +412,7 @@ void game::view::VehicleView::UpdateLights(float delta_t)
     MoveToward(orange_lights_factor_, (flags_ & VF_ORANGE_LIGHTS_ON) ? 1.0f : 0.0f, max_delta);
     MoveToward(reverse_light_factor_, (flags_ & VF_REVERSING) ? 1.0f : 0.0f, max_delta);
 
-    colors_[VCS_HEADLIGHTS] = glm::vec4(1.0f, 1.0f, 1.0f, headlights_factor_);
+    colors_[VCS_HEADLIGHTS] = glm::vec4(headlight_color_, headlights_factor_);
     colors_[VCS_REAR_LIGHTS] = glm::vec4(1.0f, 1.0f, 1.0f, headlights_factor_ * 0.5f + braking_lights_factor_ * 1.0f);
     colors_[VCS_BRAKING_LIGHTS] = glm::vec4(1.0f, 1.0f, 1.0f, braking_lights_factor_);
     colors_[VCS_ORANGE_LIGHTS] = glm::vec4(1.0f, 1.0f, 1.0f, orange_lights_factor_);
@@ -420,8 +421,8 @@ void game::view::VehicleView::UpdateLights(float delta_t)
     if (headlights_factor_ < 0.01f)
         return;
 
-    float intensity = headlights_factor_ * 0.2f;
-    headlight_cone_color_ = glm::vec4(intensity, intensity, intensity, 1.0f);
+    float intensity = headlights_factor_ * 0.3f;
+    headlight_cone_color_ = glm::vec4(headlight_color_ * intensity, 1.0f);
 
     for (size_t i = 0; i < num_headlights; ++i)
     {

@@ -76,17 +76,17 @@ void game::Vehicle::OnContact(const collision::ContactInfo& info)
     if (info.impulse < 1000.0f)
         return;
 
-    if (window_health_ > 0.0f)
+    if (health_ > 0.0f)
     {
-        window_health_ -= info.impulse;
+        health_ -= info.impulse;
 
-        if (window_health_ <= 0.0f) // just broken
+        if (health_ <= 0.0f) // just broken
         {
             PlaySound("breakwindow", 1.0f, 1.0f);
         }
     }
 
-    if (window_health_ <= 0.0f)
+    if (health_ <= 0.0f)
     {
         Deform(info.pos, -glm::normalize(info.normal) * 0.1f, 1.0f);
     }
@@ -343,7 +343,7 @@ void game::Vehicle::ProcessInput()
 
 void game::Vehicle::UpdateCrash()
 {
-    if (window_health_ <= 0.0f)
+    if (health_ <= 0.0f)
         flags_ |= VF_BROKENWINDOWS;
 
     if (no_crash_frames_)
@@ -591,6 +591,13 @@ void game::Vehicle::ApplyTuning(const VehicleTuning& tuning)
             func(tuning_ctx_);
         }
     }
+
+    if (tuning_ctx_.colors[2] == 0) // secondary <- primary
+    {
+        tuning_ctx_.colors[2] = tuning_ctx_.colors[0];
+    }
+
+    health_ = tuning_ctx_.health;
 
     // (re)create physics
     physics_.reset();

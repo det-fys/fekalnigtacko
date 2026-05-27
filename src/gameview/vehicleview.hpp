@@ -74,6 +74,7 @@ private:
     std::shared_ptr<const assets::VehicleModel> model_;
     assets::Mesh mesh_;
     glm::vec4 colors_[SD_MAX_COLORS];
+    glm::vec3 headlight_color_;
 
     game::VehicleSyncState sync_;
     std::vector<VehicleWheelViewInfo> wheels_;

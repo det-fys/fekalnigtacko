@@ -129,7 +129,7 @@ private:
 
     VehicleInputFlags in_ = 0;
 
-    float window_health_ = 10000.0f;
+    float health_ = 10000.0f;
 
     float crash_intensity_ = 0.0f;
     size_t no_crash_frames_ = 0;
