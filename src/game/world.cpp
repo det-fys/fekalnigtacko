@@ -245,6 +245,9 @@ void game::World::HandleContacts()
 
 void game::World::DestroyObject(net::ObjNum objnum)
 {
+    if (destroyed_objs_.contains(objnum))
+        return;
+
     SendObjDestroyedMsg(objnum);
     destroyed_objs_.insert(objnum);
 
