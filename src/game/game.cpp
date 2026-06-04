@@ -180,7 +180,7 @@ void game::Game::MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& ne
         auto& player_info = GetPlayerInfo(*player);
 
         auto& new_character = MovePlayerToWorld(player_info, new_world, glm::vec3(0.0f), 0.0f);
-        new_character.SetVehicle(&new_vehicle, i);
+        new_character.Ride(&new_vehicle, i);
     }
 
     vehicle.Remove();

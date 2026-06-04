@@ -1,7 +1,7 @@
 #pragma once
 
 #include "assets/map.hpp"
-#include "controllable_character.hpp"
+#include "human_character.hpp"
 
 namespace game
 {
@@ -14,24 +14,20 @@ enum NpcVehicleThinkState
     NVT_REVERSING,
 };
 
-class NpcCharacter : public ControllableCharacter
+class NpcCharacter : public HumanCharacter
 {
 public:
-    using Super = ControllableCharacter;
+    using Super = HumanCharacter;
 
     NpcCharacter(World& world, const CharacterTuning& tuning);
 
-    virtual void VehicleChanged() override;
+    virtual void Update() override;
 
-
-    virtual void Update() override
-    {
-        Super::Update();
-
-        VehicleThink();
-    }
+protected:
+    virtual void OnRideableChanged() override;
 
 private:
+    void UpdateVehicleState();
     void SelectNextNode();
     void VehicleThink();
 

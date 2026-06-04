@@ -6,10 +6,23 @@
 #include <iostream>
 
 game::NpcCharacter::NpcCharacter(World& world, const CharacterTuning& tuning) : Super(world, tuning) {
-    VehicleChanged();
+    UpdateVehicleState();
 }
 
-void game::NpcCharacter::VehicleChanged()
+void game::NpcCharacter::Update()
+{
+    Super::Update();
+
+    if (GetVehicle() && IsDriver())
+        VehicleThink();
+}
+
+void game::NpcCharacter::OnRideableChanged()
+{
+    UpdateVehicleState();
+}
+
+void game::NpcCharacter::UpdateVehicleState()
 {
     roads_ = nullptr;
     path_.clear();
@@ -85,8 +98,10 @@ static float GetTurnAngle(const glm::vec3& pos, const glm::quat& rot, const glm:
 
 void game::NpcCharacter::VehicleThink()
 {
-    if (!IsDriver() || !GetVehicle() || !roads_)
+    if (!roads_)
         return;
+
+    auto vehicle = GetVehicle();
 
     if (vehicle_state_ == NVT_REVERSING)
     {
@@ -98,13 +113,13 @@ void game::NpcCharacter::VehicleThink()
         {
             vehicle_state_ = NVT_NORMAL;
             stuck_counter_ = 0;
-            vehicle_->SetInput(game::VIN_BACKWARD, false);
+            vehicle->SetInput(game::VIN_BACKWARD, false);
         }
         return;
     }
 
 
-    const auto& vehicle_trans = GetVehicle()->GetRootTransform();
+    const auto& vehicle_trans = vehicle->GetRootTransform();
 
     const glm::vec3& pos = vehicle_trans.position;
     const glm::quat& rot = vehicle_trans.rotation;
@@ -220,13 +235,13 @@ void game::NpcCharacter::VehicleThink()
             //    BotThink(s);
             //});
 
-            vehicle_->SetSteering(true, -angle); // try turn away while reversing
-            vehicle_->SetInputs(0); // stop
-            vehicle_->SetInput(game::VIN_BACKWARD, true);
+            vehicle->SetSteering(true, -angle); // try turn away while reversing
+            vehicle->SetInputs(0); // stop
+            vehicle->SetInput(game::VIN_BACKWARD, true);
             vehicle_state_ = NVT_REVERSING;
             reversing_frames_ = 50; // reverse for 50 frames
 
-            // GetVehicle()->SetInputs(0); // stop
+            // GetVehicleOld()->SetInputs(0); // stop
             // is_driver_ = false; // TODO: fix 
             return;
         }
@@ -237,11 +252,11 @@ void game::NpcCharacter::VehicleThink()
         last_pos_ = pos;
     }
 
-    GetVehicle()->SetSteering(true, angle);
+    vehicle->SetSteering(true, angle);
 
     game::VehicleInputFlags vin = 0;
 
-    float speed = GetVehicle()->GetSpeed();
+    float speed = vehicle->GetSpeed();
 
     // if (glm::distance(pos, target) < 10.0f)
     // {
@@ -267,5 +282,5 @@ void game::NpcCharacter::VehicleThink()
         vin |= 1 << game::VIN_BACKWARD;
     }
 
-    GetVehicle()->SetInputs(vin);
+    vehicle->SetInputs(vin);
 }

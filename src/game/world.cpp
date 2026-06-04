@@ -112,11 +112,11 @@ struct UseTargetAabbCallback : public btBroadphaseAabbCallback
 
     UseTargetAabbCallback(game::PlayerCharacter& character, game::UseTargetQueryResult& res) : character(character), pos(character.GetRoot().GetGlobalPosition()), best_res(res)
     {
-        auto vehicle = character.GetVehicle();
-        if (vehicle)
+        auto rideable_entity = dynamic_cast<game::Entity*>(character.GetRideable());
+        if (rideable_entity)
         {
             radius = 5.0f;
-            pos = vehicle->GetRoot().GetGlobalPosition();
+            pos = rideable_entity->GetRoot().GetGlobalPosition();
         }
     }
 

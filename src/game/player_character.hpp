@@ -1,4 +1,4 @@
-#include "controllable_character.hpp"
+#include "human_character.hpp"
 
 #include "drivable_vehicle.hpp"
 #include "player.hpp"
@@ -7,16 +7,14 @@
 namespace game
 {
 
-class PlayerCharacter : public ControllableCharacter
+class PlayerCharacter : public HumanCharacter
 {
 public:
-    using Super = ControllableCharacter;
+    using Super = HumanCharacter;
 
     PlayerCharacter(World& world, Player& player, const CharacterTuning& tuning);
 
     virtual void Update() override;
-
-    virtual void VehicleChanged() override;
 
     void ProcessInput(PlayerInputType type, bool enabled);
 
@@ -24,7 +22,11 @@ public:
 
     Player* GetPlayer() const { return player_; }
 
+protected:
+    virtual void OnRideableChanged() override;
+
 private:
+    void UpdatePlayerCamera();
     void UpdateInputs();
     
     void UpdateUseTarget();

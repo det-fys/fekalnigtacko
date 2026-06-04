@@ -23,8 +23,8 @@ void game::EnterableWorld::PlayerInput(Player& player, PlayerInputType type, boo
     // case IN_DEBUG1:
     //     if (enabled)
     //     {
-    //         if (character->GetVehicle())
-    //             character->GetVehicle()->SetPosition({100.0f, 100.0f, 5.0f});
+    //         if (character->GetVehicleOld())
+    //             character->GetVehicleOld()->SetPosition({100.0f, 100.0f, 5.0f});
     //         else
     //             character->SetPosition({100.0f, 100.0f, 5.0f});
     //     }

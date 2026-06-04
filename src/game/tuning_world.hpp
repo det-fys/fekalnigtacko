@@ -29,8 +29,6 @@ public:
 private:
     void Setup();
 
-    void AddTuningGroupSelect(game::RemoteMenu& menu, const VehicleTuningGroup& group);
-
     void OpenMainTuningMenu();
     void OpenGroupMenu(const VehicleTuningGroup& group);
     std::string GetCurrentPartId(const std::string& group_id);

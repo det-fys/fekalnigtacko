@@ -2,18 +2,13 @@
 
 #include "vehicle.hpp"
 #include "usable.hpp"
-#include "controllable_character.hpp"
+#include "rideable.hpp"
+#include "human_character.hpp"
 
 namespace game
 {
 
-struct VehicleSeat
-{
-    glm::vec3 position;
-    ControllableCharacter* occupant;
-};
-
-class DrivableVehicle : public Vehicle, public Usable
+class DrivableVehicle : public Vehicle, public Usable, public Rideable
 {
 public:
     using Super = Vehicle;
@@ -29,19 +24,12 @@ public:
     virtual bool QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res) override;
     virtual void Use(PlayerCharacter& character, uint32_t target_id) override;
 
-    bool SetPassenger(uint32_t seat_idx, ControllableCharacter* character);
-
-    size_t GetNumSeats() const { return seats_.size(); }
-    ControllableCharacter* GetPassenger(size_t idx) const { return seats_[idx].occupant; }
-
-    ~DrivableVehicle() override;
+    virtual void SetRideableInput(PlayerInputFlags in);
 
 private:
     void InitSeats();
     void UpdateUseTargetNames();
 
-private:
-    std::vector<VehicleSeat> seats_;
 };
 
 }

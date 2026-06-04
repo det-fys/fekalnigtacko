@@ -174,7 +174,7 @@ void game::OpenWorld::SpawnBot()
     npc_tuning.clothes.push_back({ "shorts", GetRandomColor24() });
 
     auto& driver = Spawn<NpcCharacter>(npc_tuning);
-    driver.SetVehicle(&vehicle, 0);
+    driver.Ride(&vehicle, 0);
 }
 
 void game::OpenWorld::CreateTuningGarage(const glm::vec3& position, float yaw)

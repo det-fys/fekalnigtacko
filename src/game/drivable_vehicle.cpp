@@ -2,7 +2,7 @@
 #include "player_character.hpp"
 #include "utils/random.hpp"
 
-game::DrivableVehicle::DrivableVehicle(World& world, const VehicleTuning& tuning) : Vehicle(world, tuning), Usable(GetRoot().matrix)
+game::DrivableVehicle::DrivableVehicle(World& world, const VehicleTuning& tuning) : Vehicle(world, tuning), Usable(GetRoot().matrix), Rideable(*this, RIDEABLE_VEHICLE)
 {
     InitSeats();
     OnPhysicsChanged();
@@ -11,7 +11,7 @@ game::DrivableVehicle::DrivableVehicle(World& world, const VehicleTuning& tuning
 void game::DrivableVehicle::Update()
 {
     float daytime = world_.GetDayTime();
-    SetLightsOn(seats_[0].occupant && (daytime < 6.0f || daytime > 18.0f));
+    SetLightsOn(GetPassenger(0) && (daytime < 6.0f || daytime > 18.0f));
 
     Super::Update();
 
@@ -31,13 +31,13 @@ void game::DrivableVehicle::OnPhysicsChanged()
 
 bool game::DrivableVehicle::QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res)
 {
-    if (character.GetVehicle())
-        return false; // already in vehicle
+    if (character.GetRideable())
+        return false; // already in something
 
     res.enabled = true;
     res.error_text = nullptr;
     
-    bool seat_occupied = seats_[target_id].occupant != nullptr;
+    bool seat_occupied = GetPassenger(target_id) != nullptr;
     res.delay = seat_occupied ? 2.0f : 0.25f;
 
     return true;
@@ -45,53 +45,35 @@ bool game::DrivableVehicle::QueryUseTarget(PlayerCharacter& character, uint32_t 
 
 void game::DrivableVehicle::Use(PlayerCharacter& character, uint32_t target_id)
 {
-    if (target_id >= seats_.size())
+    if (target_id >= GetNumSeats())
         return;
 
-    character.SetVehicle(this, target_id); // seat idx is same as target_id
+    character.Ride(this, target_id);
     PlaySound("cardoor", 1.0f, RandomFloat(0.9f, 1.1f));
-
 }
 
-bool game::DrivableVehicle::SetPassenger(uint32_t seat_idx, ControllableCharacter* character)
+static game::CharacterInputFlags MapPlayerInputToVehicleInput(game::PlayerInputFlags in)
 {
-    if (seat_idx >= seats_.size())
-        return false;
+    game::VehicleInputFlags vin = 0;
 
-    auto& seat_info = seats_[seat_idx];
+    if (in & (1 << game::IN_FORWARD))
+        vin |= 1 << game::VIN_FORWARD;
 
-    if (seat_info.occupant == character)
-        return true; // already sitting here
+    if (in & (1 << game::IN_BACKWARD))
+        vin |= 1 << game::VIN_BACKWARD;
 
-    if (seat_info.occupant && character)
-    {
-        seat_info.occupant->SetVehicle(nullptr, 0); // remove current occupant
-    }
+    if (in & (1 << game::IN_LEFT))
+        vin |= 1 << game::VIN_LEFT;
 
-    seat_info.occupant = character;
+    if (in & (1 << game::IN_RIGHT))
+        vin |= 1 << game::VIN_RIGHT;
 
-    if (seat_idx == 0)
-    {
-        if (!character)
-        {
-            // clear inputs
-            SetInputs(0);
-            SetSteering(false, 0.0f);
-        }
-
-    }
-
-    return true;
+    return vin;
 }
 
-game::DrivableVehicle::~DrivableVehicle()
+void game::DrivableVehicle::SetRideableInput(PlayerInputFlags in)
 {
-    // remove occupants
-    for (auto& seat : seats_)
-    {
-        if (seat.occupant)
-            seat.occupant->SetVehicle(nullptr, 0);
-    }
+    SetInputs(MapPlayerInputToVehicleInput(in));
 }
 
 static char HexChar(uint32_t val)
@@ -120,13 +102,11 @@ void game::DrivableVehicle::InitSeats()
         if (!trans)
             break;
 
-        VehicleSeat seat{};
-        seat.position = trans->position;
-        seat.position.z += 1.0f; // the original pos is for animated character which is under vehicle
-        seats_.emplace_back(seat);
+        auto position = trans->position;
+        size_t seat_idx = AddSeat(position);
 
-        uint32_t id = seats_.size() - 1;
-        use_targets_.emplace_back(this, id, seat.position, std::string());
+        position.z += 1.0f; // the original pos is for animated character which is under vehicle
+        use_targets_.emplace_back(this, static_cast<uint32_t>(seat_idx), position, std::string());
     }
 
     UpdateUseTargetNames();

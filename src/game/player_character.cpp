@@ -4,10 +4,8 @@
 game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const CharacterTuning& tuning) : Super(world, tuning), player_(&player)
 {
     EnablePhysics(true);
-    VehicleChanged();
-
+    UpdatePlayerCamera();
     SetNametag(player.GetName());
-
     SendUseTargetInfo();
 }
 
@@ -15,23 +13,6 @@ void game::PlayerCharacter::Update()
 {
     UpdateUseTarget();
     Super::Update();
-}
-
-void game::PlayerCharacter::VehicleChanged()
-{
-    if (!player_)
-        return;
-
-    if (vehicle_)
-    {
-        player_->SetCamera(vehicle_->GetEntNum());
-    }
-    else
-    {
-        player_->SetCamera(GetEntNum());
-    }
-
-    UpdateInputs();
 }
 
 void game::PlayerCharacter::ProcessInput(PlayerInputType type, bool enabled)
@@ -53,58 +34,67 @@ void game::PlayerCharacter::DetachFromPlayer()
     player_ = nullptr;
 }
 
-void game::PlayerCharacter::UpdateInputs()
+void game::PlayerCharacter::OnRideableChanged()
 {
-    auto in = player_ ? player_->GetInput() : 0;
-    CharacterInputFlags c_in = 0;
-    VehicleInputFlags v_in = 0;
+    UpdatePlayerCamera();
+    UpdateInputs();
+}
 
-    if (in & (1 << IN_FORWARD))
-    {
-        c_in |= 1 << CIN_FORWARD;
-        v_in |= 1 << VIN_FORWARD;
-    }
+static game::CharacterInputFlags MapPlayerInputToCharacterInput(game::PlayerInputFlags in)
+{
+    game::CharacterInputFlags c_in = 0;
 
-    if (in & (1 << IN_BACKWARD))
-    {
-        c_in |= 1 << CIN_BACKWARD;
-        v_in |= 1 << VIN_BACKWARD;
-    }
+    if (in & (1 << game::IN_FORWARD))
+        c_in |= 1 << game::CIN_FORWARD;
 
-    if (in & (1 << IN_LEFT))
-    {
-        c_in |= 1 << CIN_LEFT;
-        v_in |= 1 << VIN_LEFT;
-    }
+    if (in & (1 << game::IN_BACKWARD))
+        c_in |= 1 << game::CIN_BACKWARD;
 
-    if (in & (1 << IN_RIGHT))
-    {
-        c_in |= 1 << CIN_RIGHT;
-        v_in |= 1 << VIN_RIGHT;
-    }
+    if (in & (1 << game::IN_LEFT))
+        c_in |= 1 << game::CIN_LEFT;
 
-    if (in & (1 << IN_JUMP))
-    {
-        c_in |= 1 << CIN_JUMP;
-    }
-    
-    if (in & (1 << IN_SPRINT))
-    {
-        c_in |= 1 << CIN_SPRINT;
-    }
+    if (in & (1 << game::IN_RIGHT))
+        c_in |= 1 << game::CIN_RIGHT;
 
-    if (vehicle_)
-    {
-        SetInputs(0);
+    if (in & (1 << game::IN_JUMP))
+        c_in |= 1 << game::CIN_JUMP;
 
-        if (is_driver_)
-        {
-            vehicle_->SetInputs(v_in);
-        }
+    if (in & (1 << game::IN_SPRINT))
+        c_in |= 1 << game::CIN_SPRINT;
+
+    return c_in;
+}
+
+void game::PlayerCharacter::UpdatePlayerCamera()
+{
+    if (!player_)
+        return;
+
+    if (auto rideable = GetRideable(); rideable)
+    {
+        player_->SetCamera(rideable->GetEntity().GetEntNum());
     }
     else
     {
-        SetInputs(c_in);
+        player_->SetCamera(GetEntNum());
+    }
+}
+
+
+void game::PlayerCharacter::UpdateInputs()
+{
+    auto in = player_ ? player_->GetInput() : 0;
+
+    if (auto rideable = GetRideable(); rideable)
+    {
+        SetInputs(0);
+
+        if (IsDriver())
+            rideable->SetRideableInput(in);
+    }
+    else
+    {
+        SetInputs(MapPlayerInputToCharacterInput(in));
     }
 }
 
@@ -142,8 +132,9 @@ void game::PlayerCharacter::UseChanged(bool enabled)
 {
     if (!use_target_)
     {
-        if (vehicle_ && enabled)
-            SetVehicle(nullptr, 0);// no use target and in vehicle -> exit
+        // exit rideable if not target
+        if (enabled && GetRideable())
+            Ride(nullptr, 0);
 
         return;
     }
