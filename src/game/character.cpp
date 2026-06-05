@@ -9,9 +9,7 @@ game::Character::Character(World& world, const CharacterTuning& tuning)
 {
     z_offset_ = tuning_.shape.height * 0.5f + tuning_.shape.radius - 0.05f;
 
-    sk_ = SkeletonInstance(assets::CacheManager::GetSkeleton("data/human.sk"), &root_);
-    animstate_.idle_anim_idx = GetAnim("idle");
-    animstate_.walk_anim_idx = GetAnim("walk");
+    sk_ = SkeletonInstance(assets::CacheManager::GetSkeleton("data/" + tuning.model_name + ".sk"), &root_);
 }
 
 static bool Turn(float& angle, float target, float step)
@@ -52,6 +50,9 @@ void game::Character::SendInitData(Player& player, net::OutMessage& msg) const
 {
     Super::SendInitData(player, msg);
 
+    // write model name
+    msg.Write(net::ModelName(tuning_.model_name));
+
     // write clothes
     msg.Write<net::NumClothes>(tuning_.clothes.size());
     for (const auto& clothes : tuning_.clothes)
@@ -83,7 +84,7 @@ void game::Character::EnablePhysics(bool enable)
 {
     if (enable && !controller_)
     {
-        controller_ = std::make_unique<CharacterPhysicsController>(world_.GetBtWorld(), bt_shape_);
+        controller_ = std::make_unique<CharacterPhysicsController>(*this, world_.GetBtWorld(), bt_shape_);
         SyncControllerTransform();
     }
     else if (!enable && controller_)
@@ -100,41 +101,25 @@ void game::Character::SetInput(CharacterInputType type, bool enable)
         in_ &= ~(1 << type);
 }
 
-// static bool SweepCapsule(btCollisionWorld& world, const btCapsuleShapeZ& shape, const glm::vec3& start,
-//                          const glm::vec3& end, float& hit_fraction, glm::vec3& hit_normal)
-// {
-//     btVector3 bt_start(start.x, start.y, start.z);
-//     btVector3 bt_end(end.x, end.y, end.z);
-
-//     static const btMatrix3x3 bt_basis(1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
-
-//     btTransform start_transform(bt_basis, bt_start);
-//     btTransform end_transform(bt_basis, bt_end);
-
-//     btCollisionWorld::ClosestConvexResultCallback result_callback(bt_start, bt_end);
-//     world.convexSweepTest(&shape, start_transform, end_transform, result_callback);
-
-//     if (result_callback.hasHit())
-//     {
-//         hit_fraction = result_callback.m_closestHitFraction;
-//         hit_normal = glm::vec3(result_callback.m_hitNormalWorld.x(), result_callback.m_hitNormalWorld.y(),
-//                                result_callback.m_hitNormalWorld.z());
-
-//         return true;
-//     }
-
-//     return false;
-// }
-
 void game::Character::SetPosition(const glm::vec3& position)
 {
     root_.local.position = position;
     SyncControllerTransform();
 }
 
-void game::Character::SetMainAnim(const std::string& anim_name)
+void game::Character::SetIdleAnim(const std::string& anim_name)
 {
     animstate_.idle_anim_idx = GetAnim(anim_name);
+}
+
+void game::Character::SetWalkAnim(const std::string& anim_name)
+{
+    animstate_.walk_anim_idx = GetAnim(anim_name);
+}
+
+void game::Character::SetRunAnim(const std::string& anim_name)
+{
+    animstate_.run_anim_idx = GetAnim(anim_name);
 }
 
 void game::Character::SyncControllerTransform()
@@ -300,54 +285,21 @@ game::CharacterSyncFieldFlags game::Character::WriteState(net::OutMessage& msg, 
     return fields;
 }
 
-void game::Character::Move(glm::vec3& velocity, float t)
-{
-    // glm::vec3 u = velocity * t; // Calculate the movement vector
-
-    // btCollisionWorld& bt_world = world_.GetBtWorld();
-    // btCapsuleShapeZ bt_shape(shape_.radius, shape_.height);
-
-    // const int MAX_ITERS = 16;
-    // for (size_t i = 0; i < MAX_ITERS && glm::dot(u, u) > 0.0f; ++i)
-    // {
-    //     // printf("Entity::Move: Iteration %zu, u = (%f, %f, %f)\n", i, u.x, u.y, u.z);
-
-    //     glm::vec3 to = position_ + u;
-
-    //     float hit_fraction = 1.0f;
-    //     glm::vec3 hit_normal;
-
-    //     bool hit = SweepCapsule(bt_world, bt_shape, position_, to, hit_fraction, hit_normal);
-
-    //     // Update the position based on the hit fraction
-    //     position_ += hit_fraction * u;
-
-    //     if (!hit)
-    //         break;
-
-    //     // hit_normal *= -1.0f; // Invert the normal to point outwards
-    //     // printf("Entity::Move: Hit detected, hit_fraction = %f, hit_normal = (%f, %f, %f)\n", hit_fraction,
-    //     // hit_normal.x, hit_normal.y, hit_normal.z);
-
-    //     u -= hit_fraction * u;                                   // Reduce the movement vector by the hit fraction
-    //     u -= glm::dot(u, hit_normal) * hit_normal;               // Reflect the velocity along the hit normal
-    //     velocity -= glm::dot(velocity, hit_normal) * hit_normal; // Adjust the velocity
-    // }
-}
-
 assets::AnimIdx game::Character::GetAnim(const std::string& name) const
 {
     return sk_.GetSkeleton()->GetAnimationIdx(name);
 }
 
-game::CharacterPhysicsController::CharacterPhysicsController(btDynamicsWorld& bt_world, btCapsuleShapeZ& bt_shape)
-    : bt_world_(bt_world), bt_character_(&bt_ghost_, &bt_shape, 0.3f, btVector3(0, 0, 1))
+game::CharacterPhysicsController::CharacterPhysicsController(Character& character, btDynamicsWorld& bt_world, btCapsuleShapeZ& bt_shape)
+    : character_(character), bt_world_(bt_world), bt_character_(&bt_ghost_, &bt_shape, 0.3f, btVector3(0, 0, 1))
 {
     btTransform start_transform;
     start_transform.setIdentity();
     bt_ghost_.setWorldTransform(start_transform);
     bt_ghost_.setCollisionShape(&bt_shape);
     bt_ghost_.setCollisionFlags(btCollisionObject::CF_CHARACTER_OBJECT);
+
+    collision::SetObjectInfo(&bt_ghost_, collision::OT_ENTITY, 0, &character);
 
     bt_world_.addCollisionObject(&bt_ghost_, btBroadphaseProxy::CharacterFilter,
                                  btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter);

@@ -19,7 +19,7 @@ class NpcCharacter : public HumanCharacter
 public:
     using Super = HumanCharacter;
 
-    NpcCharacter(World& world, const CharacterTuning& tuning);
+    NpcCharacter(World& world, const HumanCharacterTuning& tuning);
 
     virtual void Update() override;
 

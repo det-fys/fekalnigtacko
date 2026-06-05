@@ -52,7 +52,7 @@ void game::Game::PlayerJoined(Player& player)
     player_info.world = openworld_.get();
     player.SetWorld(openworld_.get());
 
-    CharacterTuning tuning{};
+    HumanCharacterTuning tuning{};
     tuning.clothes.push_back({"tshirt", GetRandomColor24()});
     tuning.clothes.push_back({"shorts", GetRandomColor24()});
 
@@ -142,7 +142,7 @@ game::PlayerCharacter& game::Game::MovePlayerToWorld(PlayerGameInfo& player_info
     auto& old_world = *player_info.world;
 
     auto old_character = old_world.GetPlayerCharacter(player); 
-    auto& tuning = old_character->GetTuning();
+    auto& tuning = old_character->GetHumanTuning();
     old_world.RemovePlayer(player);
 
     player.SetWorld(&new_world);

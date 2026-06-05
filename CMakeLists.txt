@@ -132,8 +132,12 @@ set(CLIENT_ONLY_SOURCES
 )
 
 set(SERVER_ONLY_SOURCES
+    "src/game/animal.hpp"
+    "src/game/animal.cpp"
     "src/game/character.hpp"
     "src/game/character.cpp"
+    "src/game/cow.hpp"
+    "src/game/cow.cpp"
     "src/game/destroyed_object.hpp"
     "src/game/destroyed_object.cpp"
     "src/game/drivable_vehicle.hpp"

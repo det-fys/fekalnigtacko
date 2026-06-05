@@ -1,6 +1,7 @@
 #include "drivable_vehicle.hpp"
 #include "player_character.hpp"
 #include "utils/random.hpp"
+#include "input_mapping.hpp"
 
 game::DrivableVehicle::DrivableVehicle(World& world, const VehicleTuning& tuning) : Vehicle(world, tuning), Usable(GetRoot().matrix), Rideable(*this, RIDEABLE_VEHICLE)
 {
@@ -52,28 +53,19 @@ void game::DrivableVehicle::Use(PlayerCharacter& character, uint32_t target_id)
     PlaySound("cardoor", 1.0f, RandomFloat(0.9f, 1.1f));
 }
 
-static game::CharacterInputFlags MapPlayerInputToVehicleInput(game::PlayerInputFlags in)
-{
-    game::VehicleInputFlags vin = 0;
-
-    if (in & (1 << game::IN_FORWARD))
-        vin |= 1 << game::VIN_FORWARD;
-
-    if (in & (1 << game::IN_BACKWARD))
-        vin |= 1 << game::VIN_BACKWARD;
-
-    if (in & (1 << game::IN_LEFT))
-        vin |= 1 << game::VIN_LEFT;
-
-    if (in & (1 << game::IN_RIGHT))
-        vin |= 1 << game::VIN_RIGHT;
-
-    return vin;
-}
 
 void game::DrivableVehicle::SetRideableInput(PlayerInputFlags in)
 {
     SetInputs(MapPlayerInputToVehicleInput(in));
+}
+
+void game::DrivableVehicle::OnPassengerChanged(size_t seat_idx, HumanCharacter* passenger)
+{
+    if (seat_idx == 0 && !passenger)
+    {
+        // driver left
+        SetInputs(0);
+    }
 }
 
 static char HexChar(uint32_t val)

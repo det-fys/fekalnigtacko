@@ -1,7 +1,8 @@
 #include "player_character.hpp"
 #include "world.hpp"
+#include "input_mapping.hpp"
 
-game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const CharacterTuning& tuning) : Super(world, tuning), player_(&player)
+game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const HumanCharacterTuning& tuning) : Super(world, tuning), player_(&player)
 {
     EnablePhysics(true);
     UpdatePlayerCamera();
@@ -13,6 +14,11 @@ void game::PlayerCharacter::Update()
 {
     UpdateUseTarget();
     Super::Update();
+
+    if (GetRideable() && IsDriver())
+    {
+        GetRideable()->SetRideableYaw(GetForwardYaw());
+    }
 }
 
 void game::PlayerCharacter::ProcessInput(PlayerInputType type, bool enabled)
@@ -40,31 +46,6 @@ void game::PlayerCharacter::OnRideableChanged()
     UpdateInputs();
 }
 
-static game::CharacterInputFlags MapPlayerInputToCharacterInput(game::PlayerInputFlags in)
-{
-    game::CharacterInputFlags c_in = 0;
-
-    if (in & (1 << game::IN_FORWARD))
-        c_in |= 1 << game::CIN_FORWARD;
-
-    if (in & (1 << game::IN_BACKWARD))
-        c_in |= 1 << game::CIN_BACKWARD;
-
-    if (in & (1 << game::IN_LEFT))
-        c_in |= 1 << game::CIN_LEFT;
-
-    if (in & (1 << game::IN_RIGHT))
-        c_in |= 1 << game::CIN_RIGHT;
-
-    if (in & (1 << game::IN_JUMP))
-        c_in |= 1 << game::CIN_JUMP;
-
-    if (in & (1 << game::IN_SPRINT))
-        c_in |= 1 << game::CIN_SPRINT;
-
-    return c_in;
-}
-
 void game::PlayerCharacter::UpdatePlayerCamera()
 {
     if (!player_)
@@ -80,7 +61,6 @@ void game::PlayerCharacter::UpdatePlayerCamera()
     }
 }
 
-
 void game::PlayerCharacter::UpdateInputs()
 {
     auto in = player_ ? player_->GetInput() : 0;
@@ -90,7 +70,9 @@ void game::PlayerCharacter::UpdateInputs()
         SetInputs(0);
 
         if (IsDriver())
+        {
             rideable->SetRideableInput(in);
+        }
     }
     else
     {

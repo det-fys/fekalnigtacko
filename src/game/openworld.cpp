@@ -11,6 +11,7 @@
 #include "marker.hpp"
 #include "tuning_world.hpp"
 #include "game.hpp"
+#include "cow.hpp"
 
 namespace game
 {
@@ -87,6 +88,9 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld("openworld"), game_(game
         CreateTuningGarage(loc.transform.position, glm::eulerAngles(loc.transform.rotation).x);
     }
 
+    // cow
+    auto& cow = Spawn<Cow>(glm::vec3(0.0f, 0.0f, 2.0f), 0.0f);
+    cow.SetNametag("no ty krávo");
 }
 
 void game::OpenWorld::Update(int64_t delta_time)
@@ -169,7 +173,7 @@ void game::OpenWorld::SpawnBot()
     auto& vehicle = SpawnRandomVehicle();
     vehicle.SetPosition(roads->nodes[start_node].position + glm::vec3{0.0f, 0.0f, 5.0f});
 
-    CharacterTuning npc_tuning;
+    HumanCharacterTuning npc_tuning;
     npc_tuning.clothes.push_back({ "tshirt", GetRandomColor24() });
     npc_tuning.clothes.push_back({ "shorts", GetRandomColor24() });
 

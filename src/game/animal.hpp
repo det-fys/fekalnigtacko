@@ -1,37 +1,30 @@
 #pragma once
 
-#include "vehicle.hpp"
+#include "character.hpp"
 #include "usable.hpp"
 #include "rideable.hpp"
-#include "human_character.hpp"
 
 namespace game
 {
 
-class DrivableVehicle : public Vehicle, public Usable, public Rideable
+class Animal : public Character, public Usable, public Rideable
 {
 public:
-    using Super = Vehicle;
+    Animal(World& world, const CharacterTuning& tuning, const glm::vec3& position, float yaw);
 
-    DrivableVehicle(World& world, const VehicleTuning& tuning);
-
-    virtual void Update() override;
-
-    virtual void SetTuning(const VehicleTuning& tuning) override;
-
-    virtual void OnPhysicsChanged() override;
-    
     virtual bool QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res) override;
     virtual void Use(PlayerCharacter& character, uint32_t target_id) override;
 
     virtual void SetRideableInput(PlayerInputFlags in) override;
+    virtual void SetRideableYaw(float yaw) override;
 
 protected:
     virtual void OnPassengerChanged(size_t seat_idx, HumanCharacter* passenger) override;
+    void SetUseMessage(const std::string& message);
+    void AddAnimalSeat(const glm::vec3& offset);
 
 private:
-    void InitSeats();
-    void UpdateUseTargetNames();
+    std::string use_message_;
 
 };
 

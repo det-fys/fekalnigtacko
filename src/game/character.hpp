@@ -23,10 +23,12 @@ enum CharacterInputType
     CIN_SPRINT,
 };
 
+class Character;
+
 class CharacterPhysicsController
 {
 public:
-    CharacterPhysicsController(btDynamicsWorld& bt_world, btCapsuleShapeZ& bt_shape);
+    CharacterPhysicsController(Character& character, btDynamicsWorld& bt_world, btCapsuleShapeZ& bt_shape);
     DELETE_COPY_MOVE(CharacterPhysicsController)
 
     btKinematicCharacterController& GetBtController() { return bt_character_; }
@@ -37,6 +39,7 @@ public:
     ~CharacterPhysicsController();
 
 private:
+    Character& character_;
     btDynamicsWorld& bt_world_;
     btPairCachingGhostObject bt_ghost_;
     btKinematicCharacterController bt_character_;
@@ -57,16 +60,20 @@ public:
     const CharacterTuning& GetTuning() const { return tuning_; }
 
     void EnablePhysics(bool enable);
+    CharacterPhysicsController* GetController() { return controller_.get(); }
 
     void SetInput(CharacterInputType type, bool enable);
     void SetInputs(CharacterInputFlags inputs) { in_ = inputs; }
 
     void SetForwardYaw(float yaw) { forward_yaw_ = yaw; }
+    float GetForwardYaw() const { return forward_yaw_; }
     void SetYaw(float yaw) { yaw_ = yaw; }
 
     void SetPosition(const glm::vec3& position);
 
-    void SetMainAnim(const std::string& anim_name);
+    void SetIdleAnim(const std::string& anim_name);
+    void SetWalkAnim(const std::string& anim_name);
+    void SetRunAnim(const std::string& anim_name);
 
     ~Character() override = default;
 
@@ -78,8 +85,6 @@ private:
     void UpdateSyncState();
     void SendUpdateMsg();
     CharacterSyncFieldFlags WriteState(net::OutMessage& msg, const CharacterSyncState& base) const;
-
-    void Move(glm::vec3& velocity, float t);
 
     assets::AnimIdx GetAnim(const std::string& name) const;
 

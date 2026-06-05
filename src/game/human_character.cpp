@@ -1,7 +1,21 @@
 #include "human_character.hpp"
 #include "drivable_vehicle.hpp"
 
-game::HumanCharacter::HumanCharacter(World& world, const CharacterTuning& tuning) : Character(world, tuning) {}
+static game::CharacterTuning GetCharacterTuning(const game::HumanCharacterTuning& tuning)
+{
+    game::CharacterTuning ct{};
+    ct.shape = game::CharacterShape(0.3f, 0.75f);
+    ct.model_name = "human";
+    ct.clothes = tuning.clothes;
+
+    return ct;
+}
+
+game::HumanCharacter::HumanCharacter(World& world, const HumanCharacterTuning& tuning) : Character(world, GetCharacterTuning(tuning)), human_tuning_(tuning)
+{
+    SetIdleAnim("idle");
+    SetWalkAnim("walk");
+}
 
 void game::HumanCharacter::SetRideable(Rideable* rideable, size_t seat_idx)
 {
@@ -14,8 +28,8 @@ void game::HumanCharacter::SetRideable(Rideable* rideable, size_t seat_idx)
         EnablePhysics(false);
 
         Attach(rideable->GetEntity().GetEntNum());
-        SetMainAnim(seat_idx == 0 ? "vehicle_drive" : "vehicle_passenger");
-        SetYaw(0.5f * glm::pi<float>());
+        SetIdleAnim((rideable->GetRideableType() == RIDEABLE_VEHICLE && seat_idx == 0) ? "vehicle_drive" : "vehicle_passenger");
+        SetYaw(rideable->GetRideableType() == RIDEABLE_VEHICLE ? 0.5f * glm::pi<float>() : 1.0f * glm::pi<float>());
     }
     else
     {
@@ -29,7 +43,7 @@ void game::HumanCharacter::SetRideable(Rideable* rideable, size_t seat_idx)
         SetPosition(pos);
 
         Attach(0);
-        SetMainAnim("idle");
+        SetIdleAnim("idle");
     }
 
     rideable_ = rideable;
