@@ -131,7 +131,7 @@ void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) con
     float yaw_sin = glm::sin(yaw_);
     float pitch_cos = glm::cos(pitch_);
     float pitch_sin = glm::sin(pitch_);
-    glm::vec3 dir(yaw_cos * pitch_cos, yaw_sin * pitch_cos, pitch_sin);
+    glm::vec3 dir(-yaw_sin * pitch_cos, yaw_cos * pitch_cos, pitch_sin);
 
     glm::vec3 end = start - dir * distance;
 

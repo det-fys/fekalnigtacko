@@ -71,11 +71,13 @@ public:
 
     void SetPosition(const glm::vec3& position);
 
+    
+    ~Character() override = default;
+    
+protected:
     void SetIdleAnim(const std::string& anim_name);
     void SetWalkAnim(const std::string& anim_name);
     void SetRunAnim(const std::string& anim_name);
-
-    ~Character() override = default;
 
 private:
     void SyncControllerTransform();
@@ -87,6 +89,11 @@ private:
     CharacterSyncFieldFlags WriteState(net::OutMessage& msg, const CharacterSyncState& base) const;
 
     assets::AnimIdx GetAnim(const std::string& name) const;
+
+protected:
+    float turn_speed_ = 8.0f;
+    float walk_speed_ = 2.0f;
+    float run_speed_mult_ = 3.0f;
 
 private:
     CharacterTuning tuning_;
@@ -102,8 +109,6 @@ private:
 
     float yaw_ = 0.0f;
     float forward_yaw_ = 0.0f;
-
-    float walk_speed_ = 2.0f;
 
     SkeletonInstance sk_;
     CharacterAnimState animstate_;

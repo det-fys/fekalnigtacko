@@ -29,7 +29,7 @@ void game::HumanCharacter::SetRideable(Rideable* rideable, size_t seat_idx)
 
         Attach(rideable->GetEntity().GetEntNum());
         SetIdleAnim((rideable->GetRideableType() == RIDEABLE_VEHICLE && seat_idx == 0) ? "vehicle_drive" : "vehicle_passenger");
-        SetYaw(rideable->GetRideableType() == RIDEABLE_VEHICLE ? 0.5f * glm::pi<float>() : 1.0f * glm::pi<float>());
+        SetYaw(0.0f);
     }
     else
     {

@@ -37,9 +37,8 @@ void game::Character::Update()
     Super::Update();
 
     SyncTransformFromController();
-    root_.UpdateMatrix();
-
     UpdateMovement();
+    root_.UpdateMatrix();
 
     sync_current_ = 1 - sync_current_;
     UpdateSyncState();
@@ -147,22 +146,21 @@ void game::Character::SyncTransformFromController()
 void game::Character::UpdateMovement()
 {
     constexpr float dt = 1.0f / 25.0f;
-    constexpr float running_mult = 3.0f;
     bool walking = false;
     bool running = false;
     glm::vec2 movedir(0.0f);
 
     if (in_ & (1 << CIN_FORWARD))
-        movedir.x += 1.0f;
+        movedir.y += 1.0f;
 
     if (in_ & (1 << CIN_BACKWARD))
-        movedir.x -= 1.0f;
-
-    if (in_ & (1 << CIN_RIGHT))
         movedir.y -= 1.0f;
 
+    if (in_ & (1 << CIN_RIGHT))
+        movedir.x -= 1.0f;
+
     if (in_ & (1 << CIN_LEFT))
-        movedir.y += 1.0f;
+        movedir.x += 1.0f;
 
     glm::vec3 walkdir(0.0f);
 
@@ -173,16 +171,18 @@ void game::Character::UpdateMovement()
         if (in_ & (1 << CIN_SPRINT))
             running = true;
 
-        float target_yaw = forward_yaw_ + std::atan2(movedir.y, movedir.x);
-        Turn(yaw_, target_yaw, 8.0f * dt);
+        float target_yaw = forward_yaw_ + std::atan2(movedir.x, movedir.y);
+        Turn(yaw_, target_yaw, turn_speed_ * dt);
 
-        glm::vec3 forward_dir(glm::cos(yaw_), glm::sin(yaw_), 0.0f);
+        glm::vec3 forward_dir(-glm::sin(yaw_), glm::cos(yaw_), 0.0f);
         walkdir = forward_dir * walk_speed_ * dt;
 
         if (running)
-            walkdir *= running_mult;
+            walkdir *= run_speed_mult_;
 
     }
+
+    root_.local.rotation = glm::angleAxis(yaw_, glm::vec3(0.0f, 0.0f, 1.0f));
 
     if (controller_)
     {
@@ -200,7 +200,7 @@ void game::Character::UpdateMovement()
     MoveToward(animstate_.loco_blend, run_blend_target, dt * 2.0f);
     float anim_speed = glm::mix(0.5f, 1.5f, UnMix(0.0f, 0.5f, animstate_.loco_blend));
     if (running)
-        anim_speed *= running_mult;
+        anim_speed *= run_speed_mult_;
     animstate_.loco_phase = glm::mod(animstate_.loco_phase + anim_speed * dt, 1.0f);
 }
 

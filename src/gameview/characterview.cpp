@@ -180,8 +180,8 @@ bool game::view::CharacterView::ReadState(net::InMessage* msg)
                 return false;
 
             net::DecodePosition(sync_.pos, new_state.trans.position);
-            new_state.trans.rotation = glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
-                                                sync_.yaw.Decode() + glm::pi<float>() * 0.5f, glm::vec3(0, 0, 1));
+            new_state.trans.rotation =
+                glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), sync_.yaw.Decode(), glm::vec3(0, 0, 1));
         }
 
         if (fields & CSF_IDLE_ANIM)
