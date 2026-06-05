@@ -8,10 +8,17 @@ namespace game
 class Cow : public Animal
 {
 public:
+    using Super = Animal;
+
     Cow(World& world, const glm::vec3& position, float yaw);
 
-private:
+protected:
+    virtual void OnPassengerChanged(size_t seat_idx, HumanCharacter* passenger) override;
 
+private:
+    void ScheduleRandomMoo();
+    void PlayRandomMoo();
+    void PlayUseSound();
 
 
 };
