@@ -95,17 +95,17 @@ void game::view::CharacterView::Draw(const DrawArgs& args)
     //args.dlist.AddBeam(start, end, 0xFF007700, 0.05f);
 
     //// draw bones debug
-    const auto& bone_nodes = sk_.GetBoneNodes();
-    for (const auto& bone_node : bone_nodes)
-    {
-        if (!bone_node.parent)
-            continue;
+    // const auto& bone_nodes = sk_.GetBoneNodes();
+    // for (const auto& bone_node : bone_nodes)
+    // {
+    //     if (!bone_node.parent)
+    //         continue;
 
-       glm::vec3 p0 = bone_node.parent->matrix[3];
-       glm::vec3 p1 = bone_node.matrix[3];
+    //    glm::vec3 p0 = bone_node.parent->matrix[3];
+    //    glm::vec3 p1 = bone_node.matrix[3];
 
-       args.dlist.AddBeam(p0, p1, 0xFF00EEEE, 0.01f);
-    }
+    //    args.dlist.AddBeam(p0, p1, 0xFF00EEEE, 0.01f);
+    // }
 
     // update skinning matrices
     if (!ubo_valid_)
