@@ -13,8 +13,14 @@ namespace game::view
 struct CharacterViewState
 {
     Transform trans;
+    
     float loco_blend = 0.0f;
     float loco_phase = 0.0f;
+    
+    float action_phase = 0.0f;
+
+    float aim_yaw = 0.0f;
+    float aim_pitch = 0.0f; 
 };
 
 struct CharacterViewClothes

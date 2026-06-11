@@ -147,14 +147,14 @@ inline bool ReadRGB(InMessage& msg, uint32_t& color)
 
 // DELTA
 template <std::unsigned_integral T> requires (sizeof(T) == 1)
-inline void WriteDelta(OutMessage& msg, T previous, T current)
+inline void WriteDelta(OutMessage& msg, T current, T previous)
 {
     // 1 byte => just write current
     msg.Write(current);
 }
 
 template <std::unsigned_integral T> requires (sizeof(T) > 1)
-inline void WriteDelta(OutMessage& msg, T previous, T current)
+inline void WriteDelta(OutMessage& msg, T current, T previous)
 {
     static_assert(sizeof(T) <= 4);
 
@@ -169,18 +169,18 @@ inline void WriteDelta(OutMessage& msg, T previous, T current)
 template <AnyQuantized T>
 inline void WriteDelta(OutMessage& msg, T current, T previous)
 {
-    WriteDelta(msg, previous.value, current.value);
+    WriteDelta(msg, current.value, previous.value);
 }
 
 template <std::unsigned_integral T> requires (sizeof(T) == 1)
-inline bool ReadDelta(InMessage& msg, T previous, T& current)
+inline bool ReadDelta(InMessage& msg, T& current, T previous)
 {
     // 1 byte => just read current
     return msg.Read(current);
 }
 
 template <std::unsigned_integral T> requires (sizeof(T) > 1)
-inline bool ReadDelta(InMessage& msg, T previous, T& current)
+inline bool ReadDelta(InMessage& msg, T& current, T previous)
 {
     static_assert(sizeof(T) <= 4);
 

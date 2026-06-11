@@ -26,7 +26,6 @@ void game::CharacterAnimState::ApplyToSkeleton(SkeletonInstance& sk) const
         sk.ApplySkelAnim(*idle_anim, loco_phase, 1.0f);
         sk.ApplySkelAnim(*walk_anim, loco_phase, UnMix(0.0f, 0.5f, loco_blend));
     }
-
     else if (loco_blend == 0.5f) // walk
     {
         sk.ApplySkelAnim(*walk_anim, loco_phase, 1.0f);
@@ -39,6 +38,18 @@ void game::CharacterAnimState::ApplyToSkeleton(SkeletonInstance& sk) const
     else // run
     {
         sk.ApplySkelAnim(*run_anim, loco_phase, 1.0f);
+    }
+
+    // action
+    auto action_anim = skeleton->GetAnimation(action_anim_idx);
+    if (action_anim)
+    {
+        sk.ApplySkelAnim(*action_anim, action_phase, 1.0f);
+    }
+
+    if (glm::abs(yaw) > 0.01f || glm::abs(pitch) > 0.01f)
+    {
+        sk.ApplyAim(yaw, pitch);
     }
 
 }

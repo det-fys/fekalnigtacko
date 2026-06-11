@@ -52,6 +52,20 @@ void game::SkeletonInstance::ApplySkelAnim(const assets::Animation& anim, float 
     }
 }
 
+void game::SkeletonInstance::ApplyAim(float yaw, float pitch)
+{
+    const auto& aim_bones = skeleton_->GetAimBones();
+    if (aim_bones.empty())
+        return;
+
+    for (const auto& aim_bone : aim_bones)
+    {
+        auto& bone_transform = bone_nodes_[aim_bone.idx].local;
+        auto rotation = glm::angleAxis(-pitch * aim_bone.weight, glm::vec3(1.0f, 0.0f, 0.0f));
+        bone_transform.rotation = rotation * bone_transform.rotation;
+    }
+}
+
 void game::SkeletonInstance::UpdateBoneMatrices()
 {
     for (TransformNode& node : bone_nodes_)

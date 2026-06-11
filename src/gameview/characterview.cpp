@@ -63,10 +63,13 @@ void game::view::CharacterView::Update(const UpdateInfo& info)
 
     // interpolate states
     float tps = 25.0f;
-    float t = (info.time - update_time_) * tps * 0.8f; // assume some jitter, interpolate for longer
+    float t = (info.time - update_time_) * tps * 0.8f; // assume some jitter, interpolate for longer;
     t = glm::clamp(t, 0.0f, 2.0f);
+    float t_sane = glm::clamp(t, 0.0f, 1.0f);
 
     root_.local = Transform::Lerp(states_[0].trans, states_[1].trans, t);
+
+    // loco
     animstate_.loco_blend = glm::mix(states_[0].loco_blend, states_[1].loco_blend, t);
 
     float loco_phase0 = states_[0].loco_phase;
@@ -74,6 +77,13 @@ void game::view::CharacterView::Update(const UpdateInfo& info)
     if (loco_phase0 > loco_phase1)
         loco_phase0 -= 1.0f;
     animstate_.loco_phase = glm::mod(glm::mix(loco_phase0, loco_phase1, t), 1.0f);
+
+    // action
+    animstate_.action_phase = glm::mix(states_[0].action_phase, states_[1].action_phase, t_sane);
+    
+    // aim
+    animstate_.yaw = glm::mix(states_[0].aim_yaw, states_[1].aim_yaw, t_sane);
+    animstate_.pitch = glm::mix(states_[0].aim_pitch, states_[1].aim_pitch, t_sane);
 
     animstate_.ApplyToSkeleton(sk_);
 
@@ -157,13 +167,17 @@ void game::view::CharacterView::OnAttach()
 bool game::view::CharacterView::ReadState(net::InMessage* msg)
 {
     update_time_ = world_.GetTime();
+    
+    auto& old_state = states_[0];
+    auto& new_state = states_[1];
 
     // init lerp start state
-    states_[0].trans = root_.local;
-    states_[0].loco_blend = animstate_.loco_blend;
-    states_[0].loco_phase = animstate_.loco_phase;
-
-    auto& new_state = states_[1];
+    old_state.trans = root_.local;
+    old_state.loco_blend = animstate_.loco_blend;
+    old_state.loco_phase = animstate_.loco_phase;
+    old_state.action_phase = animstate_.action_phase;
+    old_state.aim_yaw = animstate_.yaw;
+    old_state.aim_pitch = animstate_.pitch;
 
     if (msg)
     {
@@ -208,6 +222,40 @@ bool game::view::CharacterView::ReadState(net::InMessage* msg)
 
             new_state.loco_blend = sync_.loco_blend.Decode();
             new_state.loco_phase = sync_.loco_phase.Decode();
+        }
+
+        // action anim
+        if (fields & CSF_ACTION_ANIM)
+        {
+            if (!msg->Read(sync_.action_anim))
+                return false;
+
+            animstate_.action_anim_idx = sync_.action_anim;
+        }
+
+        // action phase
+        if (fields & CSF_ACTION_PHASE)
+        {
+            if (!net::ReadDelta(*msg, sync_.action_phase))
+                return false;
+
+            new_state.action_phase = sync_.action_phase.Decode();
+
+            if (fields & CSF_ACTION_ANIM)
+            {
+                // anim just changed, dont blend phase
+                old_state.action_phase = new_state.action_phase;
+            }
+        }
+
+        // aim
+        if (fields & CSF_AIM)
+        {
+            if (!net::ReadDelta(*msg, sync_.aim_yaw) || !net::ReadDelta(*msg, sync_.aim_pitch))
+                return false; 
+
+            new_state.aim_yaw = sync_.aim_yaw.Decode();
+            new_state.aim_pitch = sync_.aim_pitch.Decode();
         }
     }
 

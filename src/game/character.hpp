@@ -45,6 +45,13 @@ private:
     btKinematicCharacterController bt_character_;
 };
 
+enum CharacterMovementType
+{
+    CMT_DISABLED,
+    CMT_TURN,
+    CMT_DIRECTIONAL,
+};
+
 class Character : public Entity
 {
 public:
@@ -64,13 +71,17 @@ public:
 
     void SetInput(CharacterInputType type, bool enable);
     void SetInputs(CharacterInputFlags inputs) { in_ = inputs; }
+    CharacterInputFlags GetInputs() const { return in_; }
 
-    void SetForwardYaw(float yaw) { forward_yaw_ = yaw; }
-    float GetForwardYaw() const { return forward_yaw_; }
+    void SetMovementType(CharacterMovementType type);
+
+    void SetViewAngles(float yaw, float pitch);
+    float GetViewYaw() const { return view_yaw_; }
+    float GetViewPitch() const { return view_pitch_; }
+
     void SetYaw(float yaw) { yaw_ = yaw; }
 
     void SetPosition(const glm::vec3& position);
-
     
     ~Character() override = default;
     
@@ -78,6 +89,10 @@ protected:
     void SetIdleAnim(const std::string& anim_name);
     void SetWalkAnim(const std::string& anim_name);
     void SetRunAnim(const std::string& anim_name);
+    void PlayActionAnim(assets::AnimIdx anim_idx, float speed);
+    void PlayActionAnim(const std::string& anim_name, float speed = 1.0f);
+    void ClearActionAnim();
+    bool IsActionAnimDone() { return action_anim_done_; }
 
 private:
     void SyncControllerTransform();
@@ -89,6 +104,8 @@ private:
     CharacterSyncFieldFlags WriteState(net::OutMessage& msg, const CharacterSyncState& base) const;
 
     assets::AnimIdx GetAnim(const std::string& name) const;
+
+    void UpdateActionAnim();
 
 protected:
     float turn_speed_ = 8.0f;
@@ -108,13 +125,20 @@ private:
     std::unique_ptr<CharacterPhysicsController> controller_;
 
     float yaw_ = 0.0f;
-    float forward_yaw_ = 0.0f;
+    float view_yaw_ = 0.0f;
+    float view_pitch_ = 0.0f;
 
     SkeletonInstance sk_;
     CharacterAnimState animstate_;
 
     CharacterSyncState sync_[2];
     size_t sync_current_ = 0;
+
+    CharacterMovementType movement_ = CMT_DISABLED;
+
+    float action_anim_playback_speed_ = 0.0f;
+    float action_anim_end_ = 0.0f;
+    bool action_anim_done_ = true;
 };
 
 } // namespace game

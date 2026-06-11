@@ -97,6 +97,10 @@ std::shared_ptr<const assets::Animation> assets::Animation::LoadFromFile(const s
         {
             iss >> anim->tps_;
         }
+        else if (command == "cyclic")
+        {
+            anim->cyclic_ = true;
+        }
     });
 
     if (anim->channels_.empty())
@@ -119,6 +123,10 @@ std::shared_ptr<const assets::Animation> assets::Animation::LoadFromFile(const s
         AnimationChannel& channel = anim->channels_[i];
         channel.frames = &anim->frame_refs_[i * anim->num_frames_];
     }
+
+    // calc duration
+    auto frame_range = anim->cyclic_ ? anim->num_frames_ : anim->num_frames_ - 1;
+    anim->duration_ = static_cast<float>(frame_range) / anim->tps_;
 
     return anim;
 }

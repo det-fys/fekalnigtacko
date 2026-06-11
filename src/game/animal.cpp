@@ -9,6 +9,7 @@ game::Animal::Animal(World& world, const CharacterTuning& tuning, const glm::vec
     SetPosition(position);
     SetYaw(yaw);
     EnablePhysics(true);
+    SetMovementType(CMT_TURN);
 
     collision::AddObjectFlags(&GetController()->GetBtGhost(), collision::OF_USABLE);
 }
@@ -40,9 +41,9 @@ void game::Animal::SetRideableInput(PlayerInputFlags in)
     SetInputs(MapPlayerInputToCharacterInput(in));
 }
 
-void game::Animal::SetRideableYaw(float yaw)
+void game::Animal::SetRideableViewAngles(float yaw, float pitch)
 {
-    SetForwardYaw(yaw);
+    SetViewAngles(yaw, pitch);
 }
 
 void game::Animal::OnPassengerChanged(size_t seat_idx, HumanCharacter* passenger)

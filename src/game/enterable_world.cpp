@@ -45,7 +45,7 @@ void game::EnterableWorld::PlayerViewAnglesChanged(Player& player, float yaw, fl
 
     auto character = it->second;
 
-    character->SetForwardYaw(yaw);
+    character->SetViewAngles(yaw, pitch);
 }
 
 void game::EnterableWorld::RemovePlayer(Player& player)

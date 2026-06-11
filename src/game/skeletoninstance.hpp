@@ -17,6 +17,8 @@ public:
     const TransformNode& GetBoneNode(size_t index) const { return bone_nodes_[index]; }
 
     void ApplySkelAnim(const assets::Animation& anim, float time, float weight);
+    void ApplyAim(float yaw, float pitch);
+
     void UpdateBoneMatrices();
 
     const std::vector<TransformNode> GetBoneNodes() const { return bone_nodes_; }

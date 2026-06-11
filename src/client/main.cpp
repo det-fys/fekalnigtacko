@@ -196,6 +196,20 @@ static void PollEvents()
             }
             break;
 
+        case SDL_MOUSEBUTTONDOWN:
+        case SDL_MOUSEBUTTONUP:
+            {
+                if (event.button.button == SDL_BUTTON_LEFT)
+                {
+                    s_app->Input(game::IN_ATTACK_PRIMARY, event.button.state == SDL_PRESSED, event.button.clicks > 1);
+                }
+                else if (event.button.button == SDL_BUTTON_RIGHT)
+                {
+                    s_app->Input(game::IN_ATTACK_SECONDARY, event.button.state == SDL_PRESSED, event.button.clicks > 1);
+                }
+            }
+            break;
+
         }
         
     }
@@ -362,16 +376,6 @@ static void Frame()
 	int width, height;
 	SDL_GetWindowSize(s_window, &width, &height);
 	s_app->SetViewportSize(width, height);
-    
-	game::PlayerInputFlags input = 0;
-	const uint8_t* kbd_state = SDL_GetKeyboardState(nullptr);
-    
-
-
-	int mouse_state = SDL_GetMouseState(nullptr, nullptr);
-
-	if (mouse_state & SDL_BUTTON(SDL_BUTTON_LEFT))
-		input |= (1 << game::IN_ATTACK);
 
     s_app->Frame();
 

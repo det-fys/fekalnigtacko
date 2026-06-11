@@ -16,7 +16,7 @@ public:
     virtual void Use(PlayerCharacter& character, uint32_t target_id) override;
 
     virtual void SetRideableInput(PlayerInputFlags in) override;
-    virtual void SetRideableYaw(float yaw) override;
+    virtual void SetRideableViewAngles(float yaw, float pitch) override;
 
 protected:
     virtual void OnPassengerChanged(size_t seat_idx, HumanCharacter* passenger) override;

@@ -40,6 +40,8 @@ std::shared_ptr<const assets::Skeleton> assets::Skeleton::LoadFromFile(const std
         }
     });
 
+    skeleton->AddAimBones();
+
     return skeleton;
 }
 
@@ -94,4 +96,25 @@ void assets::Skeleton::AddAnimation(const std::string& name, const std::shared_p
 {
     anim_idxs_[name] = anims_.size();
     anims_.push_back(anim);
+}
+
+void assets::Skeleton::AddAimBones()
+{
+    AddAimBone("DEF-spine.002", 0.5f);
+    AddAimBone("MCH-spine.002", 0.5f);
+    AddAimBone("DEF-spine.003", 0.5f);
+    AddAimBone("MCH-spine.003", 0.5f);
+
+}
+
+void assets::Skeleton::AddAimBone(const std::string& name, float weight)
+{
+    auto idx = GetBoneIndex(name);
+    if (idx < 0)
+        return;
+
+    AimBone aimbone{};
+    aimbone.idx = idx;
+    aimbone.weight = weight;
+    aim_bones_.emplace_back(aimbone);
 }

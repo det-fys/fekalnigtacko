@@ -22,6 +22,12 @@ struct Bone
 using AnimIdx = uint8_t;
 constexpr AnimIdx NO_ANIM = 255;
 
+struct AimBone
+{
+    size_t idx;
+    float weight;
+};
+
 class Skeleton
 {
 public:
@@ -37,16 +43,24 @@ public:
     const Animation* GetAnimation(AnimIdx idx) const;
     const Animation* GetAnimation(const std::string& name) const;
 
+    const std::vector<AimBone> GetAimBones() const { return aim_bones_; }
+
 private:
     void AddBone(const std::string& name, const std::string& parent_name, const Transform& transform);
     void AddAnimation(const std::string& name, const std::shared_ptr<const Animation>& anim);
 
+    void AddAimBones();
+    void AddAimBone(const std::string& name, float weight);
+
 private:
+    std::string name_;
     std::vector<Bone> bones_;
     std::map<std::string, int> bone_map_;
 
     std::vector<std::shared_ptr<const Animation>> anims_;
     std::map<std::string, AnimIdx> anim_idxs_;
+
+    std::vector<AimBone> aim_bones_;
 };
 
 } // namespace assets

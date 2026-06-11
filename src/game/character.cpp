@@ -38,6 +38,7 @@ void game::Character::Update()
 
     SyncTransformFromController();
     UpdateMovement();
+    UpdateActionAnim();
     root_.UpdateMatrix();
 
     sync_current_ = 1 - sync_current_;
@@ -100,6 +101,17 @@ void game::Character::SetInput(CharacterInputType type, bool enable)
         in_ &= ~(1 << type);
 }
 
+void game::Character::SetMovementType(CharacterMovementType type)
+{
+    movement_ = type;
+}
+
+void game::Character::SetViewAngles(float yaw, float pitch)
+{
+    view_yaw_ = yaw;
+    view_pitch_ = pitch;
+}
+
 void game::Character::SetPosition(const glm::vec3& position)
 {
     root_.local.position = position;
@@ -119,6 +131,30 @@ void game::Character::SetWalkAnim(const std::string& anim_name)
 void game::Character::SetRunAnim(const std::string& anim_name)
 {
     animstate_.run_anim_idx = GetAnim(anim_name);
+}
+
+void game::Character::PlayActionAnim(assets::AnimIdx anim_idx, float speed)
+{
+    action_anim_end_ = (anim_idx != assets::NO_ANIM) ? sk_.GetSkeleton()->GetAnimation(anim_idx)->GetDuration() : 0.0f;
+
+    if (animstate_.action_anim_idx != anim_idx)
+    {
+        // continue from current time if same anim
+        animstate_.action_phase = (speed > 0.0f) ? 0.0f : action_anim_end_;
+    }
+    animstate_.action_anim_idx = anim_idx;
+    action_anim_playback_speed_ = speed;
+    action_anim_done_ = anim_idx == assets::NO_ANIM;
+}
+
+void game::Character::PlayActionAnim(const std::string& anim_name, float speed)
+{
+    PlayActionAnim(GetAnim(anim_name), speed);
+}
+
+void game::Character::ClearActionAnim()
+{
+    PlayActionAnim(assets::NO_ANIM, 0.0f);
 }
 
 void game::Character::SyncControllerTransform()
@@ -143,42 +179,58 @@ void game::Character::SyncTransformFromController()
     root_.local.position.z -= z_offset_; // foot pos
 }
 
+static glm::vec2 GetInputDir(game::CharacterInputFlags in)
+{
+    glm::vec2 dir(0.0f);
+
+    if (in & (1 << game::CIN_FORWARD))
+        dir.y += 1.0f;
+
+    if (in & (1 << game::CIN_BACKWARD))
+        dir.y -= 1.0f;
+
+    if (in & (1 << game::CIN_RIGHT))
+        dir.x -= 1.0f;
+
+    if (in & (1 << game::CIN_LEFT))
+        dir.x += 1.0f;
+
+    return dir;
+}
+
 void game::Character::UpdateMovement()
 {
+    if (movement_ == CMT_DISABLED)
+    {
+        animstate_.loco_blend = 0.0f;
+        return;
+    }
+
     constexpr float dt = 1.0f / 25.0f;
     bool walking = false;
     bool running = false;
-    glm::vec2 movedir(0.0f);
 
-    if (in_ & (1 << CIN_FORWARD))
-        movedir.y += 1.0f;
+    glm::vec3 move_dir(0.0f);
 
-    if (in_ & (1 << CIN_BACKWARD))
-        movedir.y -= 1.0f;
-
-    if (in_ & (1 << CIN_RIGHT))
-        movedir.x -= 1.0f;
-
-    if (in_ & (1 << CIN_LEFT))
-        movedir.x += 1.0f;
-
-    glm::vec3 walkdir(0.0f);
-
-    if (movedir.x != 0.0f || movedir.y != 0.0f)
+    auto input_dir = GetInputDir(in_);
+    if (input_dir.x != 0.0f || input_dir.y != 0.0f)
     {
         walking = true;
         
         if (in_ & (1 << CIN_SPRINT))
             running = true;
 
-        float target_yaw = forward_yaw_ + std::atan2(movedir.x, movedir.y);
-        Turn(yaw_, target_yaw, turn_speed_ * dt);
+        const bool directional = (movement_ == CMT_DIRECTIONAL);
 
-        glm::vec3 forward_dir(-glm::sin(yaw_), glm::cos(yaw_), 0.0f);
-        walkdir = forward_dir * walk_speed_ * dt;
-
+        float relative_yaw = std::atan2(input_dir.x, input_dir.y);
+        float turn_yaw = directional ? view_yaw_ : view_yaw_ + relative_yaw;
+        Turn(yaw_, turn_yaw, turn_speed_ * dt);
+        float move_yaw = directional ? yaw_ + relative_yaw : yaw_;
+    
+        move_dir = glm::vec3(-glm::sin(move_yaw), glm::cos(move_yaw), 0.0f) * walk_speed_ * dt;
+       
         if (running)
-            walkdir *= run_speed_mult_;
+            move_dir *= run_speed_mult_;
 
     }
 
@@ -187,7 +239,7 @@ void game::Character::UpdateMovement()
     if (controller_)
     {
         auto& bt_character = controller_->GetBtController();
-        bt_character.setWalkDirection(btVector3(walkdir.x, walkdir.y, walkdir.z));
+        bt_character.setWalkDirection(btVector3(move_dir.x, move_dir.y, move_dir.z));
 
         if (in_ & (1 << CIN_JUMP) && bt_character.canJump())
         {
@@ -202,6 +254,9 @@ void game::Character::UpdateMovement()
     if (running)
         anim_speed *= run_speed_mult_;
     animstate_.loco_phase = glm::mod(animstate_.loco_phase + anim_speed * dt, 1.0f);
+
+    animstate_.pitch = view_pitch_;
+
 }
 
 void game::Character::UpdateSyncState()
@@ -220,6 +275,14 @@ void game::Character::UpdateSyncState()
     state.run_anim = animstate_.run_anim_idx;
     state.loco_phase.Encode(animstate_.loco_phase);
     state.loco_blend.Encode(animstate_.loco_blend);
+
+    // action
+    state.action_anim = animstate_.action_anim_idx;
+    state.action_phase.Encode(animstate_.action_phase);
+
+    // aim
+    state.aim_yaw.Encode(animstate_.yaw);
+    state.aim_pitch.Encode(animstate_.pitch);
 }
 
 void game::Character::SendUpdateMsg()
@@ -282,12 +345,62 @@ game::CharacterSyncFieldFlags game::Character::WriteState(net::OutMessage& msg, 
         net::WriteDelta(msg, curr.loco_phase, base.loco_phase);
     }
 
+    // action anim
+    if (curr.action_anim != base.action_anim)
+    {
+        fields |= CSF_ACTION_ANIM;
+
+        msg.Write(curr.action_anim);
+    }
+
+    // action phase
+    if (curr.action_phase.value != base.action_phase.value)
+    {
+        fields |= CSF_ACTION_PHASE;
+
+        net::WriteDelta(msg, curr.action_phase, base.action_phase);
+    }
+
+    // aim
+    if (curr.aim_yaw.value != base.aim_yaw.value || curr.aim_pitch.value != base.aim_pitch.value)
+    {
+        fields |= CSF_AIM;
+
+        net::WriteDelta(msg, curr.aim_yaw.value, base.aim_yaw.value);
+        net::WriteDelta(msg, curr.aim_pitch.value, base.aim_pitch.value);
+    }
+
     return fields;
 }
 
 assets::AnimIdx game::Character::GetAnim(const std::string& name) const
 {
     return sk_.GetSkeleton()->GetAnimationIdx(name);
+}
+
+void game::Character::UpdateActionAnim()
+{
+    if (action_anim_done_)
+        return;
+
+    animstate_.action_phase += action_anim_playback_speed_ * (1.0f / 25.0f);
+    
+    if (action_anim_playback_speed_ > 0.0f)
+    {
+        if (animstate_.action_phase >= action_anim_end_)
+        {
+            animstate_.action_phase = action_anim_end_;
+            action_anim_done_ = true;
+        }
+    }
+    else
+    {
+        if (animstate_.action_phase <= 0.0f)
+        {
+            animstate_.action_phase = 0.0f;
+            action_anim_done_ = true;
+        }
+    }
 }
 
 game::CharacterPhysicsController::CharacterPhysicsController(Character& character, btDynamicsWorld& bt_world, btCapsuleShapeZ& bt_shape)

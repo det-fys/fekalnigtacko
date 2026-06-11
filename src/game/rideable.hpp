@@ -31,7 +31,7 @@ public:
     void KickAll();
 
     virtual void SetRideableInput(PlayerInputFlags in) {}
-    virtual void SetRideableYaw(float yaw) {}
+    virtual void SetRideableViewAngles(float yaw, float pitch) {}
     
     RideableType GetRideableType() const { return type_; }
     

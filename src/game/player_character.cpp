@@ -17,7 +17,7 @@ void game::PlayerCharacter::Update()
 
     if (GetRideable() && IsDriver())
     {
-        GetRideable()->SetRideableYaw(GetForwardYaw());
+        GetRideable()->SetRideableViewAngles(GetViewYaw(), GetViewPitch());
     }
 }
 
@@ -78,6 +78,8 @@ void game::PlayerCharacter::UpdateInputs()
     {
         SetInputs(MapPlayerInputToCharacterInput(in));
     }
+
+    SetAiming(in & (1 << IN_ATTACK_SECONDARY));
 }
 
 void game::PlayerCharacter::UpdateUseTarget()
