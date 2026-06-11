@@ -53,7 +53,6 @@ void game::DrivableVehicle::Use(PlayerCharacter& character, uint32_t target_id)
     PlaySound("cardoor", 1.0f, RandomFloat(0.9f, 1.1f));
 }
 
-
 void game::DrivableVehicle::SetRideableInput(PlayerInputFlags in)
 {
     SetInputs(MapPlayerInputToVehicleInput(in));
@@ -64,6 +63,7 @@ void game::DrivableVehicle::OnPassengerChanged(size_t seat_idx, HumanCharacter* 
     if (seat_idx == 0 && !passenger)
     {
         // driver left
+        SetSteering(false, 0.0f);
         SetInputs(0);
     }
 }
