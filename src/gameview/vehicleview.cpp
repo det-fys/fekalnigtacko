@@ -387,7 +387,7 @@ void game::view::VehicleView::UpdateSounds()
 
     if (accel && !snd_accel_src_)
     {
-        snd_accel_src_ = audioplayer_.PlaySound(snd_accel_, &root_.local.position);
+        snd_accel_src_ = audioplayer_.PlaySound(snd_accel_, &root_);
         snd_accel_src_->SetLooping(true);
     }
     else if (!accel && snd_accel_src_)

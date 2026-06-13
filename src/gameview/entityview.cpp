@@ -103,7 +103,7 @@ bool game::view::EntityView::ProcessPlaySoundMsg(net::InMessage& msg)
         return true; // dont play if not loaded yet
 
     auto sound = assets::CacheManager::GetSound("data/" + std::string(name) + ".snd");
-    auto snd = audioplayer_.PlaySound(sound, &root_.local.position);
+    auto snd = audioplayer_.PlaySound(sound, &root_);
     snd->SetVolume(volume);
     snd->SetPitch(pitch);
 

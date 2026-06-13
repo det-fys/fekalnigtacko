@@ -14,7 +14,7 @@ public:
     Player(Master& master);
     DELETE_COPY_MOVE(Player)
 
-    SoundSource* PlaySound(const std::shared_ptr<const Sound>& sound, const glm::vec3* attach_position);
+    SoundSource* PlaySound(const std::shared_ptr<const Sound>& sound, const game::TransformNode* attach_node);
 
     void Update();
 

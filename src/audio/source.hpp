@@ -3,6 +3,8 @@
 #include "master.hpp"
 #include <memory>
 
+#include "game/transform_node.hpp"
+
 namespace audio
 {
 
@@ -24,7 +26,7 @@ public:
 
     void SetPosition(const glm::vec3& position);
     void SetVelocity(const glm::vec3& velocity);
-    void AttachToPosition(const glm::vec3* position);
+    void AttachToNode(const game::TransformNode* node);
     void SetRelativeToListener(bool relative);
 
     virtual void SetLooping(bool looping) = 0;
@@ -45,7 +47,7 @@ protected:
 
     unsigned int source_ = 0;
 
-    const glm::vec3* attach_position_ = nullptr;
+    const game::TransformNode* attach_node_ = nullptr;
     bool should_play_ = true; // auto play when created
     bool finished_ = false;
     bool delete_on_finish_ = true; // auto delete when finished

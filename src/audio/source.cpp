@@ -47,12 +47,11 @@ void audio::Source::SetVelocity(const glm::vec3& velocity)
     alSource3f(source_, AL_VELOCITY, velocity.x, velocity.y, velocity.z);
 }
 
-void audio::Source::AttachToPosition(const glm::vec3* position)
+void audio::Source::AttachToNode(const game::TransformNode* node)
 {
-    attach_position_ = position;
-    if (attach_position_)
-        SetPosition(*attach_position_);
-    // TsrDebugf(DML_2, "Attached source %p to position %p\n", this, position);
+    attach_node_ = node;
+    if (attach_node_)
+        SetPosition(attach_node_->GetGlobalPosition());
 }
 
 void audio::Source::SetRelativeToListener(bool relative)
@@ -71,8 +70,8 @@ void audio::Source::SetRelativeToListener(bool relative)
 
 void audio::Source::Update()
 {
-    if (attach_position_)
-        SetPosition(*attach_position_);
+    if (attach_node_)
+        SetPosition(attach_node_->GetGlobalPosition());
 }
 
 void audio::Source::Delete()
