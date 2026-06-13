@@ -254,28 +254,33 @@ void game::HumanCharacter::EnterActionState(ActionState state)
         if (state_ == HS_ON_FOOT)
             SetIdleAnim("idle_relaxed");
         SetAiming(false);
+        SetCanSprint(true);
         PlayActionAnim("rifle_idle");
+        SetViewItem("airsniper");
         break;
 
     case ACTION_AIM:
-        SetViewItem("airsniper");
         SetAiming(true);
+        SetCanSprint(false);
         PlayActionAnim("rifle_aim", 3.0f);
         break;
 
     case ACTION_AIMING:
         SetAiming(true);
+        SetCanSprint(false);
         PlayActionAnim("rifle_aiming");
         break;
 
     case ACTION_FIRE:
         SetAiming(true);
+        SetCanSprint(false);
         PlayActionAnim("rifle_fire");
         Fire();
         break;
 
     case ACTION_UNAIM:
         SetAiming(false);
+        SetCanSprint(false);
         PlayActionAnim("rifle_aim", -3.0f);
         break;
 

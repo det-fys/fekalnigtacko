@@ -272,7 +272,7 @@ void game::Character::UpdateMovement()
     {
         walking = true;
         
-        if (in_ & (1 << CIN_SPRINT))
+        if ((in_ & (1 << CIN_SPRINT)) && can_sprint_)
             running = true;
 
         const bool directional = (movement_ == CMT_DIRECTIONAL);

@@ -100,6 +100,7 @@ public:
     ~Character() override;
     
 protected:
+    void SetCanSprint(bool can_sprint) { can_sprint_ = can_sprint; }
     void SetIdleAnim(const std::string& anim_name);
     void SetWalkAnim(const std::string& anim_name);
     void SetRunAnim(const std::string& anim_name);
@@ -148,6 +149,7 @@ private:
     // glm::vec3 velocity_ = glm::vec3(0.0f);
 
     CharacterInputFlags in_ = 0;
+    bool can_sprint_ = true;
 
     btCapsuleShapeZ bt_shape_;
     float z_offset_ = 0.0f; // offset of controller from root
