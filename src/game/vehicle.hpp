@@ -134,6 +134,7 @@ private:
 
     float crash_intensity_ = 0.0f;
     size_t no_crash_frames_ = 0;
+    glm::vec3 prev_velocity_ = glm::vec3(0.0f);
 
     std::unique_ptr<DeformGrid> deformgrid_;
 

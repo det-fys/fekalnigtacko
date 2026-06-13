@@ -364,30 +364,43 @@ void game::Vehicle::UpdateCrash()
     }
     else
     {
-        if (crash_intensity_ > 1000.0f)
+        if (physics_)
         {
-            float volume = RandomFloat(0.9f, 1.2f);
-            float pitch = RandomFloat(1.0f, 1.3f);
+            auto bt_vel = physics_->GetBtBody().getLinearVelocity();
+            glm::vec3 velocity(bt_vel.x(), bt_vel.y(), bt_vel.z());
+            float diff = glm::distance(velocity, prev_velocity_);
+            prev_velocity_ = velocity;
 
-            if (crash_intensity_ > 12000.0f)
+            float snd_crash_intensity = glm::max(diff * 500.0f, crash_intensity_);
+
+            if (snd_crash_intensity > 1000.0f)
             {
-                volume *= 1.7f;
-                pitch *= 0.8f;
-            }
-            if (crash_intensity_ > 4000.0f)
-            {
-                volume *= 1.3f;
-                pitch *= 0.8f;
-            }
-            else
-            {
-                volume *= 0.8f;
-                pitch *= 1.2f;
+                float volume = RandomFloat(0.9f, 1.2f);
+                float pitch = RandomFloat(1.0f, 1.3f);
+
+                if (snd_crash_intensity > 12000.0f)
+                {
+                    volume *= 1.7f;
+                    pitch *= 0.8f;
+                }
+                if (snd_crash_intensity > 4000.0f)
+                {
+                    volume *= 1.3f;
+                    pitch *= 0.8f;
+                }
+                else
+                {
+                    volume *= 0.8f;
+                    pitch *= 1.2f;
+                }
+
+                PlaySound("crash", volume, pitch);
+                no_crash_frames_ = 8 + rand() % 5;
             }
 
-            PlaySound("crash", volume, pitch);
-            no_crash_frames_ = 7 + rand() % 10;
         }
+
+
     }
 
     crash_intensity_ = 0.0f;
