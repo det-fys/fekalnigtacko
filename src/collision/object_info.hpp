@@ -11,6 +11,22 @@ namespace game
 namespace collision
 {
 
+enum ObjectGroup : int
+{
+    OG_DEFAULT = btBroadphaseProxy::DefaultFilter,
+    OG_STATIC = btBroadphaseProxy::StaticFilter,
+    OG_KINEMATIC = btBroadphaseProxy::KinematicFilter,
+    OG_DEBRIS = btBroadphaseProxy::DebrisFilter,
+    OG_SENSOR = btBroadphaseProxy::SensorTrigger,
+    OG_CHARACTER = btBroadphaseProxy::CharacterFilter,
+
+    OG_PROJECTILE = 64,
+    OG_HITBONES_PROXY = 128,
+        
+    OG_ALL = -1,
+
+};
+
 enum ObjectType : int
 {
     OT_UNDEFINED,
@@ -40,8 +56,11 @@ class ObjectCallback
 public:
     ObjectCallback() = default;
 
+    virtual void ActivateHitBones() {}
+    
     virtual void OnContact(const ContactInfo& info) {}
     virtual void OnBulletHit(const game::BulletInfo& bullet, const btCollisionObject* hit_object) {}
+    
 
     virtual ~ObjectCallback() = default;
 };

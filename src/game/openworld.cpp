@@ -91,6 +91,11 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld("openworld"), game_(game
     // cow
     auto& cow = Spawn<Cow>(glm::vec3(0.0f, 0.0f, 2.0f), 0.0f);
     cow.SetNametag("no ty krávo");
+
+    // hit target npc
+    auto& npc = SpawnRandomNpc();
+    npc.SetPosition({90.0f, 100.0f, 5.0f});
+    npc.EnablePhysics(true);
 }
 
 void game::OpenWorld::Update(int64_t delta_time)
@@ -159,6 +164,15 @@ game::DrivableVehicle& game::OpenWorld::SpawnRandomVehicle()
     return vehicle;
 }
 
+game::NpcCharacter& game::OpenWorld::SpawnRandomNpc()
+{
+    HumanCharacterTuning npc_tuning;
+    npc_tuning.clothes.push_back({ "tshirt", GetRandomColor24() });
+    npc_tuning.clothes.push_back({ "shorts", GetRandomColor24() });
+
+    return Spawn<NpcCharacter>(npc_tuning);
+}
+
 void game::OpenWorld::SpawnBot()
 {
     auto roads = GetMap().GetGraph("roads");
@@ -173,11 +187,7 @@ void game::OpenWorld::SpawnBot()
     auto& vehicle = SpawnRandomVehicle();
     vehicle.SetPosition(roads->nodes[start_node].position + glm::vec3{0.0f, 0.0f, 5.0f});
 
-    HumanCharacterTuning npc_tuning;
-    npc_tuning.clothes.push_back({ "tshirt", GetRandomColor24() });
-    npc_tuning.clothes.push_back({ "shorts", GetRandomColor24() });
-
-    auto& driver = Spawn<NpcCharacter>(npc_tuning);
+    auto& driver = SpawnRandomNpc();
     driver.Ride(&vehicle, 0);
 }
 

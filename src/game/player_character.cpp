@@ -100,23 +100,15 @@ void game::PlayerCharacter::UpdateAimTarget()
 
     auto target = eye + forward * 1000.0f;
 
-    btVector3 bt_from(eye.x, eye.y, eye.z);
-    btVector3 bt_to(target.x, target.y, target.z);
-
-    btCollisionWorld::ClosestRayResultCallback cb(bt_from, bt_to);
-    cb.m_collisionFilterGroup = btBroadphaseProxy::DefaultFilter;
-    cb.m_collisionFilterMask = btBroadphaseProxy::StaticFilter;
-
-    GetWorld().GetBtWorld().rayTest(bt_from, bt_to, cb);
-
-    if (cb.hasHit())
+    if (GetAiming()) // save perf if not aiming
     {
-        target = glm::vec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z()); 
+        GetWorld().TraceBullet(eye, target, this, target); // update target if hit
     }
 
     SetAimTarget(target);
 
     // GetWorld().Beam(eye, target, 0xFFFF00, 1.0 / 25.0f);
+    GetWorld().BeamBox(target - 0.05f, target + 0.05f, 0xFFFF00, 1.5f / 25.0f);
 }
 
 void game::PlayerCharacter::UpdateUseTarget()

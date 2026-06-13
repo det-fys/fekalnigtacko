@@ -38,6 +38,31 @@ std::shared_ptr<const assets::Skeleton> assets::Skeleton::LoadFromFile(const std
                 Animation::LoadFromFile("data/" + anim_filename + ".anim", skeleton.get());
             skeleton->AddAnimation(anim_name, anim);
         }
+        else if (command == "hitbone")
+        {
+            auto& hitbone = skeleton->hit_bones_.emplace_back();
+
+            std::string shape_name, bone_name;
+            float sy, sz;
+            iss >> hitbone.name >> bone_name >> shape_name;
+            ParseTransform(iss, hitbone.offset);
+            iss >> sy >> sz;
+
+            int bone_idx = skeleton->GetBoneIndex(bone_name);
+            hitbone.bone_idx = bone_idx >= 0 ? bone_idx : 0; 
+
+            glm::vec3 shape_size(hitbone.offset.scale, sy, sz);
+            hitbone.offset.scale = 1.0f;
+
+            if (shape_name == "capsule")
+            {
+                hitbone.col_shape = std::make_unique<btCapsuleShapeZ>(shape_size.x, shape_size.z); // TODO: check dimenmsions
+            }
+            else
+            {
+                throw std::runtime_error("Unknown hitbone shape: " + shape_name);
+            }
+        }
     });
 
     skeleton->AddAimBones();

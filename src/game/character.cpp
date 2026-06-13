@@ -10,6 +10,7 @@ game::Character::Character(World& world, const CharacterTuning& tuning)
     z_offset_ = tuning_.shape.height * 0.5f + tuning_.shape.radius - 0.05f;
 
     sk_ = SkeletonInstance(assets::CacheManager::GetSkeleton("data/" + tuning.model_name + ".sk"), &root_);
+    SetupHitBones();
 }
 
 static bool Turn(float& angle, float target, float step)
@@ -36,11 +37,15 @@ void game::Character::Update()
 {
     Super::Update();
 
+    pose_valid_ = false;
+    hitbones_valid_ = false;
+
     SyncTransformFromController();
     UpdateMovement();
     UpdateAiming();
     UpdateActionAnim();
     root_.UpdateMatrix();
+    UpdateHitBones();
 
     sync_current_ = 1 - sync_current_;
     UpdateSyncState();
@@ -72,6 +77,20 @@ void game::Character::SendInitData(Player& player, net::OutMessage& msg) const
     msg.WriteAt(fields_pos, fields);
 }
 
+void game::Character::OnBulletHit(const game::BulletInfo& bullet, const btCollisionObject* hit_object)
+{
+    std::string_view hit_name = "???";
+
+    auto it = hitbone_names_.find(hit_object);
+    if (it != hitbone_names_.end())
+    {
+        hit_name = it->second;
+    }
+
+    std::string text = "au! " + std::string(hit_name);
+    GetWorld().SendChat(text);
+}
+
 void game::Character::Attach(net::EntNum parentnum)
 {
     Super::Attach(parentnum);
@@ -94,6 +113,7 @@ void game::Character::EnablePhysics(bool enable)
     else if (!enable && controller_)
     {
         controller_.reset();
+        root_.local.rotation = glm::quat(); // reset rotation
     }
 }
 
@@ -120,6 +140,24 @@ void game::Character::SetPosition(const glm::vec3& position)
 {
     root_.local.position = position;
     SyncControllerTransform();
+}
+
+void game::Character::ActivateHitBones()
+{
+    Super::ActivateHitBones();
+    EnableHitBones(true);
+}
+
+void game::Character::FinalizeFrame()
+{
+    Super::FinalizeFrame();
+    pose_valid_ = false;
+    hitbones_valid_ = false;
+}
+
+game::Character::~Character()
+{
+    DeleteHitBones();
 }
 
 void game::Character::SetIdleAnim(const std::string& anim_name)
@@ -310,6 +348,8 @@ void game::Character::UpdateAiming()
     if (movement_ == CMT_DISABLED)
     {
         auto target_yaw = glm::mod(yaw + glm::pi<float>(), glm::two_pi<float>()) - glm::pi<float>();
+        const float yaw_limit = glm::radians(120.0f);
+        target_yaw = glm::clamp(target_yaw, -yaw_limit, yaw_limit);
         MoveToward(animstate_.yaw, target_yaw, delta);
     }
     else
@@ -456,6 +496,133 @@ assets::AnimIdx game::Character::GetAnim(const std::string& name) const
     return sk_.GetSkeleton()->GetAnimationIdx(name);
 }
 
+void game::Character::SetupHitBones()
+{
+    const auto& sk_hitbones = sk_.GetSkeleton()->GetHitBones();
+    hitbones_.resize(sk_hitbones.size());
+
+    for (size_t i = 0; i < hitbones_.size(); ++i)
+    {
+        auto& hitbone = hitbones_[i];
+        auto& sk_hitbone = sk_hitbones[i];
+
+        // setup node
+        hitbone.node.parent = &sk_.GetBoneNode(sk_hitbone.bone_idx);
+        hitbone.node.local = sk_hitbone.offset;
+
+        // setup object
+        auto& col_obj = hitbone.col_obj;
+        col_obj.setCollisionShape(sk_hitbone.col_shape.get());
+        collision::SetObjectInfo(&col_obj, collision::OT_ENTITY, 0, this);
+
+        hitbone_names_[&col_obj] = sk_hitbone.name;
+    }
+    
+    // setup proxy
+    static btSphereShape proxy_shape(1.5f);
+    hitbone_proxy_.setCollisionShape(&proxy_shape);
+    collision::SetObjectInfo(&hitbone_proxy_, collision::OT_ENTITY, 0, this);
+    GetWorld().GetBtWorld().addCollisionObject(&hitbone_proxy_, collision::OG_HITBONES_PROXY, collision::OG_PROJECTILE);
+}
+
+void game::Character::EnableHitBones(bool enable)
+{
+    if (enable)
+    {
+        hitbones_timer_ = 2; // reset timer
+    }
+
+    if (enable == hitbones_active_)
+        return;
+
+    hitbones_active_ = enable;
+    hitbones_valid_ = false;
+
+    auto& bt_world = GetWorld().GetBtWorld();
+
+    if (enable)
+    {
+        UpdateHitBoneTransforms(); // update transforms first
+
+        for (auto& hitbone : hitbones_)
+        {
+            bt_world.addCollisionObject(&hitbone.col_obj, collision::OG_DEFAULT, collision::OG_PROJECTILE);
+        }
+    }
+    else
+    {
+        for (auto& hitbone : hitbones_)
+        {
+            bt_world.removeCollisionObject(&hitbone.col_obj);
+        }
+    }
+
+}
+
+void game::Character::UpdateHitBones()
+{
+    // update proxy transform
+    glm::vec3 center = GetRoot().matrix * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+    btTransform trans;
+    trans.setIdentity();
+    trans.setOrigin(btVector3(center.x, center.y, center.z));
+    hitbone_proxy_.setWorldTransform(trans);
+
+    if (hitbones_active_)
+    {
+        if (hitbones_timer_ > 0)
+            --hitbones_timer_;
+        else
+            EnableHitBones(false);
+    }
+
+    UpdateHitBoneTransforms();
+}
+
+static btTransform BtTransformFromMat4(const glm::mat4& m)
+{
+    btMatrix3x3 basis(
+        m[0][0], m[1][0], m[2][0],
+        m[0][1], m[1][1], m[2][1],
+        m[0][2], m[1][2], m[2][2]
+    );
+
+    btVector3 origin(
+        m[3][0],
+        m[3][1],
+        m[3][2]
+    );
+
+    btTransform trans;
+    trans.setBasis(basis);
+    trans.setOrigin(origin);
+    return trans;
+}
+
+void game::Character::UpdateHitBoneTransforms()
+{
+    if (hitbones_valid_ || !hitbones_active_)
+        return;
+
+    UpdatePose();
+
+    for (auto& hitbone : hitbones_)
+    {
+        hitbone.node.UpdateMatrix();
+        hitbone.col_obj.setWorldTransform(BtTransformFromMat4(hitbone.node.matrix));
+
+        // debug boxes
+        // GetWorld().BeamBox(hitbone.node.GetGlobalPosition() - 0.05f, hitbone.node.GetGlobalPosition() + 0.05f, 0xFFFF00,
+        //                    1.5f / 25.0f);
+    }
+}
+
+void game::Character::DeleteHitBones()
+{
+    EnableHitBones(false);
+    GetWorld().GetBtWorld().removeCollisionObject(&hitbone_proxy_);
+}
+
 void game::Character::UpdateActionAnim()
 {
     if (action_anim_done_)
@@ -479,6 +646,17 @@ void game::Character::UpdateActionAnim()
             action_anim_done_ = true;
         }
     }
+}
+
+void game::Character::UpdatePose()
+{
+    if (pose_valid_)
+        return;
+
+    animstate_.ApplyToSkeleton(sk_);
+    sk_.UpdateBoneMatrices();
+
+    pose_valid_ = true;
 }
 
 game::CharacterPhysicsController::CharacterPhysicsController(Character& character, btDynamicsWorld& bt_world, btCapsuleShapeZ& bt_shape)

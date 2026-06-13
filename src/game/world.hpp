@@ -62,10 +62,13 @@ public:
     float GetDayTime() const { return daytime_; }
     void SetDayTime(float daytime) { daytime_ = glm::mod(daytime, 24.0f); }
 
+    bool TraceBullet(const glm::vec3& start, const glm::vec3& end, game::HumanCharacter* shooter, glm::vec3& out_hit_pos);
     void FireBullet(const BulletInfo& bullet);
 
     void Beam(const glm::vec3& start, const glm::vec3& end, uint32_t color, float time);
     void BeamBox(const glm::vec3& min, const glm::vec3& max, uint32_t color, float time);
+
+    void SendChat(const std::string& text);
 
     virtual ~World() = default;
 
@@ -76,6 +79,9 @@ private:
 
     void SendObjDestroyedMsg(net::ObjNum objnum);
     void SendObjRespawnedMsg(net::ObjNum objnum);
+
+    const btCollisionObject* TraceBulletInternal(const glm::vec3& start, const glm::vec3& end,
+                                                 game::HumanCharacter* shooter, glm::vec3& out_hit_pos);
 
 private:
     MapInstance map_;

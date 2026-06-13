@@ -709,7 +709,7 @@ game::VehiclePhysics::VehiclePhysics(collision::DynamicsWorld& world, Transform&
     }
 
     auto& bt_world = world_.GetBtWorld();
-    bt_world.addRigidBody(body_.get(), btBroadphaseProxy::DefaultFilter, btBroadphaseProxy::AllFilter);
+    bt_world.addRigidBody(body_.get(), collision::OG_DEFAULT, ~collision::OG_PROJECTILE);
     bt_world.addAction(vehicle_.get());
 
 }

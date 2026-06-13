@@ -34,7 +34,7 @@ public:
  
     std::span<const char> GetUpdateMsg() const { return update_msg_buf_; }
 
-    void FinalizeFrame();
+    virtual void FinalizeFrame();
 
     void SetNametag(const std::string& nametag);
      

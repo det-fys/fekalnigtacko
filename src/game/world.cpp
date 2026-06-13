@@ -173,72 +173,23 @@ const game::UseTarget* game::World::GetBestUseTarget(game::PlayerCharacter& char
     return cb.best_target;
 }
 
-static bool IsMeOrMyRideOrOtherPassengerOfMyRide(const game::HumanCharacter* me, const btCollisionObject* obj)
+bool game::World::TraceBullet(const glm::vec3& start, const glm::vec3& end, game::HumanCharacter* shooter,
+                              glm::vec3& out_hit_pos)
 {
-    if (!me) // i am not
-        return false;
-
-    // is me?
-    auto obj_cb = collision::GetObjectCallback(obj);
-    if (!obj_cb)
-        return false; // is nothing
-
-    if (obj_cb == me)
-        return true; // its me
-
-    auto my_ride = me->GetRideable();
-    if (!my_ride)
-        return false; // im not riding anything
-
-    // is my ride?
-    if (&my_ride->GetEntity() == obj_cb)
-        return true; // yes
-
-    // is other passenger?
-    auto character = dynamic_cast<game::HumanCharacter*>(obj_cb);
-    if (!character)
-        return false; // is not even human
-
-    return character->GetRideable() == my_ride;
+    return TraceBulletInternal(start, end, shooter, out_hit_pos) != nullptr;
 }
-
-struct NotMeNotMyRideAndNotOtherPassengersOfMyRideClosestRayResultCallback : public btCollisionWorld::ClosestRayResultCallback
-{
-    using Super = ClosestRayResultCallback;
-
-    NotMeNotMyRideAndNotOtherPassengersOfMyRideClosestRayResultCallback(const btVector3& rayFromWorld,
-                                                                        const btVector3& rayToWorld)
-        : ClosestRayResultCallback(rayFromWorld, rayToWorld)
-    {
-    }
-
-    game::HumanCharacter* me = nullptr;
-
-    virtual btScalar addSingleResult(btCollisionWorld::LocalRayResult& rayResult, bool normalInWorldSpace) override
-    {
-        if (IsMeOrMyRideOrOtherPassengerOfMyRide(me, rayResult.m_collisionObject))
-            return rayResult.m_hitFraction;
-        
-        return Super::addSingleResult(rayResult, normalInWorldSpace);
-    }
-};
 
 void game::World::FireBullet(const BulletInfo& bullet)
 {
-    btVector3 bt_start(bullet.start.x, bullet.start.y, bullet.start.z);
-    btVector3 bt_end(bullet.end.x, bullet.end.y, bullet.end.z);
-
-    NotMeNotMyRideAndNotOtherPassengersOfMyRideClosestRayResultCallback cb(bt_start, bt_end);
-    cb.me = bullet.shooter;
-    GetBtWorld().rayTest(bt_start, bt_end, cb);
-
-    if (!cb.hasHit() || !cb.m_collisionObject)
+    glm::vec3 hit_pos;
+    auto hit_obj = TraceBulletInternal(bullet.start, bullet.end, bullet.shooter, hit_pos);
+    if (!hit_obj)
         return;
 
-    auto obj_cb = collision::GetObjectCallback(cb.m_collisionObject);
-    obj_cb->OnBulletHit(bullet, cb.m_collisionObject);
+    auto obj_cb = collision::GetObjectCallback(hit_obj);
+    obj_cb->OnBulletHit(bullet, hit_obj);
 
-    glm::vec3 hit_pos(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
+    // TODO: remove
     const float box_extent = 0.1f;
     BeamBox(hit_pos - box_extent, hit_pos + box_extent, 0x0077FF, 1.0f);
 }
@@ -277,6 +228,12 @@ void game::World::BeamBox(const glm::vec3& min, const glm::vec3& max, uint32_t c
     Beam(p1, p5, color, time);
     Beam(p2, p6, color, time);
     Beam(p3, p7, color, time);
+}
+
+void game::World::SendChat(const std::string& text)
+{
+    auto msg = BeginMsg(net::MSG_CHAT);
+    msg.Write(net::ChatMessage(text));
 }
 
 void game::World::HandleContacts()
@@ -376,4 +333,89 @@ void game::World::SendObjRespawnedMsg(net::ObjNum objnum)
 {
     auto msg = BeginMsg(net::MSG_OBJRESPAWN);
     msg.Write(objnum);
+}
+
+static bool IsMeOrMyRideOrOtherPassengerOfMyRide(const game::HumanCharacter* me, const btCollisionObject* obj)
+{
+    if (!me) // i am not
+        return false;
+
+    // is me?
+    auto obj_cb = collision::GetObjectCallback(obj);
+    if (!obj_cb)
+        return false; // is nothing
+
+    if (obj_cb == me)
+        return true; // its me
+
+    auto my_ride = me->GetRideable();
+    if (!my_ride)
+        return false; // im not riding anything
+
+    // is my ride?
+    if (&my_ride->GetEntity() == obj_cb)
+        return true; // yes
+
+    // is other passenger?
+    auto character = dynamic_cast<game::HumanCharacter*>(obj_cb);
+    if (!character)
+        return false; // is not even human
+
+    return character->GetRideable() == my_ride;
+}
+
+struct NotMeNotMyRideAndNotOtherPassengersOfMyRideClosestRayResultCallback : public btCollisionWorld::ClosestRayResultCallback
+{
+    using Super = ClosestRayResultCallback;
+
+    NotMeNotMyRideAndNotOtherPassengersOfMyRideClosestRayResultCallback(const btVector3& rayFromWorld,
+                                                                        const btVector3& rayToWorld)
+        : ClosestRayResultCallback(rayFromWorld, rayToWorld)
+    {
+    }
+
+    game::HumanCharacter* me = nullptr;
+
+    virtual btScalar addSingleResult(btCollisionWorld::LocalRayResult& rayResult, bool normalInWorldSpace) override
+    {
+        if (IsMeOrMyRideOrOtherPassengerOfMyRide(me, rayResult.m_collisionObject))
+            return rayResult.m_hitFraction;
+        
+        return Super::addSingleResult(rayResult, normalInWorldSpace);
+    }
+};
+
+const btCollisionObject* game::World::TraceBulletInternal(const glm::vec3& start, const glm::vec3& end,
+                                                          game::HumanCharacter* shooter, glm::vec3& out_hit_pos)
+{
+    btVector3 bt_start(start.x, start.y, start.z);
+    btVector3 bt_end(end.x, end.y, end.z);
+
+    // find hitbone targets first
+    btCollisionWorld::AllHitsRayResultCallback hitbone_cb(bt_start, bt_end);
+    hitbone_cb.m_collisionFilterGroup = collision::OG_PROJECTILE;
+    hitbone_cb.m_collisionFilterMask = collision::OG_HITBONES_PROXY;
+    GetBtWorld().rayTest(bt_start, bt_end, hitbone_cb);
+
+    for (size_t i = 0; i < hitbone_cb.m_collisionObjects.size(); ++i)
+    {
+        auto col_obj = hitbone_cb.m_collisionObjects[i];
+        auto obj_cb = collision::GetObjectCallback(col_obj);
+        if (!obj_cb)
+            continue;
+
+        obj_cb->ActivateHitBones();
+    }
+
+    NotMeNotMyRideAndNotOtherPassengersOfMyRideClosestRayResultCallback cb(bt_start, bt_end);
+    cb.m_collisionFilterGroup = collision::OG_PROJECTILE;
+    cb.m_collisionFilterMask = ~collision::OG_HITBONES_PROXY;
+    cb.me = shooter;
+    GetBtWorld().rayTest(bt_start, bt_end, cb);
+
+    if (!cb.hasHit())
+        return nullptr;
+
+    out_hit_pos = glm::vec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
+    return cb.m_collisionObject;
 }

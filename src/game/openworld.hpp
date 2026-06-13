@@ -20,6 +20,7 @@ public:
 
 private: 
     game::DrivableVehicle& SpawnRandomVehicle();
+    game::NpcCharacter& SpawnRandomNpc();
     void SpawnBot();
 
     void CreateTuningGarage(const glm::vec3& position, float yaw);

@@ -31,6 +31,14 @@ struct AimBone
     glm::vec3 pitch_axis;
 };
 
+struct HitBone
+{
+    size_t bone_idx = 0;
+    std::string name;
+    Transform offset;
+    std::unique_ptr<btCollisionShape> col_shape;
+};
+
 class Skeleton
 {
 public:
@@ -46,7 +54,8 @@ public:
     const Animation* GetAnimation(AnimIdx idx) const;
     const Animation* GetAnimation(const std::string& name) const;
 
-    const std::vector<AimBone> GetAimBones() const { return aim_bones_; }
+    const std::vector<AimBone>& GetAimBones() const { return aim_bones_; }
+    const std::vector<HitBone>& GetHitBones() const { return hit_bones_; }
 
 private:
     void AddBone(const std::string& name, const std::string& parent_name, const Transform& transform);
@@ -64,6 +73,7 @@ private:
     std::map<std::string, AnimIdx> anim_idxs_;
 
     std::vector<AimBone> aim_bones_;
+    std::vector<HitBone> hit_bones_;
 };
 
 } // namespace assets

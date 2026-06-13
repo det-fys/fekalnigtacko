@@ -52,6 +52,12 @@ enum CharacterMovementType
     CMT_DIRECTIONAL,
 };
 
+struct CharacterHitBoneInstance
+{
+    btCollisionObject col_obj;
+    TransformNode node;
+};
+
 class Character : public Entity
 {
 public:
@@ -61,6 +67,8 @@ public:
 
     virtual void Update() override;
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
+
+    virtual void OnBulletHit(const game::BulletInfo& bullet, const btCollisionObject* hit_object);
 
     virtual void Attach(net::EntNum parentnum) override;
 
@@ -86,7 +94,10 @@ public:
 
     void SetPosition(const glm::vec3& position);
 
-    ~Character() override = default;
+    virtual void ActivateHitBones() override;
+    virtual void FinalizeFrame() override;
+
+    ~Character() override;
     
 protected:
     void SetIdleAnim(const std::string& anim_name);
@@ -114,7 +125,16 @@ private:
 
     assets::AnimIdx GetAnim(const std::string& name) const;
 
+    void SetupHitBones();
+    void EnableHitBones(bool enable);
+    void UpdateHitBones();
+    void UpdateHitBoneTransforms();
+    void DeleteHitBones();
+
     void UpdateActionAnim();
+
+    void UpdatePose();
+
 
 protected:
     float turn_speed_ = 8.0f;
@@ -156,6 +176,15 @@ private:
     glm::vec3 aim_dir_ = glm::vec3(0.0f);
 
     std::string item_;
+
+    bool pose_valid_ = false;
+
+    std::vector<CharacterHitBoneInstance> hitbones_;
+    btCollisionObject hitbone_proxy_;
+    bool hitbones_active_ = false;
+    size_t hitbones_timer_ = 0;
+    bool hitbones_valid_ = false;
+    std::map<const btCollisionObject*, std::string_view> hitbone_names_;
 };
 
 } // namespace game

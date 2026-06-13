@@ -143,7 +143,7 @@ using SoundPitchQ = Quantized<uint8_t, 0, 2>;
 using AnimBlendQ = Quantized<uint8_t, 0, 1>;
 using AnimTimeQ = Quantized<uint8_t, 0, 1>;
 
-using AnimAimAngleQ = Quantized<uint8_t, -PI_N, PI_N, PI_D * 2>;
+using AnimAimAngleQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
 
 using NumClothes = uint8_t;
 using ClothesName = FixedStr<32>;
