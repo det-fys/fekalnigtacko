@@ -124,6 +124,11 @@ game::view::EntityView* game::view::WorldView::GetEntity(net::EntNum entnum)
     return nullptr;
 }
 
+bool game::view::WorldView::IsLoaded() const
+{
+    return map_ && map_->IsLoaded();
+}
+
 void game::view::WorldView::DrawLoadingScreen(const DrawArgs& args) const
 {
     float margin = 50.0f;

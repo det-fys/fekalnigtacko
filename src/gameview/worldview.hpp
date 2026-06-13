@@ -40,6 +40,8 @@ public:
     float GetTime() const { return time_; }
     audio::Master& GetAudioMaster() const { return audiomaster_; }
 
+    bool IsLoaded() const;
+
 private:
     void DrawLoadingScreen(const DrawArgs& args) const;
 

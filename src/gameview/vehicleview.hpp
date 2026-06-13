@@ -68,6 +68,8 @@ private:
 
     void InitHeadlights();
 
+    void UpdateSounds();
+    void UpdateWindows();
     void UpdateLights(float delta_t);
 
 private:

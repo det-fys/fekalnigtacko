@@ -93,33 +93,8 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
         wheels_[i].node.UpdateMatrix();
     }
 
-    // update snds
-    bool accel = flags_ & VF_ACCELERATING;
-
-    if (accel && !snd_accel_src_)
-    {
-        snd_accel_src_ = audioplayer_.PlaySound(snd_accel_, &root_.local.position);
-        snd_accel_src_->SetLooping(true);
-    }
-    else if (!accel && snd_accel_src_)
-    {
-        snd_accel_src_->Delete();
-        snd_accel_src_ = nullptr;
-    }
-
-    // update windows
-    if ((flags_ & VF_BROKENWINDOWS) && !windows_broken_)
-    {
-        windows_broken_ = true;
-
-        auto it = mesh_.surface_names.find("carwindows"); 
-        if (it != mesh_.surface_names.end())
-        {
-            size_t idx = it->second;
-            mesh_.surfaces[idx].texture = assets::CacheManager::GetTexture("data/carbrokenwindows.png");
-        }
-    }
-
+    UpdateSounds();
+    UpdateWindows();
     UpdateLights(info.delta_time);
 }
 
@@ -400,6 +375,40 @@ void game::view::VehicleView::InitHeadlights()
         light_cone_node_[i].local.position = loc->position;
 
         ++num_headlights;
+    }
+}
+
+void game::view::VehicleView::UpdateSounds()
+{
+    if (!world_.IsLoaded())
+        return;
+
+    bool accel = flags_ & VF_ACCELERATING;
+
+    if (accel && !snd_accel_src_)
+    {
+        snd_accel_src_ = audioplayer_.PlaySound(snd_accel_, &root_.local.position);
+        snd_accel_src_->SetLooping(true);
+    }
+    else if (!accel && snd_accel_src_)
+    {
+        snd_accel_src_->Delete();
+        snd_accel_src_ = nullptr;
+    }
+}
+
+void game::view::VehicleView::UpdateWindows()
+{
+    if ((flags_ & VF_BROKENWINDOWS) && !windows_broken_)
+    {
+        windows_broken_ = true;
+
+        auto it = mesh_.surface_names.find("carwindows"); 
+        if (it != mesh_.surface_names.end())
+        {
+            size_t idx = it->second;
+            mesh_.surfaces[idx].texture = assets::CacheManager::GetTexture("data/carbrokenwindows.png");
+        }
     }
 }
 
