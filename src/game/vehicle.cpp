@@ -92,6 +92,18 @@ void game::Vehicle::OnContact(const collision::ContactInfo& info)
     }
 }
 
+void game::Vehicle::OnBulletHit(const game::BulletInfo& bullet, const btCollisionObject* hit_object)
+{
+    Super::OnBulletHit(bullet, hit_object);
+
+    if (!physics_)
+        return;
+
+    auto impulse = glm::normalize(bullet.end - bullet.start) * 10000.0f;
+    physics_->GetBtBody().activate();
+    physics_->GetBtBody().applyCentralImpulse(btVector3(impulse.x, impulse.y, impulse.z));
+}
+
 void game::Vehicle::SetInput(VehicleInputType type, bool enable)
 {
     if (enable)

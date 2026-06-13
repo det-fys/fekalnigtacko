@@ -35,6 +35,7 @@ void game::Player::Update()
 {
     SyncWorld();
     SendMenuMsgs();
+    UpdateCamera();
 }
 
 void game::Player::SetWorld(World* world)
@@ -45,12 +46,14 @@ void game::Player::SetWorld(World* world)
     world_ = world;
 }
 
-void game::Player::SetCamera(net::EntNum entnum)
+void game::Player::SetCamera(const CameraInfo& camera_info)
 {
-    cam_ent_ = entnum;
+    camera_info_ = camera_info;
 
     auto msg = BeginMsg(net::MSG_CAM);
-    msg.Write(entnum);
+    msg.Write(camera_info.character_entnum);
+    msg.Write(camera_info.rideable_entnum);
+    msg.Write(camera_info.flags);
 }
 
 void game::Player::SendChat(const std::string& text)
@@ -97,6 +100,24 @@ void game::Player::CloseMenu(const RemoteMenu& menu)
     remote_menu_.reset();
 }
 
+bool game::Player::GetView(glm::vec3& eye, glm::vec3& forward)
+{
+    if (!world_)
+        return false;
+
+    auto character = world_->GetEntity(camera_info_.character_entnum);
+    camera_controller_.SetCharacterTransform(character ? &character->GetRoot().matrix : nullptr);
+    
+    auto rideable = world_->GetEntity(camera_info_.rideable_entnum);
+    camera_controller_.SetRideableTransform(rideable ? &rideable->GetRoot().matrix : nullptr);
+
+    camera_controller_.Recalculate(world_);
+
+    eye = camera_controller_.GetEye();
+    forward = camera_controller_.GetForward();
+    return true;
+}
+
 game::Player::~Player()
 {
     game_.PlayerLeft(*this);
@@ -115,9 +136,23 @@ void game::Player::SyncWorld()
 
     if (world_)
     {
+        UpdateCullPos();
         SendWorldUpdateMsg();
         SendEnv();
         SyncEntities();
+    }
+}
+
+void game::Player::UpdateCullPos()
+{
+    auto cam_entnum = camera_info_.rideable_entnum ? camera_info_.rideable_entnum : camera_info_.character_entnum;
+    if (cam_entnum)
+    {
+        auto cam_ent = world_->GetEntity(cam_entnum);
+        if (cam_ent)
+        {
+            cull_pos_ = cam_ent->GetRoot().GetGlobalPosition();
+        }
     }
 }
 
@@ -137,6 +172,9 @@ void game::Player::SendWorldUpdateMsg()
 
     auto msg = BeginMsg(); // no CMD here, included in world payload
     msg.Write(world_->GetMsg());
+
+    // local msgs
+    world_->PickLocalMsgs(*this, cull_pos_);
 }
 
 void game::Player::SendEnv()
@@ -152,16 +190,6 @@ void game::Player::SendEnv()
 
 void game::Player::SyncEntities()
 {
-    // update cull pos
-    if (cam_ent_)
-    {
-        auto cam_ent = world_->GetEntity(cam_ent_);
-        if (cam_ent)
-        {
-            cull_pos_ = cam_ent->GetRoot().GetGlobalPosition();
-        }
-    }
-
     // list of entities to send update and messages of
     static std::vector<const Entity*> upd_ents;
     upd_ents.clear();
@@ -293,10 +321,8 @@ bool game::Player::ProcessViewAnglesMsg(net::InMessage& msg)
     if (!msg.Read(yaw_q.value) || !msg.Read(pitch_q.value))
         return false;
 
-    view_yaw_ = yaw_q.Decode();
-    view_pitch_ = pitch_q.Decode();
-    
-    game_.PlayerViewAnglesChanged(*this, view_yaw_, view_pitch_);    
+    camera_controller_.SetViewAngles(yaw_q.Decode(),  pitch_q.Decode());
+    game_.PlayerViewAnglesChanged(*this, camera_controller_.GetYaw(), camera_controller_.GetPitch());    
     return true;
 }
 
@@ -356,4 +382,10 @@ void game::Player::SendMenuMsgs()
 
     remote_menu_->ResetMsg();
 
+}
+
+void game::Player::UpdateCamera()
+{
+    camera_controller_.SetAiming(camera_info_.flags & CAM_AIMING);
+    camera_controller_.Update(1.0f / 25.0f);
 }

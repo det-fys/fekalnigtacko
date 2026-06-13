@@ -47,8 +47,6 @@ void game::HumanCharacter::SetRideable(Rideable* rideable, size_t seat_idx)
 
     SetSignal(HSS_RIDEABLE_CHANGED);
     OnRideableChanged();
-
-
 }
 
 void game::HumanCharacter::Ride(Rideable* rideable, size_t seat_idx)
@@ -67,6 +65,27 @@ void game::HumanCharacter::Ride(Rideable* rideable, size_t seat_idx)
 game::HumanCharacter::~HumanCharacter()
 {
     Ride(nullptr, 0); // exit rideable
+}
+
+void game::HumanCharacter::SetAiming(bool aiming)
+{
+    if (aiming == GetAiming())
+        return;
+
+    Super::SetAiming(aiming);
+    OnAimingChanged();
+}
+
+void game::HumanCharacter::Fire()
+{
+    PlaySound("airrifle_fire");
+
+    game::BulletInfo bullet{};
+    bullet.start = GetEyePosition();
+    bullet.end = bullet.start + GetAimDirection() * 1000.0f;
+    bullet.damage = 1.0f;
+    bullet.shooter = this;
+    GetWorld().FireBullet(bullet);
 }
 
 void game::HumanCharacter::UpdateState()
@@ -158,6 +177,8 @@ void game::HumanCharacter::StateOnFootEnter()
     SetWalkAnim("walk");
     SetMovementType(CMT_TURN);
     EnablePhysics(true);
+
+    EnterActionState(ACTION_IDLE);
 }
 
 game::HumanCharacterState game::HumanCharacter::StateOnFootUpdate()
@@ -168,7 +189,7 @@ game::HumanCharacterState game::HumanCharacter::StateOnFootUpdate()
     if (PopSignal(HSS_KNOCK_DOWN))
         return HS_KNOCKED_DOWN;
 
-    SetMovementType(aiming_ ? CMT_DIRECTIONAL : CMT_TURN);
+    SetMovementType(aimheld_ ? CMT_DIRECTIONAL : CMT_TURN);
 
     return HS_ON_FOOT;
 }
@@ -183,6 +204,8 @@ void game::HumanCharacter::StateRidingEnter()
     SetIdleAnim((rideable->GetRideableType() == RIDEABLE_VEHICLE && seat_idx_ == 0) ? "vehicle_drive" : "vehicle_passenger");
     SetYaw(0.0f);
     SetMovementType(CMT_DISABLED);
+
+    EnterActionState(ACTION_IDLE);
 }
 
 game::HumanCharacterState game::HumanCharacter::StateRidingUpdate()
@@ -217,32 +240,42 @@ void game::HumanCharacter::UpdateActionState()
         if (new_state == actionstate_)
             break;
 
-        ExitActionState();
-        actionstate_ = new_state;
-        EnterActionState();
+        EnterActionState(new_state);
     }
 }
 
-void game::HumanCharacter::EnterActionState()
+void game::HumanCharacter::EnterActionState(ActionState state)
 {
-    switch (actionstate_)
+    actionstate_ = state;
+
+    switch (state)
     {
     case ACTION_IDLE:
-        ClearActionAnim();
+        if (state_ == HS_ON_FOOT)
+            SetIdleAnim("idle_relaxed");
+        SetAiming(false);
+        PlayActionAnim("rifle_idle");
         break;
 
     case ACTION_AIM:
+        SetViewItem("airsniper");
+        SetAiming(true);
         PlayActionAnim("rifle_aim", 3.0f);
         break;
 
     case ACTION_AIMING:
+        SetAiming(true);
+        PlayActionAnim("rifle_aiming");
         break;
 
     case ACTION_FIRE:
+        SetAiming(true);
         PlayActionAnim("rifle_fire");
+        Fire();
         break;
 
     case ACTION_UNAIM:
+        SetAiming(false);
         PlayActionAnim("rifle_aim", -3.0f);
         break;
 
@@ -256,7 +289,7 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
     switch (actionstate_)
     {
     case ACTION_IDLE:
-        if (aiming_) // want aim
+        if (aimheld_) // want aim
             return ACTION_AIM;
 
         return ACTION_IDLE;
@@ -265,41 +298,36 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
         if (IsActionAnimDone())
             return ACTION_AIMING;
 
-        if (!aiming_) // stop aiming immediately
+        if (!aimheld_) // stop aiming immediately
             return ACTION_UNAIM;
 
         return ACTION_AIM;
 
     case ACTION_AIMING:
-        if (!aiming_)
+        if (!aimheld_)
             return ACTION_UNAIM; // wants aim no more
 
-        // TODO: check fire
+        if (fireheld_)
+            return ACTION_FIRE;
 
         return ACTION_AIMING;
 
     case ACTION_FIRE:
+        if (IsActionAnimDone())
+            return ACTION_AIMING;
+
         return ACTION_FIRE;
 
     case ACTION_UNAIM:
         if (IsActionAnimDone())
             return ACTION_IDLE;
 
-        if (aiming_) // start aiming again
+        if (aimheld_) // start aiming again
             return ACTION_AIM;
 
         return ACTION_UNAIM;
 
     default:
         return actionstate_;
-    }
-}
-
-void game::HumanCharacter::ExitActionState()
-{
-    switch (actionstate_)
-    {
-    default:
-        break;
     }
 }

@@ -4,6 +4,7 @@
 #include "model.hpp"
 #include "skeleton.hpp"
 #include "vehiclemdl.hpp"
+#include "item.hpp"
 
 #include "utils/defs.hpp"
 
@@ -92,6 +93,12 @@ protected:
     PtrType Load(const std::string& key) override { return VehicleModel::LoadFromFile(key); }
 };
 
+class ItemCache final : public Cache<Item>
+{
+protected:
+    PtrType Load(const std::string& key) override { return Item::LoadFromFile(key); }
+};
+
 class CacheManager
 {
 public:
@@ -107,6 +114,11 @@ public:
     static std::shared_ptr<const VehicleModel> GetVehicleModel(const std::string& filename)
     {
         return vehicle_cache_.Get(filename);
+    }
+
+    static std::shared_ptr<const Item> GetItem(const std::string& filename)
+    {
+        return item_cache_.Get(filename);
     }
 
 #ifdef CLIENT
@@ -131,6 +143,7 @@ private:
     static ModelCache model_cache_;
     static MapCache map_cache_;
     static VehicleCache vehicle_cache_;
+    static ItemCache item_cache_;
     CLIENT_ONLY(static TextureCache texture_cache_;)
     CLIENT_ONLY(static SoundCache sound_cache_;)
     CLIENT_ONLY(static FontCache font_cache_;)

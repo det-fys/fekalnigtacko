@@ -7,6 +7,15 @@ game::SkeletonInstance::SkeletonInstance(std::shared_ptr<const assets::Skeleton>
     SetupBoneNodes();
 }
 
+const game::TransformNode* game::SkeletonInstance::GetBoneNodeByName(const std::string& bone_name) const
+{
+    auto idx = skeleton_->GetBoneIndex(bone_name);
+    if (idx < 0)
+        return nullptr;
+
+    return &GetBoneNode(idx);
+}
+
 void game::SkeletonInstance::ApplySkelAnim(const assets::Animation& anim, float time, float weight)
 {
     float anim_frame = time * anim.GetTPS();
@@ -61,8 +70,20 @@ void game::SkeletonInstance::ApplyAim(float yaw, float pitch)
     for (const auto& aim_bone : aim_bones)
     {
         auto& bone_transform = bone_nodes_[aim_bone.idx].local;
-        auto rotation = glm::angleAxis(-pitch * aim_bone.weight, glm::vec3(1.0f, 0.0f, 0.0f));
-        bone_transform.rotation = rotation * bone_transform.rotation;
+
+        if (aim_bone.pitch_weight > 0.0f)
+        {
+            auto pitch_rotation = glm::angleAxis(-pitch * aim_bone.pitch_weight, aim_bone.pitch_axis);
+            bone_transform.rotation = pitch_rotation * bone_transform.rotation;
+        }
+        
+        if (aim_bone.yaw_weight > 0.0f)
+        {
+            auto yaw_rotation = glm::angleAxis(yaw * aim_bone.yaw_weight, aim_bone.yaw_axis);
+            bone_transform.rotation = yaw_rotation * bone_transform.rotation;
+        }
+        
+
     }
 }
 

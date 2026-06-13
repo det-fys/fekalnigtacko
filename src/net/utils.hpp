@@ -10,12 +10,12 @@ namespace net
 
 /// TRANSFORMS
 
-// inline void WritePosition(OutMessage& msg, const glm::vec3& pos)
-// {
-//     msg.Write<PositionQ>(pos.x);
-//     msg.Write<PositionQ>(pos.y);
-//     msg.Write<PositionQ>(pos.z);
-// }
+inline void WritePosition(OutMessage& msg, const glm::vec3& pos)
+{
+    msg.Write<PositionElemQ>(pos.x);
+    msg.Write<PositionElemQ>(pos.y);
+    msg.Write<PositionElemQ>(pos.z);
+}
 
 inline void EncodePosition(const glm::vec3& pos, PositionQ& out)
 {
@@ -66,10 +66,10 @@ inline void WriteRotationQ(OutMessage& msg, const QuatQ& rotq)
 //     WriteRotation(msg, trans.rotation);
 // }
 
-// inline bool ReadPosition(InMessage& msg, glm::vec3& pos)
-// {
-//     return msg.Read<PositionQ>(pos.x) && msg.Read<PositionQ>(pos.y) && msg.Read<PositionQ>(pos.z);
-// }
+inline bool ReadPosition(InMessage& msg, glm::vec3& pos)
+{
+    return msg.Read<PositionElemQ>(pos.x) && msg.Read<PositionElemQ>(pos.y) && msg.Read<PositionElemQ>(pos.z);
+}
 
 inline bool ReadPositionQ(InMessage& msg, PositionQ& posq)
 {

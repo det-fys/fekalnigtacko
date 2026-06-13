@@ -100,14 +100,16 @@ void assets::Skeleton::AddAnimation(const std::string& name, const std::shared_p
 
 void assets::Skeleton::AddAimBones()
 {
-    AddAimBone("DEF-spine.002", 0.5f);
-    AddAimBone("MCH-spine.002", 0.5f);
-    AddAimBone("DEF-spine.003", 0.5f);
-    AddAimBone("MCH-spine.003", 0.5f);
+    AddAimBone("DEF-spine.002", 1.0f, glm::vec3(0.0f, 1.0f, 0.0f), 0.0f, glm::vec3(0.0f));
+    AddAimBone("spine_fk.002", 1.0f, glm::vec3(0.0f, 0.0f, 1.0f), 0.0f, glm::vec3(0.0f));
 
+    AddAimBone("DEF-spine.002", 0.0f, glm::vec3(0.0f), 0.5f, glm::vec3(1.0f, 0.0f, 0.0f));
+    AddAimBone("MCH-spine.002", 0.0f, glm::vec3(0.0f), 0.5f, glm::vec3(1.0f, 0.0f, 0.0f));
+    AddAimBone("DEF-spine.003", 0.0f, glm::vec3(0.0f), 0.5f, glm::vec3(1.0f, 0.0f, 0.0f));
+    AddAimBone("MCH-spine.003", 0.0f, glm::vec3(0.0f), 0.5f, glm::vec3(1.0f, 0.0f, 0.0f));
 }
 
-void assets::Skeleton::AddAimBone(const std::string& name, float weight)
+void assets::Skeleton::AddAimBone(const std::string& name, float yaw_weight, const glm::vec3& yaw_axis, float pitch_weight, const glm::vec3& pitch_axis)
 {
     auto idx = GetBoneIndex(name);
     if (idx < 0)
@@ -115,6 +117,9 @@ void assets::Skeleton::AddAimBone(const std::string& name, float weight)
 
     AimBone aimbone{};
     aimbone.idx = idx;
-    aimbone.weight = weight;
+    aimbone.yaw_weight = yaw_weight;
+    aimbone.yaw_axis = yaw_axis;
+    aimbone.pitch_weight = pitch_weight;
+    aimbone.pitch_axis = pitch_axis;
     aim_bones_.emplace_back(aimbone);
 }

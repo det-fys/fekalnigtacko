@@ -9,10 +9,10 @@
 #include "net/inmessage.hpp"
 #include "net/msg_producer.hpp"
 #include "utils/defs.hpp"
-
 #include "player_input.hpp"
-
 #include "remote_menu.hpp"
+#include "camera_info.hpp"
+#include "camera_controller.hpp"
 
 namespace game
 {
@@ -32,7 +32,7 @@ public:
 
     void SetWorld(World* world);
 
-    void SetCamera(net::EntNum entnum);
+    void SetCamera(const CameraInfo& camera_info);
     void SendChat(const std::string& text);
     void SetUseTarget(const std::string& text, const std::string& error_text, float delay);
 
@@ -43,8 +43,9 @@ public:
     const std::string& GetName() const { return name_; }
 
     PlayerInputFlags GetInput() const { return in_; }
-    float GetViewYaw() const { return view_yaw_; }
-    float GetViewPitch() const { return view_pitch_; }
+    float GetViewYaw() const { return camera_controller_.GetYaw(); }
+    float GetViewPitch() const { return camera_controller_.GetPitch(); }
+    bool GetView(glm::vec3& eye, glm::vec3& forward);
 
     const glm::vec3 GetCullPos() const { return cull_pos_; }
 
@@ -53,6 +54,7 @@ public:
 private:
     // world sync
     void SyncWorld();
+    void UpdateCullPos();
     void SendWorldMsg();
     void SendWorldUpdateMsg();
     void SendEnv();
@@ -74,6 +76,8 @@ private:
     // menu sync
     void SendMenuMsgs();
 
+    void UpdateCamera();
+
 private:
     Game& game_;
     std::string name_;
@@ -84,9 +88,9 @@ private:
     int64_t last_env_time_ = 0;
 
     PlayerInputFlags in_ = 0;
-    float view_yaw_ = 0.0f, view_pitch_ = 0.0f;
 
-    net::EntNum cam_ent_ = 0;
+    CameraInfo camera_info_;
+    CameraController camera_controller_;
     glm::vec3 cull_pos_ = glm::vec3(0.0f);
 
     // menus

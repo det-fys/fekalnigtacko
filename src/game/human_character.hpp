@@ -58,14 +58,19 @@ public:
     size_t GeatSeatIdx() const { return seat_idx_; }
     bool IsDriver() const { return is_driver_; }
     
-    void SetAiming(bool aiming) { aiming_ = aiming; }
+    void SetAimHeld(bool aimheld) { aimheld_ = aimheld; }
+    void SetFireHeld(bool fireheld) { fireheld_ = fireheld; }
 
     virtual ~HumanCharacter() override;
 
 protected:
     virtual void OnRideableChanged() {}
+    virtual void OnAimingChanged() {}
 
 private:
+    void SetAiming(bool aiming);
+    void Fire();
+
     void UpdateState();
     void SetSignal(HumanCharacterStateSignal signal);
     bool PopSignal(HumanCharacterStateSignal signal);
@@ -89,9 +94,8 @@ private:
 
     void UpdateActionState();
 
-    void EnterActionState();
+    void EnterActionState(ActionState state);
     ActionState CheckActionStateTransition();
-    void ExitActionState();
 
 private:
     HumanCharacterTuning human_tuning_;
@@ -106,7 +110,8 @@ private:
 
     glm::vec3 rideable_exit_pos_ = glm::vec3(0.0f);
 
-    bool aiming_ = false;
+    bool aimheld_ = false;
+    bool fireheld_ = false;
 
     ActionState actionstate_ = ACTION_IDLE;
 

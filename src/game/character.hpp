@@ -79,10 +79,13 @@ public:
     float GetViewYaw() const { return view_yaw_; }
     float GetViewPitch() const { return view_pitch_; }
 
+    const glm::vec3& GetEyePosition() const { return eye_pos_; }
+    const glm::vec3& GetAimDirection() const { return aim_dir_; }
+
     void SetYaw(float yaw) { yaw_ = yaw; }
 
     void SetPosition(const glm::vec3& position);
-    
+
     ~Character() override = default;
     
 protected:
@@ -93,12 +96,18 @@ protected:
     void PlayActionAnim(const std::string& anim_name, float speed = 1.0f);
     void ClearActionAnim();
     bool IsActionAnimDone() { return action_anim_done_; }
+    void SetAiming(bool aiming) { aiming_ = aiming; }
+    bool GetAiming() const { return aiming_; }
+    void SetAimTarget(const glm::vec3& target);
+    void SetViewItem(const std::string& item_name);
 
 private:
     void SyncControllerTransform();
     void SyncTransformFromController();
 
     void UpdateMovement();
+    void UpdateAiming();
+    void UpdateAimDirection();
     void UpdateSyncState();
     void SendUpdateMsg();
     CharacterSyncFieldFlags WriteState(net::OutMessage& msg, const CharacterSyncState& base) const;
@@ -139,6 +148,14 @@ private:
     float action_anim_playback_speed_ = 0.0f;
     float action_anim_end_ = 0.0f;
     bool action_anim_done_ = true;
+
+    bool aiming_ = false;
+    glm::vec3 aim_target_ = glm::vec3(0.0f);
+    float aim_z_offset_ = 1.6f;
+    glm::vec3 eye_pos_ = glm::vec3(0.0f);
+    glm::vec3 aim_dir_ = glm::vec3(0.0f);
+
+    std::string item_;
 };
 
 } // namespace game

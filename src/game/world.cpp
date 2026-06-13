@@ -8,6 +8,7 @@
 #include "destroyed_object.hpp"
 #include "utils/allocnum.hpp"
 #include "player_character.hpp"
+#include "net/utils.hpp"
 
 game::World::World(std::string mapname) : Scheduler(time_ms_), map_(*this, std::move(mapname)) {}
 
@@ -68,6 +69,7 @@ void game::World::Update(int64_t delta_time)
 void game::World::FinishFrame()
 {
     ResetMsg();
+    ResetLocalMsgs();
 
     // reset ent msgs
     for (auto& [entnum, ent] : ents_)
@@ -169,6 +171,112 @@ const game::UseTarget* game::World::GetBestUseTarget(game::PlayerCharacter& char
 
     GetBtBroadphase().aabbTest(min, max, cb);
     return cb.best_target;
+}
+
+static bool IsMeOrMyRideOrOtherPassengerOfMyRide(const game::HumanCharacter* me, const btCollisionObject* obj)
+{
+    if (!me) // i am not
+        return false;
+
+    // is me?
+    auto obj_cb = collision::GetObjectCallback(obj);
+    if (!obj_cb)
+        return false; // is nothing
+
+    if (obj_cb == me)
+        return true; // its me
+
+    auto my_ride = me->GetRideable();
+    if (!my_ride)
+        return false; // im not riding anything
+
+    // is my ride?
+    if (&my_ride->GetEntity() == obj_cb)
+        return true; // yes
+
+    // is other passenger?
+    auto character = dynamic_cast<game::HumanCharacter*>(obj_cb);
+    if (!character)
+        return false; // is not even human
+
+    return character->GetRideable() == my_ride;
+}
+
+struct NotMeNotMyRideAndNotOtherPassengersOfMyRideClosestRayResultCallback : public btCollisionWorld::ClosestRayResultCallback
+{
+    using Super = ClosestRayResultCallback;
+
+    NotMeNotMyRideAndNotOtherPassengersOfMyRideClosestRayResultCallback(const btVector3& rayFromWorld,
+                                                                        const btVector3& rayToWorld)
+        : ClosestRayResultCallback(rayFromWorld, rayToWorld)
+    {
+    }
+
+    game::HumanCharacter* me = nullptr;
+
+    virtual btScalar addSingleResult(btCollisionWorld::LocalRayResult& rayResult, bool normalInWorldSpace) override
+    {
+        if (IsMeOrMyRideOrOtherPassengerOfMyRide(me, rayResult.m_collisionObject))
+            return rayResult.m_hitFraction;
+        
+        return Super::addSingleResult(rayResult, normalInWorldSpace);
+    }
+};
+
+void game::World::FireBullet(const BulletInfo& bullet)
+{
+    btVector3 bt_start(bullet.start.x, bullet.start.y, bullet.start.z);
+    btVector3 bt_end(bullet.end.x, bullet.end.y, bullet.end.z);
+
+    NotMeNotMyRideAndNotOtherPassengersOfMyRideClosestRayResultCallback cb(bt_start, bt_end);
+    cb.me = bullet.shooter;
+    GetBtWorld().rayTest(bt_start, bt_end, cb);
+
+    if (!cb.hasHit() || !cb.m_collisionObject)
+        return;
+
+    auto obj_cb = collision::GetObjectCallback(cb.m_collisionObject);
+    obj_cb->OnBulletHit(bullet, cb.m_collisionObject);
+
+    glm::vec3 hit_pos(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
+    const float box_extent = 0.1f;
+    BeamBox(hit_pos - box_extent, hit_pos + box_extent, 0x0077FF, 1.0f);
+}
+
+void game::World::Beam(const glm::vec3& start, const glm::vec3& end, uint32_t color, float time)
+{
+    auto msg = BeginLocalMsg(start, 500.0f, net::MSG_BEAM);
+    net::WritePosition(msg, start);
+    net::WritePosition(msg, end);
+    net::WriteRGB(msg, color);
+    msg.Write<net::BeamTimeQ>(time);
+}
+
+void game::World::BeamBox(const glm::vec3& min, const glm::vec3& max, uint32_t color, float time)
+{
+    const glm::vec3& p0 = min;
+    const glm::vec3 p1(max.x, min.y, min.z);
+    const glm::vec3 p2(max.x, max.y, min.z);
+    const glm::vec3 p3(min.x, max.y, min.z);
+    const glm::vec3 p4(min.x, min.y, max.z);
+    const glm::vec3 p5(max.x, min.y, max.z);
+    const glm::vec3& p6 = max;
+    const glm::vec3 p7(min.x, max.y, max.z);
+
+    Beam(p0, p1, color, time);
+    Beam(p1, p2, color, time);
+    Beam(p2, p3, color, time);
+    Beam(p3, p0, color, time);
+
+    Beam(p4, p5, color, time);
+    Beam(p5, p6, color, time);
+    Beam(p6, p7, color, time);
+    Beam(p7, p4, color, time);
+
+    Beam(p0, p4, color, time);
+    Beam(p1, p5, color, time);
+    Beam(p2, p6, color, time);
+    Beam(p3, p7, color, time);
 }
 
 void game::World::HandleContacts()

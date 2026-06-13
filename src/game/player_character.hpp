@@ -24,14 +24,17 @@ public:
 
 protected:
     virtual void OnRideableChanged() override;
+    virtual void OnAimingChanged() override;
 
 private:
     void UpdatePlayerCamera();
     void UpdateInputs();
+    void UpdateAimTarget();
     
     void UpdateUseTarget();
     void UseChanged(bool enabled);
     void SendUseTargetInfo();
+
 
 private:
     Player* player_;

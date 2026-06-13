@@ -25,7 +25,10 @@ constexpr AnimIdx NO_ANIM = 255;
 struct AimBone
 {
     size_t idx;
-    float weight;
+    float yaw_weight;
+    glm::vec3 yaw_axis;
+    float pitch_weight;
+    glm::vec3 pitch_axis;
 };
 
 class Skeleton
@@ -50,7 +53,7 @@ private:
     void AddAnimation(const std::string& name, const std::shared_ptr<const Animation>& anim);
 
     void AddAimBones();
-    void AddAimBone(const std::string& name, float weight);
+    void AddAimBone(const std::string& name, float yaw_weight, const glm::vec3& yaw_axis, float pitch_weight, const glm::vec3& pitch_axis);
 
 private:
     std::string name_;

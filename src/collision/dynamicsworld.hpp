@@ -15,6 +15,8 @@ class DynamicsWorld
 public:
     DynamicsWorld();
     
+    glm::vec3 CameraSweep(const glm::vec3& start, const glm::vec3& end);
+
     btDynamicsWorld& GetBtWorld() { return bt_world_; }
     const btDynamicsWorld& GetBtWorld() const { return bt_world_; }
     btDbvtBroadphase& GetBtBroadphase() { return bt_broadphase_; }

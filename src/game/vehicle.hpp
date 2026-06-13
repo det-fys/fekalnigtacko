@@ -64,6 +64,7 @@ public:
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
 
     virtual void OnContact(const collision::ContactInfo& info) override;
+    virtual void OnBulletHit(const game::BulletInfo& bullet, const btCollisionObject* hit_object);
 
     void SetInput(VehicleInputType type, bool enable);
     void SetInputs(VehicleInputFlags inputs) { in_ = inputs; }

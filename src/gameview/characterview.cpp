@@ -34,6 +34,13 @@ game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) 
 
     UpdateSurfaceMask();
 
+    // read item
+    net::ModelName item_name;
+    if (!msg.Read(item_name))
+        throw EntityInitError();
+
+    SetItem(item_name);
+
     // read initial state
     if (!ReadState(&msg))
         throw EntityInitError();
@@ -47,6 +54,8 @@ bool game::view::CharacterView::ProcessMsg(net::EntMsgType type, net::InMessage&
 {
     switch (type)
     {
+    case net::EMSG_EQUIP:
+        return ProcessEquipMsg(msg);
     default:
         return Super::ProcessMsg(type, msg);
     }
@@ -80,7 +89,11 @@ void game::view::CharacterView::Update(const UpdateInfo& info)
 
     // action
     animstate_.action_phase = glm::mix(states_[0].action_phase, states_[1].action_phase, t_sane);
-    
+    // if (animstate_.action_anim_idx != assets::NO_ANIM)
+    // {
+    //     std::cout <<"phase: " << animstate_.action_phase << std::endl;
+    // }
+
     // aim
     animstate_.yaw = glm::mix(states_[0].aim_yaw, states_[1].aim_yaw, t_sane);
     animstate_.pitch = glm::mix(states_[0].aim_pitch, states_[1].aim_pitch, t_sane);
@@ -90,6 +103,11 @@ void game::view::CharacterView::Update(const UpdateInfo& info)
     root_.UpdateMatrix();
     sk_.UpdateBoneMatrices();
     ubo_valid_ = false;
+
+    if (item_)
+    {
+        item_node_.UpdateMatrix();
+    }
 }
 
 void game::view::CharacterView::Draw(const DrawArgs& args)
@@ -152,6 +170,8 @@ void game::view::CharacterView::Draw(const DrawArgs& args)
         cmd.skinning = &ubo_;
         args.dlist.AddSurface(cmd);
     }
+
+    DrawItem(args);
 }
 
 void game::view::CharacterView::OnAttach()
@@ -245,6 +265,7 @@ bool game::view::CharacterView::ReadState(net::InMessage* msg)
             {
                 // anim just changed, dont blend phase
                 old_state.action_phase = new_state.action_phase;
+                animstate_.action_phase = new_state.action_phase;
             }
         }
 
@@ -257,6 +278,7 @@ bool game::view::CharacterView::ReadState(net::InMessage* msg)
             new_state.aim_yaw = sync_.aim_yaw.Decode();
             new_state.aim_pitch = sync_.aim_pitch.Decode();
         }
+
     }
 
     return true;
@@ -305,4 +327,49 @@ void game::view::CharacterView::AddClothes(const std::string& name, const glm::v
     }
 
     clothes_.emplace_back(std::move(c));
+}
+
+bool game::view::CharacterView::ProcessEquipMsg(net::InMessage& msg)
+{
+    net::ModelName item_name;
+    if (!msg.Read(item_name))
+        return false;
+
+    SetItem(item_name);
+
+    return true;
+}
+
+void game::view::CharacterView::SetItem(const std::string& item_name)
+{
+    if (item_name == item_name_)
+        return;
+
+    if (item_name.empty())
+    {
+        item_.reset();
+        return;
+    }
+
+    item_ = assets::CacheManager::GetItem("data/" + item_name + ".item");
+
+    auto bone_node = sk_.GetBoneNodeByName(item_->bone);
+    item_node_.parent = bone_node ? bone_node : &root_;
+    item_node_.local = item_->bone_offset;
+
+}
+
+void game::view::CharacterView::DrawItem(const DrawArgs& args)
+{
+    if (!item_ || !item_->model)
+        return;
+
+    const auto& mesh = *item_->model->GetMesh();
+    for (const auto& surface : mesh.surfaces)
+    {
+        gfx::DrawSurfaceCmd cmd;
+        cmd.surface = &surface;
+        cmd.matrices = &item_node_.matrix;
+        args.dlist.AddSurface(cmd);
+    }
 }

@@ -16,6 +16,15 @@ namespace game::view
 
 class ClientSession;
 
+struct BeamView
+{
+    float expiration;
+    glm::vec3 start;
+    glm::vec3 end;
+    float width;
+    uint32_t color;
+};
+
 class WorldView : public collision::DynamicsWorld
 {
 public:
@@ -25,8 +34,6 @@ public:
 
     void Update(const UpdateInfo& info);
     void Draw(const DrawArgs& args) const;
-
-    glm::vec3 CameraSweep(const glm::vec3& start, const glm::vec3& end);
 
     EntityView* GetEntity(net::EntNum entnum);
 
@@ -45,10 +52,13 @@ private:
     bool ProcessEntMsgMsg(net::InMessage& msg);
     bool ProcessUpdateEntsMsg(net::InMessage& msg);
     bool ProcessEntDestroyMsg(net::InMessage& msg);
-
     bool ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, bool enable);
+    bool ProcessBeamMsg(net::InMessage& msg);
 
     void Cache(std::any val);
+
+    void UpdateBeams();
+    void DrawBeams(const DrawArgs& args) const;
 
 private:
     ClientSession& session_;
@@ -66,6 +76,8 @@ private:
     audio::Master& audiomaster_;
 
     std::vector<std::any> cache_;
+
+    std::vector<BeamView> beams_;
 };
 
 } // namespace game::view

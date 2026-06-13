@@ -62,6 +62,9 @@ enum MessageType : uint8_t
     // OBJRESPAWN <ObjNum>
     MSG_OBJRESPAWN,
     
+    /*~~~~~~~~ Effects ~~~~~~~~*/
+    // BEAM <Position start> <Position end> <Color> <BeamTime>
+    MSG_BEAM,
 
     /*~~~~~~~~~~~~~~~~*/
     MSG_COUNT,
@@ -108,6 +111,7 @@ enum EntMsgType : uint8_t
     EMSG_PLAYSOUND,
     EMSG_DEFORM,
     EMSG_TUNING,
+    EMSG_EQUIP,
 };
 
 using PositionElemQ = Quantized<uint32_t, -10000, 10000, 1>;
@@ -192,5 +196,7 @@ enum MenuActionType
 };
 
 using MenuSelectDir = uint8_t; // 0=left, 1=right
+
+using BeamTimeQ = Quantized<uint8_t, 0, 10>;
 
 } // namespace net

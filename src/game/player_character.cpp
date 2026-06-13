@@ -13,6 +13,7 @@ game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const Human
 void game::PlayerCharacter::Update()
 {
     UpdateUseTarget();
+    UpdateAimTarget();
     Super::Update();
 
     if (GetRideable() && IsDriver())
@@ -46,19 +47,24 @@ void game::PlayerCharacter::OnRideableChanged()
     UpdateInputs();
 }
 
+void game::PlayerCharacter::OnAimingChanged()
+{
+    UpdatePlayerCamera();
+}
+
 void game::PlayerCharacter::UpdatePlayerCamera()
 {
     if (!player_)
         return;
 
-    if (auto rideable = GetRideable(); rideable)
-    {
-        player_->SetCamera(rideable->GetEntity().GetEntNum());
-    }
-    else
-    {
-        player_->SetCamera(GetEntNum());
-    }
+    CameraInfo camera_info{};
+    camera_info.character_entnum = GetEntNum();
+    camera_info.rideable_entnum = GetRideable() ? GetRideable()->GetEntity().GetEntNum() : 0;
+
+    if (GetAiming())
+        camera_info.flags |= CAM_AIMING;
+
+    player_->SetCamera(camera_info);
 }
 
 void game::PlayerCharacter::UpdateInputs()
@@ -79,7 +85,38 @@ void game::PlayerCharacter::UpdateInputs()
         SetInputs(MapPlayerInputToCharacterInput(in));
     }
 
-    SetAiming(in & (1 << IN_ATTACK_SECONDARY));
+    SetAimHeld(in & (1 << IN_ATTACK_SECONDARY));
+    SetFireHeld(in & (1 << IN_ATTACK_PRIMARY));
+}
+
+void game::PlayerCharacter::UpdateAimTarget()
+{
+    if (!player_)
+        return;
+
+    glm::vec3 eye, forward;
+    if (!player_->GetView(eye, forward))
+        return;
+
+    auto target = eye + forward * 1000.0f;
+
+    btVector3 bt_from(eye.x, eye.y, eye.z);
+    btVector3 bt_to(target.x, target.y, target.z);
+
+    btCollisionWorld::ClosestRayResultCallback cb(bt_from, bt_to);
+    cb.m_collisionFilterGroup = btBroadphaseProxy::DefaultFilter;
+    cb.m_collisionFilterMask = btBroadphaseProxy::StaticFilter;
+
+    GetWorld().GetBtWorld().rayTest(bt_from, bt_to, cb);
+
+    if (cb.hasHit())
+    {
+        target = glm::vec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z()); 
+    }
+
+    SetAimTarget(target);
+
+    // GetWorld().Beam(eye, target, 0xFFFF00, 1.0 / 25.0f);
 }
 
 void game::PlayerCharacter::UpdateUseTarget()

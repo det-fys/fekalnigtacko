@@ -34,7 +34,7 @@ public:
 
     void Begin(const glm::vec2& viewport_size);
 
-    void DrawRect(const glm::vec2& p0, const glm::vec2& p1, uint32_t color);
+    void DrawRect(const glm::vec2& p0, const glm::vec2& p1, uint32_t color, const gfx::Texture* texture = nullptr);
 
     glm::vec2 MeasureText(std::string_view text);
     void DrawText(std::string_view text, const glm::vec2& pos, uint32_t color = 0xFFFFFFFF, float scale = 1.0f);

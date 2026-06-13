@@ -19,9 +19,9 @@ void gui::Context::Begin(const glm::vec2& viewport_size)
     viewport_size_ = viewport_size;
 }
 
-void gui::Context::DrawRect(const glm::vec2& p0, const glm::vec2& p1, uint32_t color)
+void gui::Context::DrawRect(const glm::vec2& p0, const glm::vec2& p1, uint32_t color, const gfx::Texture* texture)
 {
-    BeginTexture(white_tex_.get());
+    BeginTexture(texture ? texture : white_tex_.get());
     PushRect(p0, glm::vec2(0.0f), p1, glm::vec2(1.0f), color);
 }
 

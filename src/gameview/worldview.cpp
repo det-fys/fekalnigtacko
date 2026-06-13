@@ -8,6 +8,7 @@
 #include "markerview.hpp"
 #include "client_session.hpp"
 #include "draw_args.hpp"
+#include "net/utils.hpp"
 
 game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) : 
     session_(session), audiomaster_(session_.GetAudioMaster())
@@ -69,6 +70,9 @@ bool game::view::WorldView::ProcessMsg(net::MessageType type, net::InMessage& ms
     case net::MSG_OBJRESPAWN:
         return ProcessObjDestroyOrRespawnMsg(msg, true);
 
+    case net::MSG_BEAM:
+        return ProcessBeamMsg(msg);
+
     default:
         return false;
     }
@@ -87,6 +91,7 @@ void game::view::WorldView::Update(const UpdateInfo& info)
     }
 
     UpdateEnv();
+    UpdateBeams();
 }
 
 void game::view::WorldView::Draw(const DrawArgs& args) const
@@ -106,31 +111,8 @@ void game::view::WorldView::Draw(const DrawArgs& args) const
         if (args.frustum.IsSphereVisible(ent->GetBoundingSphere()))
             ent->Draw(args);
     }
-}
 
-glm::vec3 game::view::WorldView::CameraSweep(const glm::vec3& start, const glm::vec3& end)
-{
-    const auto& bt_world = GetBtWorld();
-
-    static const btSphereShape shape(0.1f);
-
-    btVector3 bt_start(start.x, start.y, start.z);
-    btVector3 bt_end(end.x, end.y, end.z);
-
-    btTransform from, to;
-    from.setIdentity();
-    from.setOrigin(bt_start);
-    to.setIdentity();
-    to.setOrigin(bt_end);
-
-    btCollisionWorld::ClosestConvexResultCallback cb(bt_start, bt_end);
-
-    bt_world.convexSweepTest(&shape, from, to, cb);
-
-    if (!cb.hasHit())
-        return end;
-
-    return glm::mix(start, end, cb.m_closestHitFraction);
+    DrawBeams(args);
 }
 
 game::view::EntityView* game::view::WorldView::GetEntity(net::EntNum entnum)
@@ -333,7 +315,36 @@ bool game::view::WorldView::ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, b
     return true;
 }
 
+bool game::view::WorldView::ProcessBeamMsg(net::InMessage& msg)
+{
+    BeamView beam;
+    if (!net::ReadPosition(msg, beam.start) || !net::ReadPosition(msg, beam.end) || !net::ReadRGB(msg, beam.color) || !msg.Read<net::BeamTimeQ>(beam.expiration))
+    return false;
+    
+    beam.expiration += GetTime();
+    beam.width = 0.02f;
+    
+    beams_.emplace_back(beam);
+
+    return true;
+}
+
 void game::view::WorldView::Cache(std::any val)
 {
     cache_.emplace_back(std::move(val));
+}
+
+void game::view::WorldView::UpdateBeams()
+{
+    beams_.erase(std::remove_if(beams_.begin(), beams_.end(),
+                                [this](const BeamView& beam) { return beam.expiration <= GetTime(); }),
+                 beams_.end());
+}
+
+void game::view::WorldView::DrawBeams(const DrawArgs& args) const
+{
+    for (const auto& beam : beams_)
+    {
+        args.dlist.AddBeam(beam.start, beam.end, beam.color | 0xFF000000, beam.width);
+    }
 }

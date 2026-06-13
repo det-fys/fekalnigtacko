@@ -13,7 +13,17 @@
 namespace game
 {
 
-class World : public collision::DynamicsWorld, public net::MsgProducer, public Scheduler
+class HumanCharacter;
+
+struct BulletInfo
+{
+    game::HumanCharacter* shooter;
+    glm::vec3 start;
+    glm::vec3 end;
+    float damage;
+};
+
+class World : public collision::DynamicsWorld, public net::MsgProducer, public net::LocalMsgProducer, public Scheduler
 {
 public:
     World(std::string mapname);
@@ -51,6 +61,11 @@ public:
     const int64_t& GetTime() const { return time_ms_; }
     float GetDayTime() const { return daytime_; }
     void SetDayTime(float daytime) { daytime_ = glm::mod(daytime, 24.0f); }
+
+    void FireBullet(const BulletInfo& bullet);
+
+    void Beam(const glm::vec3& start, const glm::vec3& end, uint32_t color, float time);
+    void BeamBox(const glm::vec3& min, const glm::vec3& max, uint32_t color, float time);
 
     virtual ~World() = default;
 

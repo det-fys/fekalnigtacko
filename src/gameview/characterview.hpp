@@ -2,6 +2,7 @@
 
 #include "entityview.hpp"
 #include "assets/model.hpp"
+#include "assets/item.hpp"
 #include "game/skeletoninstance.hpp"
 #include "skinning_ubo.hpp"
 #include "game/character_anim_state.hpp"
@@ -55,6 +56,11 @@ private:
 
     void AddClothes(const std::string& name, const glm::vec3& color);
 
+    bool ProcessEquipMsg(net::InMessage& msg);
+
+    void SetItem(const std::string& item_name);
+    void DrawItem(const DrawArgs& args);
+
 private:
     float yaw_ = 0.0f;
 
@@ -72,6 +78,10 @@ private:
     CharacterSyncState sync_;
     CharacterViewState states_[2];
     float update_time_ = 0.0f;
+
+    std::string item_name_;
+    std::shared_ptr<const assets::Item> item_;
+    TransformNode item_node_;
 };
 
 }

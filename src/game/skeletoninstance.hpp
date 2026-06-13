@@ -15,6 +15,7 @@ public:
 
     const TransformNode* GetRootNode() const { return root_node_; }
     const TransformNode& GetBoneNode(size_t index) const { return bone_nodes_[index]; }
+    const TransformNode* GetBoneNodeByName(const std::string& bone_name) const;
 
     void ApplySkelAnim(const assets::Animation& anim, float time, float weight);
     void ApplyAim(float yaw, float pitch);

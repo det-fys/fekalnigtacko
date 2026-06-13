@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "worldview.hpp"
-
 #include "gfx/draw_list.hpp"
 #include "gfx/renderer.hpp"
 #include "net/defs.hpp"
@@ -12,6 +11,8 @@
 #include "game/player_input.hpp"
 #include "gui/use_target_hud.hpp"
 #include "remote_menu_view.hpp"
+#include "game/camera_info.hpp"
+#include "game/camera_controller.hpp"
 
 class App;
 
@@ -33,7 +34,6 @@ public:
     void Draw(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui);
 
     const WorldView* GetWorld() const { return world_.get(); } 
-    void GetViewInfo(glm::vec3& eye, glm::mat4& view) const;
     audio::Master& GetAudioMaster() const;
 
 private:
@@ -44,6 +44,7 @@ private:
     bool ProcessUseTargetMsg(net::InMessage& msg);
     bool ProcessMenuMsg(net::InMessage& msg);
 
+    void UpdateCamera(const UpdateInfo& info);
     void DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui);
     
     void SendInput(game::PlayerInputType type, bool enable);
@@ -53,14 +54,16 @@ private:
     bool ProcessMenuInput(game::PlayerInputType in);
     RemoteMenuView* FindMenu(net::MenuId id) const;
 
+    void DrawCrosshair(gui::Context& gui) const;
+
 private:
     App& app_;
     
     std::unique_ptr<WorldView> world_;
 
-    float yaw_ = 0.0f, pitch_ = 0.0f;
-    net::EntNum follow_ent_ = 0;
-
+    CameraController camera_controller_;
+    CameraInfo camera_info_;
+    
     net::ViewYawQ view_yaw_q_;
     net::ViewPitchQ view_pitch_q_;
     float last_send_time_ = 0.0f;
@@ -68,6 +71,8 @@ private:
     gui::UseTargetHud use_target_hud_;
 
     std::vector<std::unique_ptr<RemoteMenuView>> remote_menus_;
+
+    std::shared_ptr<const gfx::Texture> crosshair_texture_;
 };
 
 } // namespace game::view

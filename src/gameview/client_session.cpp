@@ -7,9 +7,12 @@
 #include "utils/version.hpp"
 #include "utils.hpp"
 #include "vehicleview.hpp"
+#include "assets/cache.hpp"
 
 game::view::ClientSession::ClientSession(App& app) : app_(app), use_target_hud_(app.GetTime())
 {
+    crosshair_texture_ = assets::CacheManager::GetTexture("data/crosshair.png");
+
     // send login
     auto msg = BeginMsg(net::MSG_ID);
     msg.Write<net::Version>(FEKAL_VERSION);
@@ -75,18 +78,14 @@ void game::view::ClientSession::Input(game::PlayerInputType in, bool pressed, bo
 
 void game::view::ClientSession::ProcessMouseMove(float delta_yaw, float delta_pitch)
 {
-    yaw_ = glm::mod(yaw_ + delta_yaw, glm::two_pi<float>());
+    auto sens_mult = glm::mix(1.0f, 0.3f, camera_controller_.GetAimFactor());
 
-    pitch_ += delta_pitch;
-    // Clamp pitch to avoid gimbal lock
-    if (pitch_ > glm::radians(89.0f))
-    {
-        pitch_ = glm::radians(89.0f);
-    }
-    else if (pitch_ < glm::radians(-89.0f))
-    {
-        pitch_ = glm::radians(-89.0f);
-    }
+    float yaw = glm::mod(camera_controller_.GetYaw() + delta_yaw * sens_mult, glm::two_pi<float>());
+
+    float pitch = camera_controller_.GetPitch() + delta_pitch * sens_mult;
+    pitch = glm::clamp(pitch, glm::radians(-89.0f), glm::radians(89.0f)); // Clamp pitch to avoid gimbal lock
+    
+    camera_controller_.SetViewAngles(yaw, pitch);
 }
 
 void game::view::ClientSession::Update(const UpdateInfo& info)
@@ -95,6 +94,7 @@ void game::view::ClientSession::Update(const UpdateInfo& info)
     {
         world_->Update(info);
         SendViewAngles(info.time);
+        UpdateCamera(info);
     }
 }
 
@@ -105,39 +105,10 @@ void game::view::ClientSession::Draw(gfx::DrawList& dlist, gfx::DrawListParams& 
         DrawWorld(dlist, params, gui);
     }
 
+    DrawCrosshair(gui);
     use_target_hud_.Draw(gui);
 
     DrawMenus(gui);
-}
-
-void game::view::ClientSession::GetViewInfo(glm::vec3& eye, glm::mat4& view) const
-{
-    glm::vec3 start(0.0f, 0.0f, 2.0f);
-    float distance = 5.0f;
-
-    if (follow_ent_)
-    {
-        auto ent = world_->GetEntity(follow_ent_);
-        if (ent)
-        {
-            start += ent->GetRoot().GetGlobalPosition();
-
-            if (dynamic_cast<const VehicleView*>(ent))
-                distance = 8.0f;
-        }
-    }
-
-    float yaw_cos = glm::cos(yaw_);
-    float yaw_sin = glm::sin(yaw_);
-    float pitch_cos = glm::cos(pitch_);
-    float pitch_sin = glm::sin(pitch_);
-    glm::vec3 dir(-yaw_sin * pitch_cos, yaw_cos * pitch_cos, pitch_sin);
-
-    glm::vec3 end = start - dir * distance;
-
-    // start.z -= 0.5f; // shift this a bit to make it better when occluded
-    eye = world_->CameraSweep(start, end);
-    view = glm::lookAt(eye, eye + dir, glm::vec3(0, 0, 1));
 }
 
 audio::Master& game::view::ClientSession::GetAudioMaster() const
@@ -161,7 +132,7 @@ bool game::view::ClientSession::ProcessWorldMsg(net::InMessage& msg)
 
 bool game::view::ClientSession::ProcessCameraMsg(net::InMessage& msg)
 {
-    if (!msg.Read(follow_ent_))
+    if (!msg.Read(camera_info_.character_entnum) || !msg.Read(camera_info_.rideable_entnum) || !msg.Read(camera_info_.flags))
         return false;
 
     return true;
@@ -222,6 +193,19 @@ bool game::view::ClientSession::ProcessMenuMsg(net::InMessage& msg)
     }
 }
 
+void game::view::ClientSession::UpdateCamera(const UpdateInfo& info)
+{
+    auto character = world_->GetEntity(camera_info_.character_entnum);
+    camera_controller_.SetCharacterTransform(character ? &character->GetRoot().matrix : nullptr);
+    
+    auto rideable = world_->GetEntity(camera_info_.rideable_entnum);
+    camera_controller_.SetRideableTransform(rideable ? &rideable->GetRoot().matrix : nullptr);
+    
+    camera_controller_.SetAiming(camera_info_.flags & CAM_AIMING);
+    camera_controller_.Update(info.delta_time);
+    camera_controller_.Recalculate(world_.get());
+}
+
 void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui)
 {
     // glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f,
@@ -231,16 +215,14 @@ void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListPar
     const float farplane = 3000.0f;
 
     glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, farplane);
-    glm::vec3 eye;
-    glm::mat4 view;
-    GetViewInfo(eye, view);
+    glm::mat4 view = camera_controller_.GetViewMatrix();
 
     params.view_proj = proj * view;
-    params.cam_pos = eye;
+    params.cam_pos = camera_controller_.GetEye();
 
     // glm::mat4 fake_view_proj = glm::perspective(glm::radians(30.0f), aspect, 0.1f, 3000.0f) * view;
 
-    game::view::DrawArgs draw_args(dlist, params.env, gui, params.view_proj, eye,
+    game::view::DrawArgs draw_args(dlist, params.env, gui, params.view_proj, params.cam_pos,
                                    glm::ivec2(params.screen_width, params.screen_height), farplane, 500.0f);
     world_->Draw(draw_args);
 
@@ -264,8 +246,8 @@ void game::view::ClientSession::SendViewAngles(float time)
 
     net::ViewYawQ yaw_q;
     net::ViewPitchQ pitch_q;
-    yaw_q.Encode(yaw_);
-    pitch_q.Encode(pitch_);
+    yaw_q.Encode(camera_controller_.GetYaw());
+    pitch_q.Encode(camera_controller_.GetPitch());
 
     if (yaw_q.value == view_yaw_q_.value && pitch_q.value == view_pitch_q_.value)
         return;
@@ -311,4 +293,19 @@ game::view::RemoteMenuView* game::view::ClientSession::FindMenu(net::MenuId id) 
     }
 
     return nullptr;
+}
+
+void game::view::ClientSession::DrawCrosshair(gui::Context& gui) const
+{
+    if (camera_controller_.GetAimFactor() < 0.5f)
+        return; // no aiming no crosshair
+
+    const float crosshair_size = 32.0f;
+
+    auto& viewport_size = gui.GetViewportSize();
+
+    auto p0 = viewport_size * 0.5f - crosshair_size * 0.5f;
+    auto p1 = p0 + crosshair_size;
+
+    gui.DrawRect(p0, p1, 0xFFFFFFFF, crosshair_texture_.get());
 }

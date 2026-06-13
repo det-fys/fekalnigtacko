@@ -3,6 +3,11 @@
 #include <cstdint>
 #include <btBulletDynamicsCommon.h>
 
+namespace game
+{
+    struct BulletInfo;
+}
+
 namespace collision
 {
 
@@ -36,6 +41,7 @@ public:
     ObjectCallback() = default;
 
     virtual void OnContact(const ContactInfo& info) {}
+    virtual void OnBulletHit(const game::BulletInfo& bullet, const btCollisionObject* hit_object) {}
 
     virtual ~ObjectCallback() = default;
 };
@@ -52,11 +58,27 @@ inline void AddObjectFlags(btCollisionObject* obj, ObjectFlags flags)
     obj->setUserIndex2(static_cast<int>(static_cast<ObjectFlags>(obj->getUserIndex2())) | flags);
 }
 
+inline ObjectType GetObjectType(const btCollisionObject* obj)
+{
+    return static_cast<ObjectType>(obj->getUserIndex());
+}
+
+inline ObjectFlags GetObjectFlags(const btCollisionObject* obj)
+{
+    return static_cast<ObjectFlags>(obj->getUserIndex2());
+}
+
+inline ObjectCallback* GetObjectCallback(const btCollisionObject* obj)
+{
+    return static_cast<ObjectCallback*>(obj->getUserPointer());
+}
+
+// legacy
 inline void GetObjectInfo(const btCollisionObject* obj, ObjectType& type, ObjectFlags& flags, ObjectCallback*& callback)
 {
-    type = static_cast<ObjectType>(obj->getUserIndex());
-    flags = static_cast<ObjectFlags>(obj->getUserIndex2());
-    callback = static_cast<ObjectCallback*>(obj->getUserPointer());
+    type = GetObjectType(obj);
+    flags = GetObjectFlags(obj);
+    callback = GetObjectCallback(obj);
 }
 
 }

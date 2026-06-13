@@ -38,6 +38,7 @@ void game::Character::Update()
 
     SyncTransformFromController();
     UpdateMovement();
+    UpdateAiming();
     UpdateActionAnim();
     root_.UpdateMatrix();
 
@@ -60,6 +61,9 @@ void game::Character::SendInitData(Player& player, net::OutMessage& msg) const
         msg.Write(net::ClothesName(clothes.name));
         net::WriteRGB(msg, clothes.color);
     }
+
+    // write item
+    msg.Write(net::ModelName(item_));
 
     // write state against default
     static const CharacterSyncState default_state;
@@ -157,6 +161,19 @@ void game::Character::ClearActionAnim()
     PlayActionAnim(assets::NO_ANIM, 0.0f);
 }
 
+void game::Character::SetAimTarget(const glm::vec3& target)
+{
+    aim_target_ = target;
+}
+
+void game::Character::SetViewItem(const std::string& item_name)
+{
+    item_ = item_name;
+
+    auto msg = BeginEntMsg(net::EMSG_EQUIP);
+    msg.Write(net::ModelName(item_name));
+}
+
 void game::Character::SyncControllerTransform()
 {
     if (!controller_)
@@ -250,13 +267,74 @@ void game::Character::UpdateMovement()
     // update anim
     float run_blend_target = walking ? 0.5f : 0.0f;
     MoveToward(animstate_.loco_blend, run_blend_target, dt * 2.0f);
-    float anim_speed = glm::mix(0.5f, 1.5f, UnMix(0.0f, 0.5f, animstate_.loco_blend));
+    float anim_speed = glm::mix(0.3f, 1.5f, UnMix(0.0f, 0.5f, animstate_.loco_blend));
     if (running)
         anim_speed *= run_speed_mult_;
     animstate_.loco_phase = glm::mod(animstate_.loco_phase + anim_speed * dt, 1.0f);
+}
 
-    animstate_.pitch = view_pitch_;
+void game::Character::UpdateAiming()
+{
+    float delta = 10.0f;
 
+    if (!aiming_)
+    {
+        delta = 3.0f / 25.0f;
+        MoveToward(animstate_.yaw, 0.0f, delta);
+        MoveToward(animstate_.pitch, 0.0f, delta);
+        UpdateAimDirection();
+        return;
+    }
+
+    // get yaw and pitch relative to transform
+    glm::vec3 dir = aim_target_ - GetRoot().local.position;
+
+    if (parent_)
+    {
+        auto inv_parent =  glm::inverse(parent_->GetRoot().matrix);
+
+        // glm::vec3 character_pos_in_parent = inv_parent * glm::vec4(GetRoot().local.position, 1.0f);
+        glm::vec3 aim_target_in_parent = inv_parent * glm::vec4(aim_target_, 1.0f);
+        dir = aim_target_in_parent - GetRoot().local.position;
+    }
+
+    dir.z -= aim_z_offset_; // from eye
+    dir = glm::normalize(dir);
+
+    float pitch = glm::asin(dir.z);
+    float yaw = glm::atan(-dir.x, dir.y);
+
+    auto target_pitch = glm::clamp(pitch, glm::radians(-60.0f), glm::radians(55.0f)); // clamp to make it less weird
+    MoveToward(animstate_.pitch, target_pitch, delta);
+
+    if (movement_ == CMT_DISABLED)
+    {
+        auto target_yaw = glm::mod(yaw + glm::pi<float>(), glm::two_pi<float>()) - glm::pi<float>();
+        MoveToward(animstate_.yaw, target_yaw, delta);
+    }
+    else
+    {
+        Turn(yaw_, yaw, delta);
+        MoveToward(animstate_.yaw, 0.0f, delta);
+    }
+
+    UpdateAimDirection();
+}
+
+void game::Character::UpdateAimDirection()
+{
+    eye_pos_ = GetRoot().matrix * glm::vec4(0.0f, 0.0f, aim_z_offset_, 1.0f);
+
+    auto pitch = animstate_.pitch;
+    auto yaw = yaw_ + animstate_.yaw;
+    aim_dir_ = glm::vec3(-glm::sin(yaw) * glm::cos(pitch), glm::cos(yaw) * glm::cos(pitch), glm::sin(pitch));
+
+    if (parent_)
+    {
+        aim_dir_ = glm::normalize(parent_->GetRoot().matrix * glm::vec4(aim_dir_, 0.0f));
+    }
+
+    // GetWorld().Beam(eye_pos_, eye_pos_ + aim_dir_ * 100.0f, 0x0000FF, 1.0f / 25.0f);
 }
 
 void game::Character::UpdateSyncState()

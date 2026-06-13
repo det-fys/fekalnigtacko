@@ -201,11 +201,11 @@ static void PollEvents()
             {
                 if (event.button.button == SDL_BUTTON_LEFT)
                 {
-                    s_app->Input(game::IN_ATTACK_PRIMARY, event.button.state == SDL_PRESSED, event.button.clicks > 1);
+                    s_app->Input(game::IN_ATTACK_PRIMARY, event.button.state == SDL_PRESSED, false);
                 }
                 else if (event.button.button == SDL_BUTTON_RIGHT)
                 {
-                    s_app->Input(game::IN_ATTACK_SECONDARY, event.button.state == SDL_PRESSED, event.button.clicks > 1);
+                    s_app->Input(game::IN_ATTACK_SECONDARY, event.button.state == SDL_PRESSED, false);
                 }
             }
             break;
