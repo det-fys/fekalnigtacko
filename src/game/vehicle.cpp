@@ -371,6 +371,9 @@ void game::Vehicle::UpdateCrash()
             float diff = glm::distance(velocity, prev_velocity_);
             prev_velocity_ = velocity;
 
+            if (glm::length2(velocity) > 9.0f)
+                diff = 0.0f;
+
             float snd_crash_intensity = glm::max(diff * 500.0f, crash_intensity_);
 
             if (snd_crash_intensity > 1000.0f)
