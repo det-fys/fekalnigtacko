@@ -317,7 +317,7 @@ void game::Character::UpdateAiming()
 
     if (!aiming_)
     {
-        delta = 3.0f / 25.0f;
+        delta = 6.0f / 25.0f;
         MoveToward(animstate_.yaw, 0.0f, delta);
         MoveToward(animstate_.pitch, 0.0f, delta);
         UpdateAimDirection();

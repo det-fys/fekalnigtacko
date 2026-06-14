@@ -38,9 +38,7 @@ void game::CameraController::Recalculate(collision::DynamicsWorld* world)
     glm::vec3 start_aim(0.0f);
 
     float distance_noaim = 5.0f;
-    float distance_aim = 1.0f;
-
-    auto aim_end_offset =  right * 0.4f - forward_ * 1.8f;
+    auto aim_end_offset = right * 0.4f - forward_ * 1.8f;
 
     if (character_transform_)
     {
@@ -53,11 +51,11 @@ void game::CameraController::Recalculate(collision::DynamicsWorld* world)
     {
         start_noaim = TranslationFromMatrix(*rideable_transform_) + glm::vec3(0.0f, 0.0f, 2.0f);
         distance_noaim = 8.0f;
-        distance_aim = 3.0f;
+        aim_end_offset = right * 0.3f - forward_ * 4.5f + glm::vec3(0.0f, 0.0f, 0.8f);
     }
 
     glm::vec3 end_noaim = start_noaim - forward_ * distance_noaim; 
-    glm::vec3 end_aim = start_aim + aim_end_offset * distance_aim;
+    glm::vec3 end_aim = start_aim + aim_end_offset;
 
     auto aim_factor_smooth = glm::smoothstep(0.0f, 1.0f, aim_factor_);
     auto start = glm::mix(start_noaim, start_aim, aim_factor_smooth);
