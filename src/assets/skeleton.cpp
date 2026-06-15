@@ -1,6 +1,7 @@
 #include "skeleton.hpp"
 
 #include "cmdfile.hpp"
+#include "collision/shape_info.hpp"
 
 #include <stdexcept>
 
@@ -62,6 +63,8 @@ std::shared_ptr<const assets::Skeleton> assets::Skeleton::LoadFromFile(const std
             {
                 throw std::runtime_error("Unknown hitbone shape: " + shape_name);
             }
+
+            collision::SetShapeMaterial(*hitbone.col_shape, collision::PM_FLESH);
         }
     });
 

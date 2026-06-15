@@ -68,6 +68,8 @@ public:
     void Beam(const glm::vec3& start, const glm::vec3& end, uint32_t color, float time);
     void BeamBox(const glm::vec3& min, const glm::vec3& max, uint32_t color, float time);
 
+    void Effect(const std::string& name, const glm::vec3& pos, const glm::vec3& dir);
+
     void SendChat(const std::string& text);
 
     virtual ~World() = default;
@@ -81,7 +83,9 @@ private:
     void SendObjRespawnedMsg(net::ObjNum objnum);
 
     const btCollisionObject* TraceBulletInternal(const glm::vec3& start, const glm::vec3& end,
-                                                 game::HumanCharacter* shooter, glm::vec3& out_hit_pos);
+                                                 game::HumanCharacter* shooter, glm::vec3& out_hit_pos,
+                                                 glm::vec3* out_hit_normal = nullptr,
+                                                 collision::Material* out_hit_material = nullptr);
 
 private:
     MapInstance map_;

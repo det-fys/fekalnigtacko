@@ -1,0 +1,114 @@
+#include "particle_emitter.hpp"
+#include "assets/cache.hpp"
+#include "utils/random.hpp"
+
+game::view::ParticleEmitter::ParticleEmitter(audio::Player* audioplayer) : audioplayer_(audioplayer)
+{
+    quad_model_ = assets::CacheManager::GetModel("data/quad.mdl");
+}
+
+void game::view::ParticleEmitter::Update(float delta_time)
+{
+    for (auto& particle : particles_)
+    {
+        particle.time += delta_time;
+        particle.velocity.z -= delta_time * particle.gravity;
+        particle.position += particle.velocity * delta_time;
+
+        if (particle.time > particle.fade_start)
+        {
+            float opacity = 1.0f - glm::clamp((particle.time - particle.fade_start) / (particle.lifetime - particle.fade_start), 0.0f, 1.0f);
+            particle.color.a = opacity;
+        }
+    }
+
+    // erase expired particles
+    particles_.erase(std::remove_if(particles_.begin(), particles_.end(),
+                                    [this](const Particle& particle) { return particle.lifetime < particle.time; }),
+                     particles_.end());
+}
+
+void game::view::ParticleEmitter::Draw(const DrawArgs& args)
+{
+    for (auto& particle : particles_)
+    {
+        // calc matrixa
+        auto forward = args.eye - particle.position;
+        auto right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 0.0f, 1.0f))); 
+        auto up = normalize(glm::cross(right, forward));
+
+        particle.matrix = glm::rotate(glm::mat4(
+            glm::vec4(right * particle.size, 0.0f),
+            glm::vec4(forward, 0.0f),
+            glm::vec4(up * particle.size, 0.0f),
+            glm::vec4(particle.position, 1.0f)
+        ), particle.rotation, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        gfx::DrawSurfaceCmd cmd{};
+        cmd.surface = &particle.surface;
+        cmd.matrices = &particle.matrix;
+        cmd.color = &particle.color;
+        cmd.dist = glm::dot(forward, forward);
+        args.dlist.AddSurface(cmd);
+    }
+
+
+}
+
+void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effect>& fx, const glm::vec3& pos,
+                                       const glm::vec3& dir)
+{
+    // spawn particles
+    for (const auto& def : fx->GetParticleDefs())
+    {
+        auto count = RandomInt(def.count_min, def.count_max);
+
+        if (count <= 0)
+            continue;
+
+        // steal a quad surface from quad model
+        gfx::Surface surface = quad_model_->GetMesh()->surfaces[0];
+        surface.texture = def.texture;
+        surface.sflags = gfx::SF_2SIDED | gfx::SF_OBJECT_COLOR | gfx::SF_OBJECT_COLOR_MULT;
+
+        // setup blending
+        if (def.blend == assets::PTB_BLEND_NORMAL)
+            surface.sflags |= gfx::SF_BLEND;
+        else if (def.blend == assets::PTB_BLEND_ADDITIVE)
+            surface.sflags |= gfx::SF_BLEND | gfx::SF_BLEND_ADDITIVE | gfx::SF_UNLIT;
+
+        for (int i = 0; i < count; ++i)
+        {
+            auto& particle = particles_.emplace_back();
+            particle.surface = surface;
+            particle.time = 0.0f;
+            
+            particle.position = pos;
+            particle.rotation = RandomFloat(0.0f, glm::two_pi<float>());
+            particle.size = RandomFloat(def.size_min, def.size_max);
+
+            float dispersion = RandomFloat(0.0f, def.max_dispersion);
+            float speed = RandomFloat(def.velocity_min, def.velocity_max);
+            particle.velocity = ApplyRandomDispersion(dir, dispersion) * speed;
+
+            particle.gravity = RandomFloat(def.gravity_min, def.gravity_max);
+
+            particle.lifetime = RandomFloat(def.lifetime_min, def.lifetime_max);
+            particle.fade_start = particle.lifetime - RandomFloat(def.fadetime_min, def.fadetime_max);
+
+            particle.color = glm::vec4(1.0f);
+        }
+    }
+
+    // play sounds
+    const auto& sounds = fx->GetSounds();
+    if (audioplayer_ && sounds.size() > 0)
+    {
+        auto sound_idx = rand() % sounds.size();
+
+        auto snd = audioplayer_->PlaySound(sounds[sound_idx], nullptr);
+        snd->SetPosition(pos);
+        snd->SetVolume(RandomFloat(0.9f, 1.1f));
+        // snd->SetPitch(RandomFloat(0.9f, 1.1f));
+    }
+}

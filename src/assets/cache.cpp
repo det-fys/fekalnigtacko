@@ -9,3 +9,4 @@ assets::ItemCache assets::CacheManager::item_cache_;
 CLIENT_ONLY(assets::TextureCache assets::CacheManager::texture_cache_;)
 CLIENT_ONLY(assets::SoundCache assets::CacheManager::sound_cache_;)
 CLIENT_ONLY(assets::FontCache assets::CacheManager::font_cache_;)
+CLIENT_ONLY(assets::EffectCache assets::CacheManager::effect_cache_;)

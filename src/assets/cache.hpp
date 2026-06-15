@@ -12,6 +12,7 @@
 #include "audio/sound.hpp"
 #include "gfx/texture.hpp"
 #include "gui/font.hpp"
+#include "effect.hpp"
 #endif
 
 #include <iostream>
@@ -66,6 +67,12 @@ class FontCache final : public Cache<gui::Font>
 {
 protected:
     PtrType Load(const std::string& key) override { return gui::Font::LoadFromFile(key); }
+};
+
+class EffectCache final : public Cache<Effect>
+{
+protected:
+    PtrType Load(const std::string& key) override { return Effect::LoadFromFile(key); }
 };
 #endif // CLIENT
 
@@ -136,6 +143,11 @@ public:
     {
         return font_cache_.Get(filename);
     }
+    
+    static std::shared_ptr<const Effect> GetEffect(const std::string& filename)
+    {
+        return effect_cache_.Get(filename);
+    }
 #endif
 
 private:
@@ -147,6 +159,7 @@ private:
     CLIENT_ONLY(static TextureCache texture_cache_;)
     CLIENT_ONLY(static SoundCache sound_cache_;)
     CLIENT_ONLY(static FontCache font_cache_;)
+    CLIENT_ONLY(static EffectCache effect_cache_;)
 };
 
 } // namespace assets

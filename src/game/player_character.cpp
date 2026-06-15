@@ -108,7 +108,7 @@ void game::PlayerCharacter::UpdateAimTarget()
     SetAimTarget(target);
 
     // GetWorld().Beam(eye, target, 0xFFFF00, 1.0 / 25.0f);
-    GetWorld().BeamBox(target - 0.05f, target + 0.05f, 0xFFFF00, 1.5f / 25.0f);
+    // GetWorld().BeamBox(target - 0.05f, target + 0.05f, 0xFFFF00, 1.5f / 25.0f);
 }
 
 void game::PlayerCharacter::UpdateUseTarget()

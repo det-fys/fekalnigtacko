@@ -5,6 +5,26 @@
 
 #include <BulletCollision/CollisionShapes/btShapeHull.h>
 
+static collision::Material GetMaterialByName(const std::string& name)
+{
+    if (name == "stone")
+        return collision::PM_STONE;
+    else if (name == "dirt")
+        return collision::PM_DIRT;
+    else if (name == "grass")
+        return collision::PM_GRASS;
+    else if (name == "wood")
+        return collision::PM_WOOD;
+    else if (name == "metal")
+        return collision::PM_METAL;
+    else if (name == "glass")
+        return collision::PM_GLASS;
+    else if (name == "flesh")
+        return collision::PM_FLESH;
+    else
+        return collision::PM_STONE;
+}
+
 std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::string& filename)
 {
     auto model = std::make_shared<Model>();
@@ -14,6 +34,8 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
     CLIENT_ONLY(MeshBuilder mb(gfx::MF_NONE);)
     std::unique_ptr<btConvexHullShape> temp_hull;
     std::unique_ptr<btCompoundShape> compound;
+
+    bool current_collision = true;
 
     LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
         if (command == "v")
@@ -69,7 +91,7 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                 mb.AddTriangle(t);
             )
 
-            if (model->cmesh_)
+            if (current_collision && model->cmesh_)
             {
                 glm::vec3 p[3];
                 for (size_t i = 0; i < 3; ++i)
@@ -198,6 +220,23 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
             std::string key, val;
             iss >> key >> val;
             model->params_[key] = val;
+        }
+        else if (command == "pm")
+        {
+            std::string pm_name;
+            iss >> pm_name;
+            if (pm_name == "none")
+            {
+                current_collision = false;
+            }
+            else
+            {
+                current_collision = true;
+                if (model->cmesh_)
+                {
+                    model->cmesh_->BeginMaterial(GetMaterialByName(pm_name));
+                }
+            }
         }
         else
         {

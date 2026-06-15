@@ -10,6 +10,7 @@
 #include "entityview.hpp"
 #include "mapinstanceview.hpp"
 #include "worldenv.hpp"
+#include "particle_emitter.hpp"
 
 namespace game::view
 {
@@ -33,7 +34,7 @@ public:
     bool ProcessMsg(net::MessageType type, net::InMessage& msg);
 
     void Update(const UpdateInfo& info);
-    void Draw(const DrawArgs& args) const;
+    void Draw(const DrawArgs& args);
 
     EntityView* GetEntity(net::EntNum entnum);
 
@@ -56,6 +57,7 @@ private:
     bool ProcessEntDestroyMsg(net::InMessage& msg);
     bool ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, bool enable);
     bool ProcessBeamMsg(net::InMessage& msg);
+    bool ProcessFxMsg(net::InMessage& msg);
 
     void Cache(std::any val);
 
@@ -76,10 +78,14 @@ private:
     float env_msg_time_ = 0.0f;
 
     audio::Master& audiomaster_;
+    audio::Player audioplayer_; // for non-entity sounds
 
     std::vector<std::any> cache_;
 
     std::vector<BeamView> beams_;
+
+    ParticleEmitter emitter_;
+
 };
 
 } // namespace game::view

@@ -11,7 +11,7 @@
 #include "net/utils.hpp"
 
 game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) : 
-    session_(session), audiomaster_(session_.GetAudioMaster())
+    session_(session), audiomaster_(session_.GetAudioMaster()), audioplayer_(audiomaster_), emitter_(&audioplayer_)
 {
     net::MapName mapname;
     if (!msg.Read(mapname))
@@ -73,6 +73,9 @@ bool game::view::WorldView::ProcessMsg(net::MessageType type, net::InMessage& ms
     case net::MSG_BEAM:
         return ProcessBeamMsg(msg);
 
+    case net::MSG_FX:
+        return ProcessFxMsg(msg);
+
     default:
         return false;
     }
@@ -92,9 +95,11 @@ void game::view::WorldView::Update(const UpdateInfo& info)
 
     UpdateEnv();
     UpdateBeams();
+    audioplayer_.Update();
+    emitter_.Update(info.delta_time);
 }
 
-void game::view::WorldView::Draw(const DrawArgs& args) const
+void game::view::WorldView::Draw(const DrawArgs& args)
 {
     if (!map_->IsLoaded())
     {
@@ -113,6 +118,7 @@ void game::view::WorldView::Draw(const DrawArgs& args) const
     }
 
     DrawBeams(args);
+    emitter_.Draw(args);
 }
 
 game::view::EntityView* game::view::WorldView::GetEntity(net::EntNum entnum)
@@ -332,6 +338,23 @@ bool game::view::WorldView::ProcessBeamMsg(net::InMessage& msg)
     beams_.emplace_back(beam);
 
     return true;
+}
+
+bool game::view::WorldView::ProcessFxMsg(net::InMessage& msg)
+{
+    net::ModelName name;
+    glm::vec3 pos, dir;
+
+    if (!msg.Read(name) || !net::ReadPosition(msg, pos) || !msg.Read<net::DirQ>(dir.x) || !msg.Read<net::DirQ>(dir.y) ||
+        !msg.Read<net::DirQ>(dir.z))
+        return false;
+
+    if (glm::length2(dir) < 0.3f)
+        return true;// weird
+
+    emitter_.Emit(assets::CacheManager::GetEffect("data/" + std::string(name) + ".fx"), pos, glm::normalize(dir));
+    return true;
+
 }
 
 void game::view::WorldView::Cache(std::any val)

@@ -1,26 +1,36 @@
 #pragma once
 
-#include <vector>
-#include <span>
-#include <glm/glm.hpp>
-
 #include <memory>
+#include <span>
+#include <vector>
 
 #include <btBulletCollisionCommon.h>
+#include <glm/glm.hpp>
+
+#include "shape_info.hpp"
+#include "utils/defs.hpp"
 
 namespace collision
 {
-	class TriangleMesh
-	{
-		btTriangleMesh bt_mesh_;
-		std::unique_ptr<btBvhTriangleMeshShape> bt_shape_;
 
-	public:
-		TriangleMesh();
+class TriangleMesh
+{
+public:
+    TriangleMesh();
+    DELETE_COPY_MOVE(TriangleMesh)
 
-		void AddTriangle(const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2);
-		void Build();
+    void BeginMaterial(Material material);
+    void AddTriangle(const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2);
+    void Build();
 
-		btBvhTriangleMeshShape* GetShape() const { return bt_shape_.get(); }
-	};
-}
+    btBvhTriangleMeshShape* GetShape() const { return bt_shape_.get(); }
+
+private:
+    Material current_material_ = PM_STONE;
+    btTriangleMesh bt_mesh_;
+    std::unique_ptr<btBvhTriangleMeshShape> bt_shape_;
+    std::vector<Material> tri_materials_;
+    ShapeInfo shape_info_;
+};
+
+} // namespace collision

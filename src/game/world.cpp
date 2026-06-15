@@ -179,19 +179,74 @@ bool game::World::TraceBullet(const glm::vec3& start, const glm::vec3& end, game
     return TraceBulletInternal(start, end, shooter, out_hit_pos) != nullptr;
 }
 
+static uint32_t GetMaterialColor(collision::Material material)
+{
+    switch (material)
+    {
+    case collision::PM_STONE:
+        return 0xFFFFFF;
+    case collision::PM_DIRT:
+        return 0x224488;
+    case collision::PM_GRASS:
+        return 0x00FF00;
+    case collision::PM_WOOD:
+        return 0x0000FF;
+    case collision::PM_METAL:
+        return 0x0077FF;
+    case collision::PM_GLASS:
+        return 0xFF7700;
+    case collision::PM_FLESH:
+        return 0xFF00FF;
+    default:
+        return 0xFFFFFF;
+    }
+}
+
+static std::string GetMaterialImpactFx(collision::Material material)
+{
+    switch (material)
+    {
+    // case collision::PM_STONE:
+    //     return "impact_stone";
+    // case collision::PM_DIRT:
+    //     return "impact_dirt";
+    case collision::PM_GRASS:
+        return "impact_grass";
+    // case collision::PM_WOOD:
+    // //     return "impact_wood";
+    // case collision::PM_METAL:
+    //     return "impact_metal";
+    // case collision::PM_GLASS:
+    //     return "impact_glass";
+    // case collision::PM_FLESH:
+    //     return "impact_organic";
+    default:
+        return "impact_metal";
+    }
+}
+
 void game::World::FireBullet(const BulletInfo& bullet)
 {
-    glm::vec3 hit_pos;
-    auto hit_obj = TraceBulletInternal(bullet.start, bullet.end, bullet.shooter, hit_pos);
+    glm::vec3 hit_pos, hit_normal;
+    collision::Material material;
+    auto hit_obj = TraceBulletInternal(bullet.start, bullet.end, bullet.shooter, hit_pos, &hit_normal, &material);
     if (!hit_obj)
+    {
+        // Beam(bullet.start, bullet.end, 0x0044DD, 0.04f);
         return;
-
+    }
+    
     auto obj_cb = collision::GetObjectCallback(hit_obj);
     obj_cb->OnBulletHit(bullet, hit_obj);
-
+    
     // TODO: remove
-    const float box_extent = 0.1f;
-    BeamBox(hit_pos - box_extent, hit_pos + box_extent, 0x0077FF, 1.0f);
+    // const float box_extent = 0.1f;
+    // BeamBox(hit_pos - box_extent, hit_pos + box_extent, GetMaterialColor(material), 1.0f);
+    
+    // Beam(bullet.start, hit_pos, 0x0044DD, 0.04f);
+
+    // effect
+    Effect(GetMaterialImpactFx(material), hit_pos, glm::normalize(hit_normal));
 }
 
 void game::World::Beam(const glm::vec3& start, const glm::vec3& end, uint32_t color, float time)
@@ -228,6 +283,16 @@ void game::World::BeamBox(const glm::vec3& min, const glm::vec3& max, uint32_t c
     Beam(p1, p5, color, time);
     Beam(p2, p6, color, time);
     Beam(p3, p7, color, time);
+}
+
+void game::World::Effect(const std::string& name, const glm::vec3& pos, const glm::vec3& dir)
+{
+    auto msg = BeginLocalMsg(pos, 400.0f, net::MSG_FX);
+    msg.Write(net::ModelName(name));
+    net::WritePosition(msg, pos);
+    msg.Write<net::DirQ>(dir.x);
+    msg.Write<net::DirQ>(dir.y);
+    msg.Write<net::DirQ>(dir.z);
 }
 
 void game::World::SendChat(const std::string& text)
@@ -375,18 +440,23 @@ struct NotMeNotMyRideAndNotOtherPassengersOfMyRideClosestRayResultCallback : pub
     }
 
     game::HumanCharacter* me = nullptr;
+    int triangle_idx = 0;
 
     virtual btScalar addSingleResult(btCollisionWorld::LocalRayResult& rayResult, bool normalInWorldSpace) override
     {
         if (IsMeOrMyRideOrOtherPassengerOfMyRide(me, rayResult.m_collisionObject))
             return rayResult.m_hitFraction;
         
+        triangle_idx = rayResult.m_localShapeInfo ? rayResult.m_localShapeInfo->m_triangleIndex : -1;
+
         return Super::addSingleResult(rayResult, normalInWorldSpace);
     }
 };
 
 const btCollisionObject* game::World::TraceBulletInternal(const glm::vec3& start, const glm::vec3& end,
-                                                          game::HumanCharacter* shooter, glm::vec3& out_hit_pos)
+                                                          game::HumanCharacter* shooter, glm::vec3& out_hit_pos,
+                                                          glm::vec3* out_hit_normal,
+                                                          collision::Material* out_hit_material)
 {
     btVector3 bt_start(start.x, start.y, start.z);
     btVector3 bt_end(end.x, end.y, end.z);
@@ -417,5 +487,32 @@ const btCollisionObject* game::World::TraceBulletInternal(const glm::vec3& start
         return nullptr;
 
     out_hit_pos = glm::vec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
+    
+    if (out_hit_normal)
+    {
+        *out_hit_normal = glm::vec3(cb.m_hitNormalWorld.x(), cb.m_hitNormalWorld.y(), cb.m_hitNormalWorld.z());
+    }
+
+    // get material
+    if (out_hit_material)
+    {
+        *out_hit_material = collision::PM_STONE;
+        auto shape = cb.m_collisionObject->getCollisionShape();
+        if (shape)
+        {
+            *out_hit_material = collision::GetShapeMaterial(*shape);
+
+            // try to get triangle material
+            if (cb.triangle_idx >= 0)
+            {
+                auto shape_info = collision::GetShapeInfo(*shape);
+                if (shape_info && shape_info->triangle_materials.size() > cb.triangle_idx)
+                {
+                    *out_hit_material = shape_info->triangle_materials[cb.triangle_idx];
+                }
+            }
+        }
+    }
+
     return cb.m_collisionObject;
 }

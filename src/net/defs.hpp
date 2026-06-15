@@ -66,6 +66,9 @@ enum MessageType : uint8_t
     // BEAM <Position start> <Position end> <Color> <BeamTime>
     MSG_BEAM,
 
+    // FX <ModelName effect> <Position> <Dir x> <Dir y> <Dir z>
+    MSG_FX,
+
     /*~~~~~~~~~~~~~~~~*/
     MSG_COUNT,
 };
@@ -198,5 +201,7 @@ enum MenuActionType
 using MenuSelectDir = uint8_t; // 0=left, 1=right
 
 using BeamTimeQ = Quantized<uint8_t, 0, 10>;
+
+using DirQ = Quantized<uint8_t, -1, 1>;
 
 } // namespace net
