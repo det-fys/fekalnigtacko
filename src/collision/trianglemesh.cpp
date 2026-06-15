@@ -11,6 +11,9 @@ void collision::TriangleMesh::BeginMaterial(Material material)
 
 void collision::TriangleMesh::AddTriangle(const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2)
 {
+	if (current_material_ == PM_NONE)
+		return;
+
 	btVector3 bt_v0(v0.x, v0.y, v0.z);
 	btVector3 bt_v1(v1.x, v1.y, v1.z);
 	btVector3 bt_v2(v2.x, v2.y, v2.z);

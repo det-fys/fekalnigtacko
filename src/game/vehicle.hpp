@@ -41,16 +41,22 @@ public:
 
     DELETE_COPY_MOVE(VehiclePhysics)
 
+    void Update();
+
     btRigidBody& GetBtBody() { return *body_; }
     collision::RaycastVehicle& GetBtVehicle() { return *vehicle_; }
 
     ~VehiclePhysics();
 
 private:
+    void UpdateBulletHitboxTransform();
+
+private:
     collision::DynamicsWorld& world_;
     collision::MotionState motion_;
     std::unique_ptr<btRigidBody> body_;
     std::unique_ptr<collision::RaycastVehicle> vehicle_;
+    std::unique_ptr<btCollisionObject> bullet_hitbox_;
 };
 
 class Vehicle : public Entity

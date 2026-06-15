@@ -9,6 +9,7 @@ namespace collision
 
 enum Material : uint8_t
 {
+    PM_NONE,
     PM_STONE,
     PM_DIRT,
     PM_GRASS,

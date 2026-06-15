@@ -45,6 +45,7 @@ public:
     const glm::vec3& GetColOffset() const { return col_offset_; }
     const collision::TriangleMesh* GetColMesh() const { return cmesh_.get(); }
     btCollisionShape* GetColShape() const { return cshape_.get(); }
+    bool IsColShapeBulletTarget() const { return cshape_is_bullet_target_; }
 
     const std::shared_ptr<const Skeleton>& GetSkeleton() const { return skeleton_; }
     CLIENT_ONLY(const std::shared_ptr<const Mesh>& GetMesh() const { return mesh_; })
@@ -60,6 +61,7 @@ private:
     // std::vector<ModelCollisionShape> cshapes_;
     std::vector<std::unique_ptr<btCollisionShape>> subshapes_;
     std::unique_ptr<btCollisionShape> cshape_;
+    bool cshape_is_bullet_target_ = false;
 
     std::shared_ptr<const Skeleton> skeleton_;
     CLIENT_ONLY(std::shared_ptr<const Mesh> mesh_;);

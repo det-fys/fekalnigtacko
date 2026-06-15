@@ -21,6 +21,10 @@ static collision::Material GetMaterialByName(const std::string& name)
         return collision::PM_GLASS;
     else if (name == "flesh")
         return collision::PM_FLESH;
+    else if (name == "car") // TODO: make new material for cars
+        return collision::PM_METAL;
+    else if (name == "carwindow")
+        return collision::PM_NONE;
     else
         return collision::PM_STONE;
 }
@@ -35,7 +39,7 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
     std::unique_ptr<btConvexHullShape> temp_hull;
     std::unique_ptr<btCompoundShape> compound;
 
-    bool current_collision = true;
+    collision::Material col_material = collision::PM_NONE;
 
     LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
         if (command == "v")
@@ -91,7 +95,7 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                 mb.AddTriangle(t);
             )
 
-            if (current_collision && model->cmesh_)
+            if (model->cmesh_)
             {
                 glm::vec3 p[3];
                 for (size_t i = 0; i < 3; ++i)
@@ -225,18 +229,17 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
         {
             std::string pm_name;
             iss >> pm_name;
-            if (pm_name == "none")
+
+            if (model->cmesh_)
             {
-                current_collision = false;
+                model->cmesh_->BeginMaterial(GetMaterialByName(pm_name));
             }
-            else
-            {
-                current_collision = true;
-                if (model->cmesh_)
-                {
-                    model->cmesh_->BeginMaterial(GetMaterialByName(pm_name));
-                }
-            }
+        }
+        else if (command == "cpm")
+        {
+            std::string pm_name;
+            iss >> pm_name;
+            col_material = GetMaterialByName(pm_name);
         }
         else
         {
@@ -266,6 +269,13 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
     else
     {
         model->cshape_ = std::move(compound);
+    }
+
+    if (model->cshape_)
+    {
+        collision::SetShapeMaterial(*model->cshape_, col_material);
+        if (col_material != collision::PM_NONE)
+            model->cshape_is_bullet_target_ = true;
     }
 
     return model;

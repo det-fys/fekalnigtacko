@@ -38,6 +38,11 @@ void game::Vehicle::Update()
 {
     Super::Update();
 
+    if (physics_)
+    {
+        physics_->Update();
+    }
+
     root_.UpdateMatrix();
 
     flags_ = 0;
@@ -99,7 +104,7 @@ void game::Vehicle::OnBulletHit(const game::BulletInfo& bullet, const btCollisio
     if (!physics_)
         return;
 
-    auto impulse = glm::normalize(bullet.end - bullet.start) * 10000.0f;
+    auto impulse = glm::normalize(bullet.end - bullet.start) * 100.0f;
     physics_->GetBtBody().activate();
     physics_->GetBtBody().applyCentralImpulse(btVector3(impulse.x, impulse.y, impulse.z));
 }
@@ -728,6 +733,25 @@ game::VehiclePhysics::VehiclePhysics(collision::DynamicsWorld& world, Transform&
     bt_world.addRigidBody(body_.get(), collision::OG_DEFAULT, ~collision::OG_PROJECTILE);
     bt_world.addAction(vehicle_.get());
 
+
+    // make bullet hitbox
+    auto col_mesh = model.GetModel()->GetColMesh();
+    if (col_mesh)
+    {
+        bullet_hitbox_ = std::make_unique<btCollisionObject>();
+        bullet_hitbox_->setCollisionShape(col_mesh->GetShape());
+        collision::SetObjectInfo(bullet_hitbox_.get(), collision::OT_ENTITY, 0, &obj_cb);
+    
+        bt_world.addCollisionObject(bullet_hitbox_.get(), collision::OG_DEFAULT, collision::OG_PROJECTILE);
+
+        UpdateBulletHitboxTransform();
+    }
+
+}
+
+void game::VehiclePhysics::Update()
+{
+    UpdateBulletHitboxTransform();
 }
 
 game::VehiclePhysics::~VehiclePhysics()
@@ -735,4 +759,17 @@ game::VehiclePhysics::~VehiclePhysics()
     auto& bt_world = world_.GetBtWorld();
     bt_world.removeRigidBody(body_.get());
     bt_world.removeAction(vehicle_.get());
+
+    if (bullet_hitbox_)
+    {
+        bt_world.removeCollisionObject(bullet_hitbox_.get());
+    }
+}
+
+void game::VehiclePhysics::UpdateBulletHitboxTransform()
+{
+    if (!bullet_hitbox_)
+        return;
+
+    bullet_hitbox_->setWorldTransform(body_->getWorldTransform());
 }

@@ -26,7 +26,7 @@ public:
     btBvhTriangleMeshShape* GetShape() const { return bt_shape_.get(); }
 
 private:
-    Material current_material_ = PM_STONE;
+    Material current_material_ = PM_NONE;
     btTriangleMesh bt_mesh_;
     std::unique_ptr<btBvhTriangleMeshShape> bt_shape_;
     std::vector<Material> tri_materials_;
