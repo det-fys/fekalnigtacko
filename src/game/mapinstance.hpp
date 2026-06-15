@@ -31,8 +31,8 @@ public:
     net::ObjNum GetNum() const { return num_; }
     float GetDestroyThreshold() const { return destr_th_; }
 
-    int col_group_ = 0, col_mask_ = 0;
-
+    bool no_projectile_collision_ = false;
+    
     virtual ~MapObjectCollision() override;
 
 private:

@@ -76,8 +76,7 @@ game::MapObjectCollision::MapObjectCollision(collision::DynamicsWorld& world,
         model_->GetParamFloat("destr_th", destr_th_);
     }
 
-    col_group_ = collision::OG_DEFAULT;
-    col_mask_ = collision::OG_ALL; 
+    int col_mask = ~collision::OG_STATIC; 
 
     // prefer simple cshape which allow destruction
     if (cshape)
@@ -87,7 +86,8 @@ game::MapObjectCollision::MapObjectCollision(collision::DynamicsWorld& world,
 
         if (!model_->IsColShapeBulletTarget())
         {
-            col_mask_ &= ~collision::OG_PROJECTILE;
+            col_mask &= ~collision::OG_PROJECTILE;
+            no_projectile_collision_ = true;
         }
     }
     else if (cmesh)
@@ -104,7 +104,7 @@ game::MapObjectCollision::MapObjectCollision(collision::DynamicsWorld& world,
     collision::SetObjectInfo(body_.get(), collision::OT_MAP_OBJECT, oflags, this);
 
     // world_.GetBtWorld().addRigidBody(body_.get(), btBroadphaseProxy::StaticFilter, btBroadphaseProxy::AllFilter);
-    world_.GetBtWorld().addRigidBody(body_.get(), col_group_, col_mask_);
+    world_.GetBtWorld().addRigidBody(body_.get(), collision::OG_STATIC, col_mask);
 }
 
 void game::MapObjectCollision::Break()
@@ -129,8 +129,12 @@ void game::MapObjectCollision::Break()
     body_->setWorldTransform(trans);
     
     collision::SetObjectInfo(body_.get(), collision::OT_UNDEFINED, 0, this);
+    
+    int col_mask = collision::OG_ALL;
+    if (no_projectile_collision_)
+        col_mask &= ~collision::OG_PROJECTILE;
 
-    world_.GetBtWorld().addRigidBody(body_.get(), col_group_, col_mask_);
+    world_.GetBtWorld().addRigidBody(body_.get(), collision::OG_DEFAULT, col_mask);
 }
 
 void game::MapObjectCollision::GetModelTransform(Transform& trans) const
