@@ -48,13 +48,32 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
         }
         else if (command == "attach")
         {
-            iss >> item->bone;
-            glm::vec3 position;
-            glm::vec3 angles;
-            iss >> position.x >> position.y >> position.z >> angles.x >> angles.y >> angles.z;
+            std::string target;
+            iss >> target;
 
-            item->bone_offset.position = position;
-            item->bone_offset.rotation = glm::quat(glm::radians(angles));
+            if (target == "loc")
+            {
+                std::string sk_name, loc_name;
+                iss >> sk_name >> loc_name;
+                
+                auto sk = assets::CacheManager::GetSkeleton("data/" + sk_name + ".sk");
+                auto loc = sk->GetLocation(loc_name);
+                if (!loc)
+                    throw std::runtime_error("Invalid skeleton location: " + loc_name);
+
+                item->bone = loc->bone_name;
+                item->bone_offset = loc->offset;
+            }
+            else
+            {
+                item->bone = target;
+                glm::vec3 position;
+                glm::vec3 angles;
+                iss >> position.x >> position.y >> position.z >> angles.x >> angles.y >> angles.z;
+    
+                item->bone_offset.position = position;
+                item->bone_offset.rotation = glm::quat(glm::radians(angles));
+            }
 
             // ParseTransform(iss, item->bone_offset);
         }

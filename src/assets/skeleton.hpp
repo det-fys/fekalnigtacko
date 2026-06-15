@@ -39,6 +39,13 @@ struct HitBone
     std::unique_ptr<btCollisionShape> col_shape;
 };
 
+struct SkeletonLocation
+{
+    size_t bone_idx = 0;
+    std::string bone_name;
+    Transform offset;
+};
+
 class Skeleton
 {
 public:
@@ -56,6 +63,7 @@ public:
 
     const std::vector<AimBone>& GetAimBones() const { return aim_bones_; }
     const std::vector<HitBone>& GetHitBones() const { return hit_bones_; }
+    const SkeletonLocation* GetLocation(const std::string& name) const;
 
 private:
     void AddBone(const std::string& name, const std::string& parent_name, const Transform& transform);
@@ -74,6 +82,7 @@ private:
 
     std::vector<AimBone> aim_bones_;
     std::vector<HitBone> hit_bones_;
+    std::map<std::string, SkeletonLocation> locations_;
 };
 
 } // namespace assets

@@ -66,6 +66,18 @@ std::shared_ptr<const assets::Skeleton> assets::Skeleton::LoadFromFile(const std
 
             collision::SetShapeMaterial(*hitbone.col_shape, collision::PM_FLESH);
         }
+        else if (command == "loc")
+        {
+            std::string loc_name, bone_name;
+            iss >> loc_name >> bone_name;
+
+            auto& loc = skeleton->locations_[loc_name];
+            ParseTransform(iss, loc.offset);
+
+            loc.bone_name = bone_name;
+            int bone_idx = skeleton->GetBoneIndex(bone_name);
+            loc.bone_idx = bone_idx >= 0 ? bone_idx : 0; 
+        }
     });
 
     skeleton->AddAimBones();
@@ -105,6 +117,15 @@ const assets::Animation* assets::Skeleton::GetAnimation(AnimIdx idx) const
 const assets::Animation* assets::Skeleton::GetAnimation(const std::string& name) const
 {
     return GetAnimation(GetAnimationIdx(name));
+}
+
+const assets::SkeletonLocation* assets::Skeleton::GetLocation(const std::string& name) const
+{
+    auto it = locations_.find(name);
+    if (it == locations_.end())
+        return nullptr;
+
+    return &it->second;
 }
 
 void assets::Skeleton::AddBone(const std::string& name, const std::string& parent_name, const Transform& transform)
