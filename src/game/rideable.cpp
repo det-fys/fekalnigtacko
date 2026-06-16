@@ -17,6 +17,8 @@ void game::Rideable::SetPassenger(size_t seat_idx, HumanCharacter* passenger)
     if (seat.passenger)
     {
         seat.passenger->SetRideable(nullptr, 0); // remove current passenger
+        seat.passenger = nullptr;
+        OnPassengerChanged(seat_idx, nullptr);
     }
 
     seat.passenger = passenger;
