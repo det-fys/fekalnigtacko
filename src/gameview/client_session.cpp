@@ -8,8 +8,9 @@
 #include "utils.hpp"
 #include "vehicleview.hpp"
 #include "assets/cache.hpp"
+#include "game/player_hud_data.hpp"
 
-game::view::ClientSession::ClientSession(App& app) : app_(app), use_target_hud_(app.GetTime())
+game::view::ClientSession::ClientSession(App& app) : app_(app), hud_(app.GetTime())
 {
     crosshair_texture_ = assets::CacheManager::GetTexture("data/crosshair.png");
 
@@ -49,6 +50,9 @@ bool game::view::ClientSession::ProcessSingleMessage(net::MessageType type, net:
 
     case net::MSG_CHAT:
         return ProcessChatMsg(msg);
+
+    case net::MSG_HUD:
+        return ProcessHudMsg(msg);
 
     case net::MSG_USETARGET:
         return ProcessUseTargetMsg(msg);
@@ -103,10 +107,13 @@ void game::view::ClientSession::Draw(gfx::DrawList& dlist, gfx::DrawListParams& 
     if (world_)
     {
         DrawWorld(dlist, params, gui);
-    }
 
-    DrawCrosshair(gui);
-    use_target_hud_.Draw(gui);
+        if (world_->IsLoaded())
+        {
+            DrawCrosshair(gui);
+            hud_.Draw(gui);
+        }
+    }
 
     DrawMenus(gui);
 }
@@ -148,6 +155,70 @@ bool game::view::ClientSession::ProcessChatMsg(net::InMessage& msg)
     return true;
 }
 
+bool game::view::ClientSession::ProcessHudMsg(net::InMessage& msg)
+{
+    PlayerHudFields fields{};
+    if (!msg.Read(fields))
+        return false;
+
+    PlayerHudData hud_data{};
+
+    if (fields & PHUD_HEALTH)
+    {
+        if (!msg.Read(hud_data.health))
+            return false;
+
+        hud_.SetHealth(static_cast<float>(hud_data.health));
+    }
+
+    if (fields & PHUD_WEAPON_SLOTS)
+    {
+        if (!msg.Read(hud_data.weapon_slots))
+            return false;
+        
+        hud_.SetWeaponSlots(hud_data.weapon_slots);
+    }
+
+    if (fields & PHUD_ITEM)
+    {
+        net::ModelName item_name;
+        if (!msg.Read(item_name))
+            return false;
+
+        hud_data.held_item = item_name;
+
+        // determine clip size
+        size_t clip_size = 0;
+        size_t item_slot = 0;
+        if (!hud_data.held_item.empty())
+        {
+            auto item = assets::CacheManager::GetItem("data/" + hud_data.held_item + ".item");
+            clip_size = item->clip_size;
+            item_slot = item->slot;
+        }
+
+        hud_.SetItemInfo(hud_data.held_item, item_slot, clip_size);
+    }
+
+    if (fields & PHUD_AMMO_LOADED)
+    {
+        if (!msg.Read(hud_data.ammo_loaded))
+            return false;
+
+        hud_.SetLoadedAmmo(static_cast<size_t>(hud_data.ammo_loaded));
+    }
+
+    if (fields & PHUD_AMMO_TOTAL)
+    {
+        if (!msg.Read(hud_data.ammo_total))
+            return false;
+
+        hud_.SetTotalAmmo(static_cast<size_t>(hud_data.ammo_total));
+    }
+
+    return true;
+}
+
 bool game::view::ClientSession::ProcessUseTargetMsg(net::InMessage& msg)
 {
     net::UseTargetName text, error_text;
@@ -156,7 +227,7 @@ bool game::view::ClientSession::ProcessUseTargetMsg(net::InMessage& msg)
     if (!msg.Read(text) || !msg.Read(error_text) || !msg.Read<net::UseDelayQ>(delay))
         return false;
 
-    use_target_hud_.SetData(text, error_text, delay);
+    hud_.SetUseTargetData(text, error_text, delay);
     return true;
 }
 

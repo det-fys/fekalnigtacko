@@ -206,22 +206,22 @@ static std::string GetMaterialImpactFx(collision::Material material)
 {
     switch (material)
     {
-    // case collision::PM_STONE:
-    //     return "impact_stone";
-    // case collision::PM_DIRT:
-    //     return "impact_dirt";
+    case collision::PM_STONE:
+        return "impact_stone";
+    case collision::PM_DIRT:
+        return "impact_dirt";
     case collision::PM_GRASS:
         return "impact_grass";
-    // case collision::PM_WOOD:
-    // //     return "impact_wood";
-    // case collision::PM_METAL:
-    //     return "impact_metal";
-    // case collision::PM_GLASS:
-    //     return "impact_glass";
-    // case collision::PM_FLESH:
-    //     return "impact_organic";
-    default:
+    case collision::PM_WOOD:
+        return "impact_wood";
+    case collision::PM_METAL:
         return "impact_metal";
+    case collision::PM_GLASS:
+        return "impact_glass";
+    case collision::PM_FLESH:
+        return "impact_flesh";
+    default:
+        return "impact_stone";
     }
 }
 
@@ -240,7 +240,7 @@ void game::World::FireBullet(const BulletInfo& bullet)
     obj_cb->OnBulletHit(bullet, hit_obj);
     
     // TODO: remove
-    // const float box_extent = 0.1f;
+    const float box_extent = 0.1f;
     // BeamBox(hit_pos - box_extent, hit_pos + box_extent, GetMaterialColor(material), 1.0f);
     
     // Beam(bullet.start, hit_pos, 0x0044DD, 0.04f);

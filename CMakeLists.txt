@@ -134,8 +134,8 @@ set(CLIENT_ONLY_SOURCES
     "src/gui/font.cpp"
     "src/gui/menu.hpp"
     "src/gui/menu.cpp"
-    "src/gui/use_target_hud.hpp"
-    "src/gui/use_target_hud.cpp"
+    "src/gui/player_hud.hpp"
+    "src/gui/player_hud.cpp"
     "src/utils/files.cpp"
 )
 
@@ -158,6 +158,8 @@ set(SERVER_ONLY_SOURCES
     "src/game/game.cpp"
     "src/game/human_character.hpp"
     "src/game/human_character.cpp"
+    "src/game/item_instance.hpp"
+    "src/game/item_instance.cpp"
     "src/game/mapinstance.hpp"
     "src/game/mapinstance.cpp"
     "src/game/marker.hpp"

@@ -40,6 +40,7 @@ public:
 
     float GetTime() const { return time_; }
     audio::Master& GetAudioMaster() const { return audiomaster_; }
+    ParticleEmitter& GetEmitter() { return emitter_; }
 
     bool IsLoaded() const;
 

@@ -31,20 +31,25 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
 
             if (anim_type == "idle")
                 item->idle_anim = anim_name;
+            else if (anim_type == "raise")
+                item->raise_anim = anim_name;
             else if (anim_type == "use" || anim_type == "fire")
                 item->use_anim = anim_name;
             else if (anim_type == "aim")
                 item->aim_anim = anim_name;
             else if (anim_type == "aiming")
                 item->aiming_anim = anim_name;
+            else if (anim_type == "reload")
+                item->reload_anim = anim_name;
+            else if (anim_type == "legs")
+                item->legs_anim = anim_name;
             else
                 throw std::runtime_error("Unknown item anim type " + anim_type);
         }
         else if (command == "model")
         {
-            std::string model_name;
-            iss >> model_name;
-            item->model = CacheManager::GetModel("data/" + model_name + ".mdl");    
+            iss >> item->model_name;
+            item->model = CacheManager::GetModel("data/" + item->model_name + ".mdl");    
         }
         else if (command == "attach")
         {
@@ -116,6 +121,30 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
         else if (command == "firedelay")
         {
             iss >> item->fire_delay;
+        }
+        else if (command == "firesnd")
+        {
+            iss >> item->fire_snd;
+        }
+        else if (command == "firefx")
+        {
+            iss >> item->fire_fx >> item->fire_fx_loc;
+        }
+        else if (command == "dispersion")
+        {
+            iss >> item->dispersion_min >> item->dispersion_max >> item->dispersion_shot >> item->dispersion_decay;
+        }
+        else if (command == "slot")
+        {
+            iss >> item->slot;
+        }
+        else if (command == "twohanded")
+        {
+            item->twohanded = true;
+        }
+        else if (command == "walkspeedmult")
+        {
+            iss >> item->walk_speed_mult;
         }
         else
         {

@@ -46,6 +46,9 @@ enum MessageType : uint8_t
     // REMOTEMENU <MenuId> <MenuMessageType> ...
     MSG_REMOTEMENU,
 
+    // HUD ...
+    MSG_HUD,
+
     /*~~~~~~~~ Entity ~~~~~~~~*/
     // ENTSPAWN <EntNum> <EntType> data...
     MSG_ENTSPAWN,
@@ -115,6 +118,7 @@ enum EntMsgType : uint8_t
     EMSG_DEFORM,
     EMSG_TUNING,
     EMSG_EQUIP,
+    EMSG_FIRE,
 };
 
 using PositionElemQ = Quantized<uint32_t, -10000, 10000, 1>;
@@ -144,7 +148,8 @@ using SoundVolumeQ = Quantized<uint8_t, 0, 2>;
 using SoundPitchQ = Quantized<uint8_t, 0, 2>;
 
 using AnimBlendQ = Quantized<uint8_t, 0, 1>;
-using AnimTimeQ = Quantized<uint8_t, 0, 1>;
+using AnimPhaseQ = Quantized<uint8_t, 0, 1>;
+using AnimTimeQ = Quantized<uint16_t, 0, 255>;
 
 using AnimAimAngleQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
 

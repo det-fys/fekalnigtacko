@@ -4,7 +4,7 @@
 
 namespace game
 {
-	using PlayerInputFlags = uint16_t;
+	using PlayerInputFlags = uint32_t;
 
 	enum PlayerInputType : uint8_t
 	{
@@ -18,6 +18,18 @@ namespace game
 		IN_USE,
 		IN_ATTACK_PRIMARY,
 		IN_ATTACK_SECONDARY,
+		IN_HOLSTER,
+		IN_RELOAD,
+		IN_WEAPON_1,
+		IN_WEAPON_2,
+		IN_WEAPON_3,
+		IN_WEAPON_4,
+		IN_WEAPON_5,
+		IN_WEAPON_6,
+		IN_WEAPON_7,
+		IN_WEAPON_8,
+		IN_WEAPON_9,
+		IN_WEAPON_0,
 		IN_DEBUG1,
 		IN_DEBUG2,
 		IN_DEBUG3,

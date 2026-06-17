@@ -143,10 +143,12 @@ game::PlayerCharacter& game::Game::MovePlayerToWorld(PlayerGameInfo& player_info
 
     auto old_character = old_world.GetPlayerCharacter(player); 
     auto& tuning = old_character->GetHumanTuning();
+    auto inventory = old_character->TakeInventory();
     old_world.RemovePlayer(player);
 
     player.SetWorld(&new_world);
     auto& new_character = new_world.InsertPlayer(player, tuning, pos, yaw);
+    new_character.SetInventory(std::move(inventory));
 
     player_info.world = &new_world;
 

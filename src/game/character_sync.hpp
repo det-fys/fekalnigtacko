@@ -21,11 +21,11 @@ struct CharacterSyncState
     assets::AnimIdx walk_anim = assets::NO_ANIM;
     assets::AnimIdx run_anim = assets::NO_ANIM;
     net::AnimBlendQ loco_blend;
-    net::AnimTimeQ loco_phase;
+    net::AnimPhaseQ loco_phase;
 
     // action anim
     assets::AnimIdx action_anim = assets::NO_ANIM;
-    net::AnimTimeQ action_phase;
+    net::AnimTimeQ action_time;
 
     // aim
     net::AnimAimAngleQ aim_yaw;
@@ -44,7 +44,7 @@ enum CharacterSyncFieldFlag
     CSF_LOCO_ANIMS = 4,
     CSF_LOCO_VALS = 8,
     CSF_ACTION_ANIM = 16,
-    CSF_ACTION_PHASE = 32,
+    CSF_ACTION_TIME = 32,
     CSF_AIM = 64,
 };
 

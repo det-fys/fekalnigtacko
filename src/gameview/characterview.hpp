@@ -3,6 +3,7 @@
 #include "entityview.hpp"
 #include "assets/model.hpp"
 #include "assets/item.hpp"
+#include "assets/effect.hpp"
 #include "game/skeletoninstance.hpp"
 #include "skinning_ubo.hpp"
 #include "game/character_anim_state.hpp"
@@ -18,7 +19,7 @@ struct CharacterViewState
     float loco_blend = 0.0f;
     float loco_phase = 0.0f;
     
-    float action_phase = 0.0f;
+    float action_time = 0.0f;
 
     float aim_yaw = 0.0f;
     float aim_pitch = 0.0f; 
@@ -57,9 +58,11 @@ private:
     void AddClothes(const std::string& name, const glm::vec3& color);
 
     bool ProcessEquipMsg(net::InMessage& msg);
+    bool ProcessFireMsg(net::InMessage& msg);
 
     void SetItem(const std::string& item_name);
     void DrawItem(const DrawArgs& args);
+    void FireItem();
 
 private:
     float yaw_ = 0.0f;
@@ -80,8 +83,11 @@ private:
     float update_time_ = 0.0f;
 
     std::string item_name_;
-    std::shared_ptr<const assets::Item> item_;
     TransformNode item_node_;
+    std::shared_ptr<const assets::Item> item_;
+    std::shared_ptr<const audio::Sound> fire_snd_;
+    std::shared_ptr<const assets::Effect> fire_fx_;
+    glm::vec3 fire_fx_offset_{};
 };
 
 }

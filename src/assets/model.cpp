@@ -241,6 +241,12 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
             iss >> pm_name;
             col_material = GetMaterialByName(pm_name);
         }
+        else if (command == "loc")
+        {
+            std::string loc_name;
+            iss >> loc_name;
+            ParseTransform(iss, model->locations_[loc_name]);
+        }
         else
         {
             throw std::runtime_error("Unknown command in model file: " + command);
@@ -305,4 +311,13 @@ bool assets::Model::GetParamFloat(const std::string& key, float& out) const
     out = std::strtof(str.c_str(), nullptr);
 
     return true;
+}
+
+const Transform* assets::Model::GetLocation(const std::string& key) const
+{
+    auto it = locations_.find(key);
+    if (it == locations_.end())
+        return nullptr;
+
+    return &it->second;
 }

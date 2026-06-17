@@ -182,7 +182,7 @@ void game::Character::PlayActionAnim(assets::AnimIdx anim_idx, float speed)
     if (animstate_.action_anim_idx != anim_idx)
     {
         // continue from current time if same anim
-        animstate_.action_phase = (speed > 0.0f) ? 0.0f : action_anim_end_;
+        animstate_.action_time = (speed > 0.0f) ? 0.0f : action_anim_end_;
     }
     animstate_.action_anim_idx = anim_idx;
     action_anim_playback_speed_ = speed;
@@ -191,6 +191,12 @@ void game::Character::PlayActionAnim(assets::AnimIdx anim_idx, float speed)
 
 void game::Character::PlayActionAnim(const std::string& anim_name, float speed)
 {
+    if (anim_name.empty())
+    {
+        ClearActionAnim();
+        return;
+    }
+
     PlayActionAnim(GetAnim(anim_name), speed);
 }
 
@@ -206,10 +212,18 @@ void game::Character::SetAimTarget(const glm::vec3& target)
 
 void game::Character::SetViewItem(const std::string& item_name)
 {
+    if (item_ == item_name)
+        return;
+
     item_ = item_name;
 
     auto msg = BeginEntMsg(net::EMSG_EQUIP);
     msg.Write(net::ModelName(item_name));
+}
+
+void game::Character::SendFire()
+{
+    auto msg = BeginEntMsg(net::EMSG_FIRE);
 }
 
 void game::Character::SyncControllerTransform()
@@ -282,7 +296,7 @@ void game::Character::UpdateMovement()
         Turn(yaw_, turn_yaw, turn_speed_ * dt);
         float move_yaw = directional ? yaw_ + relative_yaw : yaw_;
     
-        move_dir = glm::vec3(-glm::sin(move_yaw), glm::cos(move_yaw), 0.0f) * walk_speed_ * dt;
+        move_dir = glm::vec3(-glm::sin(move_yaw), glm::cos(move_yaw), 0.0f) * walk_speed_ * dt * weight_speed_mult_;
        
         if (running)
             move_dir *= run_speed_mult_;
@@ -305,7 +319,7 @@ void game::Character::UpdateMovement()
     // update anim
     float run_blend_target = walking ? 0.5f : 0.0f;
     MoveToward(animstate_.loco_blend, run_blend_target, dt * 2.0f);
-    float anim_speed = glm::mix(0.3f, 1.5f, UnMix(0.0f, 0.5f, animstate_.loco_blend));
+    float anim_speed = glm::mix(0.3f, 1.5f, UnMix(0.0f, 0.5f, animstate_.loco_blend)) * weight_speed_mult_;
     if (running)
         anim_speed *= run_speed_mult_;
     animstate_.loco_phase = glm::mod(animstate_.loco_phase + anim_speed * dt, 1.0f);
@@ -396,7 +410,7 @@ void game::Character::UpdateSyncState()
 
     // action
     state.action_anim = animstate_.action_anim_idx;
-    state.action_phase.Encode(animstate_.action_phase);
+    state.action_time.Encode(animstate_.action_time);
 
     // aim
     state.aim_yaw.Encode(animstate_.yaw);
@@ -472,11 +486,11 @@ game::CharacterSyncFieldFlags game::Character::WriteState(net::OutMessage& msg, 
     }
 
     // action phase
-    if (curr.action_phase.value != base.action_phase.value)
+    if (curr.action_time.value != base.action_time.value)
     {
-        fields |= CSF_ACTION_PHASE;
+        fields |= CSF_ACTION_TIME;
 
-        net::WriteDelta(msg, curr.action_phase, base.action_phase);
+        net::WriteDelta(msg, curr.action_time, base.action_time);
     }
 
     // aim
@@ -628,21 +642,21 @@ void game::Character::UpdateActionAnim()
     if (action_anim_done_)
         return;
 
-    animstate_.action_phase += action_anim_playback_speed_ * (1.0f / 25.0f);
+    animstate_.action_time += action_anim_playback_speed_ * (1.0f / 25.0f);
     
     if (action_anim_playback_speed_ > 0.0f)
     {
-        if (animstate_.action_phase >= action_anim_end_)
+        if (animstate_.action_time >= action_anim_end_)
         {
-            animstate_.action_phase = action_anim_end_;
+            animstate_.action_time = action_anim_end_;
             action_anim_done_ = true;
         }
     }
     else
     {
-        if (animstate_.action_phase <= 0.0f)
+        if (animstate_.action_time <= 0.0f)
         {
-            animstate_.action_phase = 0.0f;
+            animstate_.action_time = 0.0f;
             action_anim_done_ = true;
         }
     }

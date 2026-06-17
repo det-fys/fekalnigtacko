@@ -9,18 +9,18 @@ game::Marker::Marker(World& world, const MarkerInfo& info) : Super(world, net::E
 {
     root_.local.position = info_.position;
     root_.UpdateMatrix();
+
+    max_distance_ = 150.0f;
 }
 
 void game::Marker::SendInitData(Player& player, net::OutMessage& msg) const
 {
     Super::SendInitData(player, msg);
 
-    net::PositionQ pos_q;
-    net::EncodePosition(info_.position, pos_q);
-
     msg.Write(info_.type);
-    net::WritePositionQ(msg, pos_q);
+    net::WritePosition(msg, info_.position);
     net::WriteRGB(msg, info_.color);
+    msg.Write(net::ModelName(info_.model));
 }
 
 void game::Marker::Update()
@@ -31,6 +31,9 @@ void game::Marker::Update()
 
 bool game::Marker::QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res)
 {
+    if (!useable_)
+        return false;
+
     if (!query_cb_)
         return false;
 

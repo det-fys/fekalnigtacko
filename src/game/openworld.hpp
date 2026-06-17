@@ -24,6 +24,8 @@ private:
     void SpawnBot();
 
     void CreateTuningGarage(const glm::vec3& position, float yaw);
+    void CreateItemPickups(const std::string& loc_name, const std::string& item_name);
+    void CreateItemPickup(const glm::vec3& position, const std::string& item);
 
     void RecoverPlayer(Player& player);
     bool GetRecoveryPosition(const glm::vec3& current, glm::vec3& recovery);

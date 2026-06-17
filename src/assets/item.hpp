@@ -41,14 +41,23 @@ struct Item
     ItemType type = ITEM_NONE;
     std::string name;
 
-    std::string idle_anim;
-    std::string use_anim; // use or fire
-    
+    size_t slot = 0;
+
+    std::string model_name;
     std::shared_ptr<const assets::Model> model;
     
     std::string bone;
     Transform bone_offset;
 
+    bool twohanded = false;
+
+    float walk_speed_mult = 1.0f;
+
+    std::string legs_anim;
+    std::string raise_anim;
+    std::string idle_anim;
+    std::string use_anim; // use or fire
+    
     // consumable
     std::string action;
 
@@ -58,9 +67,18 @@ struct Item
     std::string ammo_type;
     size_t clip_size = 0;
     size_t fire_delay = 0;
+    float dispersion_min = 0.0f;
+    float dispersion_max = 0.0f;
+    float dispersion_shot = 0.0f;
+    float dispersion_decay = 1.0f;
 
     std::string aim_anim;
     std::string aiming_anim;
+    std::string reload_anim;
+
+    std::string fire_snd;
+    std::string fire_fx;
+    std::string fire_fx_loc;
 
     static std::shared_ptr<Item> LoadFromFile(const std::string& path);
 };

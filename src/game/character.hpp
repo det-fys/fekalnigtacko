@@ -94,6 +94,8 @@ public:
 
     void SetPosition(const glm::vec3& position);
 
+    void SetWeightSpeedMult(float mult) { weight_speed_mult_ = mult; }
+
     virtual void ActivateHitBones() override;
     virtual void FinalizeFrame() override;
 
@@ -112,6 +114,7 @@ protected:
     bool GetAiming() const { return aiming_; }
     void SetAimTarget(const glm::vec3& target);
     void SetViewItem(const std::string& item_name);
+    void SendFire();
 
 private:
     void SyncControllerTransform();
@@ -141,6 +144,7 @@ protected:
     float turn_speed_ = 8.0f;
     float walk_speed_ = 2.0f;
     float run_speed_mult_ = 3.0f;
+    float weight_speed_mult_ = 1.0f;
 
 private:
     CharacterTuning tuning_;

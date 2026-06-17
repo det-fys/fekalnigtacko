@@ -44,7 +44,7 @@ void game::CharacterAnimState::ApplyToSkeleton(SkeletonInstance& sk) const
     auto action_anim = skeleton->GetAnimation(action_anim_idx);
     if (action_anim)
     {
-        sk.ApplySkelAnim(*action_anim, action_phase, 1.0f);
+        sk.ApplySkelAnim(*action_anim, action_time, 1.0f);
     }
 
     if (glm::abs(yaw) > 0.01f || glm::abs(pitch) > 0.01f)

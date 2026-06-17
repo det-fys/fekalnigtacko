@@ -25,6 +25,7 @@ public:
     virtual void Use(PlayerCharacter& character, uint32_t target_id) override;
 
     void SetUseTarget(const std::string& name, MarkerQueryCallback query, MarkerUseCallback use);
+    void SetUseable(bool useable) { useable_ = useable; }
 
     virtual ~Marker() override;
 
@@ -35,6 +36,8 @@ private:
 
     MarkerQueryCallback query_cb_;
     MarkerUseCallback use_cb_;
+
+    bool useable_ = true;
 };
 
 

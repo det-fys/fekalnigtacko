@@ -53,7 +53,9 @@ public:
 
     const std::string* GetParam(const std::string& key) const;
     bool GetParamFloat(const std::string& key, float& out) const;
-
+    
+    const Transform* GetLocation(const std::string& key) const;
+    
 private:
     std::string name_;
     glm::vec3 col_offset_ = glm::vec3(0.0f);
@@ -68,6 +70,7 @@ private:
     AABB3 aabb_;
 
     std::map<std::string, std::string> params_;
+    std::map<std::string, Transform> locations_;
 
 };
 

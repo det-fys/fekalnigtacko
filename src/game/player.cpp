@@ -36,6 +36,9 @@ void game::Player::Update()
     SyncWorld();
     SendMenuMsgs();
     UpdateCamera();
+
+    // reset for next frame
+    in_new_ = 0;
 }
 
 void game::Player::SetWorld(World* world)
@@ -98,6 +101,62 @@ void game::Player::CloseMenu(const RemoteMenu& menu)
     msg.Write(net::MMSG_CLOSE);
 
     remote_menu_.reset();
+}
+
+void game::Player::SetHudData(const PlayerHudData& hud_data)
+{
+    PlayerHudFields fields = 0;
+
+    auto msg = BeginMsg(net::MSG_HUD);
+    auto fields_pos = msg.Reserve<PlayerHudFields>();
+
+    if (hud_data.health != hud_data_.health)
+    {
+        fields |= PHUD_HEALTH;
+        hud_data_.health = hud_data.health;
+        msg.Write(hud_data.health);
+    }
+
+    if (hud_data.weapon_slots != hud_data_.weapon_slots)
+    {
+        fields |= PHUD_WEAPON_SLOTS;
+        hud_data_.weapon_slots = hud_data.weapon_slots;
+        msg.Write(hud_data.weapon_slots);
+    }
+
+    if (hud_data.held_item != hud_data_.held_item)
+    {
+        fields |= PHUD_ITEM;
+        hud_data_.held_item = hud_data.held_item;
+        msg.Write(net::ModelName(hud_data.held_item));
+    }
+
+    if (hud_data.ammo_loaded != hud_data_.ammo_loaded)
+    {
+        fields |= PHUD_AMMO_LOADED;
+        hud_data_.ammo_loaded = hud_data.ammo_loaded;
+        msg.Write(hud_data.ammo_loaded);
+    }
+
+    if (hud_data.ammo_total != hud_data_.ammo_total)
+    {
+        fields |= PHUD_AMMO_TOTAL;
+        hud_data_.ammo_total = hud_data.ammo_total;
+        msg.Write(hud_data.ammo_total);
+    }
+
+    if (fields == 0)
+    {
+        DiscardMsg();
+        return;
+    }
+
+    msg.WriteAt(fields_pos, fields);
+}
+
+void game::Player::ResetHudData()
+{
+    SetHudData(PlayerHudData{});
 }
 
 bool game::Player::GetView(glm::vec3& eye, glm::vec3& forward)
@@ -358,10 +417,17 @@ bool game::Player::ProcessMenuActionMsg(net::InMessage& msg)
 
 void game::Player::Input(PlayerInputType type, bool enabled)
 {
+    PlayerInputFlags flag = 1 << type;
+
     if (enabled)
-        in_ |= (1 << type);
+    {
+        in_ |= flag;
+        in_new_ |= flag;
+    }
     else
-        in_ &= ~(1 << type);
+    {
+        in_ &= ~flag;
+    }
 
     game_.PlayerInput(*this, type, enabled);
 }

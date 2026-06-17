@@ -56,6 +56,8 @@ bool game::view::CharacterView::ProcessMsg(net::EntMsgType type, net::InMessage&
     {
     case net::EMSG_EQUIP:
         return ProcessEquipMsg(msg);
+    case net::EMSG_FIRE:
+        return ProcessFireMsg(msg);
     default:
         return Super::ProcessMsg(type, msg);
     }
@@ -88,7 +90,7 @@ void game::view::CharacterView::Update(const UpdateInfo& info)
     animstate_.loco_phase = glm::mod(glm::mix(loco_phase0, loco_phase1, t), 1.0f);
 
     // action
-    animstate_.action_phase = glm::mix(states_[0].action_phase, states_[1].action_phase, t_sane);
+    animstate_.action_time = glm::mix(states_[0].action_time, states_[1].action_time, t_sane);
     // if (animstate_.action_anim_idx != assets::NO_ANIM)
     // {
     //     std::cout <<"phase: " << animstate_.action_phase << std::endl;
@@ -195,7 +197,7 @@ bool game::view::CharacterView::ReadState(net::InMessage* msg)
     old_state.trans = root_.local;
     old_state.loco_blend = animstate_.loco_blend;
     old_state.loco_phase = animstate_.loco_phase;
-    old_state.action_phase = animstate_.action_phase;
+    old_state.action_time = animstate_.action_time;
     old_state.aim_yaw = animstate_.yaw;
     old_state.aim_pitch = animstate_.pitch;
 
@@ -253,19 +255,19 @@ bool game::view::CharacterView::ReadState(net::InMessage* msg)
             animstate_.action_anim_idx = sync_.action_anim;
         }
 
-        // action phase
-        if (fields & CSF_ACTION_PHASE)
+        // action time
+        if (fields & CSF_ACTION_TIME)
         {
-            if (!net::ReadDelta(*msg, sync_.action_phase))
+            if (!net::ReadDelta(*msg, sync_.action_time))
                 return false;
 
-            new_state.action_phase = sync_.action_phase.Decode();
+            new_state.action_time = sync_.action_time.Decode();
 
             if (fields & CSF_ACTION_ANIM)
             {
-                // anim just changed, dont blend phase
-                old_state.action_phase = new_state.action_phase;
-                animstate_.action_phase = new_state.action_phase;
+                // anim just changed, dont blend time
+                old_state.action_time = new_state.action_time;
+                animstate_.action_time = new_state.action_time;
             }
         }
 
@@ -340,10 +342,21 @@ bool game::view::CharacterView::ProcessEquipMsg(net::InMessage& msg)
     return true;
 }
 
+bool game::view::CharacterView::ProcessFireMsg(net::InMessage& msg)
+{
+    FireItem();
+    return true;
+}
+
 void game::view::CharacterView::SetItem(const std::string& item_name)
 {
     if (item_name == item_name_)
         return;
+
+    item_name_ = item_name;
+
+    fire_snd_.reset();
+    fire_fx_.reset();
 
     if (item_name.empty())
     {
@@ -356,6 +369,20 @@ void game::view::CharacterView::SetItem(const std::string& item_name)
     auto bone_node = sk_.GetBoneNodeByName(item_->bone);
     item_node_.parent = bone_node ? bone_node : &root_;
     item_node_.local = item_->bone_offset;
+
+    // snd
+    if (!item_->fire_snd.empty())
+    {
+        fire_snd_ = assets::CacheManager::GetSound("data/" + item_->fire_snd + ".snd");
+    }
+
+    // fx
+    if (!item_->fire_fx.empty())
+    {
+        fire_fx_ = assets::CacheManager::GetEffect("data/" + item_->fire_fx + ".fx");
+        auto loc = item_->model->GetLocation(item_->fire_fx_loc);
+        fire_fx_offset_ = loc ? loc->position : glm::vec3(0.0f);
+    }
 
 }
 
@@ -372,4 +399,25 @@ void game::view::CharacterView::DrawItem(const DrawArgs& args)
         cmd.matrices = &item_node_.matrix;
         args.dlist.AddSurface(cmd);
     }
+}
+
+void game::view::CharacterView::FireItem()
+{
+    if (!item_)
+        return;
+
+    if (fire_snd_)
+    {
+        auto snd = audioplayer_.PlaySound(fire_snd_, &item_node_);
+        // snd->SetPosition(item_node_.GetGlobalPosition());
+    }
+
+    if (fire_fx_)
+    {
+        glm::vec3 pos = item_node_.matrix * glm::vec4(fire_fx_offset_, 1.0f);
+        glm::vec3 dir = item_node_.matrix * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+        world_.GetEmitter().Emit(fire_fx_, pos, glm::normalize(dir));
+    }
+
+
 }

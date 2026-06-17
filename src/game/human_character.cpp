@@ -1,5 +1,6 @@
 #include "human_character.hpp"
 #include "drivable_vehicle.hpp"
+#include "utils/random.hpp"
 
 static game::CharacterTuning GetCharacterTuning(const game::HumanCharacterTuning& tuning)
 {
@@ -21,6 +22,7 @@ void game::HumanCharacter::Update()
 {
     UpdateState();
     UpdateActionState();
+    UpdateDispersion();
     Super::Update();
 }
 
@@ -62,9 +64,34 @@ void game::HumanCharacter::Ride(Rideable* rideable, size_t seat_idx)
     }
 }
 
+void game::HumanCharacter::Equip(std::shared_ptr<ItemInstance> item)
+{
+    pending_item_ = std::move(item);
+}
+
 game::HumanCharacter::~HumanCharacter()
 {
     Ride(nullptr, 0); // exit rideable
+}
+
+bool game::HumanCharacter::HaveAmmo(const std::string& ammo_name)
+{
+    return true;
+}
+
+size_t game::HumanCharacter::GetAmmo(size_t required, const std::string& ammo_name)
+{
+    return required; // unlimited by default
+}
+
+int64_t game::HumanCharacter::GetTime() const
+{
+    return GetWorld().GetTime();
+}
+
+bool game::HumanCharacter::CanAim()
+{
+    return !NeedReload() && !PendingItemSwitch() && !(GetVehicle() && IsDriver() && !item_);
 }
 
 void game::HumanCharacter::SetAiming(bool aiming)
@@ -76,16 +103,109 @@ void game::HumanCharacter::SetAiming(bool aiming)
     OnAimingChanged();
 }
 
+bool game::HumanCharacter::CanFire()
+{
+    return item_ && item_->ammo > 0 && ((GetTime() - last_fire_time_ + 40) >= item_->def->fire_delay);
+}
+
 void game::HumanCharacter::Fire()
 {
-    PlaySound("airrifle_fire");
+    if (!item_)
+        return; // fire wat?
 
+    // PlaySound("airrifle_fire");
+    SendFire();
+
+    float range = 500.0f;
+    // float dispersion = 5.0f; // m/100m
+    
     game::BulletInfo bullet{};
     bullet.start = GetEyePosition();
-    bullet.end = bullet.start + GetAimDirection() * 1000.0f;
+    bullet.end = bullet.start + ApplyRandomDispersion(GetAimDirection(), dispersion_) * range;
     bullet.damage = 1.0f;
     bullet.shooter = this;
     GetWorld().FireBullet(bullet);
+
+    last_fire_time_ = GetTime();
+    dispersion_ = glm::min(dispersion_ + item_->def->dispersion_shot, item_->def->dispersion_max);
+
+    // it should always be >0 but if it has been faked this far
+    // nothing else can be done than to pretend that
+    // the bullet was there
+    if (item_->ammo > 0)
+    { 
+        --item_->ammo;
+    }
+}
+
+bool game::HumanCharacter::NeedReload()
+{
+    return item_ && CanReload() && (item_->ammo == 0 || reloadheld_);
+}
+
+bool game::HumanCharacter::CanReload()
+{
+    return item_ && HaveAmmo(item_->def->ammo_type) && item_->ammo < item_->def->clip_size;
+}
+
+void game::HumanCharacter::Reload()
+{
+    if (!item_)
+        return;
+
+    item_->ammo += GetAmmo(item_->def->clip_size - item_->ammo, item_->def->ammo_type);
+}
+
+bool game::HumanCharacter::PendingItemSwitch()
+{
+    return pending_item_ != item_;
+}
+
+void game::HumanCharacter::SwitchItem()
+{
+    if (item_ == pending_item_)
+        return;
+
+    item_ = pending_item_;
+    UpdateItemStuff();
+    OnHeldItemChanged();
+}
+
+void game::HumanCharacter::UpdateItemStuff()
+{
+    // update legs anim
+    if (state_ == HS_ON_FOOT)
+    {
+        if (item_ && !item_->def->legs_anim.empty())
+            SetIdleAnim(item_->def->legs_anim);
+        else
+            SetIdleAnim("idle");
+
+        // SetIdleAnim("idle_relaxed");
+    }
+
+    // update view item
+    if (item_)
+    {
+        SetViewItem(item_->def->name);
+        SetWeightSpeedMult(item_->def->walk_speed_mult);
+    }
+    else
+    {
+        SetViewItem("");
+        SetWeightSpeedMult(1.0f);
+    }
+}
+
+void game::HumanCharacter::PlayItemActionAnim(const std::string assets::Item::*anim, float speed)
+{
+    if (!item_)
+    {
+        ClearActionAnim();
+        return;
+    }
+
+    PlayActionAnim(item_->def.get()->*anim, speed);
 }
 
 void game::HumanCharacter::UpdateState()
@@ -178,7 +298,7 @@ void game::HumanCharacter::StateOnFootEnter()
     SetMovementType(CMT_TURN);
     EnablePhysics(true);
 
-    EnterActionState(ACTION_IDLE);
+    ResetActionState();
 }
 
 game::HumanCharacterState game::HumanCharacter::StateOnFootUpdate()
@@ -205,7 +325,7 @@ void game::HumanCharacter::StateRidingEnter()
     SetYaw(0.0f);
     SetMovementType(CMT_DISABLED);
 
-    EnterActionState(ACTION_IDLE);
+    ResetActionState();
 }
 
 game::HumanCharacterState game::HumanCharacter::StateRidingUpdate()
@@ -231,6 +351,13 @@ game::HumanCharacterState game::HumanCharacter::StateKnockedDownUpdate()
     return HS_INIT;
 }
 
+void game::HumanCharacter::ResetActionState()
+{
+    item_.reset();
+    EnterActionState(ACTION_IDLE);
+    UpdateItemStuff();
+}
+
 void game::HumanCharacter::UpdateActionState()
 {
     while (true)
@@ -247,46 +374,72 @@ void game::HumanCharacter::UpdateActionState()
 void game::HumanCharacter::EnterActionState(ActionState state)
 {
     actionstate_ = state;
+    actionstate_start_ = GetWorld().GetTime();
 
     switch (state)
     {
     case ACTION_IDLE:
-        if (state_ == HS_ON_FOOT)
-            SetIdleAnim("idle_relaxed");
         SetAiming(false);
         SetCanSprint(true);
-        PlayActionAnim("rifle_idle");
-        SetViewItem("airsniper");
+        PlayItemActionAnim(&assets::Item::idle_anim);
+        break;
+
+    case ACTION_RAISE:
+        SwitchItem();
+        SetAiming(false);
+        SetCanSprint(true);
+        PlayItemActionAnim(&assets::Item::raise_anim, 3.0f);
         break;
 
     case ACTION_AIM:
         SetAiming(true);
         SetCanSprint(false);
-        PlayActionAnim("rifle_aim", 3.0f);
+        PlayItemActionAnim(&assets::Item::aim_anim, 3.0f);
         break;
 
     case ACTION_AIMING:
         SetAiming(true);
         SetCanSprint(false);
-        PlayActionAnim("rifle_aiming");
+        PlayItemActionAnim(&assets::Item::aiming_anim);
         break;
 
     case ACTION_FIRE:
         SetAiming(true);
         SetCanSprint(false);
-        PlayActionAnim("rifle_fire");
+        PlayItemActionAnim(&assets::Item::use_anim);
         Fire();
+        break;
+
+    case ACTION_FIRE_REPEAT:
+        PlayItemActionAnim(&assets::Item::use_anim, -5.0f);
+        break;
+
+    case ACTION_RELOAD:
+        // SetAiming(true);
+        // SetCanSprint(true);
+        PlayItemActionAnim(&assets::Item::reload_anim);
         break;
 
     case ACTION_UNAIM:
         SetAiming(false);
         SetCanSprint(false);
-        PlayActionAnim("rifle_aim", -3.0f);
+        PlayItemActionAnim(&assets::Item::aim_anim, -3.0f);
         break;
 
+    case ACTION_PUTAWAY:
+        SetAiming(false);
+        SetCanSprint(true);
+        PlayItemActionAnim(&assets::Item::raise_anim, -3.0f);
+        break;
+    
     default:
         break;
     }
+}
+
+int64_t game::HumanCharacter::GetActionStateTime() const
+{
+    return GetWorld().GetTime() - actionstate_start_;
 }
 
 game::ActionState game::HumanCharacter::CheckActionStateTransition()
@@ -294,25 +447,40 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
     switch (actionstate_)
     {
     case ACTION_IDLE:
-        if (aimheld_) // want aim
+        if (PendingItemSwitch())
+            return ACTION_PUTAWAY;
+
+        if (NeedReload())
+            return ACTION_RELOAD;
+
+        if (aimheld_ && CanAim()) // want aim
             return ACTION_AIM;
 
         return ACTION_IDLE;
 
+    case ACTION_RAISE:
+        if (PendingItemSwitch())
+            return ACTION_PUTAWAY;
+
+        if (IsActionAnimDone())
+            return ACTION_IDLE;
+
+        return ACTION_RAISE;
+
     case ACTION_AIM:
+        if (!aimheld_ || !CanAim())
+            return ACTION_UNAIM;
+
         if (IsActionAnimDone())
             return ACTION_AIMING;
-
-        if (!aimheld_) // stop aiming immediately
-            return ACTION_UNAIM;
 
         return ACTION_AIM;
 
     case ACTION_AIMING:
-        if (!aimheld_)
-            return ACTION_UNAIM; // wants aim no more
+        if (!aimheld_ || !CanAim())
+            return ACTION_UNAIM;
 
-        if (fireheld_)
+        if (fireheld_ && CanFire())
             return ACTION_FIRE;
 
         return ACTION_AIMING;
@@ -321,18 +489,59 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
         if (IsActionAnimDone())
             return ACTION_AIMING;
 
+        if (CanAim() && fireheld_ && CanFire())
+            return ACTION_FIRE_REPEAT;
+
         return ACTION_FIRE;
 
+    case ACTION_FIRE_REPEAT:
+        // proxy to enter fire state again and reset anims and stuff
+        if (GetActionStateTime() > 0)
+            return ACTION_FIRE;
+
+        return ACTION_FIRE_REPEAT; 
+
+    case ACTION_RELOAD:
+        // SetAiming(aimheld_); // optional here
+        if (IsActionAnimDone())
+        {
+            Reload();
+            return ACTION_IDLE;
+        }
+
+        return ACTION_RELOAD;
+
     case ACTION_UNAIM:
+        if (aimheld_ && CanAim()) // start aiming again
+            return ACTION_AIM;
+        
         if (IsActionAnimDone())
             return ACTION_IDLE;
 
-        if (aimheld_) // start aiming again
-            return ACTION_AIM;
-
         return ACTION_UNAIM;
+
+    case ACTION_PUTAWAY:
+        if (IsActionAnimDone())
+            return ACTION_RAISE;
+
+        if (!PendingItemSwitch()) // possibly player wants that item again
+            return ACTION_RAISE;
+
+        return ACTION_PUTAWAY;
 
     default:
         return actionstate_;
     }
+}
+
+void game::HumanCharacter::UpdateDispersion()
+{
+    if (!item_)
+    {
+        dispersion_ = 0.0f;
+        return;
+    }
+
+    dispersion_ = glm::clamp(dispersion_ - (item_->def->dispersion_decay / 25.0f), item_->def->dispersion_min,
+                             item_->def->dispersion_max);
 }

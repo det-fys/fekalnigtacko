@@ -15,7 +15,7 @@ struct CharacterAnimState
     float loco_phase = 0.0f;
 
     assets::AnimIdx action_anim_idx = assets::NO_ANIM;
-    float action_phase = 0.0f;
+    float action_time = 0.0f;
 
     float yaw = 0.0f;
     float pitch = 0.0f;

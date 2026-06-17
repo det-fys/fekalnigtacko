@@ -13,6 +13,7 @@
 #include "remote_menu.hpp"
 #include "camera_info.hpp"
 #include "camera_controller.hpp"
+#include "player_hud_data.hpp"
 
 namespace game
 {
@@ -40,9 +41,13 @@ public:
     void CloseMenu(const RemoteMenu& menu);
     bool HasOpenMenu() const { return (bool)remote_menu_; }
 
+    void SetHudData(const PlayerHudData& hud_data);
+    void ResetHudData();
+
     const std::string& GetName() const { return name_; }
 
     PlayerInputFlags GetInput() const { return in_; }
+    PlayerInputFlags GetNewInput() const { return in_new_; }
     float GetViewYaw() const { return camera_controller_.GetYaw(); }
     float GetViewPitch() const { return camera_controller_.GetPitch(); }
     bool GetView(glm::vec3& eye, glm::vec3& forward);
@@ -88,6 +93,7 @@ private:
     int64_t last_env_time_ = 0;
 
     PlayerInputFlags in_ = 0;
+    PlayerInputFlags in_new_ = 0;
 
     CameraInfo camera_info_;
     CameraController camera_controller_;
@@ -97,6 +103,9 @@ private:
     // TODO: allow more menus
     net::MenuId menu_id_ = 0;
     std::unique_ptr<RemoteMenu> remote_menu_;
+
+    // hud
+    PlayerHudData hud_data_;
 };
 
 }

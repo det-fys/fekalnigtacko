@@ -9,7 +9,7 @@
 #include "net/inmessage.hpp"
 #include "net/msg_producer.hpp"
 #include "game/player_input.hpp"
-#include "gui/use_target_hud.hpp"
+#include "gui/player_hud.hpp"
 #include "remote_menu_view.hpp"
 #include "game/camera_info.hpp"
 #include "game/camera_controller.hpp"
@@ -41,6 +41,7 @@ private:
     bool ProcessWorldMsg(net::InMessage& msg);
     bool ProcessCameraMsg(net::InMessage& msg);
     bool ProcessChatMsg(net::InMessage& msg);
+    bool ProcessHudMsg(net::InMessage& msg);
     bool ProcessUseTargetMsg(net::InMessage& msg);
     bool ProcessMenuMsg(net::InMessage& msg);
 
@@ -68,7 +69,7 @@ private:
     net::ViewPitchQ view_pitch_q_;
     float last_send_time_ = 0.0f;
 
-    gui::UseTargetHud use_target_hud_;
+    gui::PlayerHud hud_;
 
     std::vector<std::unique_ptr<RemoteMenuView>> remote_menus_;
 

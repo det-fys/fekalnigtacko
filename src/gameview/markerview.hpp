@@ -22,11 +22,15 @@ public:
 private:
     bool Init(net::InMessage& msg);
 
+    void DrawModel(const DrawArgs& args, const assets::Model& model, const TransformNode& node);
+
 private:
     MarkerType marker_type_;
     glm::vec4 color_;
 
+    std::shared_ptr<const assets::Model> base_model_;
     std::shared_ptr<const assets::Model> model_;
+    TransformNode icon_node_;
 
 };
 

@@ -11,6 +11,7 @@ enum MarkerType : uint8_t
 {
     MARKER_FOOT,
     MARKER_VEHICLE,
+    MARKER_PICKUP,
 };
 
 struct MarkerInfo
@@ -18,7 +19,7 @@ struct MarkerInfo
     glm::vec3 position;
     MarkerType type;
     uint32_t color;
-    std::string icon;
+    std::string model;
 };
 
 }

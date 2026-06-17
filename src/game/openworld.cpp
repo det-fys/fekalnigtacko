@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "assets/cache.hpp"
 #include "player.hpp"
 #include "vehicle.hpp"
 #include "player_character.hpp"
@@ -21,7 +22,7 @@ namespace game
 
 static const char* GetRandomCarModel()
 {
-    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat", "cow_static", "pig_static", "avia"};
+    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat", "avia"};
     return vehicles[rand() % (sizeof(vehicles) / sizeof(vehicles[0]))];
 }
 
@@ -87,6 +88,10 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld("openworld"), game_(game
     {
         CreateTuningGarage(loc.transform.position, glm::eulerAngles(loc.transform.rotation).x);
     }
+
+    CreateItemPickups("pickup_uzi", "uzi");
+    CreateItemPickups("pickup_ak47", "ak47");
+    CreateItemPickups("pickup_airsniper", "airsniper");
 
     // cow
     auto& cow = Spawn<Cow>(glm::vec3(0.0f, 0.0f, 2.0f), 0.0f);
@@ -200,7 +205,7 @@ void game::OpenWorld::CreateTuningGarage(const glm::vec3& position, float yaw)
     marker_info.position = position;
     marker_info.type = MARKER_VEHICLE;
     marker_info.color = 0x884400;
-    marker_info.icon = "tuning";
+    marker_info.model = "marker_tuning";
 
     auto& marker = Spawn<Marker>(marker_info);
     marker.SetUseTarget("vject do tunírny", 
@@ -243,6 +248,53 @@ void game::OpenWorld::CreateTuningGarage(const glm::vec3& position, float yaw)
     garage->SetOnExit([&marker]() {
         marker.SetNametag(std::string());
     });
+}
+
+void game::OpenWorld::CreateItemPickups(const std::string& loc_name, const std::string& item_name)
+{
+    for (auto locs = GetMap().GetLocations(loc_name); const auto& loc : locs)
+    {
+        CreateItemPickup(loc.transform.position, item_name);
+    }
+}
+
+void game::OpenWorld::CreateItemPickup(const glm::vec3& position, const std::string& item_name)
+{
+    auto item_def = assets::CacheManager::GetItem("data/" + item_name + ".item");
+
+    MarkerInfo marker_info{};
+    marker_info.position = position;
+    marker_info.type = MARKER_PICKUP;
+    marker_info.color = 0xFFFFFF;
+    marker_info.model = item_def->model_name;
+
+    auto& marker = Spawn<Marker>(marker_info);
+    marker.SetUseTarget(
+        "sebrat " + item_name,
+        [](PlayerCharacter& character, UseTargetQueryResult& res) {
+            res.enabled = true;
+            res.delay = 0.1f;
+            res.error_text = nullptr;
+            return true;
+        },
+        [this, position, item_def,
+         &marker](PlayerCharacter& character) {
+            auto player = character.GetPlayer();
+            if (!player)
+                return;
+
+            character.GiveItem(std::make_shared<ItemInstance>(item_def->name));
+            character.GiveAmmo(item_def->ammo_type, item_def->clip_size * 15);
+            character.PlaySound("pickup_ammo");
+
+            player->SendChat("sebrals " + item_def->name);
+            marker.SetUseable(false);
+            marker.Remove();
+
+            Schedule(5000, [this, position, item_def]() {
+                CreateItemPickup(position, item_def->name);
+            });
+        });
 }
 
 void game::OpenWorld::RecoverPlayer(Player& player)
