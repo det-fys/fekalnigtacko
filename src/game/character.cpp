@@ -89,6 +89,8 @@ void game::Character::OnBulletHit(const game::BulletInfo& bullet, const btCollis
 
     std::string text = "au! " + std::string(hit_name);
     GetWorld().SendChat(text);
+
+    OnBulletHit(bullet, hit_name);
 }
 
 void game::Character::Attach(net::EntNum parentnum)

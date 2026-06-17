@@ -31,7 +31,7 @@ void game::Rideable::SetPassenger(size_t seat_idx, HumanCharacter* passenger)
     OnPassengerChanged(seat_idx, passenger);
 }
 
-game::HumanCharacter* game::Rideable::GetPassenger(size_t seat_idx)
+game::HumanCharacter* game::Rideable::GetPassenger(size_t seat_idx) const
 {
     if (seat_idx >= seats_.size())
         return nullptr;
@@ -39,7 +39,7 @@ game::HumanCharacter* game::Rideable::GetPassenger(size_t seat_idx)
     return seats_[seat_idx].passenger;
 }
 
-const glm::vec3& game::Rideable::GetSeatOffset(size_t seat_idx)
+const glm::vec3& game::Rideable::GetSeatOffset(size_t seat_idx) const
 {
     if (seat_idx >= seats_.size())
         throw std::runtime_error("Invalid seat index");

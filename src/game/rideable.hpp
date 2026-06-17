@@ -25,8 +25,8 @@ public:
     Rideable(Entity& entity, RideableType type);
 
     void SetPassenger(size_t seat_idx, HumanCharacter* passenger);
-    HumanCharacter* GetPassenger(size_t seat_idx);
-    const glm::vec3& GetSeatOffset(size_t seat_idx);
+    HumanCharacter* GetPassenger(size_t seat_idx) const;
+    const glm::vec3& GetSeatOffset(size_t seat_idx) const;
     size_t GetNumSeats() const { return seats_.size(); }
     void KickAll();
 

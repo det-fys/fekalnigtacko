@@ -116,6 +116,8 @@ protected:
     void SetViewItem(const std::string& item_name);
     void SendFire();
 
+    virtual void OnBulletHit(const game::BulletInfo& bullet, const std::string_view hit_bone) {}
+
 private:
     void SyncControllerTransform();
     void SyncTransformFromController();

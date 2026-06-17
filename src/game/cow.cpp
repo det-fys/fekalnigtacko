@@ -22,7 +22,6 @@ game::Cow::Cow(World& world, const glm::vec3& position, float yaw) : Animal(worl
     SetIdleAnim("idle");
     SetWalkAnim("walk");
 
-    ScheduleRandomMoo();
 }
 
 void game::Cow::OnPassengerChanged(size_t seat_idx, HumanCharacter* passenger)
@@ -35,12 +34,14 @@ void game::Cow::OnPassengerChanged(size_t seat_idx, HumanCharacter* passenger)
     }
 }
 
-void game::Cow::ScheduleRandomMoo()
+void game::Cow::MakeSound()
 {
-    Schedule(rand() % 15000 + 5000, [this]() {
-        PlayRandomMoo();
-        ScheduleRandomMoo();
-    });
+    PlayRandomMoo();
+}
+
+void game::Cow::MakeHurtSound()
+{
+    PlayUseSound();
 }
 
 void game::Cow::PlayRandomMoo()

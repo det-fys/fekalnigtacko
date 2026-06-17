@@ -22,3 +22,13 @@ inline glm::vec3 ApplyRandomDispersion(const glm::vec3& dir, float dispersion)
 
     return dir + (right * glm::sin(rand_rotation) + up * glm::cos(rand_rotation)) * rand_dispersion;
 }
+
+inline bool Chance(float probability)
+{
+    return RandomFloat(0.0f, 1.0f) < probability;
+}
+
+inline bool ChanceAvgTime(float avg_time)
+{
+    return Chance((1.0f / 25.0f) / avg_time);
+}

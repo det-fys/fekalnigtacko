@@ -15,8 +15,10 @@ public:
 protected:
     virtual void OnPassengerChanged(size_t seat_idx, HumanCharacter* passenger) override;
 
+    virtual void MakeSound() override;
+    virtual void MakeHurtSound() override;
+
 private:
-    void ScheduleRandomMoo();
     void PlayRandomMoo();
     void PlayUseSound();
 
