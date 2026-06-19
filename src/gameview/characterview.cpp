@@ -82,12 +82,15 @@ void game::view::CharacterView::Update(const UpdateInfo& info)
 
     // loco
     animstate_.loco_blend = glm::mix(states_[0].loco_blend, states_[1].loco_blend, t);
-
+           
     float loco_phase0 = states_[0].loco_phase;
     float loco_phase1 = states_[1].loco_phase;
-    if (loco_phase0 > loco_phase1)
-        loco_phase0 -= 1.0f;
-    animstate_.loco_phase = glm::mod(glm::mix(loco_phase0, loco_phase1, t), 1.0f);
+
+    // interpolate across 0-1 wrap using the shortest direction
+    // compute signed shortest delta in range [-0.5,0.5)
+    float delta = glm::mod(loco_phase1 - loco_phase0 + 0.5f, 1.0f) - 0.5f;
+    float interp = loco_phase0 + delta * t;
+    animstate_.loco_phase = glm::mod(interp, 1.0f);
 
     // action
     animstate_.action_time = glm::mix(states_[0].action_time, states_[1].action_time, t_sane);
