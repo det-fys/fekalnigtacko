@@ -377,9 +377,13 @@ static void WSClose()
 
 #endif /* EMSCRIPTEN */
 
+static bool can_update = false;
+static Uint32 last_update = 0;
+
 static void Frame()
 {
     Uint32 current_time = SDL_GetTicks();
+    last_update = current_time;
     s_app->SetTime(current_time / 1000.0f); // Set time in seconds
 
     PollEvents();
@@ -409,6 +413,24 @@ static void Frame()
     SDL_GL_SwapWindow(s_window);
 }
 
+#ifdef EMSCRIPTEN
+
+static void Update(void* args)
+{
+
+    // std::cout << "update called" << std::endl;
+    if (can_update && (SDL_GetTicks() - last_update >= 100))
+    {
+        // std::cout << "calling Frame()" << std::endl;
+        Frame();
+    } 
+
+    emscripten_async_call(Update, nullptr, 100);
+    // std::cout << "update finished" << std::endl;
+}
+
+#endif
+
 static void Main() {
     if (s_url.empty())
         s_url = WS_URL;
@@ -430,13 +452,15 @@ static void Main() {
 
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
-
     s_app = std::make_unique<App>();
     s_app->SetUserName(s_username);
     s_app->AddChatMessagePrefix("WebSocket", "připojování na " + s_url);
 
+    can_update = true;
+
 #ifdef EMSCRIPTEN
-    emscripten_set_main_loop(Frame, 0, true);
+    emscripten_set_main_loop(Frame, 0, false);
+    Update(nullptr);
 #else
 
 #ifdef _WIN32
@@ -511,5 +535,6 @@ int main(int argc, char *argv[])
 {
 
 }
+
 
 #endif
