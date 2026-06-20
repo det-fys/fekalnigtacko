@@ -416,6 +416,7 @@ void game::Vehicle::UpdateWheels()
     {
         auto& bt_wheel = vehicle.getWheelInfo(i);
         wheels_[i].speed = -(bt_wheel.m_rotation - wheels_[i].rotation) * 25.0f;
+        bt_wheel.m_rotation = glm::mod(bt_wheel.m_rotation, glm::two_pi<float>()); // prevent going too crazy
         wheels_[i].rotation = bt_wheel.m_rotation;
         wheels_[i].z_offset = tuning_ctx_.wheels[i].z_offset - bt_wheel.m_raycastInfo.m_suspensionLength;
         
