@@ -40,6 +40,7 @@ struct Item
 {
     ItemType type = ITEM_NONE;
     std::string name;
+    std::string displayname;
 
     size_t slot = 0;
 
@@ -71,6 +72,7 @@ struct Item
     float dispersion_max = 0.0f;
     float dispersion_shot = 0.0f;
     float dispersion_decay = 1.0f;
+    float damage = 1.0f;
 
     std::string aim_anim;
     std::string aiming_anim;

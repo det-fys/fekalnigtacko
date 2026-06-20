@@ -22,6 +22,13 @@ void game::Animal::Update()
     Super::Update();
 }
 
+void game::Animal::ReceiveDamage(const DamageInfo& damage)
+{
+    Super::ReceiveDamage(damage);
+    just_hit_ = true;
+    hit_from_ = damage.from_pos;
+}
+
 bool game::Animal::QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res)
 {
     if (character.GetRideable())
@@ -58,13 +65,6 @@ void game::Animal::SetRideableViewAngles(float yaw, float pitch)
     {
         SetViewAngles(yaw, pitch);
     }
-}
-
-void game::Animal::OnBulletHit(const game::BulletInfo& bullet, const std::string_view hit_bone)
-{
-    just_hit_ = true;
-    // attacker_ = bullet.shooter->GetEntNum();
-    hit_from_ = bullet.start;
 }
 
 void game::Animal::OnPassengerChanged(size_t seat_idx, HumanCharacter* passenger)

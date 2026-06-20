@@ -49,6 +49,9 @@ enum MessageType : uint8_t
     // HUD ...
     MSG_HUD,
 
+    // DAMAGE ...
+    MSG_DAMAGE,
+
     /*~~~~~~~~ Entity ~~~~~~~~*/
     // ENTSPAWN <EntNum> <EntType> data...
     MSG_ENTSPAWN,

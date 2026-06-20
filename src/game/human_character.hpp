@@ -41,6 +41,8 @@ enum ActionState
     ACTION_RELOAD,
     ACTION_UNAIM,
     ACTION_PUTAWAY,
+    ACTION_DIE,
+    ACTION_DEAD,
 };
 
 class HumanCharacter : public Character
@@ -51,6 +53,7 @@ public:
     HumanCharacter(World& world, const HumanCharacterTuning& tuning);
     
     virtual void Update() override;
+    virtual void ReceiveDamage(const DamageInfo& damage) override;
 
     const HumanCharacterTuning& GetHumanTuning() const { return human_tuning_; }
 
@@ -70,6 +73,12 @@ public:
     void Equip(std::shared_ptr<ItemInstance> item);
     const std::shared_ptr<ItemInstance>& GetHeldItem() const { return item_; }
 
+    virtual void OnRideableDamaged(const DamageInfo& damage) {}
+
+    virtual void OnDamageDealt(bool was_kill) {}
+
+    bool IsDead() const;
+
     virtual ~HumanCharacter() override;
 
 protected:
@@ -78,8 +87,11 @@ protected:
     virtual void OnHeldItemChanged() {}
     virtual bool HaveAmmo(const std::string& ammo_name);
     virtual size_t GetAmmo(size_t required, const std::string& ammo_name);
+    virtual void SpawnLoot() {}
 
-private:
+    bool IsOnFoot() const;
+
+protected:
     int64_t GetTime() const;
     bool CanAim();
     void SetAiming(bool aiming);
@@ -91,7 +103,10 @@ private:
     bool PendingItemSwitch();
     void SwitchItem();
     void UpdateItemStuff();
+    void ClearItem();
     void PlayItemActionAnim(const std::string assets::Item::*anim, float speed = 1.0f);
+    void PlayDeathAnim();
+    void TrySpawnLoot();
 
     void UpdateState();
     void SetSignal(HumanCharacterStateSignal signal);
@@ -146,6 +161,8 @@ private:
     
     int64_t last_fire_time_ = 0;
     float dispersion_ = 0.0f;
+
+    bool loot_spawned_ = false;
 };
 }
 

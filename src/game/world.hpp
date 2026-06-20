@@ -9,18 +9,39 @@
 #include "net/defs.hpp"
 #include "player_input.hpp"
 #include "usable.hpp"
+#include "item_instance.hpp"
 
 namespace game
 {
 
+enum DamageType
+{
+    DAMAGE_OTHER,
+    DAMAGE_BULLET,
+    DAMAGE_CRASH,
+};
+
 class HumanCharacter;
+
+struct DamageInfo
+{
+    DamageType type = DAMAGE_OTHER;
+    float damage = 0.0f;
+    float impulse = 0.0f;
+    glm::vec3 from_pos{};
+    glm::vec3 impact_pos{};
+    glm::vec3 normal{};
+    HumanCharacter* inflictor = nullptr;
+    const btCollisionObject* hit_object = nullptr;
+};
 
 struct BulletInfo
 {
-    game::HumanCharacter* shooter;
+    HumanCharacter* shooter;
     glm::vec3 start;
     glm::vec3 end;
     float damage;
+    float impulse;
 };
 
 class World : public collision::DynamicsWorld, public net::MsgProducer, public net::LocalMsgProducer, public Scheduler
@@ -71,6 +92,9 @@ public:
     void Effect(const std::string& name, const glm::vec3& pos, const glm::vec3& dir);
 
     void SendChat(const std::string& text);
+
+    void CreateItemPickup(const glm::vec3& position, std::shared_ptr<ItemInstance> item, int64_t despawn_time,
+                          int64_t respawn_time, size_t ammo_count);
 
     virtual ~World() = default;
 

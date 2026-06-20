@@ -17,6 +17,8 @@ public:
 
     virtual void Update() override;
 
+    virtual void ReceiveDamage(const DamageInfo& damage) override;
+
     void ProcessInput(PlayerInputType type, bool enabled);
 
     void DetachFromPlayer();
@@ -29,12 +31,17 @@ public:
     void GiveItem(std::shared_ptr<ItemInstance> item, bool can_equip = true);
     void GiveAmmo(const std::string& ammo_name, size_t count);
 
-protected:
+    virtual void OnDamageDealt(bool was_kill) override;
+
+    protected:
+    virtual float GetHitBoneDamageMultiplier(const std::string_view hitbone) override;
+    
     virtual void OnRideableChanged() override;
     virtual void OnAimingChanged() override;
     virtual void OnHeldItemChanged() override;
     virtual bool HaveAmmo(const std::string& ammo_name) override;
     virtual size_t GetAmmo(size_t required, const std::string& ammo_name) override;
+    virtual void SpawnLoot() override;
 
 private:
     void UpdatePlayerCamera();
@@ -51,6 +58,8 @@ private:
 
     void UpdateHudData();
     void UpdateHudSlots();
+
+    void SendDeathMessage(std::string_view killer_name);
 
 private:
     Player* player_;

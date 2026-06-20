@@ -9,6 +9,8 @@
 #include "utils/allocnum.hpp"
 #include "player_character.hpp"
 #include "net/utils.hpp"
+#include "marker.hpp"
+#include "utils/math.hpp"
 
 game::World::World(std::string mapname) : Scheduler(time_ms_), map_(*this, std::move(mapname)) {}
 
@@ -236,17 +238,31 @@ void game::World::FireBullet(const BulletInfo& bullet)
         return;
     }
     
+    hit_normal = glm::normalize(hit_normal);
+
     auto obj_cb = collision::GetObjectCallback(hit_obj);
-    obj_cb->OnBulletHit(bullet, hit_obj);
-    
+    if (obj_cb)
+    {
+        // apply damage
+        DamageInfo damage;
+        damage.type = DAMAGE_BULLET;
+        damage.damage = bullet.damage;
+        damage.from_pos = bullet.start;
+        damage.impact_pos = hit_pos;
+        damage.inflictor = bullet.shooter;
+        damage.hit_object = hit_obj;
+        damage.normal = hit_normal;
+        obj_cb->ReceiveDamage(damage);
+    }
+
     // TODO: remove
-    const float box_extent = 0.1f;
+    // const float box_extent = 0.1f;
     // BeamBox(hit_pos - box_extent, hit_pos + box_extent, GetMaterialColor(material), 1.0f);
     
     // Beam(bullet.start, hit_pos, 0x0044DD, 0.04f);
 
     // effect
-    Effect(GetMaterialImpactFx(material), hit_pos, glm::normalize(hit_normal));
+    Effect(GetMaterialImpactFx(material), hit_pos, hit_normal);
 }
 
 void game::World::Beam(const glm::vec3& start, const glm::vec3& end, uint32_t color, float time)
@@ -301,6 +317,84 @@ void game::World::SendChat(const std::string& text)
     msg.Write(net::ChatMessage(text));
 }
 
+void game::World::CreateItemPickup(const glm::vec3& position, std::shared_ptr<ItemInstance> item, int64_t despawn_time,
+                                   int64_t respawn_time, size_t ammo_count)
+{
+    MarkerInfo marker_info{};
+    marker_info.position = position;
+    marker_info.type = MARKER_PICKUP;
+    marker_info.color = 0xFFFFFF;
+    marker_info.model = item->def->model_name;
+
+    auto& marker = Spawn<Marker>(marker_info);
+    marker.SetUseTarget(
+        "sebrat ^ccc" + item->def->displayname,
+        [](PlayerCharacter& character, UseTargetQueryResult& res) {
+            res.enabled = true;
+            res.delay = 0.1f;
+            res.error_text = nullptr;
+            return true;
+        },
+        [this, position, item, despawn_time, respawn_time, ammo_count, &marker](PlayerCharacter& character) {
+            auto player = character.GetPlayer();
+            if (!player)
+                return;
+
+            character.GiveItem(item);
+
+            if (ammo_count > 0)
+            {
+                character.GiveAmmo(item->def->ammo_type, ammo_count);
+            }
+
+            character.PlaySound("pickup_ammo");
+
+            player->SendChat("sebrals ^ccc" + item->def->displayname);
+            marker.SetUseable(false);
+            marker.Remove();
+
+            if (respawn_time > 0)
+            {
+                Schedule(respawn_time, [this, position, item, despawn_time, respawn_time, ammo_count]() {
+                    CreateItemPickup(position, item, despawn_time, respawn_time, ammo_count);
+                });
+            }
+        });
+
+    if (despawn_time > 0)
+    {
+        marker.Schedule(despawn_time, [&marker]{
+            marker.Remove();
+        });
+    }
+}
+
+static void ApplyCrashDamage(collision::ObjectCallback& obj_cb, collision::ObjectCallback* other_obj_cb, float impulse, const glm::vec3& normal, const glm::vec3& velocity)
+{
+    if (glm::length(impulse) < 1000.0f)
+        return;
+
+    if (normal.z < -0.707f)
+        return;
+
+    // float velocity_magnitude = glm::length(velocity);
+    float dmg = glm::mix(10.0f, 100.0f, impulse * 0.0001f);
+
+    // if (dmg < 10.0f)
+    //     return;
+
+    game::DamageInfo damage{};
+    damage.type = game::DAMAGE_CRASH;
+    damage.impulse = impulse;
+    damage.inflictor = other_obj_cb ? other_obj_cb->GetResponsibleCharacter() : nullptr;
+    damage.damage = dmg;
+
+    if (damage.inflictor)
+    {
+        obj_cb.ReceiveDamage(damage);
+    }
+}
+
 void game::World::HandleContacts()
 {
     auto& bt_world = GetBtWorld();
@@ -319,11 +413,21 @@ void game::World::HandleContacts()
 
         if (cb && (flags & collision::OF_NOTIFY_CONTACT))
         {
+            
             collision::ContactInfo info;
             info.pos = glm::vec3(pos.x(), pos.y(), pos.z());
             info.normal = glm::vec3(normal.x(), normal.y(), normal.z());
             info.impulse = impulse;
+            // info.other_velocity = glm::vec3(ov.x(), ov.y(), ov.z());
             cb->OnContact(info);
+        }
+        
+        if (cb && (flags & collision::OF_CRASH_DAMAGE))
+        {
+            auto ov = other_body->getLinearVelocity();
+            auto other_obj_cb = collision::GetObjectCallback(other_body);
+            ApplyCrashDamage(*cb, other_obj_cb, impulse, glm::normalize(glm::vec3(normal.x(), normal.y(), normal.z())),
+                             glm::vec3(ov.x(), ov.y(), ov.z()));
         }
 
         if (type == collision::OT_MAP_OBJECT && (flags & collision::OF_DESTRUCTIBLE))

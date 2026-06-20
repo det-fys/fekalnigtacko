@@ -1,8 +1,13 @@
 #include "character.hpp"
+
+#include <format>
+
 #include "assets/cache.hpp"
 #include "net/utils.hpp"
 #include "utils/math.hpp"
 #include "world.hpp"
+#include "utils/random.hpp"
+
 
 game::Character::Character(World& world, const CharacterTuning& tuning)
     : Super(world, net::ET_CHARACTER), tuning_(tuning), bt_shape_(tuning_.shape.radius, tuning_.shape.height)
@@ -43,6 +48,8 @@ void game::Character::Update()
     SyncTransformFromController();
     UpdateMovement();
     UpdateAiming();
+    UpdatePain();
+    UpdateAnimAngles();
     UpdateActionAnim();
     root_.UpdateMatrix();
     UpdateHitBones();
@@ -77,20 +84,47 @@ void game::Character::SendInitData(Player& player, net::OutMessage& msg) const
     msg.WriteAt(fields_pos, fields);
 }
 
-void game::Character::OnBulletHit(const game::BulletInfo& bullet, const btCollisionObject* hit_object)
+void game::Character::ReceiveDamage(const DamageInfo& damage)
 {
-    std::string_view hit_name = "???";
+    Super::ReceiveDamage(damage);
 
-    auto it = hitbone_names_.find(hit_object);
-    if (it != hitbone_names_.end())
+    if (!IsAlive())
     {
-        hit_name = it->second;
+        return; // already ded
     }
 
-    std::string text = "au! " + std::string(hit_name);
-    GetWorld().SendChat(text);
+    float actual_damage = damage.damage;
 
-    OnBulletHit(bullet, hit_name);
+    if (damage.type == DAMAGE_BULLET)
+    {
+        std::string_view hit_name;
+    
+        auto it = hitbone_names_.find(damage.hit_object);
+        if (it != hitbone_names_.end())
+        {
+            hit_name = it->second;
+        }
+
+        actual_damage *= GetHitBoneDamageMultiplier(hit_name);
+
+    }
+
+    health_ -= actual_damage;
+
+    // just died
+    if (health_ <= 0.0f)
+    {
+        health_ = 0.0f;
+        death_time_ = GetWorld().GetTime();
+
+        if (on_death_)
+            on_death_();
+    }
+
+    ApplyPain();
+
+    // std::string text = "au! " + std::string(hit_name);
+    // GetWorld().SendChat(text);
 }
 
 void game::Character::Attach(net::EntNum parentnum)
@@ -155,6 +189,11 @@ void game::Character::FinalizeFrame()
     Super::FinalizeFrame();
     pose_valid_ = false;
     hitbones_valid_ = false;
+}
+
+int64_t game::Character::GetDeathTime() const
+{
+     return GetWorld().GetTime() - death_time_;
 }
 
 game::Character::~Character()
@@ -226,6 +265,23 @@ void game::Character::SetViewItem(const std::string& item_name)
 void game::Character::SendFire()
 {
     auto msg = BeginEntMsg(net::EMSG_FIRE);
+}
+
+void game::Character::ApplyPain()
+{
+    pain_pitch_ = glm::clamp(pain_pitch_ + RandomFloat(glm::radians(-5.0f), glm::radians(20.0f)), glm::radians(-30.0f), glm::radians(30.0f));
+    pain_yaw_ = glm::clamp(pain_yaw_ + RandomFloat(glm::radians(-20.0f), glm::radians(20.0f)), glm::radians(-30.0f), glm::radians(30.0f));
+}
+
+float game::Character::GetHitBoneDamageMultiplier(const std::string_view hitbone)
+{
+    if (hitbone == "head" || hitbone == "neck")
+        return 3.0f;
+
+    if (hitbone == "torso1" || hitbone == "torso2")
+        return 1.0f;
+
+    return 0.2f;
 }
 
 void game::Character::SyncControllerTransform()
@@ -334,8 +390,8 @@ void game::Character::UpdateAiming()
     if (!aiming_)
     {
         delta = 6.0f / 25.0f;
-        MoveToward(animstate_.yaw, 0.0f, delta);
-        MoveToward(animstate_.pitch, 0.0f, delta);
+        MoveToward(aim_yaw_, 0.0f, delta);
+        MoveToward(aim_pitch_, 0.0f, delta);
         UpdateAimDirection();
         return;
     }
@@ -359,19 +415,19 @@ void game::Character::UpdateAiming()
     float yaw = glm::atan(-dir.x, dir.y);
 
     auto target_pitch = glm::clamp(pitch, glm::radians(-60.0f), glm::radians(55.0f)); // clamp to make it less weird
-    MoveToward(animstate_.pitch, target_pitch, delta);
+    MoveToward(aim_pitch_, target_pitch, delta);
 
     if (movement_ == CMT_DISABLED)
     {
         auto target_yaw = glm::mod(yaw + glm::pi<float>(), glm::two_pi<float>()) - glm::pi<float>();
         const float yaw_limit = glm::radians(120.0f);
         target_yaw = glm::clamp(target_yaw, -yaw_limit, yaw_limit);
-        MoveToward(animstate_.yaw, target_yaw, delta);
+        MoveToward(aim_yaw_, target_yaw, delta);
     }
     else
     {
         Turn(yaw_, yaw, delta);
-        MoveToward(animstate_.yaw, 0.0f, delta);
+        MoveToward(aim_yaw_, 0.0f, delta);
     }
 
     UpdateAimDirection();
@@ -381,8 +437,8 @@ void game::Character::UpdateAimDirection()
 {
     eye_pos_ = GetRoot().matrix * glm::vec4(0.0f, 0.0f, aim_z_offset_, 1.0f);
 
-    auto pitch = animstate_.pitch;
-    auto yaw = yaw_ + animstate_.yaw;
+    auto pitch = aim_pitch_;
+    auto yaw = yaw_ + aim_yaw_;
     aim_dir_ = glm::vec3(-glm::sin(yaw) * glm::cos(pitch), glm::cos(yaw) * glm::cos(pitch), glm::sin(pitch));
 
     if (parent_)
@@ -391,6 +447,19 @@ void game::Character::UpdateAimDirection()
     }
 
     // GetWorld().Beam(eye_pos_, eye_pos_ + aim_dir_ * 100.0f, 0x0000FF, 1.0f / 25.0f);
+}
+
+void game::Character::UpdatePain()
+{
+    float delta = 1.5f / 25.0f;
+    MoveToward(pain_yaw_, 0.0f, delta);
+    MoveToward(pain_pitch_, 0.0f, delta);
+}
+
+void game::Character::UpdateAnimAngles()
+{
+    animstate_.yaw = aim_yaw_ + pain_yaw_;
+    animstate_.pitch = aim_pitch_ + pain_pitch_;
 }
 
 void game::Character::UpdateSyncState()
@@ -684,7 +753,7 @@ game::CharacterPhysicsController::CharacterPhysicsController(Character& characte
     bt_ghost_.setCollisionShape(&bt_shape);
     bt_ghost_.setCollisionFlags(btCollisionObject::CF_CHARACTER_OBJECT);
 
-    collision::SetObjectInfo(&bt_ghost_, collision::OT_ENTITY, 0, &character);
+    collision::SetObjectInfo(&bt_ghost_, collision::OT_ENTITY, collision::OF_CRASH_DAMAGE, &character);
 
     bt_world_.addCollisionObject(&bt_ghost_, btBroadphaseProxy::CharacterFilter,
                                  btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter);

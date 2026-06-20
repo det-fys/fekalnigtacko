@@ -13,9 +13,11 @@ class DrivableVehicle : public Vehicle, public Usable, public Rideable
 public:
     using Super = Vehicle;
 
-    DrivableVehicle(World& world, const VehicleTuning& tuning);
+    DrivableVehicle(World& world, const VehicleSpawnInfo& info);
 
     virtual void Update() override;
+
+    virtual HumanCharacter* GetResponsibleCharacter() override;
 
     virtual void SetTuning(const VehicleTuning& tuning) override;
 
@@ -23,6 +25,8 @@ public:
     
     virtual bool QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res) override;
     virtual void Use(PlayerCharacter& character, uint32_t target_id) override;
+
+    virtual void ReceiveDamage(const DamageInfo& damage) override;
 
     virtual void SetRideableInput(PlayerInputFlags in) override;
 

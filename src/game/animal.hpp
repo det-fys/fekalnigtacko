@@ -25,6 +25,8 @@ public:
 
     virtual void Update() override;
 
+    virtual void ReceiveDamage(const DamageInfo& damage) override;
+
     virtual bool QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res) override;
     virtual void Use(PlayerCharacter& character, uint32_t target_id) override;
 
@@ -32,8 +34,6 @@ public:
     virtual void SetRideableViewAngles(float yaw, float pitch) override;
 
 protected:
-    virtual void OnBulletHit(const game::BulletInfo& bullet, const std::string_view hit_bone) override;
-
     virtual void OnPassengerChanged(size_t seat_idx, HumanCharacter* passenger) override;
     void SetUseMessage(const std::string& message);
     void AddAnimalSeat(const glm::vec3& offset);

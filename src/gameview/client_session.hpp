@@ -42,6 +42,7 @@ private:
     bool ProcessCameraMsg(net::InMessage& msg);
     bool ProcessChatMsg(net::InMessage& msg);
     bool ProcessHudMsg(net::InMessage& msg);
+    bool ProcessDamageMsg(net::InMessage& msg);
     bool ProcessUseTargetMsg(net::InMessage& msg);
     bool ProcessMenuMsg(net::InMessage& msg);
 
@@ -54,8 +55,6 @@ private:
     void DrawMenus(gui::Context& gui) const;
     bool ProcessMenuInput(game::PlayerInputType in);
     RemoteMenuView* FindMenu(net::MenuId id) const;
-
-    void DrawCrosshair(gui::Context& gui) const;
 
 private:
     App& app_;
@@ -72,8 +71,6 @@ private:
     gui::PlayerHud hud_;
 
     std::vector<std::unique_ptr<RemoteMenuView>> remote_menus_;
-
-    std::shared_ptr<const gfx::Texture> crosshair_texture_;
 };
 
 } // namespace game::view

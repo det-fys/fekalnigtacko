@@ -67,8 +67,8 @@ public:
 
     virtual void Update() override;
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
-
-    virtual void OnBulletHit(const game::BulletInfo& bullet, const btCollisionObject* hit_object);
+    
+    virtual void ReceiveDamage(const DamageInfo& damage) override;
 
     virtual void Attach(net::EntNum parentnum) override;
 
@@ -99,6 +99,12 @@ public:
     virtual void ActivateHitBones() override;
     virtual void FinalizeFrame() override;
 
+    float GetHealth() const { return health_; }
+    bool IsAlive() const { return death_time_ < 0; }
+    int64_t GetDeathTime() const;
+
+    void SetOnDeath(std::function<void()> cb) { on_death_ = std::move(cb); }
+
     ~Character() override;
     
 protected:
@@ -115,8 +121,9 @@ protected:
     void SetAimTarget(const glm::vec3& target);
     void SetViewItem(const std::string& item_name);
     void SendFire();
+    void ApplyPain();
 
-    virtual void OnBulletHit(const game::BulletInfo& bullet, const std::string_view hit_bone) {}
+    virtual float GetHitBoneDamageMultiplier(const std::string_view hitbone);
 
 private:
     void SyncControllerTransform();
@@ -125,6 +132,8 @@ private:
     void UpdateMovement();
     void UpdateAiming();
     void UpdateAimDirection();
+    void UpdatePain();
+    void UpdateAnimAngles();
     void UpdateSyncState();
     void SendUpdateMsg();
     CharacterSyncFieldFlags WriteState(net::OutMessage& msg, const CharacterSyncState& base) const;
@@ -165,6 +174,12 @@ private:
     float view_yaw_ = 0.0f;
     float view_pitch_ = 0.0f;
 
+    float aim_yaw_ = 0.0f;
+    float aim_pitch_ = 0.0f;
+
+    float pain_yaw_ = 0.0f;
+    float pain_pitch_ = 0.0f;
+
     SkeletonInstance sk_;
     CharacterAnimState animstate_;
 
@@ -193,6 +208,11 @@ private:
     size_t hitbones_timer_ = 0;
     bool hitbones_valid_ = false;
     std::map<const btCollisionObject*, std::string_view> hitbone_names_;
+
+    float health_ = 100.0f;
+    int64_t death_time_ = -1;
+
+    std::function<void()> on_death_;
 };
 
 } // namespace game

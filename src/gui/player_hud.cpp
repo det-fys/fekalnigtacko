@@ -1,6 +1,9 @@
-#include "player_hud.hpp"
-
 #include <format>
+
+#include "player_hud.hpp"
+#include "utils/math.hpp"
+
+#include "assets/cache.hpp"
 
 static uint32_t COLOR_ACTIVE = 0xFF00FFFF;
 static uint32_t COLOR_NORMAL = 0xFFFFFFFF;
@@ -19,6 +22,8 @@ static uint32_t COLOR_ERROR = 0xFF7777FF;
 
 gui::PlayerHud::PlayerHud(const float& time) : time_(time)
 {
+    crosshair_texture_ = assets::CacheManager::GetTexture("data/crosshair.png");
+
     UpdateWeaponSlotsText();
 }
 
@@ -49,11 +54,31 @@ void gui::PlayerHud::SetUseTargetData(std::string text, std::string error_text, 
     ut_end_time_ = delay > 0.01f ? ut_start_time_ + delay : ut_start_time_;
 }
 
-void gui::PlayerHud::Draw(Context& ctx) const 
+void gui::PlayerHud::ShowDamageReceived()
 {
+    damage_received_factor_ = glm::min(damage_received_factor_ + 0.2f, 0.5f);
+}
+
+void gui::PlayerHud::ShowDamageDealt(bool kill)
+{
+    (kill ? damage_dealt_kill_factor_ : damage_dealt_factor_) = 1.0f;
+}
+
+void gui::PlayerHud::Update(float delta_time)
+{
+    MoveToward(damage_received_factor_, 0.0f, 1.0f * delta_time);
+    MoveToward(damage_dealt_factor_, 0.0f, 5.0f * delta_time);
+    MoveToward(damage_dealt_kill_factor_, 0.0f, 2.0f * delta_time);
+}
+
+void gui::PlayerHud::Draw(Context& ctx) const
+{
+    DrawPain(ctx);
+    DrawCrosshair(ctx);
     DrawHealthBar(ctx);
     DrawItemInfo(ctx);
     DrawUseTarget(ctx);
+    DrawDeathScreen(ctx);
 }
 
 void gui::PlayerHud::UpdateWeaponSlotsText()
@@ -75,6 +100,41 @@ void gui::PlayerHud::UpdateWeaponSlotsText()
         weapon_slots_text_ += prefix;
         weapon_slots_text_ += std::to_string((slot + 1) % 10);
     }
+}
+
+void gui::PlayerHud::DrawPain(Context& ctx) const
+{
+    if (damage_received_factor_ <= 0.01f)
+        return;
+
+    glm::vec4 color(1.0f, 0.3f, 0.3f, damage_received_factor_);
+    ctx.DrawRect(glm::vec2(0.0f), ctx.GetViewportSize(), glm::packUnorm4x8(color));
+}
+
+void gui::PlayerHud::DrawCrosshair(Context& ctx) const
+{
+    if (!display_crosshair_)
+        return;
+
+    glm::vec3 color(1.0f);
+    if (damage_dealt_factor_ > 0.01f)
+    {
+        color = glm::mix(color, glm::vec3(0.3f), damage_dealt_factor_);
+    }
+
+    if (damage_dealt_kill_factor_ > 0.01f)
+    {
+        color = glm::mix(color, glm::vec3(1.0f, 0.1f, 0.1f), damage_dealt_kill_factor_);
+    }
+
+    const float crosshair_size = 32.0f;
+
+    auto& viewport_size = ctx.GetViewportSize();
+
+    auto p0 = viewport_size * 0.5f - crosshair_size * 0.5f;
+    auto p1 = p0 + crosshair_size;
+
+    ctx.DrawRect(p0, p1, glm::packUnorm4x8(glm::vec4(color, 1.0f)), crosshair_texture_.get());
 }
 
 void gui::PlayerHud::DrawHealthBar(Context& ctx) const
@@ -194,4 +254,12 @@ void gui::PlayerHud::DrawUseTarget(Context& ctx) const
         ctx.DrawRect(progress_p0, progress_p1, 0x77000000);
         ctx.DrawRect(progress_p0, progress_p1_bar, COLOR_ACTIVE);
     }
+}
+
+void gui::PlayerHud::DrawDeathScreen(Context& ctx) const
+{
+    if (!dead_)
+        return;
+
+    ctx.DrawTextAligned("si chcíp", ctx.GetViewportSize() * 0.5f, glm::vec2(-0.5f), 0xFFFFFFFF, 3.0f);
 }

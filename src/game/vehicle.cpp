@@ -5,6 +5,7 @@
 #include "player.hpp"
 #include "player_input.hpp"
 #include "utils/random.hpp"
+#include "utils/math.hpp"
 
 #include <iostream>
 
@@ -13,23 +14,24 @@ static std::shared_ptr<const assets::VehicleModel> LoadVehicleModelByName(const 
     return assets::CacheManager::GetVehicleModel("data/" + model_name + ".veh");
 }
 
-game::Vehicle::Vehicle(World& world, const VehicleTuning& tuning)
-    : Entity(world, net::ET_VEHICLE), tuning_(tuning), model_(LoadVehicleModelByName(tuning.model)),
-      tuninglist_(VehicleTuningList::LoadFromFile("data/" + tuning.model + ".tun"))
+game::Vehicle::Vehicle(World& world, const VehicleSpawnInfo& info)
+    : Entity(world, net::ET_VEHICLE), tuning_(info.tuning), model_(LoadVehicleModelByName(info.tuning.model)),
+      tuninglist_(VehicleTuningList::LoadFromFile("data/" + info.tuning.model + ".tun"))
 {
-    root_.local.position.z = 10.0f;
+    root_.local.position = info.position;
+    root_.local.rotation = glm::angleAxis(info.yaw, glm::vec3(0.0f, 0.0f, 1.0f));
 
     wheels_.resize(model_->GetWheels().size());
 
-    ApplyTuning(tuning);
+    ApplyTuning(info.tuning);
 
     // init deform
-    gfx::DeformGridInfo info{};
-    info.min = glm::vec3(-1.0f, -2.5f, 0.10f);
-    info.max = glm::vec3(1.0f, 2.0f, 1.8f);
-    info.res = glm::ivec3(8, 16, 8);
-    info.max_offset = 0.1f;
-    deformgrid_ = std::make_unique<DeformGrid>(info);
+    gfx::DeformGridInfo deform_info{};
+    deform_info.min = glm::vec3(-1.0f, -2.5f, 0.10f);
+    deform_info.max = glm::vec3(1.0f, 2.0f, 1.8f);
+    deform_info.res = glm::ivec3(8, 16, 8);
+    deform_info.max_offset = 0.1f;
+    deformgrid_ = std::make_unique<DeformGrid>(deform_info);
 
     Update();
 }
@@ -81,32 +83,32 @@ void game::Vehicle::OnContact(const collision::ContactInfo& info)
     if (info.impulse < 1000.0f)
         return;
 
-    if (health_ > 0.0f)
-    {
-        health_ -= info.impulse;
+    ApplyDamage(info.impulse * 0.01f);
+    Deform(info.pos, -glm::normalize(info.normal) * 0.1f, 1.0f);
 
-        if (health_ <= 0.0f) // just broken
-        {
-            PlaySound("breakwindow", 1.0f, 1.0f);
-        }
-    }
-
-    if (health_ <= 0.0f)
-    {
-        Deform(info.pos, -glm::normalize(info.normal) * 0.1f, 1.0f);
-    }
 }
 
-void game::Vehicle::OnBulletHit(const game::BulletInfo& bullet, const btCollisionObject* hit_object)
+void game::Vehicle::ReceiveDamage(const DamageInfo& damage)
 {
-    Super::OnBulletHit(bullet, hit_object);
+    Super::ReceiveDamage(damage);
 
     if (!physics_)
         return;
 
-    auto impulse = glm::normalize(bullet.end - bullet.start) * 100.0f;
-    physics_->GetBtBody().activate();
-    physics_->GetBtBody().applyCentralImpulse(btVector3(impulse.x, impulse.y, impulse.z));
+    if (damage.type == DAMAGE_BULLET)
+    {
+        // TODO: adjust impulse
+        auto impulse = damage.normal * -60.0f;
+        auto& bt_body = physics_->GetBtBody();
+        bt_body.activate();
+        bt_body.applyImpulse(btVector3(impulse.x, impulse.y, impulse.z),
+                             btVector3(damage.impact_pos.x, damage.impact_pos.y, damage.impact_pos.z) -
+                                 bt_body.getCenterOfMassPosition());
+
+        ApplyDamage(damage.damage * 0.2f);
+        // Deform(damage.impact_pos, damage.normal * -0.1f, 1.0f);
+    }
+
 }
 
 void game::Vehicle::SetInput(VehicleInputType type, bool enable)
@@ -188,7 +190,11 @@ void game::Vehicle::ProcessInput()
     float steeringClamp = std::max(minsc, (1.f - (std::abs(speed) / sl)) * maxsc);
     // steeringClamp = .5f;
     float steeringSpeed = steeringClamp * 5.0f;
+    if (steering_analog_)
+        steeringSpeed *= 3.0f;
+
     float steeringInc = steeringSpeed * t_delta;
+    float steeringDec = steeringInc * 2.0f;
 
     const bool in_forward = in_ & (1 << VIN_FORWARD);
     const bool in_backward = in_ & (1 << VIN_BACKWARD);
@@ -263,23 +269,9 @@ void game::Vehicle::ProcessInput()
     }
     else
     {
-        if (steering_ < target_steering_)
-        {
-            steering_ += steeringInc;
-            if (steering_ > target_steering_)
-                steering_ = target_steering_;
-        }
-        else if (steering_ > target_steering_)
-        {
-            steering_ -= steeringInc;
-            if (steering_ < target_steering_)
-                steering_ = target_steering_;
-        }
-
-        if (steering_ > steeringClamp)
-            steering_ = steeringClamp;
-        else if (steering_ < -steeringClamp)
-            steering_ = -steeringClamp;
+        auto target_steering_clamped = glm::clamp(target_steering_, -steeringClamp, steeringClamp);
+        MoveToward(steering_, target_steering_clamped,
+                   glm::abs(target_steering_clamped) < glm::abs(steering_) ? steeringInc : steeringDec);
     }
 
     auto& vehicle = physics_->GetBtVehicle();
@@ -537,6 +529,20 @@ void game::Vehicle::SendUpdateMsg()
     msg.WriteAt(fields_pos, fields);
 }
 
+void game::Vehicle::ApplyDamage(float damage)
+{
+    if (health_ <= 0.0f)
+        return;
+
+    health_ -= damage;
+
+    if (health_ <= 0.0f) // just broken
+    {
+        PlaySound("breakwindow", 1.0f, 1.0f);
+        health_ = 0.0f;
+    }
+}
+
 void game::Vehicle::WriteDeformSync(net::OutMessage& msg) const
 {
     const auto texels = deformgrid_->GetData();
@@ -568,6 +574,9 @@ void game::Vehicle::WriteDeformSync(net::OutMessage& msg) const
 
 void game::Vehicle::Deform(const glm::vec3& pos, const glm::vec3& deform, float radius)
 {
+    if (health_ > 0.0f)
+        return;
+
     net::PositionQ pos_q;
     net::PositionQ deform_q;
     net::EncodePosition(pos, pos_q);

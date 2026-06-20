@@ -1,6 +1,8 @@
 #include "player_character.hpp"
+
 #include "world.hpp"
 #include "input_mapping.hpp"
+#include "utils/random.hpp"
 
 game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const HumanCharacterTuning& tuning) : Super(world, tuning), player_(&player)
 {
@@ -11,6 +13,7 @@ game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const Human
 
     // give some shit
     GiveItem(std::make_shared<ItemInstance>("airsniper"), false);
+    GiveAmmo("pellet", 50);
     // GiveItem(std::make_shared<ItemInstance>("ak47"), false);
     // GiveItem(std::make_shared<ItemInstance>("uzi"), false);
 }
@@ -29,6 +32,38 @@ void game::PlayerCharacter::Update()
     }
 
     UpdateHudData();
+}
+
+void game::PlayerCharacter::ReceiveDamage(const DamageInfo& damage)
+{
+    if (!IsAlive())
+        return;
+
+    Super::ReceiveDamage(damage);
+
+    if (player_)
+    {
+        player_->DisplayDamageEvent(DAMAGE_EVENT_RECEIVED);
+    }
+
+    if (!IsAlive())
+    {
+        // just died
+        std::string_view killer_name;
+        auto killer_character = dynamic_cast<PlayerCharacter*>(damage.inflictor);
+        if (killer_character)
+        {
+            auto killer_player = killer_character->GetPlayer();
+            if (killer_player)
+            {
+                killer_name = killer_player->GetName();
+            }
+        }
+
+        SendDeathMessage(killer_name);
+        SetNametag(std::string{});
+
+    }
 }
 
 void game::PlayerCharacter::ProcessInput(PlayerInputType type, bool enabled)
@@ -108,6 +143,19 @@ void game::PlayerCharacter::GiveAmmo(const std::string& ammo_name, size_t count)
     inventory_->ammo[ammo_name] += count;
 }
 
+void game::PlayerCharacter::OnDamageDealt(bool was_kill)
+{
+    if (!player_)
+        return;
+
+    player_->DisplayDamageEvent(was_kill ? DAMAGE_EVENT_DEALT_KILL : DAMAGE_EVENT_DEALT);
+}
+
+float game::PlayerCharacter::GetHitBoneDamageMultiplier(const std::string_view hitbone)
+{
+    return 0.25f * Super::GetHitBoneDamageMultiplier(hitbone);
+}
+
 void game::PlayerCharacter::OnRideableChanged()
 {
     UpdatePlayerCamera();
@@ -152,6 +200,24 @@ size_t game::PlayerCharacter::GetAmmo(size_t required, const std::string& ammo_n
     return give;
 }
 
+void game::PlayerCharacter::SpawnLoot()
+{
+    if (!inventory_)
+        return;
+
+    for (auto& slot : inventory_->slots)
+    {
+        if (!slot)
+            continue;
+
+        size_t ammo = GetAmmo(slot->def->clip_size * 5, slot->def->ammo_type);
+        auto pos = root_.GetGlobalPosition() + glm::vec3(RandomFloat(-1.0f, 1.0f), RandomFloat(-1.0f, 1.0f), RandomFloat(-0.1f, 1.0f));
+        GetWorld().CreateItemPickup(pos, std::move(slot), RandomInt(59000, 61000), 0, ammo);
+    }
+
+    inventory_.reset();
+}
+
 void game::PlayerCharacter::UpdatePlayerCamera()
 {
     if (!player_)
@@ -169,8 +235,8 @@ void game::PlayerCharacter::UpdatePlayerCamera()
 
 void game::PlayerCharacter::UpdateInputs()
 {
-    auto in = player_ ? player_->GetInput() : 0;
-
+    auto in = (player_ && IsAlive()) ? player_->GetInput() : 0;
+    
     if (auto rideable = GetRideable(); rideable)
     {
         SetInputs(0);
@@ -199,7 +265,7 @@ void game::PlayerCharacter::UpdateInputs()
 
 void game::PlayerCharacter::UpdateAimTarget()
 {
-    if (!player_)
+    if (!player_ || !IsAlive())
         return;
 
     glm::vec3 eye, forward;
@@ -221,7 +287,7 @@ void game::PlayerCharacter::UpdateAimTarget()
 
 void game::PlayerCharacter::CheckItemSwitch()
 {
-    if (!player_ || !inventory_)
+    if (!player_ || !inventory_ || !IsAlive())
         return;
     
     auto in = player_->GetNewInput();
@@ -245,7 +311,7 @@ void game::PlayerCharacter::CheckItemSwitch()
 void game::PlayerCharacter::UpdateUseTarget()
 {
     UseTargetQueryResult res{};
-    auto new_use_target = world_.GetBestUseTarget(*this, res);
+    auto new_use_target = IsAlive() ? world_.GetBestUseTarget(*this, res) : nullptr;
 
     if (new_use_target != use_target_ || res.enabled != use_enabled_ || res.error_text != use_error_ || res.delay != use_delay_)
     {
@@ -274,6 +340,9 @@ void game::PlayerCharacter::UpdateUseTarget()
 
 void game::PlayerCharacter::UseChanged(bool enabled)
 {
+    if (!IsAlive())
+        return;
+
     if (!use_target_)
     {
         // exit rideable if not target
@@ -336,8 +405,10 @@ void game::PlayerCharacter::UpdateHudData()
     if (!player_)
         return;
 
-    hud_data_.health = 100;
+    // general
+    hud_data_.health = static_cast<uint8_t>(GetHealth());
 
+    // item
     const auto& item = GetHeldItem();
     hud_data_.ammo_loaded = item ? item->ammo : 0;
 
@@ -351,6 +422,9 @@ void game::PlayerCharacter::UpdateHudData()
         }
     }
 
+    // death
+    hud_data_.dead = IsDead() ? 1 : 0;
+
     player_->SetHudData(hud_data_);
 }
 
@@ -358,7 +432,7 @@ void game::PlayerCharacter::UpdateHudSlots()
 {
     hud_data_.weapon_slots = 0;
 
-    if (!inventory_)
+    if (!inventory_ || IsDead())
         return;
 
     for (size_t i = 0; i < 10; ++i)
@@ -367,5 +441,77 @@ void game::PlayerCharacter::UpdateHudSlots()
             hud_data_.weapon_slots |= 1 << i;
     }
 
+
+}
+
+static std::string_view GetRandomDeathMessageFormat()
+{
+    switch (rand() % 8)
+    {
+    case 1:
+        return "byl zneškodněn";
+    case 2:
+        return "chcíp";
+    case 3:
+        return "umříl";
+    case 4:
+        return "umřel";
+    case 5:
+        return "pošel";
+    case 6:
+        return "odešel na věčné časy";
+    case 7:
+        return "už není mezi námi";
+    default:
+        return "zesnul";
+    }
+}
+
+static std::string_view GetRandomDeathMessageFormatKilled()
+{
+    switch (rand() % 8)
+    {
+    case 0:
+        return "zneškodnil";
+    case 1:
+        return "vyřešil";
+    case 2:
+        return "zajebal";
+    case 3:
+        return "zlikvidoval";
+    case 4:
+        return "odstranil";
+    case 5:
+        return "terminoval";
+    case 6:
+        return "zabil";
+    default:
+        return "kilnul";
+    }
+}
+
+void game::PlayerCharacter::SendDeathMessage(std::string_view killer_name)
+{
+    if (!player_)
+        return;
+
+    std::string message;
+
+    if (killer_name.empty())
+    {
+        message += player_->GetName();
+        message += "^r ";
+        message += GetRandomDeathMessageFormat();
+    }
+    else
+    {
+        message += killer_name;
+        message += "^r ";
+        message += GetRandomDeathMessageFormatKilled();
+        message += " ";
+        message += player_->GetName();
+    }
+
+    GetWorld().SendChat(message);
 
 }

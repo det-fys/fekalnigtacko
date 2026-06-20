@@ -44,6 +44,8 @@ public:
     void SetHudData(const PlayerHudData& hud_data);
     void ResetHudData();
 
+    void DisplayDamageEvent(DamageEventType type);
+
     const std::string& GetName() const { return name_; }
 
     PlayerInputFlags GetInput() const { return in_; }
@@ -62,6 +64,8 @@ private:
     void UpdateCullPos();
     void SendWorldMsg();
     void SendWorldUpdateMsg();
+    void SendDamageEvents();
+    void SendDamageEvent(DamageEventType type);
     void SendEnv();
 
     // entities sync
@@ -106,6 +110,7 @@ private:
 
     // hud
     PlayerHudData hud_data_;
+    uint8_t dmg_event_flags_ = 0;
 };
 
 }

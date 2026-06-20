@@ -5,7 +5,8 @@
 
 namespace game
 {
-    struct BulletInfo;
+    struct DamageInfo;
+    class HumanCharacter;
 }
 
 namespace collision
@@ -42,6 +43,7 @@ enum ObjectFlag : ObjectFlags
     OF_NOTIFY_CONTACT = 2,
     OF_USABLE = 4,
     OF_DESTRUCTING = 8,
+    OF_CRASH_DAMAGE = 16,
 };
 
 struct ContactInfo
@@ -59,8 +61,9 @@ public:
     virtual void ActivateHitBones() {}
     
     virtual void OnContact(const ContactInfo& info) {}
-    virtual void OnBulletHit(const game::BulletInfo& bullet, const btCollisionObject* hit_object) {}
+    virtual void ReceiveDamage(const game::DamageInfo& damage) {}
     
+    virtual game::HumanCharacter* GetResponsibleCharacter() { return nullptr; }
 
     virtual ~ObjectCallback() = default;
 };

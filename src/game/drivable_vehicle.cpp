@@ -3,7 +3,7 @@
 #include "utils/random.hpp"
 #include "input_mapping.hpp"
 
-game::DrivableVehicle::DrivableVehicle(World& world, const VehicleTuning& tuning) : Vehicle(world, tuning), Usable(GetRoot().matrix), Rideable(*this, RIDEABLE_VEHICLE)
+game::DrivableVehicle::DrivableVehicle(World& world, const VehicleSpawnInfo& info) : Vehicle(world, info), Usable(GetRoot().matrix), Rideable(*this, RIDEABLE_VEHICLE)
 {
     InitSeats();
     OnPhysicsChanged();
@@ -16,6 +16,11 @@ void game::DrivableVehicle::Update()
 
     Super::Update();
 
+}
+
+game::HumanCharacter* game::DrivableVehicle::GetResponsibleCharacter()
+{
+    return GetPassenger(0);
 }
 
 void game::DrivableVehicle::SetTuning(const VehicleTuning& tuning)
@@ -51,6 +56,12 @@ void game::DrivableVehicle::Use(PlayerCharacter& character, uint32_t target_id)
 
     character.Ride(this, target_id);
     PlaySound("cardoor", 1.0f, RandomFloat(0.9f, 1.1f));
+}
+
+void game::DrivableVehicle::ReceiveDamage(const DamageInfo& damage)
+{
+    Super::ReceiveDamage(damage);
+    OnRideableDamaged(damage);
 }
 
 void game::DrivableVehicle::SetRideableInput(PlayerInputFlags in)

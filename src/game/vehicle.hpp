@@ -59,18 +59,25 @@ private:
     std::unique_ptr<btCollisionObject> bullet_hitbox_;
 };
 
+struct VehicleSpawnInfo
+{
+    glm::vec3 position;
+    float yaw;
+    VehicleTuning tuning;
+};
+
 class Vehicle : public Entity
 {
 public:
     using Super = Entity;
 
-    Vehicle(World& world, const VehicleTuning& tuning);
+    Vehicle(World& world, const VehicleSpawnInfo& info);
 
     virtual void Update() override;
     virtual void SendInitData(Player& player, net::OutMessage& msg) const override;
 
     virtual void OnContact(const collision::ContactInfo& info) override;
-    virtual void OnBulletHit(const game::BulletInfo& bullet, const btCollisionObject* hit_object);
+    virtual void ReceiveDamage(const DamageInfo& damage) override;
 
     void SetInput(VehicleInputType type, bool enable);
     void SetInputs(VehicleInputFlags inputs) { in_ = inputs; }
@@ -102,6 +109,8 @@ private:
 
     VehicleSyncFieldFlags WriteState(net::OutMessage& msg, const VehicleSyncState& base) const;
     void SendUpdateMsg();
+
+    void ApplyDamage(float damage);
 
     void WriteDeformSync(net::OutMessage& msg) const;
     void Deform(const glm::vec3& pos, const glm::vec3& deform, float radius);
@@ -136,7 +145,7 @@ private:
 
     VehicleInputFlags in_ = 0;
 
-    float health_ = 10000.0f;
+    float health_ = 100.0f;
 
     float crash_intensity_ = 0.0f;
     size_t no_crash_frames_ = 0;

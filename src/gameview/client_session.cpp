@@ -12,8 +12,6 @@
 
 game::view::ClientSession::ClientSession(App& app) : app_(app), hud_(app.GetTime())
 {
-    crosshair_texture_ = assets::CacheManager::GetTexture("data/crosshair.png");
-
     // send login
     auto msg = BeginMsg(net::MSG_ID);
     msg.Write<net::Version>(FEKAL_VERSION);
@@ -53,6 +51,9 @@ bool game::view::ClientSession::ProcessSingleMessage(net::MessageType type, net:
 
     case net::MSG_HUD:
         return ProcessHudMsg(msg);
+
+    case net::MSG_DAMAGE:
+        return ProcessDamageMsg(msg);
 
     case net::MSG_USETARGET:
         return ProcessUseTargetMsg(msg);
@@ -100,6 +101,8 @@ void game::view::ClientSession::Update(const UpdateInfo& info)
         SendViewAngles(info.time);
         UpdateCamera(info);
     }
+
+    hud_.Update(info.delta_time);
 }
 
 void game::view::ClientSession::Draw(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui)
@@ -110,7 +113,6 @@ void game::view::ClientSession::Draw(gfx::DrawList& dlist, gfx::DrawListParams& 
 
         if (world_->IsLoaded())
         {
-            DrawCrosshair(gui);
             hud_.Draw(gui);
         }
     }
@@ -188,16 +190,18 @@ bool game::view::ClientSession::ProcessHudMsg(net::InMessage& msg)
         hud_data.held_item = item_name;
 
         // determine clip size
+        std::string displayname = hud_data.held_item;
         size_t clip_size = 0;
         size_t item_slot = 0;
         if (!hud_data.held_item.empty())
         {
             auto item = assets::CacheManager::GetItem("data/" + hud_data.held_item + ".item");
+            displayname = item->displayname;
             clip_size = item->clip_size;
             item_slot = item->slot;
         }
 
-        hud_.SetItemInfo(hud_data.held_item, item_slot, clip_size);
+        hud_.SetItemInfo(displayname, item_slot, clip_size);
     }
 
     if (fields & PHUD_AMMO_LOADED)
@@ -214,6 +218,32 @@ bool game::view::ClientSession::ProcessHudMsg(net::InMessage& msg)
             return false;
 
         hud_.SetTotalAmmo(static_cast<size_t>(hud_data.ammo_total));
+    }
+
+    if (fields & PHUD_DEATH)
+    {
+        if (!msg.Read(hud_data.dead))
+            return false;
+
+        hud_.SetDead(hud_data.dead > 0);
+    }
+
+    return true;
+}
+
+bool game::view::ClientSession::ProcessDamageMsg(net::InMessage& msg)
+{
+    DamageEventType type;
+    if (!msg.Read(type))
+        return false;
+
+    if (type == DAMAGE_EVENT_RECEIVED)
+    {
+        hud_.ShowDamageReceived();
+    }
+    else
+    {
+        hud_.ShowDamageDealt(type == DAMAGE_EVENT_DEALT_KILL);
     }
 
     return true;
@@ -275,6 +305,8 @@ void game::view::ClientSession::UpdateCamera(const UpdateInfo& info)
     camera_controller_.SetAiming(camera_info_.flags & CAM_AIMING);
     camera_controller_.Update(info.delta_time);
     camera_controller_.Recalculate(world_.get());
+
+    hud_.SetDisplayCrosshair(camera_controller_.GetAimFactor() >= 0.5f);
 }
 
 void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui)
@@ -366,17 +398,3 @@ game::view::RemoteMenuView* game::view::ClientSession::FindMenu(net::MenuId id) 
     return nullptr;
 }
 
-void game::view::ClientSession::DrawCrosshair(gui::Context& gui) const
-{
-    if (camera_controller_.GetAimFactor() < 0.5f)
-        return; // no aiming no crosshair
-
-    const float crosshair_size = 32.0f;
-
-    auto& viewport_size = gui.GetViewportSize();
-
-    auto p0 = viewport_size * 0.5f - crosshair_size * 0.5f;
-    auto p1 = p0 + crosshair_size;
-
-    gui.DrawRect(p0, p1, 0xFFFFFFFF, crosshair_texture_.get());
-}

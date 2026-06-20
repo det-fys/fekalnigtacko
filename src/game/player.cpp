@@ -36,6 +36,7 @@ void game::Player::Update()
     SyncWorld();
     SendMenuMsgs();
     UpdateCamera();
+    SendDamageEvents();
 
     // reset for next frame
     in_new_ = 0;
@@ -145,6 +146,13 @@ void game::Player::SetHudData(const PlayerHudData& hud_data)
         msg.Write(hud_data.ammo_total);
     }
 
+    if (hud_data.dead != hud_data_.dead)
+    {
+        fields |= PHUD_DEATH;
+        hud_data_.dead = hud_data.dead;
+        msg.Write(hud_data.dead);
+    }
+
     if (fields == 0)
     {
         DiscardMsg();
@@ -157,6 +165,11 @@ void game::Player::SetHudData(const PlayerHudData& hud_data)
 void game::Player::ResetHudData()
 {
     SetHudData(PlayerHudData{});
+}
+
+void game::Player::DisplayDamageEvent(DamageEventType type)
+{
+    dmg_event_flags_ |= 1 << type;
 }
 
 bool game::Player::GetView(glm::vec3& eye, glm::vec3& forward)
@@ -234,6 +247,26 @@ void game::Player::SendWorldUpdateMsg()
 
     // local msgs
     world_->PickLocalMsgs(*this, cull_pos_);
+}
+
+void game::Player::SendDamageEvents()
+{
+    if (dmg_event_flags_ & (1 << DAMAGE_EVENT_RECEIVED))
+        SendDamageEvent(DAMAGE_EVENT_RECEIVED);
+
+    if (dmg_event_flags_ & (1 << DAMAGE_EVENT_DEALT))
+        SendDamageEvent(DAMAGE_EVENT_DEALT);
+
+    if (dmg_event_flags_ & (1 << DAMAGE_EVENT_DEALT_KILL))
+        SendDamageEvent(DAMAGE_EVENT_DEALT_KILL);
+
+    dmg_event_flags_ = 0;
+}
+
+void game::Player::SendDamageEvent(DamageEventType type)
+{
+    auto msg = BeginMsg(net::MSG_DAMAGE);
+    msg.Write(type);
 }
 
 void game::Player::SendEnv()

@@ -27,13 +27,16 @@ public:
 
     PlayerCharacter* GetPlayerCharacter(Player& player);
 
+    void SetSpawnPoint(const glm::vec3& pos) { spawnpoint_ = pos; }
+    const glm::vec3& GetSpawnPoint() const { return spawnpoint_; }
+
 private:
     PlayerCharacter& CreatePlayerCharacter(Player& player, const HumanCharacterTuning& tuning, const glm::vec3& position, float yaw);
     void RemovePlayerCharacter(Player& player);
 
 private:
     std::map<Player*, PlayerCharacter*> player_characters_;
-
+    glm::vec3 spawnpoint_{};
 
 };
 

@@ -20,20 +20,31 @@ public:
 
     void SetUseTargetData(std::string text, std::string error_text, float delay);
 
+    void SetDisplayCrosshair(bool show) { display_crosshair_ = show; }
+    void ShowDamageReceived();
+    void ShowDamageDealt(bool kill);
 
+    void SetDead(bool dead) { dead_ = dead; }
+
+    void Update(float delta_time);
     void Draw(Context& ctx) const;
 
 private:
     void UpdateWeaponSlotsText();
 
+    void DrawPain(Context& ctx) const;
+    void DrawCrosshair(Context& ctx) const;
     void DrawHealthBar(Context& ctx) const;
     void DrawItemInfo(Context& ctx) const;
-
     void DrawUseTarget(Context& ctx) const;
+    void DrawDeathScreen(Context& ctx) const;
 
 private:
     const float& time_; 
     
+    // resources
+    std::shared_ptr<const gfx::Texture> crosshair_texture_;
+
     // general
     float health_ = 0.0f;
 
@@ -54,8 +65,14 @@ private:
     float ut_start_time_ = 0.0f;
     float ut_end_time_ = 0.0f;
 
-
-
+    // crosshair & events
+    bool display_crosshair_ = false;
+    float damage_received_factor_ = 0.0f;
+    float damage_dealt_factor_ = 0.0f;
+    float damage_dealt_kill_factor_ = 0.0f;
+    
+    // death
+    bool dead_ = false;
 
 };
 

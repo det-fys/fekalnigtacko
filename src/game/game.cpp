@@ -4,9 +4,6 @@
 #include "player.hpp"
 #include "player_character.hpp"
 
-static constexpr glm::vec3 openworld_spawn(100.0f, 100.0f, 1.0f);
-static constexpr glm::vec3 test_spawn(0.0f, 0.0f, 0.1f);
-
 static uint32_t GetRandomColor24()
 {
     uint8_t r, g, b;
@@ -56,7 +53,7 @@ void game::Game::PlayerJoined(Player& player)
     tuning.clothes.push_back({"tshirt", GetRandomColor24()});
     tuning.clothes.push_back({"shorts", GetRandomColor24()});
 
-    openworld_->InsertPlayer(player, tuning, openworld_spawn, 0.0f);
+    openworld_->InsertPlayer(player, tuning, openworld_->GetSpawnPoint(), 0.0f);
 }
 
 void game::Game::PlayerViewAnglesChanged(Player& player, float yaw, float pitch)
@@ -158,18 +155,19 @@ game::PlayerCharacter& game::Game::MovePlayerToWorld(PlayerGameInfo& player_info
 void game::Game::MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& new_world, const glm::vec3& pos,
                                     float yaw)
 {
-    auto& tuning = vehicle.GetTuning();
-    auto& new_vehicle = new_world.Spawn<DrivableVehicle>(tuning);
-    new_vehicle.SetPosition(pos);
-    // TODO: yaw
-
+    VehicleSpawnInfo vehicle_info{};
+    vehicle_info.tuning = vehicle.GetTuning();
+    vehicle_info.position = pos;
+    vehicle_info.yaw = yaw;
+    auto& new_vehicle = new_world.Spawn<DrivableVehicle>(vehicle_info);
+    
     // move passengers
     size_t num_seats = vehicle.GetNumSeats();
     for (size_t i = 0; i < num_seats; ++i)
     {
         auto passenger = vehicle.GetPassenger(i);
-        if (!passenger)
-            continue; // empty seat
+        if (!passenger || !passenger->IsAlive())
+            continue; // empty seat or ded
 
         auto player_passenger = dynamic_cast<PlayerCharacter*>(passenger);
         if (!player_passenger)

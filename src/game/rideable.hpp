@@ -33,8 +33,12 @@ public:
     virtual void SetRideableInput(PlayerInputFlags in) {}
     virtual void SetRideableViewAngles(float yaw, float pitch) {}
     
+    void OnRideableDamaged(const DamageInfo& damage) const;
+    
     RideableType GetRideableType() const { return type_; }
     
+    bool IsAbandoned(int64_t time) const;
+
     Entity& GetEntity() { return entity_; }
     const Entity& GetEntity() const { return entity_; }
 
@@ -45,9 +49,14 @@ protected:
     virtual void OnPassengerChanged(size_t seat_idx, HumanCharacter* passenger) {}
 
 private:
+    void UpdateLeaveTime();
+
+private:
     Entity& entity_;
     RideableType type_;
     std::vector<RideableSeat> seats_;
+
+    int64_t last_passenger_leave_time_ = -1;
 };
 
 

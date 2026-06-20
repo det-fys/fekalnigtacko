@@ -24,6 +24,10 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
         {
             iss >> item->name;
         }
+        else if (command == "displayname")
+        {
+            item->displayname = ParseString(iss);
+        }
         else if (command == "anim")
         {
             std::string anim_type, anim_name;
@@ -146,11 +150,20 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
         {
             iss >> item->walk_speed_mult;
         }
+        else if (command == "damage")
+        {
+            iss >> item->damage;
+        }
         else
         {
             throw std::runtime_error("Unknown item command: " + command);
         }
     });
 
+    if (item->displayname.empty())
+    {
+        item->displayname = item->name;
+    }
+    
     return item;
 }

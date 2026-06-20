@@ -26,6 +26,19 @@ void game::HumanCharacter::Update()
     Super::Update();
 }
 
+void game::HumanCharacter::ReceiveDamage(const DamageInfo& damage)
+{
+    if (!IsAlive())
+        return;
+
+    Super::ReceiveDamage(damage);
+
+    if (damage.inflictor && damage.inflictor != this)
+    {
+        damage.inflictor->OnDamageDealt(!IsAlive());
+    }
+}
+
 void game::HumanCharacter::SetRideable(Rideable* rideable, size_t seat_idx)
 {
     if (rideable == rideable_ && seat_idx == seat_idx_)
@@ -66,7 +79,15 @@ void game::HumanCharacter::Ride(Rideable* rideable, size_t seat_idx)
 
 void game::HumanCharacter::Equip(std::shared_ptr<ItemInstance> item)
 {
+    if (!IsAlive() && item)
+        return;
+
     pending_item_ = std::move(item);
+}
+
+bool game::HumanCharacter::IsDead() const
+{
+    return actionstate_ == ACTION_DEAD;
 }
 
 game::HumanCharacter::~HumanCharacter()
@@ -82,6 +103,11 @@ bool game::HumanCharacter::HaveAmmo(const std::string& ammo_name)
 size_t game::HumanCharacter::GetAmmo(size_t required, const std::string& ammo_name)
 {
     return required; // unlimited by default
+}
+
+bool game::HumanCharacter::IsOnFoot() const
+{
+    return state_ == HS_ON_FOOT;
 }
 
 int64_t game::HumanCharacter::GetTime() const
@@ -122,7 +148,7 @@ void game::HumanCharacter::Fire()
     game::BulletInfo bullet{};
     bullet.start = GetEyePosition();
     bullet.end = bullet.start + ApplyRandomDispersion(GetAimDirection(), dispersion_) * range;
-    bullet.damage = 1.0f;
+    bullet.damage = item_->def->damage;
     bullet.shooter = this;
     GetWorld().FireBullet(bullet);
 
@@ -197,6 +223,13 @@ void game::HumanCharacter::UpdateItemStuff()
     }
 }
 
+void game::HumanCharacter::ClearItem()
+{
+    auto item = item_;
+    Equip(nullptr);
+    SwitchItem();
+}
+
 void game::HumanCharacter::PlayItemActionAnim(const std::string assets::Item::*anim, float speed)
 {
     if (!item_)
@@ -206,6 +239,34 @@ void game::HumanCharacter::PlayItemActionAnim(const std::string assets::Item::*a
     }
 
     PlayActionAnim(item_->def.get()->*anim, speed);
+}
+
+void game::HumanCharacter::PlayDeathAnim()
+{
+    if (state_ == HS_ON_FOOT)
+    {
+        PlayActionAnim("die", 1.5f);
+    }
+    else if (state_ == HS_RIDING)
+    {
+        if (GetVehicle())
+        {
+            PlayActionAnim(IsDriver() ? "vehicle_drive_die" : "vehicle_passenger_die", 1.0f);
+        }
+        else
+        {
+            PlayActionAnim("vehicle_passenger_die_animal", 1.0f);
+        }
+    }
+}
+
+void game::HumanCharacter::TrySpawnLoot()
+{
+    if (loot_spawned_)
+        return;
+    
+    loot_spawned_ = true;
+    SpawnLoot();
 }
 
 void game::HumanCharacter::UpdateState()
@@ -309,7 +370,7 @@ game::HumanCharacterState game::HumanCharacter::StateOnFootUpdate()
     if (PopSignal(HSS_KNOCK_DOWN))
         return HS_KNOCKED_DOWN;
 
-    SetMovementType(aimheld_ ? CMT_DIRECTIONAL : CMT_TURN);
+    SetMovementType(IsAlive() ? (aimheld_ ? CMT_DIRECTIONAL : CMT_TURN) : CMT_DISABLED);
 
     return HS_ON_FOOT;
 }
@@ -432,6 +493,18 @@ void game::HumanCharacter::EnterActionState(ActionState state)
         PlayItemActionAnim(&assets::Item::raise_anim, -3.0f);
         break;
     
+    case ACTION_DIE:
+        SetAiming(false);
+        SetCanSprint(false);
+        PlayDeathAnim();
+        break;
+
+    case ACTION_DEAD:
+        EnablePhysics(false);
+        ClearItem();
+        TrySpawnLoot();
+        break;
+
     default:
         break;
     }
@@ -447,6 +520,9 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
     switch (actionstate_)
     {
     case ACTION_IDLE:
+        if (!IsAlive())
+            return ACTION_DIE;
+
         if (PendingItemSwitch())
             return ACTION_PUTAWAY;
 
@@ -459,6 +535,9 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
         return ACTION_IDLE;
 
     case ACTION_RAISE:
+        if (!IsAlive())
+            return ACTION_DIE;
+
         if (PendingItemSwitch())
             return ACTION_PUTAWAY;
 
@@ -468,6 +547,9 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
         return ACTION_RAISE;
 
     case ACTION_AIM:
+        if (!IsAlive())
+            return ACTION_DIE;
+
         if (!aimheld_ || !CanAim())
             return ACTION_UNAIM;
 
@@ -477,6 +559,9 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
         return ACTION_AIM;
 
     case ACTION_AIMING:
+        if (!IsAlive())
+            return ACTION_DIE;
+
         if (!aimheld_ || !CanAim())
             return ACTION_UNAIM;
 
@@ -486,6 +571,9 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
         return ACTION_AIMING;
 
     case ACTION_FIRE:
+        if (!IsAlive())
+            return ACTION_DIE;
+
         if (IsActionAnimDone())
             return ACTION_AIMING;
 
@@ -502,6 +590,9 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
         return ACTION_FIRE_REPEAT; 
 
     case ACTION_RELOAD:
+        if (!IsAlive())
+            return ACTION_DIE;
+
         // SetAiming(aimheld_); // optional here
         if (IsActionAnimDone())
         {
@@ -512,6 +603,9 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
         return ACTION_RELOAD;
 
     case ACTION_UNAIM:
+        if (!IsAlive())
+            return ACTION_DIE;
+
         if (aimheld_ && CanAim()) // start aiming again
             return ACTION_AIM;
         
@@ -521,6 +615,9 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
         return ACTION_UNAIM;
 
     case ACTION_PUTAWAY:
+        if (!IsAlive())
+            return ACTION_DIE;
+
         if (IsActionAnimDone())
             return ACTION_RAISE;
 
@@ -528,6 +625,15 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
             return ACTION_RAISE;
 
         return ACTION_PUTAWAY;
+
+    case ACTION_DIE:
+        if (IsActionAnimDone())
+            return ACTION_DEAD;
+        
+        return ACTION_DIE;
+    
+    case ACTION_DEAD: 
+        return ACTION_DEAD; // no way back :(
 
     default:
         return actionstate_;

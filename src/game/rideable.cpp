@@ -2,7 +2,12 @@
 
 #include <stdexcept>
 
-game::Rideable::Rideable(Entity& entity, RideableType type) : entity_(entity), type_(type) {}
+#include "world.hpp"
+
+game::Rideable::Rideable(Entity& entity, RideableType type) : entity_(entity), type_(type)
+{
+    last_passenger_leave_time_ = entity_.GetWorld().GetTime();
+}
 
 void game::Rideable::SetPassenger(size_t seat_idx, HumanCharacter* passenger) 
 {
@@ -29,6 +34,7 @@ void game::Rideable::SetPassenger(size_t seat_idx, HumanCharacter* passenger)
     }
 
     OnPassengerChanged(seat_idx, passenger);
+    UpdateLeaveTime();
 }
 
 game::HumanCharacter* game::Rideable::GetPassenger(size_t seat_idx) const
@@ -56,6 +62,28 @@ void game::Rideable::KickAll()
     }
 }
 
+void game::Rideable::OnRideableDamaged(const DamageInfo& damage) const
+{
+    for (const auto& seat : seats_)
+    {
+        if (seat.passenger)
+        {
+            seat.passenger->OnRideableDamaged(damage);
+        }
+    }
+}
+
+bool game::Rideable::IsAbandoned(int64_t time) const
+{
+    // still someone in
+    if (last_passenger_leave_time_ < 0)
+    {
+        return false;
+    }
+
+    return entity_.GetWorld().GetTime() - last_passenger_leave_time_ >= time;
+}
+
 game::Rideable::~Rideable()
 {
     // kick passengers
@@ -68,4 +96,26 @@ size_t game::Rideable::AddSeat(const glm::vec3& offset)
     seat.offset = offset;
     seats_.emplace_back(seat);
     return seats_.size() - 1;
+}
+
+void game::Rideable::UpdateLeaveTime()
+{
+    size_t num_passengers = 0;
+    for (const auto& seat : seats_)
+    {
+        if (seat.passenger)
+        {
+            ++num_passengers;
+        }
+    }
+
+    if (num_passengers > 0)
+    {
+        last_passenger_leave_time_ = -1;
+    }
+    else
+    {
+        last_passenger_leave_time_ = entity_.GetWorld().GetTime();
+    }
+
 }

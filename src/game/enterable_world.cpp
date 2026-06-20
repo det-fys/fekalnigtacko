@@ -18,6 +18,20 @@ void game::EnterableWorld::PlayerInput(Player& player, PlayerInputType type, boo
 
     auto character = it->second;
 
+    // check respawn
+    if (type == IN_ATTACK_PRIMARY && enabled)
+    {
+        auto current_character = GetPlayerCharacter(player);
+
+        if (current_character->IsDead() && current_character->GetDeathTime() >= 3000)
+        {
+            auto& tuning = current_character->GetHumanTuning();
+            CreatePlayerCharacter(player, tuning, spawnpoint_, 0.0f);
+        }
+
+        return;
+    }
+
     switch (type)
     {
     // case IN_DEBUG1:
