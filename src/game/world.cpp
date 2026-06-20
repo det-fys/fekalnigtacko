@@ -355,8 +355,8 @@ void game::World::CreateItemPickup(const glm::vec3& position, std::shared_ptr<It
 
             if (respawn_time > 0)
             {
-                Schedule(respawn_time, [this, position, item, despawn_time, respawn_time, ammo_count]() {
-                    CreateItemPickup(position, item, despawn_time, respawn_time, ammo_count);
+                Schedule(respawn_time, [this, position, item_name = item->def->name, despawn_time, respawn_time, ammo_count] {
+                    CreateItemPickup(position, std::make_shared<ItemInstance>(item_name), despawn_time, respawn_time, ammo_count);
                 });
             }
         });
