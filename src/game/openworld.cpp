@@ -84,9 +84,10 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld("openworld"), game_(game
         CreateTuningGarage(loc.transform.position, glm::eulerAngles(loc.transform.rotation).x);
     }
 
-    CreatePermaItemPickups("pickup_uzi", "uzi");
-    CreatePermaItemPickups("pickup_ak47", "ak47");
-    CreatePermaItemPickups("pickup_airsniper", "airsniper");
+    CreatePermaItemPickups("airrifle");
+    CreatePermaItemPickups("airsniper");
+    CreatePermaItemPickups("ak47");
+    CreatePermaItemPickups("uzi");
 
     SpawnNpcs();
 
@@ -353,12 +354,19 @@ void game::OpenWorld::CreateTuningGarage(const glm::vec3& position, float yaw)
     });
 }
 
-void game::OpenWorld::CreatePermaItemPickups(const std::string& loc_name, const std::string& item_name)
+void game::OpenWorld::CreatePermaItemPickups(const std::string& item_name)
 {
-    for (auto locs = GetMap().GetLocations(loc_name); const auto& loc : locs)
+    for (auto locs = GetMap().GetLocations("pickup_" + item_name); const auto& loc : locs)
     {
         CreatePermaItemPickup(loc.transform.position, item_name);
     }
+
+#ifndef NDEBUG
+    for (auto locs = GetMap().GetLocations("pickup_" + item_name + "_debug"); const auto& loc : locs)
+    {
+        CreatePermaItemPickup(loc.transform.position, item_name);
+    }
+#endif
 }
 
 void game::OpenWorld::CreatePermaItemPickup(const glm::vec3& position, const std::string& item_name)
