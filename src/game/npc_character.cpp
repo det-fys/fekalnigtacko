@@ -79,20 +79,20 @@ void game::NpcCharacter::SpawnLoot()
 void game::NpcCharacter::MakeEnemy(net::EntNum enemy_num)
 {
     // it must have been a mistake
-    if (Chance(0.1f))
+    if (Chance(0.05f))
     {
         return;
     }
 
     // cant switch enemies that fast
     auto time = GetWorld().GetTime();
-    if (enemy_num != enemy_num_ && time - enemy_time_ < 5000)
+    if (enemy_num_ > 0 && enemy_num != enemy_num_ && time - enemy_time_ < 5000)
     {
         return; 
     }
 
     // increase anger
-    if (Chance(0.7f))
+    if (Chance(0.85f))
     {
         follow_enemy_ = true;
     }
