@@ -33,13 +33,51 @@ game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) :
         map_->EnableObj(objnum, false);
     }
 
-    // cache common snds and stuff
-    Cache(assets::CacheManager::GetSound("data/breaksign.snd"));
+    // break sounds
     Cache(assets::CacheManager::GetSound("data/breakpatnik.snd"));
+    Cache(assets::CacheManager::GetSound("data/breaksign.snd"));
     Cache(assets::CacheManager::GetSound("data/breakwindow.snd"));
     Cache(assets::CacheManager::GetSound("data/breakwood.snd"));
     Cache(assets::CacheManager::GetSound("data/cardoor.snd"));
     Cache(assets::CacheManager::GetSound("data/crash.snd"));
+
+    // vehicles
+    Cache(assets::CacheManager::GetVehicleModel("data/avia.veh"));
+    Cache(assets::CacheManager::GetVehicleModel("data/passat.veh"));
+    Cache(assets::CacheManager::GetVehicleModel("data/pickup_hd.veh"));
+    Cache(assets::CacheManager::GetVehicleModel("data/polskifiat.veh"));
+    Cache(assets::CacheManager::GetVehicleModel("data/twingo.veh"));
+    
+    // models
+    Cache(assets::CacheManager::GetModel("data/marker_base.mdl"));
+    Cache(assets::CacheManager::GetModel("data/marker_tuning.mdl"));
+
+    // items
+    Cache(assets::CacheManager::GetItem("data/airrifle.item"));
+    Cache(assets::CacheManager::GetItem("data/airsniper.item"));
+    Cache(assets::CacheManager::GetItem("data/ak47.item"));
+    Cache(assets::CacheManager::GetItem("data/uzi.item"));
+    
+    // fire sounds
+    Cache(assets::CacheManager::GetSound("data/airrifle_fire.snd"));
+    Cache(assets::CacheManager::GetSound("data/ak_fire.snd"));
+    Cache(assets::CacheManager::GetSound("data/uzi_fire.snd"));
+
+    // other sounds
+    Cache(assets::CacheManager::GetSound("data/pickup_ammo.snd"));
+    Cache(assets::CacheManager::GetSound("data/cow-01.snd"));
+    Cache(assets::CacheManager::GetSound("data/cow-02.snd"));
+    Cache(assets::CacheManager::GetSound("data/cow-04.snd"));
+    Cache(assets::CacheManager::GetSound("data/cow-05.snd"));
+    
+    // fx
+    Cache(assets::CacheManager::GetEffect("data/firefx.fx"));
+    Cache(assets::CacheManager::GetEffect("data/impact_dirt.fx"));
+    Cache(assets::CacheManager::GetEffect("data/impact_flesh.fx"));
+    Cache(assets::CacheManager::GetEffect("data/impact_grass.fx"));
+    Cache(assets::CacheManager::GetEffect("data/impact_metal.fx"));
+    Cache(assets::CacheManager::GetEffect("data/impact_stone.fx"));
+    Cache(assets::CacheManager::GetEffect("data/impact_wood.fx"));
 
     env_ = std::make_unique<WorldEnv>();
     env_->SetDayTime(12.0f);
