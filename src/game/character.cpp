@@ -1,7 +1,5 @@
 #include "character.hpp"
 
-#include <format>
-
 #include "assets/cache.hpp"
 #include "net/utils.hpp"
 #include "utils/math.hpp"
