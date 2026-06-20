@@ -12,8 +12,8 @@ game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const Human
     SendUseTargetInfo();
 
     // give some shit
-    GiveItem(std::make_shared<ItemInstance>("airsniper"), false);
-    GiveAmmo("pellet", 50);
+    // GiveItem(std::make_shared<ItemInstance>("airsniper"), false);
+    // GiveAmmo("pellet", 50);
     // GiveItem(std::make_shared<ItemInstance>("ak47"), false);
     // GiveItem(std::make_shared<ItemInstance>("uzi"), false);
 }
