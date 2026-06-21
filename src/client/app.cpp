@@ -7,9 +7,10 @@
 #include "assets/cache.hpp"
 #include "gameview/worldview.hpp"
 #include "gameview/utils.hpp"
+#include "gui/loading_screen.hpp"
 
 App::App() :
-	gui_(dlist_, assets::CacheManager::GetFont("data/comic32.font"))
+	gui_(dlist_, assets::CacheManager::GetFont("data/comic32.font")), precache_("data/precache")
 {
 	std::cout << "Initializing App..." << std::endl;
 
@@ -108,6 +109,12 @@ void App::Draw()
 	if (session_)
 	{
         session_->Draw(dlist_, params, gui_);
+	}
+
+	// loading screen
+	if (!precache_.IsDone())
+	{
+		gui::DrawLoadingScreen(gui_, precache_.GetNumLoaded() * 100 / precache_.GetNumItems());
 	}
 
 	DrawStats();
@@ -370,7 +377,12 @@ AppState App::CheckStateTransition()
 		return APP_STATE_LOADING;
 	
 	case APP_STATE_LOADING:
-		return APP_STATE_IDLE;
+		if (precache_.IsDone())
+			return APP_STATE_IDLE;
+
+		precache_.LoadNext();
+
+		return APP_STATE_LOADING;
 
 	case APP_STATE_IDLE:
 		return APP_STATE_CONNECT;

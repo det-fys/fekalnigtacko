@@ -45,8 +45,6 @@ public:
     bool IsLoaded() const;
 
 private:
-    void DrawLoadingScreen(const DrawArgs& args) const;
-
     void UpdateEnv();
     void DrawEnv(const DrawArgs& args) const;
 
@@ -59,8 +57,6 @@ private:
     bool ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, bool enable);
     bool ProcessBeamMsg(net::InMessage& msg);
     bool ProcessFxMsg(net::InMessage& msg);
-
-    void Cache(std::any val);
 
     void UpdateBeams();
     void DrawBeams(const DrawArgs& args) const;
@@ -80,8 +76,6 @@ private:
 
     audio::Master& audiomaster_;
     audio::Player audioplayer_; // for non-entity sounds
-
-    std::vector<std::any> cache_;
 
     std::vector<BeamView> beams_;
 

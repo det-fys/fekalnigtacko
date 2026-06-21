@@ -13,6 +13,7 @@
 #include "gui/menu.hpp"
 #include "gameview/client_session.hpp"
 #include "wsclient.hpp"
+#include "assets/precache.hpp"
 
 struct ChatMessage
 {
@@ -100,6 +101,8 @@ private:
     bool connecting_ = false;
     bool connected_ = false;
     bool local_error_ = false;
+
+    assets::Precache precache_;
 
     std::unique_ptr<game::view::ClientSession> session_;
 
