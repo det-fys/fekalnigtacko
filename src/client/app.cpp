@@ -14,105 +14,15 @@ App::App() :
 	std::cout << "Initializing App..." << std::endl;
 
 	ApplySettings();
-	AddChatMessage("Test!");
+	// AddChatMessage("Test!");
 }
 
 void App::Frame()
 {
-	delta_time_ = time_ - prev_time_;
-	prev_time_ = time_;
+	ws_.Poll();
 
-	if (delta_time_ < 0.0f)
-	{
-		delta_time_ = 0.0f; // Prevent negative delta time
-	}
-	else if (delta_time_ > 0.1f)
-	{
-		delta_time_ = 0.1f; // Cap delta time to avoid large jumps
-	}
-
-	if (session_)
-	{
-		game::view::UpdateInfo updinfo;
-		updinfo.time = time_;
-		updinfo.delta_time = delta_time_;
-		session_->Update(updinfo);
-	}
-
-    gfx::DrawListParams params{};
-	params.screen_width = viewport_size_.x;
-	params.screen_height = viewport_size_.y;
-    params.env.clear_color = glm::vec3(0.1f);
-	
-	dlist_.Clear();
-	gui_.Begin(viewport_size_);
-
-	// draw session
-	if (session_)
-	{
-        session_->Draw(dlist_, params, gui_);
-	}
-
-	// draw stats
-	UpdateStats();
-	DrawStats();
-
-	// draw chat
-	UpdateChat();
-	DrawChat();
-
-	// draw menu
-	if (menu_)
-	{
-		auto menu_size = menu_->MeasureSize();
-		menu_->Draw(gui_, (glm::vec2(viewport_size_) - menu_size) * 0.5f);
-	}
-
-	gui_.Render();
-	renderer_.DrawList(dlist_, params);
-
-	++stat_frames_;
-}
-
-void App::Connected()
-{
-	std::cout << "WS connected" << std::endl;
-	AddChatMessagePrefix("WebSocket", "^7f7připojeno");
-
-	// init session
-	session_ = std::make_unique<game::view::ClientSession>(*this);
-}
-
-void App::ProcessMessage(net::InMessage& msg)
-{
-	if (!session_)
-		return;
-
-	size_t s = msg.End() - msg.Ptr();
- //   AddChatMessage("recvd: ^f00;" + std::to_string(s));
-
-	// std::cout << "App::ProcessMessage: received message of size " << s << " bytes" << std::endl;
-
-	if (!session_->ProcessMessage(msg))
-	{
-        std::cerr << "FAILED to process message!" << std::endl;
-	}
-
-	// record stats
-	++stat_msgs_;
-	stat_msglen_total_ += s;
-	stat_msglen_min_ = std::min(stat_msglen_min_, s);
-	stat_msglen_max_ = std::max(stat_msglen_max_, s);
-}
-
-void App::Disconnected(const std::string& reason)
-{
-	std::cout << "WS disconnected" << std::endl;
-	AddChatMessagePrefix("WebSocket", "^f77spojení je píči");
-
-
-	// close session
-	session_.reset();
+	Update();
+	Draw();
 }
 
 void App::Input(game::PlayerInputType in, bool pressed, bool repeated)
@@ -162,6 +72,59 @@ void App::AddChatMessagePrefix(const std::string& prefix, const std::string& tex
 }
 
 App::~App() {}
+
+void App::Update()
+{
+	delta_time_ = time_ - prev_time_;
+	prev_time_ = time_;
+
+	if (delta_time_ < 0.0f)
+	{
+		delta_time_ = 0.0f; // Prevent negative delta time
+	}
+	else if (delta_time_ > 0.1f)
+	{
+		delta_time_ = 0.1f; // Cap delta time to avoid large jumps
+	}
+
+	UpdateState();
+	UpdateSession();
+	UpdateStats();
+	UpdateChat();
+}
+
+void App::Draw()
+{
+
+    gfx::DrawListParams params{};
+	params.screen_width = viewport_size_.x;
+	params.screen_height = viewport_size_.y;
+    params.env.clear_color = glm::vec3(0.1f);
+	
+	dlist_.Clear();
+	gui_.Begin(viewport_size_);
+
+	// draw session
+	if (session_)
+	{
+        session_->Draw(dlist_, params, gui_);
+	}
+
+	DrawStats();
+	DrawChat();
+
+	// draw menu
+	if (menu_)
+	{
+		auto menu_size = menu_->MeasureSize();
+		menu_->Draw(gui_, (glm::vec2(viewport_size_) - menu_size) * 0.5f);
+	}
+
+	gui_.Render();
+	renderer_.DrawList(dlist_, params);
+
+	++stat_frames_;
+}
 
 void App::UpdateChat()
 {
@@ -253,6 +216,28 @@ void App::ApplySensitivity()
 #define COL_LABEL "^ccc"
 #define COL_VALUE "^5ff"
 
+void App::UpdateSession()
+{
+	if (!session_)
+		return;
+
+	game::view::UpdateInfo updinfo;
+	updinfo.time = time_;
+	updinfo.delta_time = delta_time_;
+	session_->Update(updinfo);
+
+	if (connected_)
+	{
+		auto msg = session_->GetMsg();
+		if (!msg.empty())
+		{
+			ws_.Send(msg);
+		}
+
+		session_->ResetMsg();
+	}
+}
+
 void App::UpdateStats()
 {
 	if (time_ < stats_time_ + 1.0f)
@@ -290,4 +275,128 @@ void App::DrawStats()
 	gui_.DrawTextAligned(fps_text_, pos, glm::vec2(-1.0f, 0.0f));
 	pos.y += 30.0f;
 	gui_.DrawTextAligned(msglen_text_, pos, glm::vec2(-1.0f, 0.0f));
+}
+
+void App::Connect()
+{
+	ws_.SetOnConnect([this]{
+		connected_ = true;
+		connecting_ = false;
+	});
+
+	ws_.SetOnMessage([this](std::span<const char> data) {
+		ProcessWsMessage(data);
+	});
+
+	ws_.SetOnDisconnect([this]{
+		connected_ = false;
+		connecting_ = false;
+	});
+
+	connecting_ = ws_.Connect(url_);
+}
+
+void App::ProcessWsMessage(std::span<const char> data)
+{
+	if (!session_)
+		return;
+
+	// record stats
+	size_t s = data.size();
+	++stat_msgs_;
+	stat_msglen_total_ += s;
+	stat_msglen_min_ = std::min(stat_msglen_min_, s);
+	stat_msglen_max_ = std::max(stat_msglen_max_, s);
+
+	net::InMessage msg(data.data(), data.size());
+	if (!session_->ProcessMessage(msg))
+	{
+        std::cerr << "FAILED to process message!" << std::endl;
+		local_error_ = true;
+	}
+}
+
+void App::UpdateState()
+{
+	auto new_state = CheckStateTransition();
+	if (new_state == state_)
+		return;
+
+	EnterState(new_state);
+}
+
+void App::EnterState(AppState state)
+{
+	state_ = state;
+	state_time_ = time_;
+
+	switch (state)
+	{
+	case APP_STATE_INIT:
+		break;
+
+	case APP_STATE_LOADING:
+		break;
+
+	case APP_STATE_IDLE:
+		break;
+
+	case APP_STATE_CONNECT:
+	    AddChatMessagePrefix("WebSocket", "připojování na " + url_);
+		Connect();
+		break;
+
+	case APP_STATE_CONNECTED:
+		AddChatMessagePrefix("WebSocket", "^7f7připojeno");
+		session_ = std::make_unique<game::view::ClientSession>(*this);	
+		break;
+
+	case APP_STATE_DISCONNECTED:
+		AddChatMessagePrefix("WebSocket", "^f77spojení je píči");
+		session_.reset();
+		AddChatMessagePrefix("WebSocket", "další pokus za 10 s");
+		break;
+
+	default:
+		break;
+	}
+}
+
+AppState App::CheckStateTransition()
+{
+	switch (state_)
+	{
+	case APP_STATE_INIT:
+		return APP_STATE_LOADING;
+	
+	case APP_STATE_LOADING:
+		return APP_STATE_IDLE;
+
+	case APP_STATE_IDLE:
+		return APP_STATE_CONNECT;
+
+	case APP_STATE_CONNECT:
+		if (connected_)
+			return APP_STATE_CONNECTED;
+
+		if (!connecting_)
+			return APP_STATE_DISCONNECTED;
+
+		return APP_STATE_CONNECT;
+
+	case APP_STATE_CONNECTED:
+		if (!connected_)
+			return APP_STATE_DISCONNECTED;
+
+		return APP_STATE_CONNECTED;
+
+	case APP_STATE_DISCONNECTED:
+		if (GetCurrentStateDuration() >= 10.0f)
+			return APP_STATE_CONNECT;
+
+		return APP_STATE_DISCONNECTED;
+
+	default:
+		return state_;
+	}
 }

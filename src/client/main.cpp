@@ -11,15 +11,11 @@
 #include <emscripten/html5_webgl.h>
 #include <emscripten/emscripten.h>
 #include <emscripten/websocket.h>
-#else
-#include <easywsclient.hpp>
 #endif // EMSCRIPTEN
 
 #ifdef _WIN32
 #define NOMINMAX
-#pragma comment(lib, "ws2_32")
 #pragma comment(lib, "winmm.lib")
-#include <WinSock2.h>
 #include <windows.h>
 #include <chrono>
 #include <thread>
@@ -239,144 +235,6 @@ static void PollEvents()
 #endif
 
 
-static bool s_ws_connected = false;
-
-#ifdef EMSCRIPTEN
-
-static EMSCRIPTEN_WEBSOCKET_T s_ws = 0;
-
-static EM_BOOL OnWSOpen(int type, const EmscriptenWebSocketOpenEvent *ev, void *ud)
-{
-    s_ws_connected = true;
-    s_app->Connected();
-    return EM_TRUE;
-}
-
-static EM_BOOL OnWSMessage(int type, const EmscriptenWebSocketMessageEvent *ev, void *ud)
-{
-    if (ev->isText)
-        return EM_TRUE;
-
-    net::InMessage msg(reinterpret_cast<char*>(ev->data), ev->numBytes);
-    s_app->ProcessMessage(msg);
-
-    return EM_TRUE;
-}
-
-static EM_BOOL OnWSClose(int type, const EmscriptenWebSocketCloseEvent *ev, void *ud)
-{
-    s_ws_connected = false;
-    s_app->Disconnected("");
-    return EM_TRUE;
-}
-
-static EM_BOOL OnWSError(int type, const EmscriptenWebSocketErrorEvent *ev, void *ud)
-{
-    s_ws_connected = false;
-    s_app->Disconnected("error");
-    return EM_TRUE;
-}
-
-static bool WSInit(const char* url)
-{
-    if (!emscripten_websocket_is_supported())
-    {
-        std::cerr << "EMSCRIPTEN WS NOT SUPPORTED" << std::endl;
-        return false;
-    }
-    EmscriptenWebSocketCreateAttributes ws_attrs = {
-        url,
-        NULL,
-        EM_TRUE
-    };
-
-    s_ws = emscripten_websocket_new(&ws_attrs);
-    emscripten_websocket_set_onopen_callback(s_ws, NULL, OnWSOpen);
-    emscripten_websocket_set_onmessage_callback(s_ws, NULL, OnWSMessage);
-    emscripten_websocket_set_onclose_callback(s_ws, NULL, OnWSClose);
-    emscripten_websocket_set_onerror_callback(s_ws, NULL, OnWSError);
-
-    return true;
-}
-
-static void WSSend(std::span<const char> data)
-{
-    emscripten_websocket_send_binary(s_ws, (void*)data.data(), static_cast<uint32_t>(data.size()));
-}
-
-static void WSPoll() {}
-static void WSClose() {}
-
-#else /* !EMSCRIPTEN */
-
-using namespace easywsclient; 
-
-static std::unique_ptr<WebSocket> s_ws;
-
-static bool WSInit(const char* url)
-{
-
-#ifdef _WIN32
-    INT rc;
-    WSADATA wsaData;
-
-    rc = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (rc)
-    {
-        printf("WSAStartup Failed.\n");
-        return false;
-    }
-#endif
-
-    s_ws = std::unique_ptr<WebSocket>(WebSocket::from_url(url));
-
-    if (!s_ws)
-        return false;
-
-    return true;
-}
-
-static void WSSend(std::span<const char> msg)
-{
-    static std::vector<uint8_t> data;
-    data.resize(msg.size_bytes());
-    memcpy(data.data(), msg.data(), msg.size_bytes());
-    s_ws->sendBinary(data);
-}
-
-static void WSPoll()
-{
-    s_ws->poll();
-
-    auto ws_state = s_ws->getReadyState();
-    if (ws_state == WebSocket::OPEN && !s_ws_connected)
-    {
-        s_ws_connected = true;
-        s_app->Connected();
-    }
-    else if (ws_state != WebSocket::OPEN && s_ws_connected)
-    {
-        s_ws_connected = false;
-        s_app->Disconnected("WS closed");
-    }
-
-    s_ws->dispatchBinary([&](const std::vector<uint8_t>& data) {
-        net::InMessage msg(reinterpret_cast<const char*>(data.data()), data.size());
-        s_app->ProcessMessage(msg);
-    });
-}
-
-static void WSClose()
-{
-    s_ws.reset();
-
-#ifdef _WIN32
-    WSACleanup();
-#endif
-}
-
-#endif /* EMSCRIPTEN */
-
 static bool can_update = false;
 static Uint32 last_update = 0;
 
@@ -387,28 +245,12 @@ static void Frame()
     s_app->SetTime(current_time / 1000.0f); // Set time in seconds
 
     PollEvents();
-    WSPoll();
 
 	int width, height;
 	SDL_GetWindowSize(s_window, &width, &height);
 	s_app->SetViewportSize(width, height);
 
     s_app->Frame();
-
-    auto session = s_app->GetSession();
-    if (session)
-    {
-        if (s_ws_connected)
-        {
-            auto msg = session->GetMsg();
-            if (!msg.empty())
-            {
-                WSSend(msg);
-            }
-        }
-    
-        session->ResetMsg();
-    }
 
     SDL_GL_SwapWindow(s_window);
 }
@@ -435,9 +277,6 @@ static void Main() {
     if (s_url.empty())
         s_url = WS_URL;
 
-    if (!WSInit(s_url.c_str()))
-        return;
-
     InitSDL();
 
     try
@@ -454,7 +293,7 @@ static void Main() {
 
     s_app = std::make_unique<App>();
     s_app->SetUserName(s_username);
-    s_app->AddChatMessagePrefix("WebSocket", "připojování na " + s_url);
+    s_app->SetUrl(s_url);
 
     can_update = true;
 
@@ -489,7 +328,6 @@ static void Main() {
 
     ShutdownGL();
     ShutdownSDL();
-    WSClose();
 
 #endif // EMSCRIPTEN
 }
