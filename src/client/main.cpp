@@ -413,23 +413,23 @@ static void Frame()
     SDL_GL_SwapWindow(s_window);
 }
 
-#ifdef EMSCRIPTEN
+// #ifdef EMSCRIPTEN
 
-static void Update(void* args)
-{
+// static void Update(void* args)
+// {
 
-    // std::cout << "update called" << std::endl;
-    if (can_update && (SDL_GetTicks() - last_update >= 100))
-    {
-        // std::cout << "calling Frame()" << std::endl;
-        Frame();
-    } 
+//     // std::cout << "update called" << std::endl;
+//     if (can_update && (SDL_GetTicks() - last_update >= 100))
+//     {
+//         // std::cout << "calling Frame()" << std::endl;
+//         Frame();
+//     } 
 
-    emscripten_async_call(Update, nullptr, 100);
-    // std::cout << "update finished" << std::endl;
-}
+//     emscripten_async_call(Update, nullptr, 100);
+//     // std::cout << "update finished" << std::endl;
+// }
 
-#endif
+// #endif
 
 static void Main() {
     if (s_url.empty())
@@ -460,7 +460,7 @@ static void Main() {
 
 #ifdef EMSCRIPTEN
     emscripten_set_main_loop(Frame, 0, false);
-    Update(nullptr);
+    // Update(nullptr);
 #else
 
 #ifdef _WIN32
