@@ -32,6 +32,8 @@ static std::any LoadItem(const assets::PrecacheItem& item)
         return assets::CacheManager::GetTexture("data/" + item.name + ".png");
     else if (item.type == "vehicle")
         return assets::CacheManager::GetVehicleModel("data/" + item.name + ".veh");
+    else
+        throw std::runtime_error("Precache: invalid asset type: " + item.type);
 }
 
 void assets::Precache::LoadNext()
