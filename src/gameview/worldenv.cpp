@@ -54,7 +54,7 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
     game::view::WorldEnvKeyframe{
         12.0f, // time
         glm::vec3(0.6f, 0.8f, 1.0f) * 1.2f, // clear color
-        glm::vec3(0.5f, 0.5f, 0.5f) * 1.1f, // ambient color
+        glm::vec3(0.5f, 0.5f, 0.45f) * 1.1f, // ambient color
         glm::vec3(1.0f, 0.95f, 0.7f) * 0.9f, // sun color
         1.0f, // sun light source
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // sun disc color
@@ -67,7 +67,7 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
     game::view::WorldEnvKeyframe{
         17.0f, // time
         glm::vec3(0.6f, 0.8f, 1.0f) * 1.2f, // clear color
-        glm::vec3(0.5f, 0.5f, 0.5f) * 1.4f, // ambient color
+        glm::vec3(0.5f, 0.5f, 0.4f) * 1.4f, // ambient color
         glm::vec3(1.0f, 0.95f, 0.7f) * 0.9f, // sun color
         1.0f, // sun light source
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // sun disc color
@@ -80,7 +80,7 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
     game::view::WorldEnvKeyframe{
         17.5f, // time
         glm::vec3(0.6f, 0.8f, 1.0f) * 1.1f, // clear color
-        glm::vec3(0.8f, 0.6f, 0.5f) * 1.1f, // ambient color
+        glm::vec3(0.8f, 0.6f, 0.4f) * 1.1f, // ambient color
         glm::vec3(1.0f, 0.8f, 0.6f) * 0.8f, // sun color
         1.0f, // sun light source
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // sun disc color
@@ -93,9 +93,9 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
     game::view::WorldEnvKeyframe{
         18.0f, // time
         glm::vec3(0.5f, 0.7f, 1.0f) * 0.7f, // clear color
-        glm::vec3(0.8f, 0.6f, 0.5f) * 0.8f, // ambient color
-        glm::vec3(1.0f, 0.8f, 0.6f) * 0.8f, // sun color
-        0.0f, // sun light source
+        glm::vec3(0.8f, 0.6f, 0.4f) * 0.8f, // ambient color
+        glm::vec3(1.0f, 0.7f, 0.6f) * 0.2f, // sun color
+        1.0f, // sun light source
         glm::vec4(1.0f, 0.8f, 0.7f, 1.0f), // sun disc color
         glm::vec4(1.0f, 0.7f, 0.5f, 1.0f), // sun halfsphere color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.2f), // moon disc color
@@ -107,8 +107,8 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
         19.0f, // time
         glm::vec3(0.1f, 0.15f, 0.3f), // clear color
         glm::vec3(0.4f, 0.4f, 0.4f), // ambient color
-        glm::vec3(0.5f, 0.8f, 1.0f) * 0.4f, // sun color
-        -1.0f, // sun light source
+        glm::vec3(1.0f, 0.7f, 0.6f) * 0.2f, // sun color
+        0.0f, // sun light source
         glm::vec4(1.0f, 0.5f, 0.3f, 1.0f), // sun disc color
         glm::vec4(1.0f, 0.5f, 0.2f, 0.8f), // sun halfsphere color
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // moon disc color
