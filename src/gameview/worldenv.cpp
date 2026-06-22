@@ -22,7 +22,7 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
         glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // sun halfsphere color
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // moon disc color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.1f), // moon halfsphere color
-        glm::vec4(1.0f, 1.0f, 1.0f, 10000.0f), // fog
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.00002f), // fog
     },
 
     game::view::WorldEnvKeyframe{
@@ -35,7 +35,7 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
         glm::vec4(1.0f, 0.8f, 0.6f, 0.2f), // sun halfsphere color
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // moon disc color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // moon halfsphere color
-        glm::vec4(1.0f, 1.0f, 1.0f, 10000.0f), // fog
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.00001f), // fog
     },
 
     game::view::WorldEnvKeyframe{
@@ -48,46 +48,46 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
         glm::vec4(1.0f, 1.0f, 1.0f, 0.4f), // sun halfsphere color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // moon disc color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // moon halfsphere color
-        glm::vec4(1.0f, 1.0f, 1.0f, 10000.0f), // fog
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.00001f), // fog
     },
 
     game::view::WorldEnvKeyframe{
         12.0f, // time
-        glm::vec3(0.6f, 0.8f, 1.0f), // clear color
-        glm::vec3(0.5f, 0.5f, 0.5f) * 0.9f, // ambient color
-        glm::vec3(1.0f, 0.95f, 0.7f) * 0.9f, // sun color
-        1.0f, // sun light source
-        glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // sun disc color
-        glm::vec4(1.0f, 1.0f, 1.0f, 0.7f), // sun halfsphere color
-        glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // moon disc color
-        glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // moon halfsphere color
-        glm::vec4(1.0f, 1.0f, 1.0f, 10000.0f), // fog
-    },
-
-    game::view::WorldEnvKeyframe{
-        17.0f, // time
-        glm::vec3(0.5f, 0.7f, 1.0f) * 0.9f, // clear color
+        glm::vec3(0.6f, 0.8f, 1.0f) * 1.2f, // clear color
         glm::vec3(0.5f, 0.5f, 0.5f) * 1.1f, // ambient color
         glm::vec3(1.0f, 0.95f, 0.7f) * 0.9f, // sun color
         1.0f, // sun light source
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // sun disc color
-        glm::vec4(1.0f, 1.0f, 1.0f, 0.5f), // sun halfsphere color
+        glm::vec4(1.0f, 0.9f, 0.9f, 0.5f), // sun halfsphere color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // moon disc color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // moon halfsphere color
-        glm::vec4(1.0f, 1.0f, 1.0f, 10000.0f), // fog
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.000001f), // fog
+    },
+
+    game::view::WorldEnvKeyframe{
+        17.0f, // time
+        glm::vec3(0.6f, 0.8f, 1.0f) * 1.2f, // clear color
+        glm::vec3(0.5f, 0.5f, 0.5f) * 1.4f, // ambient color
+        glm::vec3(1.0f, 0.95f, 0.7f) * 0.9f, // sun color
+        1.0f, // sun light source
+        glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // sun disc color
+        glm::vec4(1.0f, 0.85f, 0.6f, 0.7f), // sun halfsphere color
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // moon disc color
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // moon halfsphere color
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.000001f), // fog
     },
 
     game::view::WorldEnvKeyframe{
         17.5f, // time
-        glm::vec3(0.5f, 0.7f, 1.0f) * 0.8f, // clear color
-        glm::vec3(0.8f, 0.6f, 0.5f) * 0.8f, // ambient color
+        glm::vec3(0.6f, 0.8f, 1.0f) * 1.1f, // clear color
+        glm::vec3(0.8f, 0.6f, 0.5f) * 1.1f, // ambient color
         glm::vec3(1.0f, 0.8f, 0.6f) * 0.8f, // sun color
         1.0f, // sun light source
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // sun disc color
         glm::vec4(1.0f, 0.7f, 0.5f, 1.0f), // sun halfsphere color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.2f), // moon disc color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.1f), // moon halfsphere color
-        glm::vec4(1.0f, 1.0f, 1.0f, 10000.0f), // fog
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.000002f), // fog
     },
 
     game::view::WorldEnvKeyframe{
@@ -100,7 +100,7 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
         glm::vec4(1.0f, 0.7f, 0.5f, 1.0f), // sun halfsphere color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.2f), // moon disc color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.1f), // moon halfsphere color
-        glm::vec4(1.0f, 1.0f, 1.0f, 10000.0f), // fog
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.000005f), // fog
     },
 
     game::view::WorldEnvKeyframe{
@@ -113,7 +113,7 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
         glm::vec4(1.0f, 0.5f, 0.2f, 0.8f), // sun halfsphere color
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // moon disc color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.1f), // moon halfsphere color
-        glm::vec4(1.0f, 1.0f, 1.0f, 10000.0f), // fog
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.00001f), // fog
     },
 
     game::view::WorldEnvKeyframe{
@@ -126,7 +126,7 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
         glm::vec4(1.0f, 0.5f, 0.2f, 0.0f), // sun halfsphere color
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f), // moon disc color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.1f), // moon halfsphere color
-        glm::vec4(1.0f, 1.0f, 1.0f, 10000.0f), // fog
+        glm::vec4(1.0f, 1.0f, 1.0f, 0.00003f), // fog
     },
 
 
@@ -165,7 +165,7 @@ void game::view::WorldEnv::Draw(const DrawArgs& args)
     args.env.ambient_light = glm::mix(kf1->ambient_color, kf2->ambient_color, t);
     args.env.sun_color = glm::mix(kf1->sun_color, kf2->sun_color, t);
     // args.env.fog = glm::mix(kf1->fog, kf2->fog, t);
-    args.env.fog = glm::vec4(args.env.clear_color, 0.00001f);
+    args.env.fog = glm::vec4(args.env.clear_color, glm::mix(kf1->fog.a, kf2->fog.a, t));
 
     float dist = args.farplane * 0.5f;
 
