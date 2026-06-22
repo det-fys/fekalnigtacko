@@ -189,7 +189,7 @@ void game::Vehicle::ProcessInput()
 
     float steeringClamp = std::max(minsc, (1.f - (std::abs(speed) / sl)) * maxsc);
     // steeringClamp = .5f;
-    float steeringSpeed = steeringClamp * 5.0f;
+    float steeringSpeed = steeringClamp * steering_speed_;
     if (steering_analog_)
         steeringSpeed *= 3.0f;
 
@@ -641,6 +641,7 @@ void game::Vehicle::ApplyTuning(const VehicleTuning& tuning)
     }
 
     health_ = tuning_ctx_.health;
+    steering_speed_ = tuning_ctx_.steering;
 
     // (re)create physics
     physics_.reset();

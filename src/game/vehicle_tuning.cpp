@@ -14,6 +14,8 @@ static float game::VehicleTuningContext::* GetCtxVariablePointer(const std::stri
         return &game::VehicleTuningContext::braking_force;
     if (name == "health")
         return &game::VehicleTuningContext::health;
+    if (name == "steering")
+        return &game::VehicleTuningContext::steering;
 
     throw std::runtime_error("tuning list: invalid variable " + name);
 }

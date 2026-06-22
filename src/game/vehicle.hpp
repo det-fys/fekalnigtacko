@@ -136,6 +136,7 @@ private:
     float steering_ = 0.0f;
     bool steering_analog_ = false;
     float target_steering_ = 0.0f;
+    float steering_speed_ = 5.0f;
 
     std::vector<VehicleWheelState> wheels_;
 
