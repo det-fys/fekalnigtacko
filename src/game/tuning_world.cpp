@@ -128,6 +128,9 @@ void game::TuningWorld::OpenGroupMenu(const VehicleTuningGroup& group)
             btn.SetSelection(state_text);
 
             mounted_part_menu_item_ = &btn;
+
+            // play vrtačka sound
+            vehicle_->PlaySound("tuning");
         });
 
         if (GetPartState(group.id, part_id, &state_text))
