@@ -50,6 +50,18 @@ std::shared_ptr<const audio::Sound> audio::Sound::LoadFromFile(const std::string
         {
             iss >> sound->pitch_;
         }
+        else if (cmd == "refdistance")
+        {
+            iss >> sound->ref_distance_;
+        }
+        else if (cmd == "rolloff")
+        {
+            iss >> sound->rolloff_ractor_;
+        }
+        else if (cmd == "maxdistance")
+        {
+            iss >> sound->max_distance_;
+        }
     });
 
     if (sound->category_name_.empty())

@@ -20,6 +20,10 @@ public:
     float GetVolume() const { return volume_; }
     float GetPitch() const { return pitch_; }
 
+    float GetRefDistance() const { return ref_distance_; }
+    float GetRolloffFactor() const { return rolloff_ractor_; }
+    float GetMaxDistance() const { return max_distance_; }
+
     ~Sound();
 
 private:
@@ -29,6 +33,10 @@ private:
 
     float volume_ = 1.0f;
     float pitch_ = 1.0f;
+
+    float ref_distance_ = 1.0f;
+    float rolloff_ractor_= 1.0f;
+    float max_distance_ = 200.0f;
 };
 
 } // namespace audio

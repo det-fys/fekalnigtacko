@@ -12,6 +12,11 @@ audio::SoundSource::SoundSource(Player* player, std::shared_ptr<const Sound> sou
     SetPitch(1.0f);
 
     alSourcei(source_, AL_BUFFER, sound_->GetBufferId());
+    
+    // params
+    alSourcef(source_, AL_REFERENCE_DISTANCE, sound_->GetRefDistance());
+    alSourcef(source_, AL_ROLLOFF_FACTOR, sound_->GetRolloffFactor());
+    alSourcef(source_, AL_MAX_DISTANCE, sound_->GetMaxDistance());
 }
 
 void audio::SoundSource::SetLooping(bool looping)
