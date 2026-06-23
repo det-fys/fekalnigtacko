@@ -23,6 +23,7 @@ static uint32_t COLOR_ERROR = 0xFF7777FF;
 gui::PlayerHud::PlayerHud(const float& time) : time_(time)
 {
     crosshair_texture_ = assets::CacheManager::GetTexture("data/crosshair.png");
+    scope_texture_ = assets::CacheManager::GetTexture("data/scope.png");
 
     UpdateWeaponSlotsText();
 }
@@ -73,8 +74,9 @@ void gui::PlayerHud::Update(float delta_time)
 
 void gui::PlayerHud::Draw(Context& ctx) const
 {
-    DrawPain(ctx);
     DrawCrosshair(ctx);
+    DrawScope(ctx);
+    DrawPain(ctx);
     DrawHealthBar(ctx);
     DrawItemInfo(ctx);
     DrawUseTarget(ctx);
@@ -102,6 +104,22 @@ void gui::PlayerHud::UpdateWeaponSlotsText()
     }
 }
 
+uint32_t gui::PlayerHud::GetCrosshairColor() const
+{
+    glm::vec3 color(1.0f);
+    if (damage_dealt_factor_ > 0.01f)
+    {
+        color = glm::mix(color, glm::vec3(0.3f), damage_dealt_factor_);
+    }
+
+    if (damage_dealt_kill_factor_ > 0.01f)
+    {
+        color = glm::mix(color, glm::vec3(1.0f, 0.1f, 0.1f), damage_dealt_kill_factor_);
+    }
+
+    return glm::packUnorm4x8(glm::vec4(color, 1.0f));
+}
+
 void gui::PlayerHud::DrawPain(Context& ctx) const
 {
     if (damage_received_factor_ <= 0.01f)
@@ -116,17 +134,6 @@ void gui::PlayerHud::DrawCrosshair(Context& ctx) const
     if (!display_crosshair_)
         return;
 
-    glm::vec3 color(1.0f);
-    if (damage_dealt_factor_ > 0.01f)
-    {
-        color = glm::mix(color, glm::vec3(0.3f), damage_dealt_factor_);
-    }
-
-    if (damage_dealt_kill_factor_ > 0.01f)
-    {
-        color = glm::mix(color, glm::vec3(1.0f, 0.1f, 0.1f), damage_dealt_kill_factor_);
-    }
-
     const float crosshair_size = 32.0f;
 
     auto& viewport_size = ctx.GetViewportSize();
@@ -134,7 +141,41 @@ void gui::PlayerHud::DrawCrosshair(Context& ctx) const
     auto p0 = viewport_size * 0.5f - crosshair_size * 0.5f;
     auto p1 = p0 + crosshair_size;
 
-    ctx.DrawRect(p0, p1, glm::packUnorm4x8(glm::vec4(color, 1.0f)), crosshair_texture_.get());
+    ctx.DrawRect(p0, p1, GetCrosshairColor(), crosshair_texture_.get());
+}
+
+void gui::PlayerHud::DrawScope(Context& ctx) const
+{
+    if (!display_scope_)
+        return;
+
+    glm::vec2 p0(0.0f);
+    glm::vec2 size = ctx.GetViewportSize();
+
+    if (size.x < size.y)
+    {
+        p0.y += (size.y - size.x) * 0.5f;
+        size.y = size.x;
+        ctx.DrawRect(glm::vec2(0.0f), glm::vec2(p0.x + size.x, p0.y + 2.0f), 0xFF000000);
+        ctx.DrawRect(glm::vec2(p0.x, p0.y + size.y - 2.0f), ctx.GetViewportSize(), 0xFF000000);
+    }
+    else
+    {
+        p0.x += (size.x - size.y) * 0.5f;
+        size.x = size.y;
+        ctx.DrawRect(glm::vec2(0.0f), glm::vec2(p0.x + 2.0f, p0.y + size.y), 0xFF000000);
+        ctx.DrawRect(glm::vec2(p0.x + size.x - 2.0f, p0.y), ctx.GetViewportSize(), 0xFF000000);
+    }
+
+    p0 = glm::floor(p0);
+    size = glm::floor(size);
+
+    // glm::vec2 p1 = p0 + size * 0.5f;
+    glm::vec2 p2 = p0 + size;
+
+    auto color = GetCrosshairColor();
+    ctx.DrawRect(p0, p2, color, scope_texture_.get());
+    
 }
 
 void gui::PlayerHud::DrawHealthBar(Context& ctx) const

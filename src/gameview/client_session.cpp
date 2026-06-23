@@ -84,6 +84,10 @@ void game::view::ClientSession::Input(game::PlayerInputType in, bool pressed, bo
 void game::view::ClientSession::ProcessMouseMove(float delta_yaw, float delta_pitch)
 {
     auto sens_mult = glm::mix(1.0f, 0.3f, camera_controller_.GetAimFactor());
+    if (camera_controller_.ShouldDrawScope())
+    {
+        sens_mult = 0.1f;
+    }
 
     float yaw = glm::mod(camera_controller_.GetYaw() + delta_yaw * sens_mult, glm::two_pi<float>());
 
@@ -303,10 +307,19 @@ void game::view::ClientSession::UpdateCamera(const UpdateInfo& info)
     camera_controller_.SetRideableTransform(rideable ? &rideable->GetRoot().matrix : nullptr);
     
     camera_controller_.SetAiming(camera_info_.flags & CAM_AIMING);
+    camera_controller_.SetAimType(camera_info_.flags & CAM_AIM_CROSSHAIR, camera_info_.flags & CAM_AIM_SCOPE);
+
     camera_controller_.Update(info.delta_time);
     camera_controller_.Recalculate(world_.get());
 
-    hud_.SetDisplayCrosshair(camera_controller_.GetAimFactor() >= 0.5f);
+    hud_.SetDisplayCrosshair(camera_controller_.ShouldDrawCrosshair());
+    hud_.SetDisplayScope(camera_controller_.ShouldDrawScope());
+
+    // hide character if scope
+    if (character)
+    {
+        character->SetVisible(!camera_controller_.ShouldDrawScope());
+    }
 }
 
 void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui)
@@ -317,7 +330,7 @@ void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListPar
 
     const float farplane = 3000.0f;
 
-    glm::mat4 proj = glm::perspective(glm::radians(45.0f), aspect, 0.1f, farplane);
+    glm::mat4 proj = glm::perspective(glm::radians(camera_controller_.GetFov() * 0.5f), aspect, 0.1f, farplane);
     glm::mat4 view = camera_controller_.GetViewMatrix();
 
     params.view_proj = proj * view;

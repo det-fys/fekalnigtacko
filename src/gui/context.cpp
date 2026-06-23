@@ -25,6 +25,13 @@ void gui::Context::DrawRect(const glm::vec2& p0, const glm::vec2& p1, uint32_t c
     PushRect(p0, glm::vec2(0.0f), p1, glm::vec2(1.0f), color);
 }
 
+void gui::Context::DrawRectUV(const glm::vec2& p0, const glm::vec2& p1, const glm::vec2& uv0, const glm::vec2& uv1,
+                              uint32_t color, const gfx::Texture* texture)
+{
+    BeginTexture(texture ? texture : white_tex_.get());
+    PushRect(p0, uv0, p1, uv1, color);
+}
+
 static uint32_t DecodeUTF8Codepoint(const char*& p, const char* end)
 {
     if (p == end)

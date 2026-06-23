@@ -9,6 +9,8 @@ using CameraFlags = uint8_t;
 enum CameraFlag : CameraFlags
 {
     CAM_AIMING = 1,
+    CAM_AIM_CROSSHAIR = 2,
+    CAM_AIM_SCOPE = 4,
 };
 
 struct CameraInfo

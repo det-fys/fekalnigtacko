@@ -486,5 +486,6 @@ void game::Player::SendMenuMsgs()
 void game::Player::UpdateCamera()
 {
     camera_controller_.SetAiming(camera_info_.flags & CAM_AIMING);
+    camera_controller_.SetAimType(camera_info_.flags & CAM_AIM_CROSSHAIR, camera_info_.flags & CAM_AIM_SCOPE);
     camera_controller_.Update(1.0f / 25.0f);
 }

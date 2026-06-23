@@ -45,6 +45,9 @@ public:
     Sphere GetBoundingSphere() const { return Sphere{root_.GetGlobalPosition(), radius_}; }
     const TransformNode& GetRoot() const { return root_; }
 
+    void SetVisible(bool visible) { visible_ = visible; }
+    bool IsVisible() const { return visible_; }
+
     virtual ~EntityView() = default;
 
 protected:
@@ -66,6 +69,7 @@ protected:
     EntityView* parent_ = nullptr;
 
     float radius_ = 1.0f;
+    bool visible_ = true;
 
     audio::Player audioplayer_;
 

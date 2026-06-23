@@ -171,6 +171,8 @@ void game::PlayerCharacter::OnHeldItemChanged()
 {
     const auto& item = GetHeldItem();
     hud_data_.held_item = item ? item->def->name : "";
+
+    // UpdatePlayerCamera(); // might be required?
 }
 
 bool game::PlayerCharacter::HaveAmmo(const std::string& ammo_name)
@@ -229,6 +231,22 @@ void game::PlayerCharacter::UpdatePlayerCamera()
 
     if (GetAiming())
         camera_info.flags |= CAM_AIMING;
+
+    assets::ItemAimType aim_type = assets::AIMTYPE_NONE;
+    const auto& held_item = GetHeldItem();
+    if (held_item)
+    {
+        aim_type = held_item->def->aim_type;
+    }
+
+    if (aim_type != assets::AIMTYPE_NONE)
+    {
+        camera_info.flags |= CAM_AIM_CROSSHAIR;
+        if (aim_type == assets::AIMTYPE_SCOPE)
+        {
+            camera_info.flags |= CAM_AIM_SCOPE;
+        }
+    }
 
     player_->SetCamera(camera_info);
 }

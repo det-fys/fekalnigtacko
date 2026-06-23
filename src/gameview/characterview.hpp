@@ -84,6 +84,7 @@ private:
 
     std::string item_name_;
     TransformNode item_node_;
+    TransformNode fire_snd_node_;
     std::shared_ptr<const assets::Item> item_;
     std::shared_ptr<const audio::Sound> fire_snd_;
     std::shared_ptr<const assets::Effect> fire_fx_;

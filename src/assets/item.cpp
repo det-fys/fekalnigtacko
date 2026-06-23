@@ -154,6 +154,20 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
         {
             iss >> item->damage;
         }
+        else if (command == "aimtype")
+        {
+            std::string aimtype_str;
+            iss >> aimtype_str;
+
+            if (aimtype_str == "none")
+                item->aim_type = AIMTYPE_NONE;
+            else if (aimtype_str == "crosshair")
+                item->aim_type = AIMTYPE_CROSSHAIR;
+            else if (aimtype_str == "scope")
+                item->aim_type = AIMTYPE_SCOPE;
+            else
+                throw std::runtime_error("Invalid aim type: " + aimtype_str);
+        }
         else
         {
             throw std::runtime_error("Unknown item command: " + command);

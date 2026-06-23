@@ -17,7 +17,7 @@ enum ItemType
 enum ItemAimType
 {
     AIMTYPE_NONE,
-    AIMTYPE_AIM,
+    AIMTYPE_CROSSHAIR,
     AIMTYPE_SCOPE,
 
 };
@@ -59,6 +59,8 @@ struct Item
     std::string idle_anim;
     std::string use_anim; // use or fire
     
+    ItemAimType aim_type = AIMTYPE_NONE;
+
     // consumable
     std::string action;
 

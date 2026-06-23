@@ -112,6 +112,7 @@ void game::view::CharacterView::Update(const UpdateInfo& info)
     if (item_)
     {
         item_node_.UpdateMatrix();
+        fire_snd_node_.UpdateMatrix();
     }
 }
 
@@ -373,6 +374,9 @@ void game::view::CharacterView::SetItem(const std::string& item_name)
     item_node_.parent = bone_node ? bone_node : &root_;
     item_node_.local = item_->bone_offset;
 
+    fire_snd_node_.parent = &item_node_;
+    fire_snd_node_.local.position = glm::vec3(0.0f, 0.1f, 0.0f);
+
     // snd
     if (!item_->fire_snd.empty())
     {
@@ -386,7 +390,6 @@ void game::view::CharacterView::SetItem(const std::string& item_name)
         auto loc = item_->model->GetLocation(item_->fire_fx_loc);
         fire_fx_offset_ = loc ? loc->position : glm::vec3(0.0f);
     }
-
 }
 
 void game::view::CharacterView::DrawItem(const DrawArgs& args)
@@ -411,7 +414,7 @@ void game::view::CharacterView::FireItem()
 
     if (fire_snd_)
     {
-        auto snd = audioplayer_.PlaySound(fire_snd_, &item_node_);
+        auto snd = audioplayer_.PlaySound(fire_snd_, &fire_snd_node_);
         // snd->SetPosition(item_node_.GetGlobalPosition());
     }
 

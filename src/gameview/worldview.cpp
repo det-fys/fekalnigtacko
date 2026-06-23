@@ -106,8 +106,13 @@ void game::view::WorldView::Draw(const DrawArgs& args)
 
     for (const auto& [entnum, ent] : ents_)
     {
-        if (args.frustum.IsSphereVisible(ent->GetBoundingSphere()))
-            ent->Draw(args);
+        if (!ent->IsVisible())
+            continue;
+
+        if (!args.frustum.IsSphereVisible(ent->GetBoundingSphere()))
+            continue;    
+        
+        ent->Draw(args);
     }
 
     DrawBeams(args);
