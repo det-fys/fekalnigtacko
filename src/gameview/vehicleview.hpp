@@ -42,7 +42,7 @@ enum VehicleColorSlot
     VCS_ORANGE_LIGHTS,
     VCS_REVERSE_LIGHT,
 
-    VCS_RESERVED,
+    VCS_OTHER,
 };
 
 class VehicleView : public EntityView
@@ -65,6 +65,7 @@ private:
 
     bool ReadDeformSync(net::InMessage& msg);
     bool ProcessDeformMsg(net::InMessage& msg);
+    bool ProcessDeformSyncMsg(net::InMessage& msg);
 
     void InitHeadlights();
 
@@ -72,10 +73,13 @@ private:
     void UpdateWindows();
     void UpdateLights(float delta_t);
 
+    void UpdateDestroyedColors();
+
 private:
     std::shared_ptr<const assets::VehicleModel> model_;
     assets::Mesh mesh_;
     glm::vec4 colors_[SD_MAX_COLORS];
+    glm::vec4 destroyed_colors_[SD_MAX_COLORS];
     glm::vec3 headlight_color_;
 
     game::VehicleSyncState sync_;

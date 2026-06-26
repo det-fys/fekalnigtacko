@@ -46,9 +46,13 @@ public:
     btRigidBody& GetBtBody() { return *body_; }
     collision::RaycastVehicle& GetBtVehicle() { return *vehicle_; }
 
+    void DisableAction();
+    bool IsActionEnabled() const { return action_enabled_; }
+
     ~VehiclePhysics();
 
 private:
+    bool action_enabled_ = false;
     void UpdateBulletHitboxTransform();
 
 private:
@@ -100,7 +104,11 @@ public:
     const std::shared_ptr<const VehicleTuningList>& GetTuningList() const { return tuninglist_; }
     const VehicleTuningContext& GetTuningResult() const { return tuning_ctx_; }
 
+    void SetInvulnerable(bool invulnerable) { invulnerable_ = invulnerable; }
+    void SetDestroyedRemoveTime(int64_t time) { destroyed_remove_time_ = time; }
+
 private:
+    void UpdateDestruction();
     void ProcessInput();
     void UpdateCrash();
     void UpdateWheels();
@@ -110,15 +118,19 @@ private:
     VehicleSyncFieldFlags WriteState(net::OutMessage& msg, const VehicleSyncState& base) const;
     void SendUpdateMsg();
 
-    void ApplyDamage(float damage);
+    void ApplyDamage(HumanCharacter* inflictor, float damage, float window_damage);
 
     void WriteDeformSync(net::OutMessage& msg) const;
     void Deform(const glm::vec3& pos, const glm::vec3& deform, float radius);
     void SendDeformMsg(const net::PositionQ& pos, const net::PositionQ& deform);
+    void SendDeformSyncMsg();
 
     void ApplyTuning(const VehicleTuning& tuning);
 
     void WriteTuning(net::OutMessage& msg) const;
+
+    void Explode();
+    void RandomizeDeform();
 
 protected:
     VehiclePhysics* GetPhysics() { return physics_.get(); }
@@ -147,6 +159,12 @@ private:
     VehicleInputFlags in_ = 0;
 
     float health_ = 100.0f;
+    bool exploded_ = false;
+    float window_health_ = 100.0f;
+    bool invulnerable_ = false;
+    int64_t destroyed_remove_time_ = 50000;
+    size_t explosion_timer_ = 0;
+    net::EntNum destroyer_num_ = 0;
 
     float crash_intensity_ = 0.0f;
     size_t no_crash_frames_ = 0;

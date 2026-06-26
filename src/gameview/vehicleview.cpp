@@ -39,6 +39,8 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
     snd_accel_ = assets::CacheManager::GetSound("data/auto.snd");
 
     radius_ = 3.0f;
+    
+    colors_[VCS_OTHER] = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
 }
 
 bool game::view::VehicleView::ProcessMsg(net::EntMsgType type, net::InMessage& msg)
@@ -47,6 +49,8 @@ bool game::view::VehicleView::ProcessMsg(net::EntMsgType type, net::InMessage& m
     {
     case net::EMSG_DEFORM:
         return ProcessDeformMsg(msg);
+    case net::EMSG_DEFORM_SYNC:
+        return ProcessDeformSyncMsg(msg);
     case net::EMSG_TUNING:
         return ReadTuning(msg);
     default:
@@ -102,28 +106,37 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
 {
     Super::Draw(args);
 
+    bool exploded = (flags_ & VF_EXPLODED) > 0;
+    
+    // base model
+    const glm::vec4* colors = exploded ? &destroyed_colors_[0] : &colors_[0]; 
     for (const auto& surface : mesh_.surfaces)
     {
         gfx::DrawSurfaceCmd cmd;
         cmd.surface = &surface;
         cmd.matrices = &root_.matrix;
-        cmd.color = &colors_[0];
+        cmd.color = colors;
         cmd.num_colors = SD_MAX_COLORS;
         args.dlist.AddSurface(cmd);
     }
 
-    const auto& wheels = model_->GetWheels();
-    for (size_t i = 0; i < wheels.size(); ++i)
+    // wheels
+    if ((flags_ & VF_NO_WHEELS) == 0)
     {
-        const auto& mesh = *wheels_[i].model->GetMesh();
-
-        for (const auto& surface : mesh.surfaces)
+        const auto& wheels = model_->GetWheels();
+        for (size_t i = 0; i < wheels.size(); ++i)
         {
-            gfx::DrawSurfaceCmd cmd;
-            cmd.surface = &surface;
-            cmd.matrices = &wheels_[i].node.matrix;
-            cmd.color = &wheels_[i].color;
-            args.dlist.AddSurface(cmd);
+            const auto& mesh = *wheels_[i].model->GetMesh();
+    
+            for (const auto& surface : mesh.surfaces)
+            {
+                gfx::DrawSurfaceCmd cmd;
+                cmd.surface = &surface;
+                cmd.matrices = &wheels_[i].node.matrix;
+                cmd.color = &wheels_[i].color;
+                cmd.num_colors = 1;
+                args.dlist.AddSurface(cmd);
+            }
         }
     }
 
@@ -139,7 +152,7 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
     }
 
     // headlights
-    if (headlights_factor_ >= 0.01f)
+    if (!exploded && headlights_factor_ >= 0.01f)
     {
         // light
         auto light_pos = world_.CameraSweep(root_.GetGlobalPosition(), root_.matrix * glm::vec4(0.0f, 7.0f, 0.0f, 1.0f));
@@ -216,11 +229,14 @@ bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
 
         wheels_[i].model = !wheel_model_name.empty() ? assets::CacheManager::GetModel("data/" + wheel_model_name + ".mdl") : model_->GetWheels()[i].model;
         wheels_[i].color = recv_colors[1]; // TODO: dynamic?;
+        wheels_[i].color.a = 0.0f;
     }
 
     colors_[VCS_PRIMARY] = recv_colors[0]; // primary
     colors_[VCS_SECONDARY] =  recv_colors[2]; // secondary
     headlight_color_ = recv_colors[3];
+
+    UpdateDestroyedColors();
 
     return true;
 }
@@ -356,6 +372,11 @@ bool game::view::VehicleView::ProcessDeformMsg(net::InMessage& msg)
 
 }
 
+bool game::view::VehicleView::ProcessDeformSyncMsg(net::InMessage& msg)
+{
+    return ReadDeformSync(msg);
+}
+
 void game::view::VehicleView::InitHeadlights()
 {
     for (size_t i = 0; i < 2; ++i)
@@ -437,4 +458,19 @@ void game::view::VehicleView::UpdateLights(float delta_t)
     {
         light_cone_node_[i].UpdateMatrix();
     }
+}
+
+void game::view::VehicleView::UpdateDestroyedColors()
+{
+    destroyed_colors_[VCS_PRIMARY] = glm::mix(colors_[VCS_PRIMARY], glm::vec4(0.1f, 0.1f, 0.1f, 0.0f), 0.8f);
+    destroyed_colors_[VCS_SECONDARY] = glm::mix(colors_[VCS_SECONDARY], glm::vec4(0.1f, 0.1f, 0.1f, 0.0f), 0.8f);
+
+    destroyed_colors_[VCS_HEADLIGHTS] = glm::vec4(0.1f, 0.1f, 0.1f, 0.0f);
+    destroyed_colors_[VCS_REAR_LIGHTS] = glm::vec4(0.1f, 0.1f, 0.1f, 0.0f);
+    destroyed_colors_[VCS_BRAKING_LIGHTS] = glm::vec4(0.1f, 0.1f, 0.1f, 0.0f);
+    destroyed_colors_[VCS_ORANGE_LIGHTS] = glm::vec4(0.1f, 0.1f, 0.1f, 0.0f);
+    destroyed_colors_[VCS_REVERSE_LIGHT] = glm::vec4(0.1f, 0.1f, 0.1f, 0.0f);
+
+    destroyed_colors_[VCS_OTHER] = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
+
 }

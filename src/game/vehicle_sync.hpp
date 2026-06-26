@@ -20,6 +20,8 @@ enum VehicleFlag : VehicleFlags
     VF_LIGHTS_ON = 8,
     VF_REVERSING = 16,
     VF_ORANGE_LIGHTS_ON = 32,
+    VF_NO_WHEELS = 64,
+    VF_EXPLODED = 128,
 };
 
 struct VehicleSyncState

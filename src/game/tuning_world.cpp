@@ -34,6 +34,9 @@ void game::TuningWorld::OnVehicleJoined(DrivableVehicle& vehicle)
     tuning_list_ = vehicle.GetTuningList().get();
     player_ = player;
 
+    vehicle_->SetInvulnerable(true);
+    vehicle_->SetDestroyedRemoveTime(0);
+
     Setup();
 }
 

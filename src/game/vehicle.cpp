@@ -6,6 +6,7 @@
 #include "player_input.hpp"
 #include "utils/random.hpp"
 #include "utils/math.hpp"
+#include "human_character.hpp"
 
 #include <iostream>
 
@@ -48,6 +49,7 @@ void game::Vehicle::Update()
     root_.UpdateMatrix();
 
     flags_ = 0;
+    UpdateDestruction();
     UpdateCrash();
     ProcessInput();
     UpdateWheels();
@@ -83,7 +85,7 @@ void game::Vehicle::OnContact(const collision::ContactInfo& info)
     if (info.impulse < 1000.0f)
         return;
 
-    ApplyDamage(info.impulse * 0.01f);
+    ApplyDamage(nullptr, info.impulse * 0.0001f, info.impulse * 0.01f);
     Deform(info.pos, -glm::normalize(info.normal) * 0.1f, 1.0f);
 
 }
@@ -111,9 +113,9 @@ void game::Vehicle::ReceiveDamage(const DamageInfo& damage)
     auto dmg = damage.damage;
     if (damage.type == DAMAGE_BULLET)
     {
-        dmg *= 0.1f;
+        dmg *= 0.02f;
     }
-    ApplyDamage(dmg);
+    ApplyDamage(damage.inflictor, dmg, dmg * 2.0f);
     // Deform(damage.impact_pos, damage.normal * -0.1f, 1.0f);
 
 }
@@ -155,8 +157,43 @@ void game::Vehicle::SetTuning(const VehicleTuning& tuning)
     WriteTuning(msg);
 }
 
+void game::Vehicle::UpdateDestruction()
+{
+    if (window_health_ <= 0.0f)
+        flags_ |= VF_BROKENWINDOWS;
+
+    if (exploded_)
+    {
+        flags_ |= VF_EXPLODED;
+        return;
+    }
+
+    if (explosion_timer_ == 0)
+        return;
+
+    --explosion_timer_;
+
+    auto& world = GetWorld();
+
+    // check existence of destroyer
+    if (destroyer_num_ && !world.GetEntity(destroyer_num_))
+    {
+        destroyer_num_ = 0;
+    }
+
+    if (explosion_timer_ > 0)
+        return;
+
+    Explode();
+}
+
 void game::Vehicle::ProcessInput()
 {
+    if (!physics_->IsActionEnabled())
+    {
+        return; // destroyed
+    }
+
     // TODO: totally fix
 
     // std::string nt = "";
@@ -359,9 +396,6 @@ void game::Vehicle::ProcessInput()
 
 void game::Vehicle::UpdateCrash()
 {
-    if (health_ <= 0.0f)
-        flags_ |= VF_BROKENWINDOWS;
-
     if (no_crash_frames_)
     {
         --no_crash_frames_;
@@ -415,9 +449,15 @@ void game::Vehicle::UpdateCrash()
 
 void game::Vehicle::UpdateWheels()
 {
-    auto& vehicle = physics_->GetBtVehicle();
-
     wheels_on_ground_ = 0;
+
+    if (!physics_->IsActionEnabled())
+    {
+        flags_ |= VF_NO_WHEELS;
+        return;
+    }
+
+    auto& vehicle = physics_->GetBtVehicle();
 
     for (size_t i = 0; i < wheels_.size(); ++i)
     {
@@ -434,6 +474,11 @@ void game::Vehicle::UpdateWheels()
 
 void game::Vehicle::UpdateLights()
 {
+    if (exploded_)
+    {
+        return;
+    }
+
     if (lights_on_)
         flags_ |= VF_LIGHTS_ON;
 
@@ -537,17 +582,41 @@ void game::Vehicle::SendUpdateMsg()
     msg.WriteAt(fields_pos, fields);
 }
 
-void game::Vehicle::ApplyDamage(float damage)
+void game::Vehicle::ApplyDamage(HumanCharacter* inflictor, float damage, float window_damage)
 {
-    if (health_ <= 0.0f)
+    if (invulnerable_)
         return;
 
-    health_ -= damage;
-
-    if (health_ <= 0.0f) // just broken
+    // main health
+    if (health_ > 0.0f)
     {
-        PlaySound("breakwindow", 1.0f, 1.0f);
-        health_ = 0.0f;
+        health_ -= damage;
+
+        if (health_ <= 0.0f)
+        {
+            health_ = 0.0f;
+            window_health_ = 0.0f; // make sure windows are destroyed
+
+            // boom
+            // Schedule(RandomInt(100, 1000), [this]{
+            //     Explode();
+            // });
+            destroyer_num_ = inflictor ? inflictor->GetEntNum() : 0;
+            explosion_timer_ = RandomInt(5, 20);
+        }
+    }
+
+    // window health
+    if (window_health_ > 0.0f)
+    {
+        window_health_ -= window_damage;
+
+        if (window_health_ <= 0.0f)  // just broken
+        {
+            window_health_ = 0.0f;
+
+            PlaySound("breakwindow", 1.0f, 1.0f);
+        }
     }
 }
 
@@ -582,7 +651,7 @@ void game::Vehicle::WriteDeformSync(net::OutMessage& msg) const
 
 void game::Vehicle::Deform(const glm::vec3& pos, const glm::vec3& deform, float radius)
 {
-    if (health_ > 0.0f)
+    if (window_health_ > 0.0f)
         return;
 
     net::PositionQ pos_q;
@@ -605,6 +674,12 @@ void game::Vehicle::SendDeformMsg(const net::PositionQ& pos, const net::Position
     auto msg = BeginEntMsg(net::EMSG_DEFORM);
     net::WritePositionQ(msg, pos);
     net::WritePositionQ(msg, deform);
+}
+
+void game::Vehicle::SendDeformSyncMsg()
+{
+    auto msg = BeginEntMsg(net::EMSG_DEFORM_SYNC);
+    WriteDeformSync(msg);
 }
 
 void game::Vehicle::ApplyTuning(const VehicleTuning& tuning)
@@ -648,11 +723,17 @@ void game::Vehicle::ApplyTuning(const VehicleTuning& tuning)
     }
 
     health_ = tuning_ctx_.health;
+    window_health_ = health_;
     steering_speed_ = tuning_ctx_.steering;
 
     // (re)create physics
     physics_.reset();
     physics_ = std::make_unique<VehiclePhysics>(world_, root_.local, *this, *model_, tuning_ctx_);
+    if (exploded_)
+    {
+        physics_->DisableAction();
+    }
+
     OnPhysicsChanged();
 }
 
@@ -669,6 +750,51 @@ void game::Vehicle::WriteTuning(net::OutMessage& msg) const
     {
         msg.Write(net::ModelName(wheel.modelname));
     }
+}
+
+void game::Vehicle::Explode()
+{
+    exploded_ = true;
+
+    auto& world = GetWorld();
+
+    if (physics_)
+    {
+        physics_->DisableAction();
+    }
+
+    world.Effect("carexplo", root_.local.position, glm::vec3(0.0f, 0.0f, 1.0f));
+
+    ExplosionInfo explo{};
+    explo.center = root_.local.position - glm::vec3(0.0f, 0.0f, -0.1f);
+    explo.damage = 400.0f;
+    explo.radius = 5.0f;
+    explo.impulse = 7000.0f;
+    explo.inflictor = dynamic_cast<HumanCharacter*>(world.GetEntity(destroyer_num_));
+    world.MakeExplosion(explo);
+
+    RandomizeDeform();
+
+    if (destroyed_remove_time_ > 0)
+    {
+        Schedule(destroyed_remove_time_, [this]{
+            Remove();
+        });
+    }
+
+}
+
+void game::Vehicle::RandomizeDeform()
+{
+    auto data = deformgrid_->GetData();
+    for (auto& texel : data)
+    {
+        texel.x = RandomInt(-125, 125);
+        texel.y = RandomInt(-125, 125);
+        texel.z = RandomInt(-125, 125);
+    }
+
+    SendDeformSyncMsg();
 }
 
 // PHYSICS
@@ -749,10 +875,11 @@ game::VehiclePhysics::VehiclePhysics(collision::DynamicsWorld& world, Transform&
         wi.m_maxSuspensionTravelCm = wheel_tun.suspension_travel * 100.0f;
     }
 
+
     auto& bt_world = world_.GetBtWorld();
     bt_world.addRigidBody(body_.get(), collision::OG_DEFAULT, ~collision::OG_PROJECTILE);
     bt_world.addAction(vehicle_.get());
-
+    action_enabled_ = true;
 
     // make bullet hitbox
     auto col_mesh = model.GetModel()->GetColMesh();
@@ -774,11 +901,22 @@ void game::VehiclePhysics::Update()
     UpdateBulletHitboxTransform();
 }
 
+void game::VehiclePhysics::DisableAction()
+{
+    if (!action_enabled_)
+        return;
+
+    auto& bt_world = world_.GetBtWorld();
+    bt_world.removeAction(vehicle_.get());
+
+    action_enabled_ = false;
+}
+
 game::VehiclePhysics::~VehiclePhysics()
 {
     auto& bt_world = world_.GetBtWorld();
     bt_world.removeRigidBody(body_.get());
-    bt_world.removeAction(vehicle_.get());
+    DisableAction();
 
     if (bullet_hitbox_)
     {

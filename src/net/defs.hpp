@@ -119,6 +119,7 @@ enum EntMsgType : uint8_t
     // EMSG_UPDATE, // deprecated
     EMSG_PLAYSOUND,
     EMSG_DEFORM,
+    EMSG_DEFORM_SYNC,
     EMSG_TUNING,
     EMSG_EQUIP,
     EMSG_FIRE,
