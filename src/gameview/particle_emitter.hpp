@@ -19,6 +19,7 @@ struct Particle
     glm::vec3 position;
     float rotation;
     float size;
+    float size_speed;
     glm::vec3 velocity;
     float gravity;
     float lifetime;

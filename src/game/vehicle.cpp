@@ -95,19 +95,26 @@ void game::Vehicle::ReceiveDamage(const DamageInfo& damage)
     if (!physics_)
         return;
 
+    if (damage.type != DAMAGE_BULLET && damage.type != DAMAGE_EXPLOSION)
+    {
+        return;
+    }
+
+    // TODO: adjust impulse
+    auto impulse = damage.normal * -damage.impulse;
+    auto& bt_body = physics_->GetBtBody();
+    bt_body.activate();
+    bt_body.applyImpulse(btVector3(impulse.x, impulse.y, impulse.z),
+                            btVector3(damage.impact_pos.x, damage.impact_pos.y, damage.impact_pos.z) -
+                                bt_body.getCenterOfMassPosition());
+
+    auto dmg = damage.damage;
     if (damage.type == DAMAGE_BULLET)
     {
-        // TODO: adjust impulse
-        auto impulse = damage.normal * -60.0f;
-        auto& bt_body = physics_->GetBtBody();
-        bt_body.activate();
-        bt_body.applyImpulse(btVector3(impulse.x, impulse.y, impulse.z),
-                             btVector3(damage.impact_pos.x, damage.impact_pos.y, damage.impact_pos.z) -
-                                 bt_body.getCenterOfMassPosition());
-
-        ApplyDamage(damage.damage * 0.2f);
-        // Deform(damage.impact_pos, damage.normal * -0.1f, 1.0f);
+        dmg *= 0.1f;
     }
+    ApplyDamage(dmg);
+    // Deform(damage.impact_pos, damage.normal * -0.1f, 1.0f);
 
 }
 
@@ -684,7 +691,9 @@ game::VehiclePhysics::VehiclePhysics(collision::DynamicsWorld& world, Transform&
     body_ = std::make_unique<btRigidBody>(rb_info);
     // body_->setActivationState(DISABLE_DEACTIVATION);
 
-    collision::SetObjectInfo(body_.get(), collision::OT_ENTITY, collision::OF_NOTIFY_CONTACT | collision::OF_DESTRUCTING, &obj_cb);
+    collision::SetObjectInfo(body_.get(), collision::OT_ENTITY,
+                             collision::OF_NOTIFY_CONTACT | collision::OF_DESTRUCTING | collision::OF_EXPLOSION_DAMAGE,
+                             &obj_cb);
 
     // setup vehicle
     btRaycastVehicle::btVehicleTuning bt_tuning;

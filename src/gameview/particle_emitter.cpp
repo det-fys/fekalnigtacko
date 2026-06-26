@@ -1,11 +1,14 @@
 #include "particle_emitter.hpp"
 #include "assets/cache.hpp"
 #include "utils/random.hpp"
+#include "utils/math.hpp"
 
 game::view::ParticleEmitter::ParticleEmitter(audio::Player* audioplayer) : audioplayer_(audioplayer)
 {
     quad_model_ = assets::CacheManager::GetModel("data/quad.mdl");
 }
+
+
 
 void game::view::ParticleEmitter::Update(float delta_time)
 {
@@ -20,6 +23,8 @@ void game::view::ParticleEmitter::Update(float delta_time)
             float opacity = 1.0f - glm::clamp((particle.time - particle.fade_start) / (particle.lifetime - particle.fade_start), 0.0f, 1.0f);
             particle.color.a = opacity;
         }
+
+        particle.size += particle.size_speed * delta_time;
     }
 
     // erase expired particles
@@ -33,14 +38,16 @@ void game::view::ParticleEmitter::Draw(const DrawArgs& args)
     for (auto& particle : particles_)
     {
         // calc matrixa
-        auto forward = args.eye - particle.position;
-        auto right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 0.0f, 1.0f))); 
-        auto up = normalize(glm::cross(right, forward));
+        // auto forward = args.eye - particle.position;
+        // auto right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 0.0f, 1.0f))); 
+        // auto up = normalize(glm::cross(right, forward));
+        auto dir = args.eye - particle.position;
+        auto basis = BasisFromDir(dir);
 
         particle.matrix = glm::rotate(glm::mat4(
-            glm::vec4(right * particle.size, 0.0f),
-            glm::vec4(forward, 0.0f),
-            glm::vec4(up * particle.size, 0.0f),
+            glm::vec4(basis[0] * particle.size, 0.0f),
+            glm::vec4(basis[1], 0.0f),
+            glm::vec4(basis[2] * particle.size, 0.0f),
             glm::vec4(particle.position, 1.0f)
         ), particle.rotation, glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -48,7 +55,7 @@ void game::view::ParticleEmitter::Draw(const DrawArgs& args)
         cmd.surface = &particle.surface;
         cmd.matrices = &particle.matrix;
         cmd.color = &particle.color;
-        cmd.dist = glm::dot(forward, forward);
+        cmd.dist = glm::dot(dir, dir);
         args.dlist.AddSurface(cmd);
     }
 
@@ -61,7 +68,13 @@ void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effec
     // spawn particles
     for (const auto& def : fx->GetParticleDefs())
     {
-        auto count = RandomInt(def.count_min, def.count_max);
+        size_t count = 0;
+
+        for (const auto& p : def.probabilities)
+        {
+            if (Chance(p))
+                ++count;
+        }
 
         if (count <= 0)
             continue;
@@ -80,12 +93,19 @@ void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effec
         for (int i = 0; i < count; ++i)
         {
             auto& particle = particles_.emplace_back();
+            particle.fx = fx;
+
             particle.surface = surface;
             particle.time = 0.0f;
-            
-            particle.position = pos;
+
+            glm::vec3 offset_ps(RandomFloat(def.offset_min.x, def.offset_max.x),
+                                RandomFloat(def.offset_min.y, def.offset_max.y),
+                                RandomFloat(def.offset_min.z, def.offset_max.z));
+
+            particle.position = pos + BasisFromDir(dir) * offset_ps;
             particle.rotation = RandomFloat(0.0f, glm::two_pi<float>());
             particle.size = RandomFloat(def.size_min, def.size_max);
+            particle.size_speed = RandomFloat(def.size_speed_min, def.size_speed_max);
 
             float dispersion = RandomFloat(0.0f, def.max_dispersion);
             float speed = RandomFloat(def.velocity_min, def.velocity_max);

@@ -19,6 +19,16 @@ std::shared_ptr<const assets::Effect> assets::Effect::LoadFromFile(const std::st
         else if (command == "particle")
         {
             particle = &fx->particle_defs_.emplace_back();
+        
+            size_t num = 0;
+            iss >> num;
+            for (size_t i = 0; i < num; ++i)
+            {
+                float probability = 1.0f;
+                iss >> probability;
+                particle->probabilities.push_back(probability);
+            }
+        
         }
         else if (particle)
         {
@@ -42,9 +52,9 @@ std::shared_ptr<const assets::Effect> assets::Effect::LoadFromFile(const std::st
             {
                 iss >> particle->size_min >> particle->size_max;
             }
-            else if (command == "count")
+            else if (command == "sizespeed")
             {
-                iss >> particle->count_min >> particle->count_max;
+                iss >> particle->size_speed_min >> particle->size_speed_max;
             }
             else if (command == "velocity")
             {
@@ -65,6 +75,12 @@ std::shared_ptr<const assets::Effect> assets::Effect::LoadFromFile(const std::st
             else if (command == "fadetime")
             {
                 iss >> particle->fadetime_min >> particle->fadetime_max;
+            }
+            else if (command == "offset")
+            {
+                auto& min = particle->offset_min;
+                auto& max = particle->offset_max;
+                iss >> min.x >> min.y >> min.z >> max.x >> max.y >> max.z;
             }
 
         }

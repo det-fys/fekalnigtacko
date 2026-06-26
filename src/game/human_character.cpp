@@ -1,6 +1,7 @@
 #include "human_character.hpp"
 #include "drivable_vehicle.hpp"
 #include "utils/random.hpp"
+#include "projectile.hpp"
 
 static game::CharacterTuning GetCharacterTuning(const game::HumanCharacterTuning& tuning)
 {
@@ -145,12 +146,36 @@ void game::HumanCharacter::Fire()
     float range = 500.0f;
     // float dispersion = 5.0f; // m/100m
     
-    game::BulletInfo bullet{};
-    bullet.start = GetEyePosition();
-    bullet.end = bullet.start + ApplyRandomDispersion(GetAimDirection(), dispersion_) * range;
-    bullet.damage = item_->def->damage;
-    bullet.shooter = this;
-    GetWorld().FireBullet(bullet);
+    auto& world = GetWorld();
+
+    auto start = GetEyePosition();
+    auto dir = glm::normalize(ApplyRandomDispersion(GetAimDirection(), dispersion_));
+
+    if (item_->def->fire_type == assets::FIRETYPE_BULLET)
+    {
+        BulletInfo bullet{};
+        bullet.start = start;
+        bullet.end = start + dir * range;
+        bullet.damage = item_->def->damage;
+        bullet.shooter = this;
+        bullet.impulse = 60.0f;
+        world.FireBullet(bullet);
+    }
+    else if (item_->def->fire_type == assets::FIRETYPE_PROJECTILE)
+    {
+        ProjectileInfo projectile{};
+        projectile.model_name = "panzerschreck_projectile";
+        projectile.shooter_num = GetEntNum();
+        projectile.start_pos = start;
+        projectile.velocity = dir * 60.0f;
+        projectile.lifetime = 5000;
+        projectile.fx_name = "panzerschreck_projectile";
+        projectile.sound_name = "rpg_projectile";
+        projectile.explo_damage = 300.0f;
+        projectile.explo_radius = 6.0f;
+        projectile.explo_impulse = 5000.0f;
+        world.Spawn<Projectile>(projectile);
+    }
 
     last_fire_time_ = GetTime();
     dispersion_ = glm::min(dispersion_ + item_->def->dispersion_shot, item_->def->dispersion_max);

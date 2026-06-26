@@ -19,19 +19,31 @@ struct ParticleDef
 {
     std::shared_ptr<const gfx::Texture> texture;
     ParticleBlendType blend = PTB_NONE;
+    
+    std::vector<float> probabilities;
+
     float size_min = 1.0f;
     float size_max = 1.0f;
-    size_t count_min = 1;
-    size_t count_max = 1;
+
+    float size_speed_min = 0.0f;
+    float size_speed_max = 0.0f;
+    
     float velocity_min = 1.0f;
     float velocity_max = 1.0f;
+    
     float max_dispersion = 0.0f;
+    
     float gravity_min = 1.0f;
     float gravity_max = 1.0f;
+    
     float lifetime_min = 1.0f;
     float lifetime_max = 1.0f;
+    
     float fadetime_min = 1.0f;
     float fadetime_max = 1.0f;
+
+    glm::vec3 offset_min{0.0f};
+    glm::vec3 offset_max{0.0f};
 };
 
 class Effect

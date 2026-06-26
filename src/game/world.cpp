@@ -105,68 +105,68 @@ void game::World::RespawnObj(net::ObjNum objnum)
     }
 }
 
-struct UseTargetAabbCallback : public btBroadphaseAabbCallback
-{
-    game::PlayerCharacter& character;
-    glm::vec3 pos;
-    const game::UseTarget* best_target = nullptr;
-    float best_dist = std::numeric_limits<float>::max();
-    game::UseTargetQueryResult& best_res;
-    float radius = 2.0f;
-
-    UseTargetAabbCallback(game::PlayerCharacter& character, game::UseTargetQueryResult& res) : character(character), pos(character.GetRoot().GetGlobalPosition()), best_res(res)
-    {
-        auto rideable_entity = dynamic_cast<game::Entity*>(character.GetRideable());
-        if (rideable_entity)
-        {
-            radius = 5.0f;
-            pos = rideable_entity->GetRoot().GetGlobalPosition();
-        }
-    }
-
-    virtual bool process(const btBroadphaseProxy* proxy)
-    {
-        auto obj = reinterpret_cast<const btCollisionObject*>(proxy->m_clientObject);
-
-        collision::ObjectType type;
-        collision::ObjectFlags flags;
-        collision::ObjectCallback* obj_cb;
-        collision::GetObjectInfo(obj, type, flags, obj_cb);
-
-        if ((flags & collision::OF_USABLE) == 0 || !obj_cb)
-            return true;
-        
-        auto usable = dynamic_cast<game::Usable*>(obj_cb);
-        if (!usable)
-            return true;
-
-        auto& matrix = usable->GetWSTransformMatrix();
-
-        for (const auto& target : usable->GetUseTargets())
-        {
-            glm::vec3 pos_world = matrix * glm::vec4(target.position, 1.0f);
-
-            float dist = glm::distance(pos, pos_world);
-            if (dist < radius && dist < best_dist)
-            {
-                game::UseTargetQueryResult res{};
-                if (!usable->QueryUseTarget(character, target.id, res))
-                    continue;
-
-                best_res = res;
-                best_dist = dist;
-                best_target = &target;
-            }
-        }
-
-        return true;
-    }
-};
-
-const game::UseTarget* game::World::GetBestUseTarget(game::PlayerCharacter& character, game::UseTargetQueryResult& res)
+const game::UseTarget* game::World::GetBestUseTarget(PlayerCharacter& character, UseTargetQueryResult& res)
 {
     const float radius = 5.0f;
     
+    struct UseTargetAabbCallback : public btBroadphaseAabbCallback
+    {
+        PlayerCharacter& character;
+        glm::vec3 pos;
+        const UseTarget* best_target = nullptr;
+        float best_dist = std::numeric_limits<float>::max();
+        UseTargetQueryResult& best_res;
+        float radius = 2.0f;
+
+        UseTargetAabbCallback(PlayerCharacter& character, UseTargetQueryResult& res) : character(character), pos(character.GetRoot().GetGlobalPosition()), best_res(res)
+        {
+            auto rideable_entity = dynamic_cast<Entity*>(character.GetRideable());
+            if (rideable_entity)
+            {
+                radius = 5.0f;
+                pos = rideable_entity->GetRoot().GetGlobalPosition();
+            }
+        }
+
+        virtual bool process(const btBroadphaseProxy* proxy)
+        {
+            auto obj = reinterpret_cast<const btCollisionObject*>(proxy->m_clientObject);
+
+            collision::ObjectType type;
+            collision::ObjectFlags flags;
+            collision::ObjectCallback* obj_cb;
+            collision::GetObjectInfo(obj, type, flags, obj_cb);
+
+            if ((flags & collision::OF_USABLE) == 0 || !obj_cb)
+                return true;
+            
+            auto usable = dynamic_cast<Usable*>(obj_cb);
+            if (!usable)
+                return true;
+
+            auto& matrix = usable->GetWSTransformMatrix();
+
+            for (const auto& target : usable->GetUseTargets())
+            {
+                glm::vec3 pos_world = matrix * glm::vec4(target.position, 1.0f);
+
+                float dist = glm::distance(pos, pos_world);
+                if (dist < radius && dist < best_dist)
+                {
+                    UseTargetQueryResult res{};
+                    if (!usable->QueryUseTarget(character, target.id, res))
+                        continue;
+
+                    best_res = res;
+                    best_dist = dist;
+                    best_target = &target;
+                }
+            }
+
+            return true;
+        }
+    };
+
     UseTargetAabbCallback cb(character, res);
     btVector3 min(cb.pos.x - radius, cb.pos.y - radius, cb.pos.z - radius);
     btVector3 max(cb.pos.x + radius, cb.pos.y + radius, cb.pos.z + radius);
@@ -175,7 +175,7 @@ const game::UseTarget* game::World::GetBestUseTarget(game::PlayerCharacter& char
     return cb.best_target;
 }
 
-bool game::World::TraceBullet(const glm::vec3& start, const glm::vec3& end, game::HumanCharacter* shooter,
+bool game::World::TraceBullet(const glm::vec3& start, const glm::vec3& end, HumanCharacter* shooter,
                               glm::vec3& out_hit_pos)
 {
     return TraceBulletInternal(start, end, shooter, out_hit_pos) != nullptr;
@@ -244,9 +244,10 @@ void game::World::FireBullet(const BulletInfo& bullet)
     if (obj_cb)
     {
         // apply damage
-        DamageInfo damage;
+        DamageInfo damage{};
         damage.type = DAMAGE_BULLET;
         damage.damage = bullet.damage;
+        damage.impulse = bullet.impulse;
         damage.from_pos = bullet.start;
         damage.impact_pos = hit_pos;
         damage.inflictor = bullet.shooter;
@@ -263,6 +264,57 @@ void game::World::FireBullet(const BulletInfo& bullet)
 
     // effect
     Effect(GetMaterialImpactFx(material), hit_pos, hit_normal);
+}
+
+void game::World::MakeExplosion(const ExplosionInfo& explo)
+{
+    struct ExplosionAabbCallback : btBroadphaseAabbCallback
+    {
+        const ExplosionInfo& explo;
+
+        ExplosionAabbCallback(const ExplosionInfo& explo) : explo(explo) {}
+        
+        virtual bool process(const btBroadphaseProxy* proxy)
+        {
+            auto obj = reinterpret_cast<const btCollisionObject*>(proxy->m_clientObject);
+            auto flags = collision::GetObjectFlags(obj);
+            auto obj_cb = collision::GetObjectCallback(obj);
+
+            if (!obj_cb || (flags & collision::OF_EXPLOSION_DAMAGE) == 0)
+                return true;
+
+            auto& world_trans = obj->getWorldTransform();
+            auto bt_pos = world_trans.getOrigin();
+            bt_pos += world_trans.getBasis() * btVector3(0.0f, 0.0f, 1.3f);
+            glm::vec3 pos(bt_pos.x(), bt_pos.y(), bt_pos.z());
+
+            auto distance = glm::distance(explo.center, pos);
+            if (distance > explo.radius)
+                return true; // out of radius 
+
+            auto factor = 1.0f - (distance / explo.radius);
+
+            DamageInfo damage{};
+            damage.type = DAMAGE_EXPLOSION;
+            damage.damage = explo.damage * factor;
+            damage.impulse = explo.impulse * factor;
+            damage.from_pos = explo.center;
+            damage.impact_pos = pos;
+            damage.inflictor = explo.inflictor;
+            damage.hit_object = obj;
+            damage.normal = glm::normalize(explo.center - pos);
+            obj_cb->ReceiveDamage(damage);
+
+            return true;
+        }
+
+    };
+
+    ExplosionAabbCallback cb{explo};
+    btVector3 min(explo.center.x - explo.radius, explo.center.y - explo.radius, explo.center.z - explo.radius);
+    btVector3 max(explo.center.x + explo.radius, explo.center.y + explo.radius, explo.center.z + explo.radius);
+
+    GetBtBroadphase().aabbTest(min, max, cb);
 }
 
 void game::World::Beam(const glm::vec3& start, const glm::vec3& end, uint32_t color, float time)

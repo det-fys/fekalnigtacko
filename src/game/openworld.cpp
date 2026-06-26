@@ -88,6 +88,7 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld("openworld"), game_(game
     CreatePermaItemPickups("airsniper");
     CreatePermaItemPickups("ak47");
     CreatePermaItemPickups("uzi");
+    CreatePermaItemPickups("panzerschreck");
 
     SpawnNpcs();
 

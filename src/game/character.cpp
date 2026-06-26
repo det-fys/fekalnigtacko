@@ -604,7 +604,7 @@ void game::Character::SetupHitBones()
     // setup proxy
     static btSphereShape proxy_shape(1.5f);
     hitbone_proxy_.setCollisionShape(&proxy_shape);
-    collision::SetObjectInfo(&hitbone_proxy_, collision::OT_ENTITY, 0, this);
+    collision::SetObjectInfo(&hitbone_proxy_, collision::OT_ENTITY, collision::OF_EXPLOSION_DAMAGE, this);
     GetWorld().GetBtWorld().addCollisionObject(&hitbone_proxy_, collision::OG_HITBONES_PROXY, collision::OG_PROJECTILE);
 }
 

@@ -19,6 +19,7 @@ enum DamageType
     DAMAGE_OTHER,
     DAMAGE_BULLET,
     DAMAGE_CRASH,
+    DAMAGE_EXPLOSION,
 };
 
 class HumanCharacter;
@@ -40,6 +41,15 @@ struct BulletInfo
     HumanCharacter* shooter;
     glm::vec3 start;
     glm::vec3 end;
+    float damage;
+    float impulse;
+};
+
+struct ExplosionInfo
+{
+    HumanCharacter* inflictor;
+    glm::vec3 center;
+    float radius;
     float damage;
     float impulse;
 };
@@ -74,7 +84,7 @@ public:
 
     void RespawnObj(net::ObjNum objnum);
 
-    const UseTarget* GetBestUseTarget(game::PlayerCharacter& character, UseTargetQueryResult& res);
+    const UseTarget* GetBestUseTarget(PlayerCharacter& character, UseTargetQueryResult& res);
 
     const assets::Map& GetMap() const { return map_.GetMap(); }
     const std::string& GetMapName() const { return map_.GetName(); }
@@ -83,8 +93,10 @@ public:
     float GetDayTime() const { return daytime_; }
     void SetDayTime(float daytime) { daytime_ = glm::mod(daytime, 24.0f); }
 
-    bool TraceBullet(const glm::vec3& start, const glm::vec3& end, game::HumanCharacter* shooter, glm::vec3& out_hit_pos);
+    bool TraceBullet(const glm::vec3& start, const glm::vec3& end, HumanCharacter* shooter, glm::vec3& out_hit_pos);
     void FireBullet(const BulletInfo& bullet);
+
+    void MakeExplosion(const ExplosionInfo& explo);
 
     void Beam(const glm::vec3& start, const glm::vec3& end, uint32_t color, float time);
     void BeamBox(const glm::vec3& min, const glm::vec3& max, uint32_t color, float time);

@@ -44,6 +44,7 @@ enum ObjectFlag : ObjectFlags
     OF_USABLE = 4,
     OF_DESTRUCTING = 8,
     OF_CRASH_DAMAGE = 16,
+    OF_EXPLOSION_DAMAGE = 32,
 };
 
 struct ContactInfo

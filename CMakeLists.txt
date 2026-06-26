@@ -179,6 +179,8 @@ set(SERVER_ONLY_SOURCES
     "src/game/player_character.cpp"
     "src/game/player.hpp"
     "src/game/player.cpp"
+    "src/game/projectile.hpp"
+    "src/game/projectile.cpp"
     "src/game/remote_menu.hpp"
     "src/game/remote_menu.cpp"
     "src/game/rideable.hpp"
