@@ -145,7 +145,7 @@ void game::NpcCharacter::UpdateEnemy()
     }
 
     // in vehicle with me?????
-    if (GetRideable() && enemy_->GetRideable() == GetRideable())
+    if (IsAlive() && GetRideable() && enemy_->GetRideable() == GetRideable())
     {
         Ride(nullptr, 0);
     }
@@ -153,6 +153,11 @@ void game::NpcCharacter::UpdateEnemy()
 
 bool game::NpcCharacter::CheckEnemyLost()
 {
+    if (!IsAlive())
+    {
+        return true;
+    }
+
     if (!enemy_->IsAlive())
     {
         return true; // may he rest in peace
@@ -161,7 +166,7 @@ bool game::NpcCharacter::CheckEnemyLost()
     const float max_dist = 150.0f;
     auto dist2 = glm::distance2(root_.GetGlobalPosition(), enemy_->GetRoot().GetGlobalPosition());
     if (dist2 > (max_dist * max_dist))
-        return true; // lost
+        return true; // too far
 
     return false;
 }
