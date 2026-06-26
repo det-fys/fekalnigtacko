@@ -33,7 +33,7 @@ public:
 private:
     void UpdateWeaponSlotsText();
 
-    uint32_t GetCrosshairColor() const;
+    glm::vec4 GetCrosshairColor() const;
 
     void DrawPain(Context& ctx) const;
     void DrawCrosshair(Context& ctx) const;

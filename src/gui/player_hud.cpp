@@ -104,20 +104,23 @@ void gui::PlayerHud::UpdateWeaponSlotsText()
     }
 }
 
-uint32_t gui::PlayerHud::GetCrosshairColor() const
+glm::vec4 gui::PlayerHud::GetCrosshairColor() const
 {
-    glm::vec3 color(1.0f);
+    glm::vec4 color(1.0f, 1.0f, 1.0f, 0.0f);
+    if (display_crosshair_ || display_scope_)
+        color.a = 1.0f;
+
     if (damage_dealt_factor_ > 0.01f)
     {
-        color = glm::mix(color, glm::vec3(0.3f), damage_dealt_factor_);
+        color = glm::mix(color, glm::vec4(0.3f, 0.3f, 0.3f, 1.0f), damage_dealt_factor_);
     }
 
     if (damage_dealt_kill_factor_ > 0.01f)
     {
-        color = glm::mix(color, glm::vec3(1.0f, 0.1f, 0.1f), damage_dealt_kill_factor_);
+        color = glm::mix(color, glm::vec4(1.0f, 0.1f, 0.1f, 1.0f), damage_dealt_kill_factor_);
     }
 
-    return glm::packUnorm4x8(glm::vec4(color, 1.0f));
+    return color;
 }
 
 void gui::PlayerHud::DrawPain(Context& ctx) const
@@ -131,7 +134,11 @@ void gui::PlayerHud::DrawPain(Context& ctx) const
 
 void gui::PlayerHud::DrawCrosshair(Context& ctx) const
 {
-    if (!display_crosshair_)
+    if (display_scope_)
+        return;
+
+    auto color = GetCrosshairColor();
+    if (color.a < 0.25f)
         return;
 
     const float crosshair_size = 32.0f;
@@ -141,7 +148,7 @@ void gui::PlayerHud::DrawCrosshair(Context& ctx) const
     auto p0 = viewport_size * 0.5f - crosshair_size * 0.5f;
     auto p1 = p0 + crosshair_size;
 
-    ctx.DrawRect(p0, p1, GetCrosshairColor(), crosshair_texture_.get());
+    ctx.DrawRect(p0, p1, glm::packUnorm4x8(GetCrosshairColor()), crosshair_texture_.get());
 }
 
 void gui::PlayerHud::DrawScope(Context& ctx) const
@@ -174,7 +181,7 @@ void gui::PlayerHud::DrawScope(Context& ctx) const
     glm::vec2 p2 = p0 + size;
 
     auto color = GetCrosshairColor();
-    ctx.DrawRect(p0, p2, color, scope_texture_.get());
+    ctx.DrawRect(p0, p2, glm::packUnorm4x8(color), scope_texture_.get());
     
 }
 
