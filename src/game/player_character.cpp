@@ -279,6 +279,7 @@ void game::PlayerCharacter::UpdateInputs()
     SetAimHeld(in & (1 << IN_ATTACK_SECONDARY));
     SetFireHeld(in & (1 << IN_ATTACK_PRIMARY));
     SetReloadHeld(in & (1 << IN_RELOAD));
+    sprintheld_ = (in & (1 << IN_SPRINT)) > 0;
 }
 
 void game::PlayerCharacter::UpdateAimTarget()
@@ -329,7 +330,11 @@ void game::PlayerCharacter::CheckItemSwitch()
 void game::PlayerCharacter::UpdateUseTarget()
 {
     UseTargetQueryResult res{};
-    auto new_use_target = IsAlive() ? world_.GetBestUseTarget(*this, res) : nullptr;
+    const UseTarget* new_use_target = nullptr;
+    if (IsAlive() && !(GetRideable() && sprintheld_))
+    {
+        new_use_target = world_.GetBestUseTarget(*this, res);
+    }
 
     if (new_use_target != use_target_ || res.enabled != use_enabled_ || res.error_text != use_error_ || res.delay != use_delay_)
     {

@@ -71,6 +71,7 @@ private:
     const char* use_error_ = nullptr;
     bool using_ = false; // not drugs lol
     float use_progress_ = 0.0f;
+    bool sprintheld_ = false;
 
     std::unique_ptr<Inventory> inventory_;
 
