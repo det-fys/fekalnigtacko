@@ -8,6 +8,14 @@ game::TuningWorld::TuningWorld(Game& game, EnterableWorld& exit_world, const glm
 {
 }
 
+game::PlayerCharacter& game::TuningWorld::InsertPlayer(Player& player, const HumanCharacterTuning& tuning,
+                                                       const glm::vec3& pos, float yaw)
+{
+    auto& character = Super::InsertPlayer(player, tuning, pos, yaw);
+    character.SetInvulnerable(true);
+    return character;
+}
+
 void game::TuningWorld::PlayerInput(Player& player, PlayerInputType type, bool enabled)
 {
     if (&player == player_ || !enabled || type != IN_USE)

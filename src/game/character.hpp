@@ -100,6 +100,7 @@ public:
     virtual void FinalizeFrame() override;
 
     float GetHealth() const { return health_; }
+    void SetInvulnerable(bool invulnerable) { invulnerable_ = invulnerable; }
     bool IsAlive() const { return death_time_ < 0; }
     int64_t GetDeathTime() const;
 
@@ -217,6 +218,7 @@ private:
     std::map<const btCollisionObject*, std::string_view> hitbone_names_;
 
     float health_ = 100.0f;
+    bool invulnerable_ = false;
     int64_t death_time_ = -1;
 
     std::function<void()> on_death_;

@@ -86,6 +86,11 @@ void game::Character::ReceiveDamage(const DamageInfo& damage)
 {
     Super::ReceiveDamage(damage);
 
+    if (invulnerable_)
+    {
+        return;
+    }
+
     if (damage.type == DAMAGE_EXPLOSION)
     {
         auto impulse = damage.normal * -damage.impulse * 0.002f;
