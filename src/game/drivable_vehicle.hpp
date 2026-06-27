@@ -25,7 +25,8 @@ public:
     
     virtual bool QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res) override;
     virtual void Use(PlayerCharacter& character, uint32_t target_id) override;
-
+    
+    virtual void OnContact(const collision::ContactInfo& info) override;
     virtual void ReceiveDamage(const DamageInfo& damage) override;
 
     virtual void SetRideableInput(PlayerInputFlags in) override;

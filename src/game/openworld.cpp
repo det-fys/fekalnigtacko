@@ -134,12 +134,22 @@ void game::OpenWorld::PlayerInput(Player& player, PlayerInputType type, bool ena
 
 void game::OpenWorld::SpawnNpcs()
 {
+    const size_t max_npcs = 180;
+
     int64_t next_spawn_after = 10000;
 
-    if (num_npcs_ < 120)
+    if (num_npcs_ < max_npcs)
     {
         SpawnNpcVehicleWithPassengers();
-        next_spawn_after = RandomInt(100, 1000);
+
+        if (num_npcs_ < (max_npcs * 3 / 4))
+        {
+            next_spawn_after = 120;
+        }
+        else
+        {
+            next_spawn_after = RandomInt(100, 2000);
+        }
     }
 
     Schedule(next_spawn_after, [this]{
@@ -289,24 +299,26 @@ void game::OpenWorld::SpawnNpcVehicleWithPassengers()
     auto& driver = SpawnRandomNpc();
     driver.Ride(&vehicle, 0);
 
-    if (Chance(0.5f))
-    {
-        driver.SetWeapon(std::make_shared<ItemInstance>("uzi"));
-    }
-
-    if (Chance(0.3f))
+    bool has_armed_passenger = false;
+    if (Chance(0.4f))
     {
         auto& passenger = SpawnRandomNpc();
         passenger.Ride(&vehicle, 1);
 
-        if (Chance(0.7f))
+        if (Chance(0.8f))
         {
-            passenger.SetWeapon(std::make_shared<ItemInstance>("panzerschreck"));
-            
-
-            // passenger.SetWeapon(std::make_shared<ItemInstance>(Chance(0.4f) ? "ak47" : (Chance(0.5f) ? "uzi" : "airsniper")));
+            passenger.SetWeapon(std::make_shared<ItemInstance>(
+                Chance(0.6f) ? "panzerschreck" : (Chance(0.4f) ? "ak47" : (Chance(0.5f) ? "uzi" : "airsniper"))));
+        
+            has_armed_passenger = true;
         }
     }
+
+    if (has_armed_passenger || Chance(0.5f))
+    {
+        driver.SetWeapon(std::make_shared<ItemInstance>("uzi"));
+    }
+
 }
 
 void game::OpenWorld::CreateTuningGarage(const glm::vec3& position, float yaw)

@@ -42,8 +42,23 @@ void game::NpcCharacter::SetWeapon(std::shared_ptr<ItemInstance> weapon)
 
 bool game::NpcCharacter::IsBored(int64_t time) const
 {
-    return (think_state_ == THINKSTATE_IDLE && GetCurrentThinkStateDuration() > time &&
-            driver_state_ == DRIVERSTATE_NONE && GetCurrentDriverThinkStateDuration() > time && !GetRideable());
+    if (think_state_ != THINKSTATE_IDLE || GetCurrentThinkStateDuration() < time)
+    {
+        return false; // not idle for long
+    }
+
+    if (driver_state_ != DRIVERSTATE_NONE || GetCurrentDriverThinkStateDuration() < time)
+    {
+        return false; // driving or was driving recently
+    }
+
+    auto rideable = GetRideable();
+    if (rideable->GetPassenger(0))
+    {
+        return false; // passenger in a ride with a driver
+    }
+
+    return true; // BORING
 }
 
 void game::NpcCharacter::Die()
@@ -61,7 +76,7 @@ void game::NpcCharacter::OnRideableChanged()
 
 void game::NpcCharacter::OnRideableDamaged(const DamageInfo& damage)
 {
-    if (damage.inflictor)
+    if (damage.inflictor && damage.inflictor->IsAlive())
     {
         MakeEnemy(damage.inflictor->GetEntNum());
     }
@@ -79,10 +94,10 @@ void game::NpcCharacter::SpawnLoot()
 void game::NpcCharacter::MakeEnemy(net::EntNum enemy_num)
 {
     // it must have been a mistake
-    if (Chance(0.05f))
-    {
-        return;
-    }
+    // if (Chance(0.05f))
+    // {
+    //     return;
+    // }
 
     // cant switch enemies that fast
     auto time = GetWorld().GetTime();
@@ -92,10 +107,10 @@ void game::NpcCharacter::MakeEnemy(net::EntNum enemy_num)
     }
 
     // increase anger
-    if (Chance(0.85f))
-    {
-        follow_enemy_ = true;
-    }
+    // if (Chance(0.85f))
+    // {
+    //     follow_enemy_ = true;
+    // }
 
     // this mf is already my current enemy
     if (enemy_num == enemy_num_)
@@ -104,14 +119,14 @@ void game::NpcCharacter::MakeEnemy(net::EntNum enemy_num)
     }
 
     // already have another enemy, likely stay focused on him
-    if (enemy_num_ != 0 && Chance(0.7f))
+    if (enemy_num_ != 0 && Chance(0.3f))
     {
         return;
     }
 
     // he is npc and i am not his target, was SURELY a missclick
     auto enemy_npc = dynamic_cast<NpcCharacter*>(GetWorld().GetEntity(enemy_num));
-    if (enemy_npc && enemy_npc->enemy_num_ != GetEntNum() && Chance(0.3f))
+    if (enemy_npc && enemy_npc->enemy_num_ != GetEntNum() && Chance(0.1f))
     {
         return;
     }
@@ -119,7 +134,7 @@ void game::NpcCharacter::MakeEnemy(net::EntNum enemy_num)
     // OK this one is now my enemy
     enemy_num_ = enemy_num;
     enemy_time_ = time;
-    follow_enemy_ = false;
+    follow_enemy_ = true;
     UpdateEnemy();
 }
 
@@ -670,7 +685,7 @@ game::ThinkState game::NpcCharacter::CheckThinkStateTransition()
         if (GetCurrentThinkStateDuration() > 0 && !GetAiming()) // reload or sth
             return THINKSTATE_MAD_IDLE;
 
-        if (HasThinkStateDurationElapsed())
+        if (HasThinkStateDurationElapsed() && CanTurnToTarget())
             return THINKSTATE_MAD_FIRE;
 
         return THINKSTATE_MAD_AIM;

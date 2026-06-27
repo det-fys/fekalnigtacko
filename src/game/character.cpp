@@ -406,14 +406,22 @@ void game::Character::UpdateAiming()
 {
     float delta = 10.0f;
 
+    constexpr float min_yaw = glm::radians(-120.0f);
+    constexpr float max_yaw = -min_yaw;
+    constexpr float min_pitch = glm::radians(-60.0f);
+    constexpr float max_pitch = glm::radians(55.0f);
+
     if (!aiming_)
     {
+        can_turn_to_target_ = false;
         delta = 6.0f / 25.0f;
         MoveToward(aim_yaw_, 0.0f, delta);
         MoveToward(aim_pitch_, 0.0f, delta);
         UpdateAimDirection();
         return;
     }
+
+    can_turn_to_target_ = true;
 
     // get yaw and pitch relative to transform
     glm::vec3 dir = aim_target_ - GetRoot().local.position;
@@ -430,22 +438,31 @@ void game::Character::UpdateAiming()
     dir.z -= aim_z_offset_; // from eye
     dir = glm::normalize(dir);
 
-    float pitch = glm::asin(dir.z);
-    float yaw = glm::atan(-dir.x, dir.y);
+    float target_pitch = glm::asin(dir.z);
+    float target_yaw = glm::atan(-dir.x, dir.y);
 
-    auto target_pitch = glm::clamp(pitch, glm::radians(-60.0f), glm::radians(55.0f)); // clamp to make it less weird
+    if (target_pitch < min_pitch || target_pitch > max_pitch)
+    {
+        can_turn_to_target_ = false;
+        target_pitch = glm::clamp(target_pitch, min_pitch, max_pitch);
+    }
+
     MoveToward(aim_pitch_, target_pitch, delta);
 
     if (movement_ == CMT_DISABLED)
     {
-        auto target_yaw = glm::mod(yaw + glm::pi<float>(), glm::two_pi<float>()) - glm::pi<float>();
-        const float yaw_limit = glm::radians(120.0f);
-        target_yaw = glm::clamp(target_yaw, -yaw_limit, yaw_limit);
+        target_yaw = glm::mod(target_yaw + glm::pi<float>(), glm::two_pi<float>()) - glm::pi<float>();
+        if (target_yaw < min_yaw || target_yaw > max_yaw)
+        {
+            can_turn_to_target_ = false;
+            target_yaw = glm::clamp(target_yaw, min_yaw, max_yaw);
+        }
+
         MoveToward(aim_yaw_, target_yaw, delta);
     }
     else
     {
-        Turn(yaw_, yaw, delta);
+        Turn(yaw_, target_yaw, delta);
         MoveToward(aim_yaw_, 0.0f, delta);
     }
 

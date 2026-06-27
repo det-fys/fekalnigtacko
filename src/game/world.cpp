@@ -518,10 +518,11 @@ void game::World::HandleContacts()
         if (cb && (flags & collision::OF_NOTIFY_CONTACT))
         {
             
-            collision::ContactInfo info;
+            collision::ContactInfo info{};
             info.pos = glm::vec3(pos.x(), pos.y(), pos.z());
             info.normal = glm::vec3(normal.x(), normal.y(), normal.z());
             info.impulse = impulse;
+            info.other_cb = collision::GetObjectCallback(other_body);
             // info.other_velocity = glm::vec3(ov.x(), ov.y(), ov.z());
             cb->OnContact(info);
         }

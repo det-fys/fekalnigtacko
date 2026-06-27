@@ -126,6 +126,7 @@ protected:
     void SetViewItem(const std::string& item_name);
     void SendFire();
     void ApplyPain();
+    bool CanTurnToTarget() const { return can_turn_to_target_; }
 
     virtual float GetDamageMultiplier(const DamageInfo& damage, std::string_view hitbone);
 
@@ -183,6 +184,8 @@ private:
 
     float pain_yaw_ = 0.0f;
     float pain_pitch_ = 0.0f;
+
+    bool can_turn_to_target_ = false;
 
     SkeletonInstance sk_;
     CharacterAnimState animstate_;

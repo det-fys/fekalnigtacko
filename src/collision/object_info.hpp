@@ -47,11 +47,14 @@ enum ObjectFlag : ObjectFlags
     OF_EXPLOSION_DAMAGE = 32,
 };
 
+class ObjectCallback;
+
 struct ContactInfo
 {
     glm::vec3 pos;
     glm::vec3 normal;
     float impulse;
+    ObjectCallback* other_cb;
 };
 
 class ObjectCallback

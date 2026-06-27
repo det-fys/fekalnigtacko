@@ -58,6 +58,21 @@ void game::DrivableVehicle::Use(PlayerCharacter& character, uint32_t target_id)
     PlaySound("cardoor", 1.0f, RandomFloat(0.9f, 1.1f));
 }
 
+void game::DrivableVehicle::OnContact(const collision::ContactInfo& info)
+{
+    Super::OnContact(info);
+
+    auto other_driver = info.other_cb ? info.other_cb->GetResponsibleCharacter() : nullptr;
+    if (other_driver && Chance(0.01f))
+    {
+        // make passengers angry
+        DamageInfo damage{};
+        damage.type = DAMAGE_CRASH;
+        damage.inflictor = other_driver;
+        OnRideableDamaged(damage);
+    }
+}
+
 void game::DrivableVehicle::ReceiveDamage(const DamageInfo& damage)
 {
     Super::ReceiveDamage(damage);
