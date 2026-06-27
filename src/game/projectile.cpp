@@ -51,11 +51,13 @@ void game::Projectile::UpdatePreSync()
     collision::ObjectCallback* hit_obj_cb = nullptr;
     if (world.TraceBullet(start, end, shooter_, hit_pos, &hit_obj_cb))
     {
+        auto boom_pos = hit_pos - glm::normalize(info_.velocity) * 0.1f;
+
         Remove();
-        world.Effect("explo", hit_pos, glm::vec3(0.0f, 0.0f, 1.0f));
+        world.Effect("explo", boom_pos, glm::vec3(0.0f, 0.0f, 1.0f));
         
         ExplosionInfo explo{};
-        explo.center = root_.local.position;
+        explo.center = boom_pos;
         explo.damage = info_.explo_damage;
         explo.radius = info_.explo_radius;
         explo.impulse = info_.explo_impulse;
