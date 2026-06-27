@@ -34,6 +34,7 @@ struct DamageInfo
     glm::vec3 normal{};
     HumanCharacter* inflictor = nullptr;
     const btCollisionObject* hit_object = nullptr;
+    bool direct_hit = true;
 };
 
 struct BulletInfo
@@ -52,6 +53,7 @@ struct ExplosionInfo
     float radius;
     float damage;
     float impulse;
+    collision::ObjectCallback* direct_hit;
 };
 
 class World : public collision::DynamicsWorld, public net::MsgProducer, public net::LocalMsgProducer, public Scheduler
@@ -93,7 +95,8 @@ public:
     float GetDayTime() const { return daytime_; }
     void SetDayTime(float daytime) { daytime_ = glm::mod(daytime, 24.0f); }
 
-    bool TraceBullet(const glm::vec3& start, const glm::vec3& end, HumanCharacter* shooter, glm::vec3& out_hit_pos);
+    bool TraceBullet(const glm::vec3& start, const glm::vec3& end, HumanCharacter* shooter, glm::vec3& out_hit_pos,
+                     collision::ObjectCallback** out_hit_obj_cb = nullptr);
     void FireBullet(const BulletInfo& bullet);
 
     void MakeExplosion(const ExplosionInfo& explo);

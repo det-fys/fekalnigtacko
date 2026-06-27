@@ -76,6 +76,16 @@ struct Item
     float dispersion_decay = 1.0f;
     float damage = 1.0f;
 
+    std::string projectile_model_name;
+    float projectile_speed = 100.0f;
+    float projectile_gravity = 0.0f;
+    float projectile_lifetime = 5.0f;
+    std::string projectile_fx;
+    std::string projectile_sound;
+    float projectile_damage = 1.0f;
+    float projectile_radius = 1.0f;
+    float projectile_impulse = 1.0f;
+
     std::string aim_anim;
     std::string aiming_anim;
     std::string reload_anim;

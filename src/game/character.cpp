@@ -86,6 +86,12 @@ void game::Character::ReceiveDamage(const DamageInfo& damage)
 {
     Super::ReceiveDamage(damage);
 
+    if (damage.type == DAMAGE_EXPLOSION)
+    {
+        auto impulse = damage.normal * -damage.impulse * 0.002f;
+        ApplyImpulse(impulse);
+    }
+
     if (!IsAlive())
     {
         return; // already ded
@@ -192,6 +198,22 @@ void game::Character::FinalizeFrame()
 int64_t game::Character::GetDeathTime() const
 {
      return GetWorld().GetTime() - death_time_;
+}
+
+void game::Character::ApplyImpulse(const glm::vec3& impulse)
+{
+    if (!controller_)
+        return;
+
+    controller_->GetBtController().applyImpulse(btVector3(impulse.x, impulse.y, impulse.z));
+}
+
+bool game::Character::IsInAir() const
+{
+    if (!controller_)
+        return false;
+
+    return !controller_->GetBtController().canJump();
 }
 
 game::Character::~Character()
@@ -371,6 +393,7 @@ void game::Character::UpdateMovement()
             bt_character.jump(btVector3(0.0f, 0.0f, 10.0f));
         }
     }
+
 
     // update anim
     float run_blend_target = walking ? 0.5f : 0.0f;

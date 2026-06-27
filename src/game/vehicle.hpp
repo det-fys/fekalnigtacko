@@ -118,7 +118,7 @@ private:
     VehicleSyncFieldFlags WriteState(net::OutMessage& msg, const VehicleSyncState& base) const;
     void SendUpdateMsg();
 
-    void ApplyDamage(HumanCharacter* inflictor, float damage, float window_damage);
+    void ApplyDamage(HumanCharacter* inflictor, float damage, float window_damage, bool fast_explo);
 
     void WriteDeformSync(net::OutMessage& msg) const;
     void Deform(const glm::vec3& pos, const glm::vec3& deform, float radius);

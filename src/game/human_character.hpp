@@ -82,6 +82,8 @@ public:
     virtual ~HumanCharacter() override;
 
 protected:
+    void SetAimTargetSmart(const glm::vec3& target_position, const glm::vec3& target_velocity);
+
     virtual void OnRideableChanged() {}
     virtual void OnAimingChanged() {}
     virtual void OnHeldItemChanged() {}

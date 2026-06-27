@@ -48,21 +48,8 @@ void game::PlayerCharacter::ReceiveDamage(const DamageInfo& damage)
 
     if (!IsAlive())
     {
-        // just died
-        std::string_view killer_name;
-        auto killer_character = dynamic_cast<PlayerCharacter*>(damage.inflictor);
-        if (killer_character)
-        {
-            auto killer_player = killer_character->GetPlayer();
-            if (killer_player)
-            {
-                killer_name = killer_player->GetName();
-            }
-        }
-
-        SendDeathMessage(killer_name);
+        SendDeathMessage(dynamic_cast<PlayerCharacter*>(damage.inflictor));
         SetNametag(std::string{});
-
     }
 }
 
@@ -75,7 +62,7 @@ void game::PlayerCharacter::ProcessInput(PlayerInputType type, bool enabled)
         break;
 
     default:
-        UpdateInputs();
+        // UpdateInputs();
         break;
     }
 }
@@ -280,6 +267,11 @@ void game::PlayerCharacter::UpdateInputs()
     SetFireHeld(in & (1 << IN_ATTACK_PRIMARY));
     SetReloadHeld(in & (1 << IN_RELOAD));
     sprintheld_ = (in & (1 << IN_SPRINT)) > 0;
+
+    if (player_ && (player_->GetNewInput() & (1<<IN_AIM_MODE)) > 0)
+    {
+        SwitchAimMode();
+    }
 }
 
 void game::PlayerCharacter::UpdateAimTarget()
@@ -298,7 +290,14 @@ void game::PlayerCharacter::UpdateAimTarget()
         GetWorld().TraceBullet(eye, target, this, target); // update target if hit
     }
 
-    SetAimTarget(target);
+    if (aim_assist_)
+    {
+        SetAimTargetSmart(target, glm::vec3(0.0f));
+    }
+    else
+    {
+        SetAimTarget(target);
+    }
 
     // GetWorld().Beam(eye, target, 0xFFFF00, 1.0 / 25.0f);
     // GetWorld().BeamBox(target - 0.05f, target + 0.05f, 0xFFFF00, 1.5f / 25.0f);
@@ -467,74 +466,76 @@ void game::PlayerCharacter::UpdateHudSlots()
 
 }
 
-static std::string_view GetRandomDeathMessageFormat()
-{
-    switch (rand() % 8)
-    {
-    case 1:
-        return "byl zneškodněn";
-    case 2:
-        return "chcíp";
-    case 3:
-        return "umříl";
-    case 4:
-        return "umřel";
-    case 5:
-        return "pošel";
-    case 6:
-        return "odešel na věčné časy";
-    case 7:
-        return "už není mezi námi";
-    default:
-        return "zesnul";
-    }
-}
+static const std::array<std::string_view, 6> suicide_messages{
+    "to vzdal",
+    "se killnul",
+    "se zneškodnil",
+    "se terminoval",
+    "se voddělal",
+    "se zlikvidoval",
+};
 
-static std::string_view GetRandomDeathMessageFormatKilled()
-{
-    switch (rand() % 8)
-    {
-    case 0:
-        return "zneškodnil";
-    case 1:
-        return "vyřešil";
-    case 2:
-        return "zajebal";
-    case 3:
-        return "zlikvidoval";
-    case 4:
-        return "odstranil";
-    case 5:
-        return "terminoval";
-    case 6:
-        return "zabil";
-    default:
-        return "kilnul";
-    }
-}
+static const std::array<std::string_view, 8> kill_messages{
+    "zneškodnil",
+    "vyřešil",
+    "zajebal",
+    "zlikvidoval",
+    "odstranil",
+    "terminoval",
+    "zabil",
+    "kilnul",
+};
 
-void game::PlayerCharacter::SendDeathMessage(std::string_view killer_name)
+static const std::array<std::string_view, 8> death_messages{
+    "byl zneškodněn",
+    "chcíp",
+    "umříl",
+    "umřel",
+    "pošel",
+    "odešel na věčné časy",
+    "už není mezi námi",
+    "zesnul",
+};
+
+void game::PlayerCharacter::SendDeathMessage(const PlayerCharacter* killer)
 {
     if (!player_)
         return;
 
     std::string message;
 
-    if (killer_name.empty())
+    if (killer == this) //suicide
     {
         message += player_->GetName();
         message += "^r ";
-        message += GetRandomDeathMessageFormat();
+        message += suicide_messages[rand() % suicide_messages.size()];
+
     }
-    else
+    else if (killer && killer->GetPlayer()) // killed by other player
     {
-        message += killer_name;
+        message += killer->GetPlayer()->GetName();
         message += "^r ";
-        message += GetRandomDeathMessageFormatKilled();
+        message += kill_messages[rand() % kill_messages.size()];
         message += " ";
         message += player_->GetName();
+    }
+    else // other cause of death
+    {
+        message += player_->GetName();
+        message += "^r ";
+        message += death_messages[rand() % death_messages.size()];
     }
 
     GetWorld().SendChat(message);
 
+}
+
+void game::PlayerCharacter::SwitchAimMode()
+{
+    aim_assist_ = !aim_assist_;
+
+    if (player_)
+    {
+        player_->SendChat(aim_assist_ ? "asistovaný míření" : "ruční míření");
+    }
 }

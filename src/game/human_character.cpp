@@ -96,6 +96,83 @@ game::HumanCharacter::~HumanCharacter()
     Ride(nullptr, 0); // exit rideable
 }
 
+
+static bool CalculateAimPoint(
+    const glm::vec3& shellPosition,
+    float shellSpeed,
+    const glm::vec3& targetPosition,
+    const glm::vec3& targetVelocity,
+    float gravity, // negative, e.g. -9.81
+    glm::vec3& outAimPoint
+)
+{
+    constexpr int iterations = 50;
+
+    float low = 0.01f;
+    float high = 10.0f;
+
+    float impactTime = -1.0f;
+
+    // Find a time where the required velocity matches shell speed
+    for (int i = 0; i < iterations; i++)
+    {
+        float t = (low + high) * 0.5f;
+
+        glm::vec3 targetAtImpact =
+            targetPosition + targetVelocity * t;
+
+        glm::vec3 displacement =
+            targetAtImpact - shellPosition;
+
+        // compensate for gravity over flight time
+        displacement.z -= 0.5f * gravity * t * t;
+
+        float requiredSpeed =
+            glm::length(displacement) / t;
+
+        if (requiredSpeed > shellSpeed)
+        {
+            low = t;
+        }
+        else
+        {
+            high = t;
+        }
+
+        impactTime = t;
+    }
+
+    if (impactTime <= 0.0f)
+        return false;
+
+    // Where target will be when hit
+    glm::vec3 targetAtImpact =
+        targetPosition + targetVelocity * impactTime;
+
+    // Offset aim point upward to compensate for gravity drop
+    outAimPoint = targetAtImpact;
+    outAimPoint.z -= 0.5f * gravity * impactTime * impactTime;
+
+    return true;
+}
+
+void game::HumanCharacter::SetAimTargetSmart(const glm::vec3& target_position, const glm::vec3& target_velocity)
+{
+    if (!GetAiming() || !item_ || item_->def->fire_type != assets::FIRETYPE_PROJECTILE)
+    {
+        SetAimTarget(target_position);
+        return;
+    }
+
+    glm::vec3 aim_point = target_position;
+
+    // CalculateAimPos(GetEyePosition(), held_item->def->projectile_speed, aim_target, velocity, aim_target);
+    CalculateAimPoint(GetEyePosition(), item_->def->projectile_speed, target_position, target_velocity,
+                      -item_->def->projectile_gravity, aim_point);
+
+    SetAimTarget(aim_point);
+}
+
 bool game::HumanCharacter::HaveAmmo(const std::string& ammo_name)
 {
     return true;
@@ -164,16 +241,17 @@ void game::HumanCharacter::Fire()
     else if (item_->def->fire_type == assets::FIRETYPE_PROJECTILE)
     {
         ProjectileInfo projectile{};
-        projectile.model_name = "panzerschreck_projectile";
+        projectile.model_name = item_->def->projectile_model_name;
         projectile.shooter_num = GetEntNum();
         projectile.start_pos = start;
-        projectile.velocity = dir * 60.0f;
-        projectile.lifetime = 5000;
-        projectile.fx_name = "panzerschreck_projectile";
-        projectile.sound_name = "rpg_projectile";
-        projectile.explo_damage = 300.0f;
-        projectile.explo_radius = 6.0f;
-        projectile.explo_impulse = 5000.0f;
+        projectile.velocity = dir * item_->def->projectile_speed;
+        projectile.gravity = item_->def->projectile_gravity;
+        projectile.lifetime = static_cast<int64_t>(item_->def->projectile_lifetime * 1000.0f);
+        projectile.fx_name = item_->def->projectile_fx;
+        projectile.sound_name = item_->def->projectile_sound;
+        projectile.explo_damage = item_->def->projectile_damage;
+        projectile.explo_radius = item_->def->projectile_radius;
+        projectile.explo_impulse = item_->def->projectile_impulse;
         world.Spawn<Projectile>(projectile);
     }
 
@@ -652,7 +730,7 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
         return ACTION_PUTAWAY;
 
     case ACTION_DIE:
-        if (IsActionAnimDone())
+        if (IsActionAnimDone() && (!IsInAir() || GetActionStateTime() > 5000))
             return ACTION_DEAD;
         
         return ACTION_DIE;

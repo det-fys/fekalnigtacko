@@ -176,9 +176,21 @@ const game::UseTarget* game::World::GetBestUseTarget(PlayerCharacter& character,
 }
 
 bool game::World::TraceBullet(const glm::vec3& start, const glm::vec3& end, HumanCharacter* shooter,
-                              glm::vec3& out_hit_pos)
+                              glm::vec3& out_hit_pos, collision::ObjectCallback** out_hit_obj_cb)
 {
-    return TraceBulletInternal(start, end, shooter, out_hit_pos) != nullptr;
+    auto hit_obj = TraceBulletInternal(start, end, shooter, out_hit_pos);
+
+    if (!hit_obj)
+    {
+        return false;
+    }
+
+    if (out_hit_obj_cb)
+    {
+        *out_hit_obj_cb = collision::GetObjectCallback(hit_obj);
+    }
+
+    return true;
 }
 
 static uint32_t GetMaterialColor(collision::Material material)
@@ -253,6 +265,7 @@ void game::World::FireBullet(const BulletInfo& bullet)
         damage.inflictor = bullet.shooter;
         damage.hit_object = hit_obj;
         damage.normal = hit_normal;
+        damage.direct_hit = true;
         obj_cb->ReceiveDamage(damage);
     }
 
@@ -303,6 +316,7 @@ void game::World::MakeExplosion(const ExplosionInfo& explo)
             damage.inflictor = explo.inflictor;
             damage.hit_object = obj;
             damage.normal = glm::normalize(explo.center - pos);
+            damage.direct_hit = explo.direct_hit == obj_cb;
             obj_cb->ReceiveDamage(damage);
 
             return true;

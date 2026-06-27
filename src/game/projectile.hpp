@@ -11,6 +11,7 @@ struct ProjectileInfo
     std::string model_name;
     glm::vec3 start_pos;
     glm::vec3 velocity;
+    float gravity;
     net::EntNum shooter_num;
     int64_t lifetime;
     std::string fx_name;

@@ -85,7 +85,7 @@ void game::Vehicle::OnContact(const collision::ContactInfo& info)
     if (info.impulse < 1000.0f)
         return;
 
-    ApplyDamage(nullptr, info.impulse * 0.0001f, info.impulse * 0.01f);
+    ApplyDamage(nullptr, info.impulse * 0.0001f, info.impulse * 0.01f, false);
     Deform(info.pos, -glm::normalize(info.normal) * 0.1f, 1.0f);
 
 }
@@ -115,7 +115,8 @@ void game::Vehicle::ReceiveDamage(const DamageInfo& damage)
     {
         dmg *= 0.02f;
     }
-    ApplyDamage(damage.inflictor, dmg, dmg * 2.0f);
+
+    ApplyDamage(damage.inflictor, dmg, dmg * 2.0f, damage.direct_hit);
     // Deform(damage.impact_pos, damage.normal * -0.1f, 1.0f);
 
 }
@@ -582,7 +583,7 @@ void game::Vehicle::SendUpdateMsg()
     msg.WriteAt(fields_pos, fields);
 }
 
-void game::Vehicle::ApplyDamage(HumanCharacter* inflictor, float damage, float window_damage)
+void game::Vehicle::ApplyDamage(HumanCharacter* inflictor, float damage, float window_damage, bool fast_explo)
 {
     if (invulnerable_)
         return;
@@ -597,12 +598,8 @@ void game::Vehicle::ApplyDamage(HumanCharacter* inflictor, float damage, float w
             health_ = 0.0f;
             window_health_ = 0.0f; // make sure windows are destroyed
 
-            // boom
-            // Schedule(RandomInt(100, 1000), [this]{
-            //     Explode();
-            // });
             destroyer_num_ = inflictor ? inflictor->GetEntNum() : 0;
-            explosion_timer_ = RandomInt(5, 20);
+            explosion_timer_ = fast_explo ? RandomInt(1, 2) : RandomInt(5, 20);
         }
     }
 

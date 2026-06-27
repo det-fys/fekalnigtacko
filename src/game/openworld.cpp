@@ -105,6 +105,11 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld("openworld"), game_(game
     auto& npc2 = SpawnRandomNpc();
     npc2.SetPosition({80.0f, 100.0f, 5.0f});
     npc2.SetWeapon(std::make_shared<ItemInstance>("airsniper"));
+
+    // hit target npc 3
+    auto& npc3 = SpawnRandomNpc();
+    npc3.SetPosition({70.0f, 100.0f, 5.0f});
+    npc3.SetWeapon(std::make_shared<ItemInstance>("panzerschreck"));
 }
 
 void game::OpenWorld::Update(int64_t delta_time)
@@ -294,9 +299,12 @@ void game::OpenWorld::SpawnNpcVehicleWithPassengers()
         auto& passenger = SpawnRandomNpc();
         passenger.Ride(&vehicle, 1);
 
-        if (Chance(0.5f))
+        if (Chance(0.7f))
         {
-            passenger.SetWeapon(std::make_shared<ItemInstance>(Chance(0.4f) ? "ak47" : (Chance(0.5f) ? "uzi" : "airsniper")));
+            passenger.SetWeapon(std::make_shared<ItemInstance>("panzerschreck"));
+            
+
+            // passenger.SetWeapon(std::make_shared<ItemInstance>(Chance(0.4f) ? "ak47" : (Chance(0.5f) ? "uzi" : "airsniper")));
         }
     }
 }

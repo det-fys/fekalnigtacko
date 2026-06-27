@@ -59,7 +59,9 @@ private:
     void UpdateHudData();
     void UpdateHudSlots();
 
-    void SendDeathMessage(std::string_view killer_name);
+    void SendDeathMessage(const PlayerCharacter* killer);
+
+    void SwitchAimMode();
 
 private:
     Player* player_;
@@ -76,6 +78,8 @@ private:
     std::unique_ptr<Inventory> inventory_;
 
     PlayerHudData hud_data_;
+
+    bool aim_assist_ = true;
 };
 
 

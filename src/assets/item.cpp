@@ -168,6 +168,42 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
             else
                 throw std::runtime_error("Invalid aim type: " + aimtype_str);
         }
+        else if (command == "projectile")
+        {
+            iss >> item->projectile_model_name;
+        }
+        else if (command == "projectile_speed")
+        {
+            iss >> item->projectile_speed;
+        }
+        else if (command == "projectile_gravity")
+        {
+            iss >> item->projectile_gravity;
+        }
+        else if (command == "projectile_lifetime")
+        {
+            iss >> item->projectile_lifetime;
+        }
+        else if (command == "projectile_fx")
+        {
+            iss >> item->projectile_fx;
+        }
+        else if (command == "projectile_sound")
+        {
+            iss >> item->projectile_sound;
+        }
+        else if (command == "projectile_damage")
+        {
+            iss >> item->projectile_damage;
+        }
+        else if (command == "projectile_radius")
+        {
+            iss >> item->projectile_radius;
+        }
+        else if (command == "projectile_impulse")
+        {
+            iss >> item->projectile_impulse;
+        }
         else
         {
             throw std::runtime_error("Unknown item command: " + command);

@@ -113,6 +113,7 @@ private:
     net::EntNum enemy_num_ = 0;
     HumanCharacter* enemy_ = nullptr;
     int64_t enemy_time_ = 0;
+    glm::vec3 last_enemy_pos_{};
 
     bool follow_enemy_ = false;
 };

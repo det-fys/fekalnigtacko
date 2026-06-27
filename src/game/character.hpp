@@ -105,6 +105,10 @@ public:
 
     void SetOnDeath(std::function<void()> cb) { on_death_ = std::move(cb); }
 
+    void ApplyImpulse(const glm::vec3& impulse);
+
+    bool IsInAir() const;
+
     ~Character() override;
     
 protected:
@@ -213,6 +217,7 @@ private:
     int64_t death_time_ = -1;
 
     std::function<void()> on_death_;
+
 };
 
 } // namespace game

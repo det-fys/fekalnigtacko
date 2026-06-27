@@ -140,8 +140,34 @@ void game::NpcCharacter::UpdateEnemy()
     }
 
     if (GetAiming())
-    {
-        SetAimTarget(enemy_->GetRoot().matrix * glm::vec4(0.0f, 0.0f, 1.7f, 1.0f));
+    {        
+        const auto& held_item = GetHeldItem(); 
+        if (held_item && held_item->def->fire_type == assets::FIRETYPE_PROJECTILE)
+        {
+            glm::vec3 aim_target;
+            // aim at vehicle and predict
+            if (enemy_->GetRideable())
+            {
+                aim_target = enemy_->GetRideable()->GetEntity().GetRoot().GetGlobalPosition();
+            }
+            else
+            {
+                aim_target = enemy_->GetRoot().GetGlobalPosition() + glm::vec3(0.0f, 0.0f, 0.2f);
+            }
+
+            auto velocity = (aim_target - last_enemy_pos_) * 20.0f;
+            last_enemy_pos_ = aim_target;
+        
+            aim_target += velocity * 0.5f; 
+
+            SetAimTargetSmart(aim_target, velocity);
+        }
+        else
+        {
+            glm::vec3 aim_target = enemy_->GetRoot().matrix * glm::vec4(0.0f, 0.0f, 1.7f, 1.0f);
+            SetAimTarget(aim_target);
+        }
+
     }
 
     // in vehicle with me?????
@@ -163,7 +189,7 @@ bool game::NpcCharacter::CheckEnemyLost()
         return true; // may he rest in peace
     }
 
-    const float max_dist = 150.0f;
+    const float max_dist = 250.0f;
     auto dist2 = glm::distance2(root_.GetGlobalPosition(), enemy_->GetRoot().GetGlobalPosition());
     if (dist2 > (max_dist * max_dist))
         return true; // too far

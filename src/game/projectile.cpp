@@ -22,6 +22,7 @@ void game::Projectile::UpdatePreSync()
 {
     auto& world = GetWorld();
     auto alive_time = world.GetTime() - spawn_time_;
+    float alive_frames = static_cast<float>(alive_time) / 40.0f;
 
     // update shooter
     if (info_.shooter_num)
@@ -33,19 +34,22 @@ void game::Projectile::UpdatePreSync()
         }
     }
 
-    // make fx
-    if (!info_.fx_name.empty() && alive_time > 40)
-    {
-        world.Effect(info_.fx_name, root_.local.position, glm::normalize(info_.velocity));
-    }
+    info_.velocity.z -= info_.gravity / 25.0f;
 
     // step forward
     auto step = info_.velocity / 25.0f;
-    auto start = root_.local.position - step;
+    auto start = root_.local.position - step * glm::min(alive_frames, 1.0f);
     auto end = root_.local.position + step; 
 
+    // make fx
+    if (!info_.fx_name.empty() && alive_time > 40)
+    {
+        world.Effect(info_.fx_name, root_.local.position - step * 0.7f, glm::normalize(info_.velocity));
+    }
+
     glm::vec3 hit_pos;
-    if (world.TraceBullet(start, end, shooter_, hit_pos))
+    collision::ObjectCallback* hit_obj_cb = nullptr;
+    if (world.TraceBullet(start, end, shooter_, hit_pos, &hit_obj_cb))
     {
         Remove();
         world.Effect("explo", hit_pos, glm::vec3(0.0f, 0.0f, 1.0f));
@@ -56,12 +60,13 @@ void game::Projectile::UpdatePreSync()
         explo.radius = info_.explo_radius;
         explo.impulse = info_.explo_impulse;
         explo.inflictor = shooter_;
+        explo.direct_hit = hit_obj_cb;
         world.MakeExplosion(explo);
         
         return;
     }
 
-    if (alive_time > info_.lifetime)
+    if (alive_time > info_.lifetime || root_.local.position.z > 300.0f || root_.local.position.z < -100.0f)
     {
         Remove();
         return;

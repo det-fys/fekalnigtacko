@@ -155,6 +155,7 @@ static const std::map<SDL_Scancode, game::PlayerInputType> s_inputmap = {
     { SDL_SCANCODE_E, game::IN_USE },
     { SDL_SCANCODE_Q, game::IN_HOLSTER },
     { SDL_SCANCODE_R, game::IN_RELOAD },
+    { SDL_SCANCODE_N, game::IN_AIM_MODE },
     { SDL_SCANCODE_1, game::IN_WEAPON_1 },
     { SDL_SCANCODE_2, game::IN_WEAPON_2 },
     { SDL_SCANCODE_3, game::IN_WEAPON_3 },
