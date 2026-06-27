@@ -45,6 +45,8 @@ public:
     void Die();
 
     // net::EntNum GetEnemyNum() const { return enemy_num_; }
+    bool IsArmed() const;
+    
 
 protected:
     virtual void OnRideableChanged() override;
@@ -59,7 +61,6 @@ private:
     void ClearEnemy();
     bool WantsToFollowEnemy();
 
-    bool IsArmed() const;
 
     bool IsVehicleDriver() const;
     void ResetVehiclePath();

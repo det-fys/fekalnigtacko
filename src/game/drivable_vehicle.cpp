@@ -1,5 +1,6 @@
 #include "drivable_vehicle.hpp"
 #include "player_character.hpp"
+#include "npc_character.hpp"
 #include "utils/random.hpp"
 #include "input_mapping.hpp"
 
@@ -16,6 +17,7 @@ void game::DrivableVehicle::Update()
 
     Super::Update();
 
+    contact_ = false;
 }
 
 game::HumanCharacter* game::DrivableVehicle::GetResponsibleCharacter()
@@ -62,15 +64,30 @@ void game::DrivableVehicle::OnContact(const collision::ContactInfo& info)
 {
     Super::OnContact(info);
 
+    // TODO: move this logic to NpcCharacter but need to coordinate driver and passenger
+
+    if (contact_)
+        return;
+
     auto other_driver = info.other_cb ? info.other_cb->GetResponsibleCharacter() : nullptr;
-    if (other_driver && Chance(0.01f))
-    {
-        // make passengers angry
-        DamageInfo damage{};
-        damage.type = DAMAGE_CRASH;
-        damage.inflictor = other_driver;
-        OnRideableDamaged(damage);
-    }
+    if (!other_driver)
+        return;
+
+    contact_ = true;
+
+    auto is_player = dynamic_cast<PlayerCharacter*>(other_driver) != nullptr;
+    if (!Chance(is_player ? 0.1f : 0.01f))
+        return;
+
+    auto my_driver = dynamic_cast<NpcCharacter*>(GetPassenger(0));
+    if (!my_driver || !my_driver->IsArmed())
+        return;
+
+    // make passengers angry
+    DamageInfo damage{};
+    damage.type = DAMAGE_CRASH;
+    damage.inflictor = other_driver;
+    OnRideableDamaged(damage);
 }
 
 void game::DrivableVehicle::ReceiveDamage(const DamageInfo& damage)

@@ -38,6 +38,8 @@ private:
     void InitSeats();
     void UpdateUseTargetNames();
 
+    bool contact_ = false;
+
 };
 
 }
