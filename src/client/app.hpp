@@ -113,7 +113,7 @@ private:
     float state_time_ = 0.0f;
 
     // settings
-    int volume_ = 50;
+    int volume_ = 20;
     int sens_ = 50;
     float sensitivity_ = 0.0f;
 

@@ -24,6 +24,8 @@ public:
     float GetRolloffFactor() const { return rolloff_ractor_; }
     float GetMaxDistance() const { return max_distance_; }
 
+    bool IsLooping() const { return looping_; }
+
     ~Sound();
 
 private:
@@ -34,9 +36,11 @@ private:
     float volume_ = 1.0f;
     float pitch_ = 1.0f;
 
-    float ref_distance_ = 1.0f;
+    float ref_distance_ = 10.0f;
     float rolloff_ractor_= 1.0f;
     float max_distance_ = 200.0f;
+
+    bool looping_ = false;
 };
 
 } // namespace audio

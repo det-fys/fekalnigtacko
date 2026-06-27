@@ -17,6 +17,8 @@ audio::SoundSource::SoundSource(Player* player, std::shared_ptr<const Sound> sou
     alSourcef(source_, AL_REFERENCE_DISTANCE, sound_->GetRefDistance());
     alSourcef(source_, AL_ROLLOFF_FACTOR, sound_->GetRolloffFactor());
     alSourcef(source_, AL_MAX_DISTANCE, sound_->GetMaxDistance());
+
+    SetLooping(sound_->IsLooping());
 }
 
 void audio::SoundSource::SetLooping(bool looping)

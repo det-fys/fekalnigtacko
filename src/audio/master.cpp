@@ -46,6 +46,9 @@ audio::Master::Master()
     }
 
     std::cout << "Audio context is now current" << std::endl;
+
+    //setup
+    alDistanceModel(AL_INVERSE_DISTANCE_CLAMPED);
 }
 
 void audio::Master::SetListenerOrientation(const glm::vec3& position, const glm::vec3& forward, const glm::vec3& up)

@@ -62,6 +62,10 @@ std::shared_ptr<const audio::Sound> audio::Sound::LoadFromFile(const std::string
         {
             iss >> sound->max_distance_;
         }
+        else if (cmd == "looping")
+        {
+            sound->looping_ = true;
+        }
     });
 
     if (sound->category_name_.empty())
