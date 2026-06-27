@@ -116,7 +116,7 @@ public:
 private:
     void HandleContacts();
 
-    void DestroyObject(net::ObjNum objnum);
+    void DestroyObject(net::ObjNum objnum, const MapObjectBreakInfo& info);
 
     void SendObjDestroyedMsg(net::ObjNum objnum);
     void SendObjRespawnedMsg(net::ObjNum objnum);

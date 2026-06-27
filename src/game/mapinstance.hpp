@@ -15,6 +15,13 @@ enum MapObjectCollisionFlag : MapObjectCollisionFlags
     MAPOBJ_DESTRUCTIBLE = 0x01,
 };
 
+struct MapObjectBreakInfo
+{
+    float impulse;
+    glm::vec3 from_pos;
+    glm::vec3 hit_pos;
+};
+
 class MapObjectCollision : public collision::ObjectCallback
 {
 public:
@@ -22,7 +29,7 @@ public:
                        net::ObjNum num, const Transform& trans, MapObjectCollisionFlags flags);
     DELETE_COPY_MOVE(MapObjectCollision)
 
-    void Break();
+    void Break(const MapObjectBreakInfo& info);
 
     void GetModelTransform(Transform& trans) const;
     
@@ -52,7 +59,7 @@ public:
     const std::string& GetName() const { return mapname_; }
 
     void SpawnObj(net::ObjNum objnum);
-    std::unique_ptr<MapObjectCollision> DestroyObj(net::ObjNum objnum);
+    std::unique_ptr<MapObjectCollision> DestroyObj(net::ObjNum objnum, const MapObjectBreakInfo& info);
 
 private:
 

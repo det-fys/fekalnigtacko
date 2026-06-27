@@ -281,11 +281,21 @@ void game::World::FireBullet(const BulletInfo& bullet)
 
 void game::World::MakeExplosion(const ExplosionInfo& explo)
 {
+    struct ToDestroy
+    {
+        net::ObjNum num = 0;
+        MapObjectBreakInfo break_info{};
+    };
+
+    static std::vector<ToDestroy> to_destroy;
+
     struct ExplosionAabbCallback : btBroadphaseAabbCallback
     {
         const ExplosionInfo& explo;
 
-        ExplosionAabbCallback(const ExplosionInfo& explo) : explo(explo) {}
+        ExplosionAabbCallback(const ExplosionInfo& explo) : explo(explo)
+        {
+        }
         
         virtual bool process(const btBroadphaseProxy* proxy)
         {
@@ -293,31 +303,52 @@ void game::World::MakeExplosion(const ExplosionInfo& explo)
             auto flags = collision::GetObjectFlags(obj);
             auto obj_cb = collision::GetObjectCallback(obj);
 
-            if (!obj_cb || (flags & collision::OF_EXPLOSION_DAMAGE) == 0)
+            if (!obj_cb || (flags & (collision::OF_EXPLOSION_DAMAGE | collision::OF_DESTRUCTIBLE)) == 0)
                 return true;
 
             auto& world_trans = obj->getWorldTransform();
             auto bt_pos = world_trans.getOrigin();
-            bt_pos += world_trans.getBasis() * btVector3(0.0f, 0.0f, 1.3f);
+            bt_pos += world_trans.getBasis() * btVector3(0.0f, 0.0f, 0.7f);
             glm::vec3 pos(bt_pos.x(), bt_pos.y(), bt_pos.z());
 
             auto distance = glm::distance(explo.center, pos);
-            if (distance > explo.radius)
+            if (distance > explo.radius && obj_cb != explo.direct_hit)
                 return true; // out of radius 
 
-            auto factor = 1.0f - (distance / explo.radius);
+            auto factor = glm::max(0.1f, 1.0f - (distance / explo.radius));
+            float impulse = explo.impulse * factor;
+            auto normal = glm::normalize(explo.center - pos);
 
-            DamageInfo damage{};
-            damage.type = DAMAGE_EXPLOSION;
-            damage.damage = explo.damage * factor;
-            damage.impulse = explo.impulse * factor;
-            damage.from_pos = explo.center;
-            damage.impact_pos = pos;
-            damage.inflictor = explo.inflictor;
-            damage.hit_object = obj;
-            damage.normal = glm::normalize(explo.center - pos);
-            damage.direct_hit = explo.direct_hit == obj_cb;
-            obj_cb->ReceiveDamage(damage);
+            if (flags & collision::OF_DESTRUCTIBLE)
+            {
+                auto col = dynamic_cast<MapObjectCollision*>(obj_cb);
+                if (!col)
+                    return true;
+
+                if (impulse > col->GetDestroyThreshold())
+                {
+                    auto& td = to_destroy.emplace_back();
+                    td.num = col->GetNum();
+                    td.break_info.from_pos = explo.center;
+                    td.break_info.hit_pos = pos;
+                    td.break_info.impulse = impulse;
+                }
+            }
+            
+            if (flags & collision::OF_EXPLOSION_DAMAGE)
+            {
+                DamageInfo damage{};
+                damage.type = DAMAGE_EXPLOSION;
+                damage.damage = explo.damage * factor;
+                damage.impulse = impulse;
+                damage.from_pos = explo.center;
+                damage.impact_pos = pos;
+                damage.inflictor = explo.inflictor;
+                damage.hit_object = obj;
+                damage.normal = normal;
+                damage.direct_hit = explo.direct_hit == obj_cb;
+                obj_cb->ReceiveDamage(damage);
+            }
 
             return true;
         }
@@ -329,6 +360,13 @@ void game::World::MakeExplosion(const ExplosionInfo& explo)
     btVector3 max(explo.center.x + explo.radius, explo.center.y + explo.radius, explo.center.z + explo.radius);
 
     GetBtBroadphase().aabbTest(min, max, cb);
+
+    for (auto td : to_destroy)
+    {
+        DestroyObject(td.num, td.break_info);
+    }
+    to_destroy.clear();
+
 }
 
 void game::World::Beam(const glm::vec3& start, const glm::vec3& end, uint32_t color, float time)
@@ -536,14 +574,16 @@ void game::World::HandleContacts()
         }
     }
 
+    MapObjectBreakInfo break_info{}; // TODO: some impulse??
+
     // destroy objs outside the loop to avoid corruption of the manifold list
     for (auto objnum : to_destroy)
     {
-        DestroyObject(objnum);
+        DestroyObject(objnum, break_info);
     }
 }
 
-void game::World::DestroyObject(net::ObjNum objnum)
+void game::World::DestroyObject(net::ObjNum objnum, const MapObjectBreakInfo& info)
 {
     if (destroyed_objs_.contains(objnum))
         return;
@@ -551,7 +591,7 @@ void game::World::DestroyObject(net::ObjNum objnum)
     SendObjDestroyedMsg(objnum);
     destroyed_objs_.insert(objnum);
 
-    auto col = map_.DestroyObj(objnum);
+    auto col = map_.DestroyObj(objnum, info);
     if (col)
     {
         DestructibleDestroyed(objnum, std::move(col));

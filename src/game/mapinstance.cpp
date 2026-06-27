@@ -40,7 +40,7 @@ void game::MapInstance::SpawnObj(net::ObjNum objnum)
     obj_cols_[i] = std::make_unique<MapObjectCollision>(world_, objs[i].model, static_cast<net::ObjNum>(i), objs[i].node.local, MAPOBJ_DESTRUCTIBLE);
 }
 
-std::unique_ptr<game::MapObjectCollision> game::MapInstance::DestroyObj(net::ObjNum objnum)
+std::unique_ptr<game::MapObjectCollision> game::MapInstance::DestroyObj(net::ObjNum objnum, const MapObjectBreakInfo& info)
 {
     size_t i = static_cast<size_t>(objnum);
     if (i >= obj_cols_.size())
@@ -50,7 +50,7 @@ std::unique_ptr<game::MapObjectCollision> game::MapInstance::DestroyObj(net::Obj
 
     if (obj)
     {
-        obj->Break();
+        obj->Break(info);
     }
 
     return obj;
@@ -107,7 +107,7 @@ game::MapObjectCollision::MapObjectCollision(collision::DynamicsWorld& world,
     world_.GetBtWorld().addRigidBody(body_.get(), collision::OG_STATIC, col_mask);
 }
 
-void game::MapObjectCollision::Break()
+void game::MapObjectCollision::Break(const MapObjectBreakInfo& info)
 {
     if (!body_)
         return;
@@ -135,6 +135,16 @@ void game::MapObjectCollision::Break()
         col_mask &= ~collision::OG_PROJECTILE;
 
     world_.GetBtWorld().addRigidBody(body_.get(), collision::OG_DEFAULT, col_mask);
+
+    if (info.impulse > 0.0f)
+    {
+        auto normal = glm::normalize(info.hit_pos - info.from_pos);
+        auto impulse = normal * info.impulse * body_->getMass() * 0.003f;
+        body_->applyImpulse(btVector3(impulse.x, impulse.y, impulse.z),
+                            btVector3(info.hit_pos.x, info.hit_pos.y, info.hit_pos.z) -
+                                body_->getCenterOfMassPosition());
+    }
+
 }
 
 void game::MapObjectCollision::GetModelTransform(Transform& trans) const
