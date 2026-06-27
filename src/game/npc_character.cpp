@@ -53,7 +53,7 @@ bool game::NpcCharacter::IsBored(int64_t time) const
     }
 
     auto rideable = GetRideable();
-    if (rideable->GetPassenger(0))
+    if (rideable && rideable->GetPassenger(0))
     {
         return false; // passenger in a ride with a driver
     }
