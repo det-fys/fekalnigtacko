@@ -244,8 +244,14 @@ void gui::Context::Render()
 
 void gui::Context::BeginTexture(const gfx::Texture* texture)
 {
-    if (!ranges_.empty() && ranges_.back().texture == texture)
-        return;
+    if (!ranges_.empty())
+    {
+        if (ranges_.back().texture == texture)
+            return;
+
+        if (ranges_.back().count == 0)
+            ranges_.pop_back();
+    } 
 
     auto& range = ranges_.emplace_back();
     range.start = indices_.size() / 3;
