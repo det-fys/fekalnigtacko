@@ -14,7 +14,12 @@ std::shared_ptr<const assets::Effect> assets::Effect::LoadFromFile(const std::st
         {
             std::string sound_name;
             iss >> sound_name;
-            fx->sounds_.emplace_back(assets::CacheManager::GetSound("data/" + sound_name + ".snd"));
+
+            auto sound = assets::CacheManager::GetSound("data/" + sound_name + ".snd");
+
+            auto& fx_sound = fx->sounds_.emplace_back();
+            fx_sound.sound = std::move(sound);
+            iss >> fx_sound.volume_min >> fx_sound.volume_max >> fx_sound.pitch_min >> fx_sound.pitch_max;
         }
         else if (command == "particle")
         {
@@ -82,7 +87,10 @@ std::shared_ptr<const assets::Effect> assets::Effect::LoadFromFile(const std::st
                 auto& max = particle->offset_max;
                 iss >> min.x >> min.y >> min.z >> max.x >> max.y >> max.z;
             }
-
+            else if (command == "rotationspeed")
+            {
+                iss >> particle->rotation_speed_min >> particle->rotation_speed_min;
+            }
         }
         else
         {

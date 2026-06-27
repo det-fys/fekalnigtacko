@@ -44,6 +44,19 @@ struct ParticleDef
 
     glm::vec3 offset_min{0.0f};
     glm::vec3 offset_max{0.0f};
+
+    float rotation_speed_min = 0.0f;
+    float rotation_speed_max = 0.0f;
+};
+
+struct EffectSound
+{
+    std::shared_ptr<const audio::Sound> sound;
+    float volume_min = 1.0f;
+    float volume_max = 1.0f;
+    float pitch_min = 1.0f;
+    float pitch_max = 1.0f;
+
 };
 
 class Effect
@@ -53,12 +66,12 @@ public:
     static std::shared_ptr<const Effect> LoadFromFile(const std::string& path);
 
     const std::vector<ParticleDef>& GetParticleDefs() const { return particle_defs_; }
-    const std::vector<std::shared_ptr<const audio::Sound>>& GetSounds() const { return sounds_; }
+    const std::vector<EffectSound>& GetSounds() const { return sounds_; }
 
 private:
 
     std::vector<ParticleDef> particle_defs_;
-    std::vector<std::shared_ptr<const audio::Sound>> sounds_;
+    std::vector<EffectSound> sounds_;
 
 };
 

@@ -25,6 +25,8 @@ void game::view::ParticleEmitter::Update(float delta_time)
         }
 
         particle.size += particle.size_speed * delta_time;
+
+        particle.rotation += particle.rotation_speed * delta_time;
     }
 
     // erase expired particles
@@ -104,6 +106,7 @@ void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effec
 
             particle.position = pos + BasisFromDir(dir) * offset_ps;
             particle.rotation = RandomFloat(0.0f, glm::two_pi<float>());
+            particle.rotation_speed = RandomFloat(def.rotation_speed_min, def.rotation_speed_max);
             particle.size = RandomFloat(def.size_min, def.size_max);
             particle.size_speed = RandomFloat(def.size_speed_min, def.size_speed_max);
 
@@ -126,9 +129,11 @@ void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effec
     {
         auto sound_idx = rand() % sounds.size();
 
-        auto snd = audioplayer_->PlaySound(sounds[sound_idx], nullptr);
+        auto fx_snd = sounds[sound_idx];
+
+        auto snd = audioplayer_->PlaySound(fx_snd.sound, nullptr);
         snd->SetPosition(pos);
-        snd->SetVolume(RandomFloat(0.9f, 1.1f));
-        // snd->SetPitch(RandomFloat(0.9f, 1.1f));
+        snd->SetVolume(RandomFloat(fx_snd.volume_min, fx_snd.volume_max));
+        snd->SetPitch(RandomFloat(fx_snd.pitch_min, fx_snd.pitch_max));
     }
 }
