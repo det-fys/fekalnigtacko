@@ -127,7 +127,7 @@ protected:
     void SendFire();
     void ApplyPain();
 
-    virtual float GetHitBoneDamageMultiplier(const std::string_view hitbone);
+    virtual float GetDamageMultiplier(const DamageInfo& damage, std::string_view hitbone);
 
 private:
     void SyncControllerTransform();

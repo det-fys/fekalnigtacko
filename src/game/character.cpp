@@ -97,22 +97,17 @@ void game::Character::ReceiveDamage(const DamageInfo& damage)
         return; // already ded
     }
 
-    float actual_damage = damage.damage;
-
+    std::string_view hit_name;
     if (damage.type == DAMAGE_BULLET)
     {
-        std::string_view hit_name;
-    
         auto it = hitbone_names_.find(damage.hit_object);
         if (it != hitbone_names_.end())
         {
             hit_name = it->second;
         }
-
-        actual_damage *= GetHitBoneDamageMultiplier(hit_name);
-
     }
-
+    
+    float actual_damage = damage.damage * GetDamageMultiplier(damage, hit_name);
     health_ -= actual_damage;
 
     // just died
@@ -293,15 +288,18 @@ void game::Character::ApplyPain()
     pain_yaw_ = glm::clamp(pain_yaw_ + RandomFloat(glm::radians(-20.0f), glm::radians(20.0f)), glm::radians(-30.0f), glm::radians(30.0f));
 }
 
-float game::Character::GetHitBoneDamageMultiplier(const std::string_view hitbone)
+float game::Character::GetDamageMultiplier(const DamageInfo& damage, std::string_view hitbone)
 {
+    if (hitbone.empty())   
+        return 1.0f;
+
     if (hitbone == "head" || hitbone == "neck")
         return 3.0f;
 
     if (hitbone == "torso1" || hitbone == "torso2")
         return 1.0f;
 
-    return 0.2f;
+    return 0.2f; // limbs
 }
 
 void game::Character::SyncControllerTransform()

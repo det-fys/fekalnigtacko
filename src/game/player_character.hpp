@@ -33,9 +33,9 @@ public:
 
     virtual void OnDamageDealt(bool was_kill) override;
 
-    protected:
-    virtual float GetHitBoneDamageMultiplier(const std::string_view hitbone) override;
-    
+protected:
+    virtual float GetDamageMultiplier(const DamageInfo& damage, std::string_view hitbone) override;
+
     virtual void OnRideableChanged() override;
     virtual void OnAimingChanged() override;
     virtual void OnHeldItemChanged() override;
@@ -60,8 +60,6 @@ private:
     void UpdateHudSlots();
 
     void SendDeathMessage(const PlayerCharacter* killer);
-
-    void SwitchAimMode();
 
 private:
     Player* player_;

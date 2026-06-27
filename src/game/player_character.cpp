@@ -138,9 +138,10 @@ void game::PlayerCharacter::OnDamageDealt(bool was_kill)
     player_->DisplayDamageEvent(was_kill ? DAMAGE_EVENT_DEALT_KILL : DAMAGE_EVENT_DEALT);
 }
 
-float game::PlayerCharacter::GetHitBoneDamageMultiplier(const std::string_view hitbone)
+float game::PlayerCharacter::GetDamageMultiplier(const DamageInfo& damage, std::string_view hitbone)
 {
-    return 0.25f * Super::GetHitBoneDamageMultiplier(hitbone);
+    float mult = damage.type == DAMAGE_BULLET ? 0.25f : 0.8f;
+    return mult * Super::GetDamageMultiplier(damage, hitbone);
 }
 
 void game::PlayerCharacter::OnRideableChanged()
@@ -267,11 +268,7 @@ void game::PlayerCharacter::UpdateInputs()
     SetFireHeld(in & (1 << IN_ATTACK_PRIMARY));
     SetReloadHeld(in & (1 << IN_RELOAD));
     sprintheld_ = (in & (1 << IN_SPRINT)) > 0;
-
-    if (player_ && (player_->GetNewInput() & (1<<IN_AIM_MODE)) > 0)
-    {
-        SwitchAimMode();
-    }
+    aim_assist_ = (in & (1 << IN_AIM_MODE)) > 0;
 }
 
 void game::PlayerCharacter::UpdateAimTarget()
@@ -528,14 +525,4 @@ void game::PlayerCharacter::SendDeathMessage(const PlayerCharacter* killer)
 
     GetWorld().SendChat(message);
 
-}
-
-void game::PlayerCharacter::SwitchAimMode()
-{
-    aim_assist_ = !aim_assist_;
-
-    if (player_)
-    {
-        player_->SendChat(aim_assist_ ? "asistovaný míření" : "ruční míření");
-    }
 }
