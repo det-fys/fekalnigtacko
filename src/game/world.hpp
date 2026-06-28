@@ -59,7 +59,7 @@ struct ExplosionInfo
 class World : public collision::DynamicsWorld, public net::MsgProducer, public net::LocalMsgProducer, public Scheduler
 {
 public:
-    World(std::string mapname);
+    World(const collision::DynamicsWorldInfo& info, std::string mapname);
     DELETE_COPY_MOVE(World)
 
     void SendInitData(Player& player, net::OutMessage& msg);

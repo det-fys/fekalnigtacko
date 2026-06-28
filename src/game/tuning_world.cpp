@@ -3,8 +3,10 @@
 #include "utils/colors.hpp"
 #include "game.hpp"
 
-game::TuningWorld::TuningWorld(Game& game, EnterableWorld& exit_world, const glm::vec3& exit_pos, float exit_yaw, std::string mapname) : 
-    Super(std::move(mapname)), game_(game), exit_world_(exit_world), exit_pos_(exit_pos), exit_yaw_(exit_yaw)
+game::TuningWorld::TuningWorld(Game& game, EnterableWorld& exit_world, const glm::vec3& exit_pos, float exit_yaw,
+                               std::string mapname)
+    : Super(collision::DynamicsWorldInfo{}, std::move(mapname)), game_(game), exit_world_(exit_world),
+      exit_pos_(exit_pos), exit_yaw_(exit_yaw)
 {
 }
 

@@ -3,9 +3,13 @@
 #include "player_character.hpp"
 #include "drivable_vehicle.hpp"
 
-game::EnterableWorld::EnterableWorld(std::string mapname) : World(std::move(mapname)) {}
+game::EnterableWorld::EnterableWorld(const collision::DynamicsWorldInfo& info, std::string mapname)
+    : World(info, std::move(mapname))
+{
+}
 
-game::PlayerCharacter& game::EnterableWorld::InsertPlayer(Player& player, const HumanCharacterTuning& tuning, const glm::vec3& pos, float yaw)
+game::PlayerCharacter& game::EnterableWorld::InsertPlayer(Player& player, const HumanCharacterTuning& tuning,
+                                                          const glm::vec3& pos, float yaw)
 {
     return CreatePlayerCharacter(player, tuning, pos, yaw);
 }

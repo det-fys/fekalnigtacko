@@ -12,7 +12,10 @@
 #include "marker.hpp"
 #include "utils/math.hpp"
 
-game::World::World(std::string mapname) : Scheduler(time_ms_), map_(*this, std::move(mapname)) {}
+game::World::World(const collision::DynamicsWorldInfo& info, std::string mapname)
+    : DynamicsWorld(info), Scheduler(time_ms_), map_(*this, std::move(mapname))
+{
+}
 
 void game::World::SendInitData(Player& player, net::OutMessage& msg)
 {

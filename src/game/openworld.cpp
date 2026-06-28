@@ -14,6 +14,7 @@
 #include "game.hpp"
 #include "cow.hpp"
 #include "utils/random.hpp"
+#include "server/server_cfg.hpp"
 
 namespace game
 {
@@ -49,7 +50,18 @@ static uint32_t GetRandomColor24()
     return (b << 16) | (g << 8) | r;
 }
 
-game::OpenWorld::OpenWorld(Game& game) : EnterableWorld("openworld"), game_(game)
+static collision::DynamicsWorldInfo GetOpenWorldDynamicsInfo()
+{
+    const auto& cfg = sv::GetCfg();
+
+    collision::DynamicsWorldInfo info{};
+    info.broadphase = cfg.broadphase;
+    info.bounds_min = cfg.bp_bounds_min;
+    info.bounds_max = cfg.bp_bounds_max;
+    return info;
+}
+
+game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo(), "openworld"), game_(game)
 {
     SetSpawnPoint(glm::vec3(100.0f, 100.0f, 1.0f));
 

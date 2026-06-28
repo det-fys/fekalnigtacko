@@ -13,10 +13,11 @@ class DrivableVehicle;
 class EnterableWorld : public World
 {
 public:
-    EnterableWorld(std::string mapname);
+    EnterableWorld(const collision::DynamicsWorldInfo& info, std::string mapname);
 
     // events
-    virtual PlayerCharacter& InsertPlayer(Player& player, const HumanCharacterTuning& tuning, const glm::vec3& pos, float yaw);
+    virtual PlayerCharacter& InsertPlayer(Player& player, const HumanCharacterTuning& tuning, const glm::vec3& pos,
+                                          float yaw);
     virtual void PlayerInput(Player& player, PlayerInputType type, bool enabled);
     virtual void PlayerViewAnglesChanged(Player& player, float yaw, float pitch);
     virtual void RemovePlayer(Player& player);
