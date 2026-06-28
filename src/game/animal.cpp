@@ -89,7 +89,7 @@ void game::Animal::AddAnimalSeat(const glm::vec3& offset)
 
 bool game::Animal::IsMounted() const
 {
-    return GetPassenger(0) != nullptr;
+    return GetPassenger(0) != nullptr && GetPassenger(0)->IsAlive();
 }
 
 void game::Animal::ChangeDirection()
