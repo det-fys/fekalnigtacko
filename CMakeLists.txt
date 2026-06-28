@@ -201,6 +201,8 @@ set(SERVER_ONLY_SOURCES
     "src/server/main.cpp"
     "src/server/server.hpp"
     "src/server/server.cpp"
+    "src/server/server_cfg.hpp"
+    "src/server/server_cfg.cpp"
     "src/server/wsserver.hpp"
     "src/server/wsserver.cpp"
     "src/utils/files_server.cpp"

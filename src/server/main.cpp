@@ -2,6 +2,7 @@
 #include <stdexcept>
 
 #include "server.hpp"
+#include "server_cfg.hpp"
 
 int main()
 {
@@ -9,7 +10,8 @@ int main()
     
     try
     {
-        sv::Server server(11200);
+        sv::LoadCfg();
+        sv::Server server(sv::GetCfg().port);
         server.Run();
     } catch (const std::exception& e)
     {
