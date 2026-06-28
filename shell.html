@@ -119,7 +119,25 @@
             document.getElementById("loginform").style = "display:none";
             document.getElementById("canvas").style = "";
 
-            Module.ccall("RunMain", null, [], []);
+            FS.mkdir('/persistent');
+            FS.mount(IDBFS, { "autoPersist": true }, '/persistent');
+            FS.syncfs(true, (err) => {
+                if (err) {
+                    console.error(err);
+                    return;
+                }
+
+                console.log("Filesystem ready");
+
+                // setInterval(() => {
+                //     FS.syncfs(false, (err) => {
+                //         if (err) console.error(err);
+                //     });
+                // }, 10000);
+
+                Module.ccall("RunMain", null, [], []);
+            });
+
         }
 
         function loadConfig() 
