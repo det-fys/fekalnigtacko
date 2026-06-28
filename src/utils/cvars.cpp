@@ -26,7 +26,7 @@ std::string CVarRegistry::Get(const std::string& name)
     return GetCVar(name).GetString();
 }
 
-void CVarRegistry::ProcessCVars(std::function<void(CVarBase&)> func, CVarFlags filter)
+bool CVarRegistry::ProcessCVars(std::function<bool(CVarBase&)> func, CVarFlags filter)
 {
     const auto& cvars = GetInstance().cvars_;
     for (const auto& entry : cvars)
@@ -34,8 +34,13 @@ void CVarRegistry::ProcessCVars(std::function<void(CVarBase&)> func, CVarFlags f
         if (filter > 0 && (entry.second->GetFlags() & filter) != filter)
             continue;
 
-        func(*entry.second);
+        if (!func || func(*entry.second))
+        {
+            return true;
+        }
     }
+
+    return false;
 }
 
 CVarRegistry& CVarRegistry::GetInstance()

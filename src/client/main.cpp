@@ -23,6 +23,7 @@
 
 #include "app.hpp"
 #include "gl.hpp"
+#include "utils/cvars.hpp"
 
 static std::string s_username;
 static std::string s_url;
@@ -235,6 +236,11 @@ static void PollEvents()
 #define WS_URL "ws://deadfish.cz:11200/ws"
 #endif
 
+#ifdef EMSCRIPTEN
+#define SAVE_PATH "/persistent/settings.dat"
+#else
+#define SAVE_PATH "settings.dat"
+#endif
 
 static bool can_update = false;
 static Uint32 last_update = 0;
@@ -292,7 +298,7 @@ static void Main() {
 
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
-    s_app = std::make_unique<App>();
+    s_app = std::make_unique<App>(SAVE_PATH);
     s_app->SetUserName(s_username);
     s_app->SetUrl(s_url);
 

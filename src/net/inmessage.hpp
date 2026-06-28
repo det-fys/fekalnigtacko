@@ -27,7 +27,7 @@ public:
 
     bool Eof() const
     {
-        return ptr_ < end_;
+        return ptr_ >= end_;
     }
 
     bool Read(char* dest, size_t n)

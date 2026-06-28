@@ -8,14 +8,25 @@
 #include "gameview/worldview.hpp"
 #include "gameview/utils.hpp"
 #include "gui/loading_screen.hpp"
+#include "utils/cvars.hpp"
 
-App::App() :
-	gui_(dlist_, assets::CacheManager::GetFont("data/comic32.font")), precache_("data/precache")
+CVAR(float, sensitivity, CV_SAVE, 0.5f);
+CVAR(float, volume, CV_SAVE, 0.2f, 0.0f);
+
+App::App(const std::string& settings_path)
+    : settings_(settings_path), gui_(dlist_, assets::CacheManager::GetFont("data/comic32.font")),
+      precache_("data/precache")
 {
 	std::cout << "Initializing App..." << std::endl;
 
-	ApplySettings();
-	// AddChatMessage("Test!");
+	try
+	{
+		settings_.Load();
+	}
+	catch (const std::runtime_error& e)
+	{
+		AddChatMessagePrefix("Nastavení", "chyba při načítání: " + std::string(e.what()));
+	}
 }
 
 void App::Frame()
@@ -52,8 +63,10 @@ void App::Input(game::PlayerInputType in, bool pressed, bool repeated)
 
 void App::MouseMove(const glm::vec2& delta)
 {
-	float delta_yaw = -delta.x * sensitivity_;
-	float delta_pitch = -delta.y * sensitivity_;
+	auto sens = glm::mix(0.0005f, 0.0035f, sensitivity.Get());
+
+	float delta_yaw = -delta.x * sens;
+	float delta_pitch = -delta.y * sens;
 
 	if (session_)
 		session_->ProcessMouseMove(delta_yaw, delta_pitch);
@@ -88,10 +101,13 @@ void App::Update()
 		delta_time_ = 0.1f; // Cap delta time to avoid large jumps
 	}
 
+	UpdateVolume();
 	UpdateState();
 	UpdateSession();
 	UpdateStats();
 	UpdateChat();
+
+	settings_.TrySave(time_);
 }
 
 void App::Draw()
@@ -180,44 +196,48 @@ static void AddSlider(gui::Menu& menu, std::string text, int& value, int min, in
 	on_switch(0);
 }
 
+static void CreatePercentSlider(gui::Menu& menu, std::string text, const std::string& cvar_name, float max)
+{
+	auto cvar = dynamic_cast<CVar<float>*>(&CVarRegistry::GetCVar(cvar_name));
+	if (!cvar)
+		return; // not float cvar
+
+	float current_value = cvar->Get();
+	int percent = glm::clamp(static_cast<int>(glm::round(current_value * 100.0f / max)), 0, 100);
+
+	auto& slider = menu.Add<gui::SelectMenuItem>(std::move(text));
+	slider.SetSelectionText(std::to_string(percent) + " %");
+
+	slider.SetSwitchCallback([&slider, cvar, max, percent](int v) mutable {
+		if (v == 0 || (percent <= 0 && v < 0) || (percent >= 100 && v > 0))
+			return;
+
+		percent += v;
+		cvar->Set(static_cast<float>(percent) * 0.01f * max);
+		slider.SetSelectionText(std::to_string(percent) + " %");
+	});
+}
+
 void App::OpenSettings()
 {
 	menu_ = std::make_unique<gui::Menu>();
 	menu_->SetTitle("nastavení");
 
-	AddSlider(*menu_, "jak moc to řve", volume_, 0, 100, [this]{
-		ApplyVolume();
-	});
-	
-	AddSlider(*menu_, "agresivita krysy", sens_, 0, 100, [this]{
-		ApplySensitivity();
-	});
+	CreatePercentSlider(*menu_, "jak moc to řve", "volume", 1.0f);
+	CreatePercentSlider(*menu_, "agresivita krysy", "sensitivity", 1.0f);
 
 	auto& ok = menu_->Add<gui::ButtonMenuItem>("0k");
 	ok.SetClickCallback([this] { menu_.reset(); });
 }
 
-void App::ApplySettings()
+void App::UpdateVolume()
 {
-	ApplyVolume();
-	ApplySensitivity();
-}
+	if (!volume.IsModified())
+		return;
 
-void App::ApplyVolume()
-{
-	float vol_f = static_cast<float>(volume_) / 50.0f;
-
-#ifndef EMSCRIPTEN
-	audiomaster_.SetMasterVolume(vol_f);
-#else
-	audiomaster_.SetMasterVolume(2.0f * vol_f);
-#endif
-}
-
-void App::ApplySensitivity()
-{
-	float f = static_cast<float>(sens_) / 100.0f;
-	sensitivity_ = glm::mix(0.0005f, 0.0035f, f);
+	
+	audiomaster_.SetMasterVolume(4.0f * volume.Get());
+	volume.ClearModified();
 }
 
 #define COL_LABEL "^ccc"

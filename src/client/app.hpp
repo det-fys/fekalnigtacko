@@ -14,6 +14,7 @@
 #include "gameview/client_session.hpp"
 #include "wsclient.hpp"
 #include "assets/precache.hpp"
+#include "settings.hpp"
 
 struct ChatMessage
 {
@@ -35,7 +36,7 @@ enum AppState
 class App
 {
 public:
-    App();
+    App(const std::string& settings_path);
 
     void Frame();
 
@@ -67,9 +68,7 @@ private:
     void DrawChat();
 
     void OpenSettings();
-    void ApplySettings();
-    void ApplyVolume();
-    void ApplySensitivity();
+    void UpdateVolume();
 
     void UpdateSession();
     void UpdateStats();
@@ -84,6 +83,8 @@ private:
     float GetCurrentStateDuration() const { return time_ - state_time_; }
 
 private:
+    Settings settings_;
+
     float time_ = 0.0f;
     glm::ivec2 viewport_size_ = {800, 600};
 
@@ -113,9 +114,10 @@ private:
     float state_time_ = 0.0f;
 
     // settings
-    int volume_ = 20;
-    int sens_ = 50;
-    float sensitivity_ = 0.0f;
+    // int volume_ = 20;
+    // int sens_ = 50;
+    // float sensitivity_ = 0.0f;
+
 
     // stats
     float stats_time_ = 0.0f;

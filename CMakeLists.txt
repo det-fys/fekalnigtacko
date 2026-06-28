@@ -83,6 +83,8 @@ set(CLIENT_ONLY_SOURCES
     "src/client/app.cpp"
     "src/client/gl.hpp"
     "src/client/main.cpp"
+    "src/client/settings.hpp"
+    "src/client/settings.cpp"
     "src/client/utils.hpp"
     "src/client/wsclient.hpp"
     "src/client/wsclient_easywsclient.cpp"

@@ -30,7 +30,7 @@ public:
     static void Set(const std::string& name, const std::string& val);
     static std::string Get(const std::string& name);
 
-    static void ProcessCVars(std::function<void(CVarBase&)> func, CVarFlags filter = 0);
+    static bool ProcessCVars(std::function<bool(CVarBase&)> func, CVarFlags filter = 0);
 
 private:
     CVarRegistry() = default;
@@ -42,7 +42,7 @@ private:
 class CVarBase
 {
 public:
-    CVarBase(const std::string& name, CVarFlags flags) : flags_(flags)
+    CVarBase(const std::string& name, CVarFlags flags) : name_(name), flags_(flags)
     {
         CVarRegistry::Register(name, this);
     }
@@ -50,15 +50,19 @@ public:
     virtual void SetString(const std::string& val) = 0;
     virtual std::string GetString() const = 0;
 
+    const std::string& GetName() const { return name_; }
     const CVarFlags& GetFlags() const { return flags_; }
 
     void ClearUnsaved() { flags_ &= ~CV_UNSAVED; }
 
-    bool IsModified() const { return flags_ & CV_MODIFIED > 0; }
+    bool IsModified() const { return (flags_ & CV_MODIFIED) > 0; }
     void ClearModified() { flags_ &= ~CV_MODIFIED; }
 
 protected:
     CVarFlags flags_;
+
+private:
+    std::string name_;
 };
 
 template <typename T>
@@ -108,7 +112,7 @@ public:
         }
 
         value_ = std::move(value);
-        flags_ |= CV_MODIFIED;
+        flags_ |= CV_MODIFIED | CV_UNSAVED;
     }
 
     virtual void SetString(const std::string& value) override
