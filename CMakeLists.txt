@@ -49,6 +49,8 @@ set(COMMON_SOURCES
     "src/net/utils.hpp"
     "src/utils/aabb.hpp"
     "src/utils/allocnum.hpp"
+    "src/utils/cvars.hpp"
+    "src/utils/cvars.cpp"
     "src/utils/defs.hpp"
     "src/utils/files.hpp"
     "src/utils/scheduler.hpp"

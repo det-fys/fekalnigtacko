@@ -12,7 +12,7 @@ namespace collision
 
 struct DynamicsWorldInfo
 {
-    std::string broadphase{"dbvt"};
+    std::string broadphase{"Dbvt"};
     glm::vec3 bounds_min{};
     glm::vec3 bounds_max{};
 };

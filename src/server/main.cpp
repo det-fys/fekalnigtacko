@@ -3,6 +3,9 @@
 
 #include "server.hpp"
 #include "server_cfg.hpp"
+#include "utils/cvars.hpp"
+
+CVAR(uint16_t, sv_port, CV_DEFAULT, 11200);
 
 int main()
 {
@@ -11,7 +14,7 @@ int main()
     try
     {
         sv::LoadCfg();
-        sv::Server server(sv::GetCfg().port);
+        sv::Server server(sv_port.Get());
         server.Run();
     } catch (const std::exception& e)
     {

@@ -1,21 +1,26 @@
 #include "dynamicsworld.hpp"
 
 #include <stdexcept>
+#include <algorithm>
 
 static std::unique_ptr<btBroadphaseInterface> CreateBroadphase(const collision::DynamicsWorldInfo& info)
 {
     btVector3 bt_world_aabb_min(info.bounds_min.x, info.bounds_min.y, info.bounds_min.z);
     btVector3 bt_world_aabb_max(info.bounds_max.x, info.bounds_max.y, info.bounds_max.z);
 
-    if (info.broadphase == "dbvt")
+    std::string broadphase = info.broadphase;
+    std::transform(broadphase.begin(), broadphase.end(), broadphase.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+
+    if (broadphase == "dbvt")
     {
         return std::make_unique<btDbvtBroadphase>();
     }
-    else if (info.broadphase == "axissweep3")
+    else if (broadphase == "axissweep3")
     {
         return std::make_unique<btAxisSweep3>(bt_world_aabb_min, bt_world_aabb_max);
     }
-    else if (info.broadphase == "32bitaxissweep3")
+    else if (broadphase == "32bitaxissweep3")
     {
         return std::make_unique<bt32BitAxisSweep3>(bt_world_aabb_min, bt_world_aabb_max);
     }

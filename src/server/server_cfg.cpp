@@ -1,11 +1,10 @@
 #include "server_cfg.hpp"
-#include "assets/cmdfile.hpp"
 
 #include <iostream>
-
 #include <set>
 
-static sv::Cfg s_config{};
+#include "assets/cmdfile.hpp"
+#include "utils/cvars.hpp"
 
 static std::set<std::string> s_conds;
 
@@ -14,9 +13,9 @@ static void InitConds()
     s_conds.clear();
 
 #ifdef NDEBUG
-    s_conds.insert("release");
+    s_conds.insert("RELEASE");
 #else
-    s_conds.insert("debug");
+    s_conds.insert("DEBUG");
 #endif
 }
 
@@ -36,24 +35,34 @@ static void ProcessIfCmd(std::istringstream& iss)
     ProcessCmd(next_cmd, iss);
 }
 
-static void ProcessSetCmd(std::istringstream& iss)
+static void ProcessEnableCmd(bool enable, std::istringstream& iss)
 {
-    std::string var_name;
-    iss >> var_name;
+    std::string cond_name;
+    iss >> cond_name;
 
-    if (var_name == "port")
+    if (enable)
     {
-        iss >> s_config.port;
-    }
-    else if (var_name == "broadphase")
-    {
-        iss >> s_config.broadphase >> s_config.bp_bounds_min.x >> s_config.bp_bounds_min.y >>
-            s_config.bp_bounds_min.z >> s_config.bp_bounds_max.x >> s_config.bp_bounds_max.y >>
-            s_config.bp_bounds_max.z;
+        s_conds.insert(cond_name);
     }
     else
     {
-        throw std::runtime_error("server cfg: unknown var: " + var_name);
+        s_conds.erase(cond_name);
+    }
+}
+
+static void ProcessSetCmd(std::istringstream& iss)
+{
+    std::string var_name, value_str;
+    iss >> var_name;
+    value_str = assets::ParseString(iss);
+
+    try
+    {
+        CVarRegistry::Set(var_name, value_str);
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << "server cfg: error setting " << var_name << ": " << e.what() << std::endl;
     }
 }
 
@@ -66,6 +75,14 @@ static void ProcessCmd(const std::string& cmd, std::istringstream& iss)
     else if (cmd == "if")
     {
         ProcessIfCmd(iss);
+    }
+    else if (cmd == "enable")
+    {
+        ProcessEnableCmd(true, iss);
+    }
+    else if (cmd == "disable")
+    {
+        ProcessEnableCmd(false, iss);
     }
     else
     {
@@ -85,9 +102,4 @@ void sv::LoadCfg()
 
     std::cout << "... server.cfg loaded" << std::endl;
 
-}
-
-const sv::Cfg& sv::GetCfg()
-{
-    return s_config;
 }

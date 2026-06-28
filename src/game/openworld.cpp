@@ -15,6 +15,43 @@
 #include "cow.hpp"
 #include "utils/random.hpp"
 #include "server/server_cfg.hpp"
+#include "utils/cvars.hpp"
+
+// physics
+CVAR(std::string, ow_broadphase, CV_DEFAULT, "Dbvt");
+
+CVAR(float, ow_aabb_min_x, CV_DEFAULT, 0.0f);
+CVAR(float, ow_aabb_min_y, CV_DEFAULT, 0.0f);
+CVAR(float, ow_aabb_min_z, CV_DEFAULT, 0.0f);
+
+CVAR(float, ow_aabb_max_x, CV_DEFAULT, 0.0f);
+CVAR(float, ow_aabb_max_y, CV_DEFAULT, 0.0f);
+CVAR(float, ow_aabb_max_z, CV_DEFAULT, 0.0f);
+
+// time
+CVAR(float, ow_day_mins, CV_DEFAULT, 1.0f, 0.0f);
+CVAR(float, ow_start_daytime, CV_DEFAULT, 1.0f, -1.0f, 24.0f);
+
+// vehicles
+CVAR(size_t, ow_vehicle_count, CV_DEFAULT, 10);
+CVAR(size_t, ow_vehicle_row_length, CV_DEFAULT, 10);
+CVAR(float, ow_vehicle_distance_x, CV_DEFAULT, 10.0f);
+CVAR(float, ow_vehicle_distance_y, CV_DEFAULT, 10.0f);
+CVAR(size_t, ow_vehicle_spawn_interval, CV_DEFAULT, 120);
+
+// npcs
+CVAR(size_t, ow_npc_count, CV_DEFAULT, 10, 0, 10000);
+CVAR(size_t, ow_npc_spawn_time_fast, CV_DEFAULT, 40);
+CVAR(size_t, ow_npc_spawn_time_slow_min, CV_DEFAULT, 40);
+CVAR(size_t, ow_npc_spawn_time_slow_max, CV_DEFAULT, 40);
+
+CVAR(size_t, ow_npc_abandoned_vehicle_despawn_time, CV_DEFAULT, 5000);
+CVAR(size_t, ow_npc_boredom_death_time, CV_DEFAULT, 5000);
+CVAR(size_t, ow_npc_dead_despawn_time, CV_DEFAULT, 5000);
+
+CVAR(float, ow_npc_driver_armed_chance, CV_DEFAULT, 0.4f, 0.0f, 1.0f);
+CVAR(float, ow_npc_passenger_chance, CV_DEFAULT, 0.3f, 0.0f, 1.0f);
+CVAR(float, ow_npc_passenger_armed_chance, CV_DEFAULT, 0.8f, 0.0f, 1.0f);
 
 namespace game
 {
@@ -52,12 +89,10 @@ static uint32_t GetRandomColor24()
 
 static collision::DynamicsWorldInfo GetOpenWorldDynamicsInfo()
 {
-    const auto& cfg = sv::GetCfg();
-
     collision::DynamicsWorldInfo info{};
-    info.broadphase = cfg.broadphase;
-    info.bounds_min = cfg.bp_bounds_min;
-    info.bounds_max = cfg.bp_bounds_max;
+    info.broadphase = ow_broadphase.Get();
+    info.bounds_min = glm::vec3(ow_aabb_min_x.Get(), ow_aabb_min_y.Get(), ow_aabb_min_z.Get());
+    info.bounds_max = glm::vec3(ow_aabb_max_x.Get(), ow_aabb_max_y.Get(), ow_aabb_max_z.Get());
     return info;
 }
 
@@ -76,20 +111,19 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo
 
     auto& veh = Spawn<game::DrivableVehicle>(twingo_info);
 
-    constexpr size_t in_row = 20;
-
-    for (size_t i = 0; i < 100; ++i)
+    for (size_t i = 0; i < ow_vehicle_count.Get(); ++i)
     {
-        Schedule(i * 160, [this, i] {
-            size_t col = i % in_row;
-            size_t row = i / in_row;
-            glm::vec3 pos(62.0f + static_cast<float>(col) * 4.0f, 165.0f + static_cast<float>(row) * 7.0f, 7.0f);
+        Schedule(i * ow_vehicle_spawn_interval.Get(), [this, i] {
+            size_t col = i % ow_vehicle_row_length.Get();
+            size_t row = i / ow_vehicle_row_length.Get();
+            glm::vec3 pos(62.0f + static_cast<float>(col) * ow_vehicle_distance_x.Get(),
+                          165.0f + static_cast<float>(row) * ow_vehicle_distance_y.Get(), 4.0f);
 
             SpawnRandomVehicle(pos, 0.0f);
         });
     }
 
-    daytime_offset_ = static_cast<float>(rand() % 24);
+    daytime_offset_ = ow_start_daytime.Get() < 0.0f ? static_cast<float>(rand() % 24) : ow_start_daytime.Get();
 
     for (auto locs = GetMap().GetLocations("tuning"); const auto& loc : locs)
     {
@@ -128,7 +162,7 @@ void game::OpenWorld::Update(int64_t delta_time)
 {
     Super::Update(delta_time);
 
-    const float day_seconds_irl = 1800.0f;
+    const float day_seconds_irl = 60.0f * ow_day_mins.Get();
     const float timespeed = 24.0f / day_seconds_irl;
     SetDayTime(static_cast<float>(GetTime()) * 0.001f * timespeed + daytime_offset_); 
 }
@@ -146,7 +180,7 @@ void game::OpenWorld::PlayerInput(Player& player, PlayerInputType type, bool ena
 
 void game::OpenWorld::SpawnNpcs()
 {
-    const size_t max_npcs = 180;
+    const size_t max_npcs = ow_npc_count.Get();
 
     int64_t next_spawn_after = 10000;
 
@@ -156,11 +190,11 @@ void game::OpenWorld::SpawnNpcs()
 
         if (num_npcs_ < (max_npcs * 3 / 4))
         {
-            next_spawn_after = 120;
+            next_spawn_after = ow_npc_spawn_time_fast.Get();
         }
         else
         {
-            next_spawn_after = RandomInt(100, 2000);
+            next_spawn_after = RandomInt(ow_npc_spawn_time_slow_min.Get(), ow_npc_spawn_time_slow_max.Get());
         }
     }
 
@@ -171,13 +205,13 @@ void game::OpenWorld::SpawnNpcs()
 
 static void CheckVehicleAbandonment(game::DrivableVehicle& vehicle)
 {
-    if (vehicle.IsAbandoned(60000 * 5)) // 5 min
+    if (vehicle.IsAbandoned(ow_npc_abandoned_vehicle_despawn_time.Get()))
     {
         vehicle.Remove();
     }
     else
     {
-        vehicle.Schedule(RandomInt(0, 1000) + 10000, [&vehicle]{
+        vehicle.Schedule(RandomInt(5000, 10000), [&vehicle]{
             CheckVehicleAbandonment(vehicle);
         });
     }
@@ -242,13 +276,13 @@ static void CheckNpcBoredom(game::NpcCharacter& npc)
     if (!npc.IsAlive())
         return;
 
-    if (npc.IsBored(60000 * 5)) // 5 min doing nothing is insufferable
+    if (npc.IsBored(ow_npc_boredom_death_time.Get()))
     {
         npc.Die();
     }
     else
     {
-        npc.Schedule(RandomInt(0, 2000) + 10000, [&npc]{
+        npc.Schedule(RandomInt(5000, 10000) + 10000, [&npc]{
             CheckNpcBoredom(npc);
         });
     }
@@ -263,7 +297,7 @@ game::NpcCharacter& game::OpenWorld::SpawnRandomNpc()
     auto& npc = Spawn<NpcCharacter>(npc_tuning);
 
     npc.SetOnDeath([this, &npc] {
-        npc.Schedule(15000, [&npc]{
+        npc.Schedule(ow_npc_dead_despawn_time.Get(), [&npc]{
             npc.Remove();
         });
 
@@ -312,12 +346,12 @@ void game::OpenWorld::SpawnNpcVehicleWithPassengers()
     driver.Ride(&vehicle, 0);
 
     bool has_armed_passenger = false;
-    if (Chance(0.4f))
+    if (Chance(ow_npc_passenger_chance.Get()))
     {
         auto& passenger = SpawnRandomNpc();
         passenger.Ride(&vehicle, 1);
 
-        if (Chance(0.8f))
+        if (Chance(ow_npc_passenger_armed_chance.Get()))
         {
             passenger.SetWeapon(std::make_shared<ItemInstance>(
                 Chance(0.6f) ? "panzerschreck" : (Chance(0.4f) ? "ak47" : (Chance(0.5f) ? "uzi" : "airsniper"))));
@@ -326,7 +360,7 @@ void game::OpenWorld::SpawnNpcVehicleWithPassengers()
         }
     }
 
-    if (has_armed_passenger || Chance(0.5f))
+    if (has_armed_passenger || Chance(ow_npc_driver_armed_chance.Get()))
     {
         driver.SetWeapon(std::make_shared<ItemInstance>("uzi"));
     }
