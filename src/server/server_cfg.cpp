@@ -19,9 +19,9 @@ static void InitConds()
 #endif
 }
 
-static void ProcessCmd(const std::string& cmd, std::istringstream& iss);
+static void ProcessCmd(const std::string& cmd, CmdLineStream& iss);
 
-static void ProcessIfCmd(std::istringstream& iss)
+static void ProcessIfCmd(CmdLineStream& iss)
 {
     std::string cond_name, next_cmd;
     iss >> cond_name >> next_cmd;
@@ -35,7 +35,7 @@ static void ProcessIfCmd(std::istringstream& iss)
     ProcessCmd(next_cmd, iss);
 }
 
-static void ProcessEnableCmd(bool enable, std::istringstream& iss)
+static void ProcessEnableCmd(bool enable, CmdLineStream& iss)
 {
     std::string cond_name;
     iss >> cond_name;
@@ -50,7 +50,7 @@ static void ProcessEnableCmd(bool enable, std::istringstream& iss)
     }
 }
 
-static void ProcessSetCmd(std::istringstream& iss)
+static void ProcessSetCmd(CmdLineStream& iss)
 {
     std::string var_name, value_str;
     iss >> var_name;
@@ -66,7 +66,7 @@ static void ProcessSetCmd(std::istringstream& iss)
     }
 }
 
-static void ProcessCmd(const std::string& cmd, std::istringstream& iss)
+static void ProcessCmd(const std::string& cmd, CmdLineStream& iss)
 {
     if (cmd == "set")
     {
@@ -96,7 +96,7 @@ void sv::LoadCfg()
 
     InitConds();
 
-    assets::LoadCMDFile("server.cfg", [](const std::string& cmd, std::istringstream& iss){
+    assets::LoadCMDFile("server.cfg", [](const std::string& cmd, CmdLineStream& iss){
         ProcessCmd(cmd, iss);
     });
 

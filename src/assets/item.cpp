@@ -7,7 +7,7 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
 {
     auto item = std::make_shared<Item>();
 
-    LoadCMDFile(path, [&](const std::string& command, std::istringstream& iss) {
+    LoadCMDFile(path, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "type")
         {
             std::string type_str;

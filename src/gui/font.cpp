@@ -11,7 +11,7 @@ std::shared_ptr<const gui::Font> gui::Font::LoadFromFile(const std::string& path
 
     auto PxToUv = [&](const glm::vec2& pos_px) { return pos_px / size; };
 
-    assets::LoadCMDFile(path, [&](const std::string& cmd, std::istringstream& iss) {
+    assets::LoadCMDFile(path, [&](const std::string& cmd, CmdLineStream& iss) {
         if (cmd == "c")
         {
             Codepoint cp = 0;

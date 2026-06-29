@@ -7,7 +7,7 @@ std::shared_ptr<const assets::VehicleModel> assets::VehicleModel::LoadFromFile(c
 {
     auto veh = std::make_shared<VehicleModel>();
 
-    LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
+    LoadCMDFile(filename, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "basemodel")
         {
             std::string model_name;

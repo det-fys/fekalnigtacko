@@ -83,7 +83,7 @@ std::shared_ptr<gfx::Texture> gfx::Texture::LoadFromFile(const std::string& file
 	std::string config_path = filename + ".cfg";
 	if (fs::FileExists(config_path))
 	{
-		assets::LoadCMDFile(config_path, [&](const std::string& command, std::istringstream& iss) {
+		assets::LoadCMDFile(config_path, [&](const std::string& command, CmdLineStream& iss) {
 			if (command == "nomipmaps")
 			{
 				mipmaps = false;

@@ -5,7 +5,7 @@
 
 assets::Precache::Precache(const std::string& path)
 {
-    LoadCMDFile(path, [this](const std::string& command, std::istringstream& iss) {
+    LoadCMDFile(path, [this](const std::string& command, CmdLineStream& iss) {
         std::string name;
         iss >> name;
         items_.emplace_back(PrecacheItem{command, name});

@@ -33,7 +33,7 @@ std::shared_ptr<const audio::Sound> audio::Sound::LoadFromFile(const std::string
 
     std::string ogg_name;
 
-    assets::LoadCMDFile(path, [&](const std::string& cmd, std::istringstream& iss) {
+    assets::LoadCMDFile(path, [&](const std::string& cmd, CmdLineStream& iss) {
         if (cmd == "ogg")
         {
             iss >> ogg_name;

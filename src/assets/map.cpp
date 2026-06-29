@@ -124,7 +124,7 @@ std::shared_ptr<const assets::Map> assets::MapLoader::GetMap() const
 
 void assets::MapLoader::ReadModels()
 {
-    LoadCMDStream(map_iss_, [&](const std::string& command, std::istringstream& iss) {
+    LoadCMDStream(map_iss_, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "basemodel")
         {
             iss >> basemodel_name_;
@@ -181,7 +181,7 @@ void assets::MapLoader::LoadStructs()
 
     Chunk* chunk = nullptr;
 
-    LoadCMDStream(map_iss_, [&](const std::string& command, std::istringstream& iss) {
+    LoadCMDStream(map_iss_, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "static")
         {
             if (!chunk)
@@ -207,8 +207,10 @@ void assets::MapLoader::LoadStructs()
             chunk->aabb.AddAABB(obj.aabb);
 
             std::string flag;
-            while (iss >> flag)
+            while (!iss.Eol())
             {
+                iss >> flag;
+
                 if (flag == "+color")
                 {
                     iss >> obj.color.r >> obj.color.g >> obj.color.b;

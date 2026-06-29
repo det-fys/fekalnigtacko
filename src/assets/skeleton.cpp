@@ -9,7 +9,7 @@ std::shared_ptr<const assets::Skeleton> assets::Skeleton::LoadFromFile(const std
 {
     auto skeleton = std::make_shared<Skeleton>();
 
-    LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
+    LoadCMDFile(filename, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "b")
         {
             Transform t;
@@ -18,22 +18,12 @@ std::shared_ptr<const assets::Skeleton> assets::Skeleton::LoadFromFile(const std
             iss >> bone_name >> parent_name;
             ParseTransform(iss, t);
 
-            if (iss.fail())
-            {
-                throw std::runtime_error("Failed to parse bone definition in file: " + filename);
-            }
-
             skeleton->AddBone(bone_name, parent_name, t);
         }
         else if (command == "anim")
         {
             std::string anim_name, anim_filename;
             iss >> anim_name >> anim_filename;
-
-            if (iss.fail())
-            {
-                throw std::runtime_error("Failed to parse animation definition in file: " + filename);
-            }
 
             std::shared_ptr<const Animation> anim =
                 Animation::LoadFromFile("data/" + anim_filename + ".anim", skeleton.get());

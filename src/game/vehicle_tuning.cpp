@@ -105,7 +105,7 @@ static uint32_t ParseColor(const std::string& color_str)
     return FlipColor(color);
 }
 
-static game::VehicleTuningFunction ParseTuningFunction(std::istringstream& iss)
+static game::VehicleTuningFunction ParseTuningFunction(CmdLineStream& iss)
 {
     std::string func_name;
     iss >> func_name;
@@ -184,7 +184,7 @@ std::unique_ptr<const game::VehicleTuningList> game::VehicleTuningList::LoadFrom
     VehicleTuningGroup* current_group = nullptr;
     VehicleTuningPart* current_part = nullptr;
 
-    auto process_command = [&](const std::string& command, std::istringstream& iss) {
+    auto process_command = [&](const std::string& command, CmdLineStream& iss) {
         if (command == "group")
         {
             VehicleTuningGroup group{};
@@ -239,7 +239,7 @@ std::unique_ptr<const game::VehicleTuningList> game::VehicleTuningList::LoadFrom
         return false;
     };
 
-    assets::LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
+    assets::LoadCMDFile(filename, [&](const std::string& command, CmdLineStream& iss) {
 
         if (process_command(command, iss))
             return;
@@ -249,7 +249,7 @@ std::unique_ptr<const game::VehicleTuningList> game::VehicleTuningList::LoadFrom
             std::string include_name;
             iss >> include_name;
 
-            assets::LoadCMDFile("data/" + include_name + ".tun", [&](const std::string& command, std::istringstream& iss) {
+            assets::LoadCMDFile("data/" + include_name + ".tun", [&](const std::string& command, CmdLineStream& iss) {
                 process_command(command, iss);
             });
 

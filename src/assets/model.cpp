@@ -41,7 +41,7 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
 
     collision::Material col_material = collision::PM_NONE;
 
-    LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
+    LoadCMDFile(filename, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "v")
         {
             glm::vec3 pos;
@@ -119,8 +119,10 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
 
             // Optional flags
             std::string flag;
-            while (iss >> flag)
+            while (!iss.Eol())
             {
+                iss >> flag;
+
                 if (flag == "+texture")
                 {
                     iss >> texture_name;

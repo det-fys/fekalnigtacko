@@ -9,7 +9,7 @@ std::shared_ptr<const assets::Effect> assets::Effect::LoadFromFile(const std::st
 
     ParticleDef* particle = nullptr;
 
-    LoadCMDFile(path, [&](const std::string& command, std::istringstream& iss) {
+    LoadCMDFile(path, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "sound")
         {
             std::string sound_name;

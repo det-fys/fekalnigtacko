@@ -32,7 +32,7 @@ std::shared_ptr<const assets::Animation> assets::Animation::LoadFromFile(const s
         frame_indices.resize(target_size, last_frame_idx);
     };
 
-    LoadCMDFile(filename, [&](const std::string& command, std::istringstream& iss) {
+    LoadCMDFile(filename, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "f")
         {
             if (anim->num_frames_ == 0)
