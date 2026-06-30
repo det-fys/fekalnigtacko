@@ -5,7 +5,7 @@
 #include "server_cfg.hpp"
 #include "utils/cvars.hpp"
 
-CVAR(uint16_t, sv_port, CV_DEFAULT, 11200);
+CVAR(uint16_t, sv_port, CV_CONST, 11200);
 
 int main()
 {

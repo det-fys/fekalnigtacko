@@ -49,6 +49,11 @@ CVarRegistry& CVarRegistry::GetInstance()
     return reg;
 }
 
+bool CVarRegistry::IsCVarName(const std::string& name)
+{
+    return GetInstance().cvars_.contains(name);
+}
+
 CVarBase& CVarRegistry::GetCVar(const std::string& name)
 {
     auto& cvars = GetInstance().cvars_;

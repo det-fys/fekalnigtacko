@@ -56,6 +56,9 @@ public:
 
     const glm::vec3 GetCullPos() const { return cull_pos_; }
 
+    void SetAdmin(bool admin) { is_admin_ = admin; }
+    bool IsAdmin() const { return is_admin_; }
+
     ~Player();
 
 private:
@@ -78,6 +81,7 @@ private:
     bool ProcessInputMsg(net::InMessage& msg);
     bool ProcessViewAnglesMsg(net::InMessage& msg);
     bool ProcessMenuActionMsg(net::InMessage& msg);
+    bool ProcessChatMsg(net::InMessage& msg);
 
     // events
     void Input(PlayerInputType type, bool enabled);
@@ -111,6 +115,8 @@ private:
     // hud
     PlayerHudData hud_data_;
     uint8_t dmg_event_flags_ = 0;
+
+    bool is_admin_ = false;
 };
 
 }

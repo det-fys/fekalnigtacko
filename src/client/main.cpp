@@ -24,6 +24,7 @@
 #include "app.hpp"
 #include "gl.hpp"
 #include "utils/cvars.hpp"
+#include "key_map.hpp"
 
 static std::string s_username;
 static std::string s_url;
@@ -145,34 +146,6 @@ static void ShutdownSDL()
     SDL_Quit();
 }
 
-static const std::map<SDL_Scancode, game::PlayerInputType> s_inputmap = {
-    { SDL_SCANCODE_W, game::IN_FORWARD },
-    { SDL_SCANCODE_S, game::IN_BACKWARD },
-    { SDL_SCANCODE_A, game::IN_LEFT },
-    { SDL_SCANCODE_D, game::IN_RIGHT },
-    { SDL_SCANCODE_SPACE, game::IN_JUMP },
-    { SDL_SCANCODE_LSHIFT, game::IN_SPRINT },
-    { SDL_SCANCODE_LCTRL, game::IN_CROUCH },
-    { SDL_SCANCODE_E, game::IN_USE },
-    { SDL_SCANCODE_Q, game::IN_HOLSTER },
-    { SDL_SCANCODE_R, game::IN_RELOAD },
-    { SDL_SCANCODE_LALT, game::IN_AIM_MODE },
-    { SDL_SCANCODE_1, game::IN_WEAPON_1 },
-    { SDL_SCANCODE_2, game::IN_WEAPON_2 },
-    { SDL_SCANCODE_3, game::IN_WEAPON_3 },
-    { SDL_SCANCODE_4, game::IN_WEAPON_4 },
-    { SDL_SCANCODE_5, game::IN_WEAPON_5 },
-    { SDL_SCANCODE_6, game::IN_WEAPON_6 },
-    { SDL_SCANCODE_7, game::IN_WEAPON_7 },
-    { SDL_SCANCODE_8, game::IN_WEAPON_8 },
-    { SDL_SCANCODE_9, game::IN_WEAPON_9 },
-    { SDL_SCANCODE_0, game::IN_WEAPON_0 },
-    { SDL_SCANCODE_F3, game::IN_DEBUG1 },
-    { SDL_SCANCODE_F4, game::IN_DEBUG2 },
-    { SDL_SCANCODE_F5, game::IN_DEBUG3 },
-    { SDL_SCANCODE_TAB, game::IN_MENU },
-};
-
 static void PollEvents()
 {
     SDL_Event event;
@@ -198,25 +171,37 @@ static void PollEvents()
         case SDL_KEYDOWN:
         case SDL_KEYUP:
             {
-                auto in_it = s_inputmap.find(event.key.keysym.scancode);
-                if (in_it != s_inputmap.end())
+                auto kc = GetKeyCodeFromSDLScancode(event.key.keysym.scancode);
+                if (kc != KEY_NONE)
                 {
-                    s_app->Input(in_it->second, event.key.state == SDL_PRESSED, event.key.repeat != 0);
+                    s_app->KeyInput(kc, event.key.state == SDL_PRESSED, event.key.repeat);
                 }
-            }
+            }    
+
+            break;
+
+        case SDL_TEXTINPUT:
+            s_app->TextInput(event.text.text);
             break;
 
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP:
             {
+                bool pressed = event.button.state == SDL_PRESSED;
                 if (event.button.button == SDL_BUTTON_LEFT)
                 {
-                    s_app->Input(game::IN_ATTACK_PRIMARY, event.button.state == SDL_PRESSED, false);
+                    s_app->KeyInput(KEY_LMB, pressed, 0);
                 }
                 else if (event.button.button == SDL_BUTTON_RIGHT)
                 {
-                    s_app->Input(game::IN_ATTACK_SECONDARY, event.button.state == SDL_PRESSED, false);
+                    s_app->KeyInput(KEY_RMB, pressed, 0);
                 }
+            }
+            break;
+
+        case SDL_MOUSEWHEEL:
+            {
+                s_app->KeyInput(event.wheel.y < 0 ? KEY_WHEELUP : KEY_WHEELDOWN, true, 0);
             }
             break;
 

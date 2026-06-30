@@ -1,6 +1,7 @@
 #include "app.hpp"
 
 #include <iostream>
+#include <map>
 
 #include "net/defs.hpp"
 #include "net/outmessage.hpp"
@@ -9,15 +10,51 @@
 #include "gameview/utils.hpp"
 #include "gui/loading_screen.hpp"
 #include "utils/cvars.hpp"
+#include "utils/keys.hpp"
+#include "utils/chatcolors.hpp"
 
 CVAR(float, sensitivity, CV_SAVE, 0.5f);
 CVAR(float, volume, CV_SAVE, 0.2f, 0.0f);
 
+static const std::map<KeyCode, game::PlayerInputType> s_inputmap = {
+	{ KEY_LMB, game::IN_ATTACK_PRIMARY },
+	{ KEY_RMB, game::IN_ATTACK_SECONDARY },
+    { KEY_W, game::IN_FORWARD },
+    { KEY_S, game::IN_BACKWARD },
+    { KEY_A, game::IN_LEFT },
+    { KEY_D, game::IN_RIGHT },
+    { KEY_SPACE, game::IN_JUMP },
+    { KEY_LSHIFT, game::IN_SPRINT },
+    { KEY_LCTRL, game::IN_CROUCH },
+    { KEY_E, game::IN_USE },
+    { KEY_Q, game::IN_HOLSTER },
+    { KEY_R, game::IN_RELOAD },
+    { KEY_LALT, game::IN_AIM_MODE },
+    { KEY_1, game::IN_WEAPON_1 },
+    { KEY_2, game::IN_WEAPON_2 },
+    { KEY_3, game::IN_WEAPON_3 },
+    { KEY_4, game::IN_WEAPON_4 },
+    { KEY_5, game::IN_WEAPON_5 },
+    { KEY_6, game::IN_WEAPON_6 },
+    { KEY_7, game::IN_WEAPON_7 },
+    { KEY_8, game::IN_WEAPON_8 },
+    { KEY_9, game::IN_WEAPON_9 },
+    { KEY_0, game::IN_WEAPON_0 },
+    { KEY_F3, game::IN_DEBUG1 },
+    { KEY_F4, game::IN_DEBUG2 },
+    { KEY_F5, game::IN_DEBUG3 },
+    { KEY_TAB, game::IN_MENU },
+};
+
 App::App(const std::string& settings_path)
     : settings_(settings_path), gui_(dlist_, assets::CacheManager::GetFont("data/comic32.font")),
-      precache_("data/precache")
+      precache_("data/precache"), chat_(gui_, time_)
 {
 	std::cout << "Initializing App..." << std::endl;
+
+	chat_.SetOnInput([this](std::string msg) {
+		ProcessChatInput(std::move(msg));
+	});
 
 	try
 	{
@@ -72,17 +109,42 @@ void App::MouseMove(const glm::vec2& delta)
 		session_->ProcessMouseMove(delta_yaw, delta_pitch);
 }
 
-void App::AddChatMessage(const std::string& text)
+bool App::KeyInput(KeyCode key, bool pressed, size_t repeat)
 {
-	auto& ch = chat_.emplace_back();
-	ch.timeout = time_ + 10.0f;
-	ch.text = text;
-	UpdateChat();
+	if (pressed)
+	{
+		if (chat_.KeyInput(key))
+			return true;
+
+		// TODO: menu controls here
+	}
+
+	auto it = s_inputmap.find(key);
+	if (it != s_inputmap.end())
+	{
+		Input(it->second, pressed, repeat > 0);
+	}
+
+	return true;
+
+}
+
+void App::TextInput(std::string_view text)
+{
+	if (!chat_.IsWindowOpen())
+		return;
+
+	chat_.TextInput(text);
 }
 
 void App::AddChatMessagePrefix(const std::string& prefix, const std::string& text)
 {
 	AddChatMessage("^aaa[^ddd" + prefix + "^aaa]^r " + text);
+}
+
+void App::AddChatMessage(std::string text)
+{
+	chat_.AddMessage(std::move(text));
 }
 
 App::~App() {}
@@ -105,8 +167,8 @@ void App::Update()
 	UpdateState();
 	UpdateSession();
 	UpdateStats();
-	UpdateChat();
-
+	chat_.Update();
+	
 	settings_.TrySave(time_);
 }
 
@@ -134,7 +196,7 @@ void App::Draw()
 	}
 
 	DrawStats();
-	DrawChat();
+	chat_.Draw();
 
 	// draw menu
 	if (menu_)
@@ -147,33 +209,6 @@ void App::Draw()
 	renderer_.DrawList(dlist_, params);
 
 	++stat_frames_;
-}
-
-void App::UpdateChat()
-{
-	// remove expired or over the limit messages
-	while (!chat_.empty() && (chat_.size() > 20 ||chat_[0].timeout < time_))
-	{
-		chat_.pop_front();
-	}
-}
-
-void App::DrawChat()
-{
-	for (size_t i = 0; i < chat_.size(); ++i)
-	{
-		glm::vec2 pos(10.0f, static_cast<float>(i) * gui_.GetFont()->GetLineHeight() + 10.0f);
-
-		float t_rem = chat_[i].timeout - time_;
-        const float fade = 1.0f;
-		if (t_rem < fade)
-		{
-            chat_[i].color.a = t_rem / fade;
-		}
-
-		uint32_t color = glm::packUnorm4x8(chat_[i].color);
-		gui_.DrawText(chat_[i].text, pos, color);
-	}
 }
 
 static void AddSlider(gui::Menu& menu, std::string text, int& value, int min, int max, std::function<void()> changed)
@@ -240,8 +275,7 @@ void App::UpdateVolume()
 	volume.ClearModified();
 }
 
-#define COL_LABEL "^ccc"
-#define COL_VALUE "^5ff"
+
 
 void App::UpdateSession()
 {
@@ -374,12 +408,12 @@ void App::EnterState(AppState state)
 		break;
 
 	case APP_STATE_CONNECTED:
-		AddChatMessagePrefix("WebSocket", "^7f7připojeno");
+		AddChatMessagePrefix("WebSocket", COL_SUCCESS "připojeno");
 		session_ = std::make_unique<game::view::ClientSession>(*this);	
 		break;
 
 	case APP_STATE_DISCONNECTED:
-		AddChatMessagePrefix("WebSocket", "^f77spojení je píči");
+		AddChatMessagePrefix("WebSocket", COL_ERROR "spojení je píči");
 		session_.reset();
 		AddChatMessagePrefix("WebSocket", "další pokus za 10 s");
 		break;
@@ -431,4 +465,89 @@ AppState App::CheckStateTransition()
 	default:
 		return state_;
 	}
+}
+
+void App::ProcessChatInput(std::string input)
+{
+	std::string_view line = input;
+	
+	if (line.empty())
+		return;
+
+	if (line[0] == '\\')
+	{
+		// local command
+		line.remove_prefix(1);		
+		ProcessLocalCommand(line);
+		return;
+	}
+
+	if (!session_)
+	{
+		chat_.AddMessage(COL_ERROR "nejsi připojen");
+		return;
+	}
+
+	session_->ChatInput(line);
+}
+
+void App::ProcessLocalCommand(std::string_view line)
+{
+	CmdLineStream iss(line);
+
+	if (iss.Eol())
+		return;
+
+	try
+	{
+		std::string cmd;
+		iss >> cmd;
+
+		if (cmd.empty())
+			return;
+
+		if (cmd == "set")
+		{
+			ProcessSetCmd(iss);
+		}
+		else
+		{
+			throw std::runtime_error("neznámej příkaz: " + cmd);
+		}
+    }
+    catch (const std::exception& e)
+    {
+		chat_.AddMessage(COL_ERROR "chyba: " + std::string(e.what()));
+	}
+}
+
+void App::ProcessSetCmd(CmdLineStream& line)
+{
+	if (line.Eol())
+	{
+		// no args - list cvars
+
+		CVarRegistry::ProcessCVars([this](CVarBase& cvar) {
+			chat_.AddMessage(COL_LABEL + cvar.GetName() + "^r=" COL_VALUE + cvar.GetString());
+			return false;
+		});
+	
+		return;
+	}
+
+	std::string cvar_name;
+	line >> cvar_name;
+
+	if (line.Eol())
+	{
+		// no value - only print current
+		chat_.AddMessage(COL_LABEL + cvar_name + "^r=" COL_VALUE + CVarRegistry::Get(cvar_name));
+	}
+
+	std::string val;
+	line >> val;
+
+	CVarRegistry::Set(cvar_name, val);
+
+	chat_.AddMessage(COL_LABEL + cvar_name + "^r nastaveno na " COL_VALUE + CVarRegistry::Get(cvar_name));
 }

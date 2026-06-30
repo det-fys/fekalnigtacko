@@ -30,6 +30,8 @@ public:
     void Input(game::PlayerInputType in, bool pressed, bool repeated);
     void ProcessMouseMove(float delta_yaw, float delta_pitch);
 
+    void ChatInput(std::string_view line);
+
     void Update(const UpdateInfo& info);
     void Draw(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui);
 

@@ -90,6 +90,7 @@ public:
     const std::shared_ptr<const gfx::Texture>& GetTexture() const { return texture_; }
 
     float GetLineHeight() const { return line_height_; }
+    float GetSpaceSize() const { return line_height_ * 0.3f; }
 
 private:
     std::shared_ptr<const gfx::Texture> texture_; // Texture atlas for the font

@@ -5,6 +5,7 @@
 #include "enterable_world.hpp"
 #include "tuning_world.hpp"
 #include "openworld.hpp"
+#include "commands.hpp"
 
 namespace game
 {
@@ -23,6 +24,9 @@ class Game
 {
 public:
     Game();
+    DELETE_COPY_MOVE(Game);
+
+    void RegisterCommands();
 
     void Update();
     void FinishFrame();
@@ -32,11 +36,15 @@ public:
     void PlayerJoined(Player& player);
     void PlayerViewAnglesChanged(Player& player, float yaw, float pitch);
     void PlayerInput(Player& player, PlayerInputType type, bool enabled);
+    void PlayerChat(Player& player, std::string_view line);
     void PlayerLeft(Player& player);
 
     void MovePlayerToWorld(Player& player, EnterableWorld& world, bool with_vehicle, const glm::vec3& pos, float yaw);
 
 private:
+    void UpdateDaytime();
+    void UpdateWorlds();
+
     void BroadcastChat(const std::string& text);
 
     PlayerCharacter& MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld& new_world, const glm::vec3& pos, float yaw);
@@ -48,6 +56,8 @@ private:
     EnterableWorld* FindPlayerWorld(Player& player) const;
 
 private:
+    CommandList cmds_;
+
     std::shared_ptr<OpenWorld> openworld_;
     std::shared_ptr<EnterableWorld> testworld_;
     std::shared_ptr<TuningWorld> garage_;

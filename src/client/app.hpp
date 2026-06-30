@@ -15,6 +15,9 @@
 #include "wsclient.hpp"
 #include "assets/precache.hpp"
 #include "settings.hpp"
+#include "gui/chat.hpp"
+#include "utils/keys.hpp"
+#include "utils/cmdlinestream.hpp"
 
 struct ChatMessage
 {
@@ -50,22 +53,22 @@ public:
     void Input(game::PlayerInputType in, bool pressed, bool repeated);
     void MouseMove(const glm::vec2& delta);
 
+    bool KeyInput(KeyCode key, bool pressed, size_t repeat);
+    void TextInput(std::string_view text);
+
     const float& GetTime() const { return time_; }
     float GetDeltaTime() const { return delta_time_; }
 
     audio::Master& GetAudioMaster() { return audiomaster_; }
 
-    void AddChatMessage(const std::string& text);
     void AddChatMessagePrefix(const std::string& prefix, const std::string& text);
+    void AddChatMessage(std::string text);
 
     ~App();
 
 private:
     void Update();
     void Draw();
-
-    void UpdateChat();
-    void DrawChat();
 
     void OpenSettings();
     void UpdateVolume();
@@ -81,6 +84,11 @@ private:
     void EnterState(AppState state);
     AppState CheckStateTransition();
     float GetCurrentStateDuration() const { return time_ - state_time_; }
+
+    void ProcessChatInput(std::string input);
+
+    void ProcessLocalCommand(std::string_view line);
+    void ProcessSetCmd(CmdLineStream& line);
 
 private:
     Settings settings_;
@@ -105,9 +113,10 @@ private:
 
     assets::Precache precache_;
 
+    gui::Chat chat_;
+
     std::unique_ptr<game::view::ClientSession> session_;
 
-    std::deque<ChatMessage> chat_;
     std::unique_ptr<gui::Menu> menu_;
 
     AppState state_ = APP_STATE_INIT;

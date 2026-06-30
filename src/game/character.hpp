@@ -101,6 +101,7 @@ public:
 
     float GetHealth() const { return health_; }
     void SetInvulnerable(bool invulnerable) { invulnerable_ = invulnerable; }
+    bool IsInvulnerable() const { return invulnerable_; }
     bool IsAlive() const { return death_time_ < 0; }
     int64_t GetDeathTime() const;
 

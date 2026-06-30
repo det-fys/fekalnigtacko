@@ -7,9 +7,19 @@
 
 #include "world.hpp"
 #include "game.hpp"
+#include "utils/cvars.hpp"
+#include "utils/chatcolors.hpp"
+
+CVAR(uint8_t, pl_autoadmin, CV_NONE, 0);
 
 game::Player::Player(Game& game, std::string name) : game_(game), name_(std::move(name))
 {
+    if (pl_autoadmin.Get() > 0)
+    {
+        is_admin_ = true;
+        SendChat(COL_SUCCESS "jsi automaticky admin (pl_autoadmin = 1)");
+    }
+
     game_.PlayerJoined(*this);
 }
 
@@ -25,6 +35,9 @@ bool game::Player::ProcessMsg(net::MessageType type, net::InMessage& msg)
 
     case net::MSG_MENUACTION:
         return ProcessMenuActionMsg(msg);
+
+    case net::MSG_CHAT:
+        return ProcessChatMsg(msg);
 
     default:
         return false;
@@ -63,8 +76,7 @@ void game::Player::SetCamera(const CameraInfo& camera_info)
 void game::Player::SendChat(const std::string& text)
 {
     auto msg = BeginMsg(net::MSG_CHAT);
-    net::ChatMessage chatm = text;
-    msg.Write(chatm);
+    msg.Write(net::ChatMessage(text));
 }
 
 void game::Player::SetUseTarget(const std::string& text, const std::string& error_text, float delay)
@@ -446,6 +458,17 @@ bool game::Player::ProcessMenuActionMsg(net::InMessage& msg)
     }
 
     return remote_menu_->ProcessActionMsg(msg, type);
+}
+
+bool game::Player::ProcessChatMsg(net::InMessage& msg)
+{
+    net::ChatMessage line;
+    if (!msg.Read(line))
+        return false;
+
+    game_.PlayerChat(*this, line);
+
+    return true;
 }
 
 void game::Player::Input(PlayerInputType type, bool enabled)

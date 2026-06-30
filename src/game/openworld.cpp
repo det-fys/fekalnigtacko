@@ -18,40 +18,40 @@
 #include "utils/cvars.hpp"
 
 // physics
-CVAR(std::string, ow_broadphase, CV_DEFAULT, "Dbvt");
+CVAR(std::string, ow_broadphase, CV_CONST, "Dbvt");
 
-CVAR(float, ow_aabb_min_x, CV_DEFAULT, 0.0f);
-CVAR(float, ow_aabb_min_y, CV_DEFAULT, 0.0f);
-CVAR(float, ow_aabb_min_z, CV_DEFAULT, 0.0f);
+CVAR(float, ow_aabb_min_x, CV_CONST, 0.0f);
+CVAR(float, ow_aabb_min_y, CV_CONST, 0.0f);
+CVAR(float, ow_aabb_min_z, CV_CONST, 0.0f);
 
-CVAR(float, ow_aabb_max_x, CV_DEFAULT, 0.0f);
-CVAR(float, ow_aabb_max_y, CV_DEFAULT, 0.0f);
-CVAR(float, ow_aabb_max_z, CV_DEFAULT, 0.0f);
+CVAR(float, ow_aabb_max_x, CV_CONST, 0.0f);
+CVAR(float, ow_aabb_max_y, CV_CONST, 0.0f);
+CVAR(float, ow_aabb_max_z, CV_CONST, 0.0f);
 
 // time
-CVAR(float, ow_day_mins, CV_DEFAULT, 1.0f, 0.0f);
-CVAR(float, ow_start_daytime, CV_DEFAULT, 1.0f, -1.0f, 24.0f);
+// CVAR(float, ow_day_mins, CV_NONE, 1.0f, 0.0f);
+// CVAR(float, ow_start_daytime, CV_NONE, 1.0f, -1.0f, 24.0f);
 
 // vehicles
-CVAR(size_t, ow_vehicle_count, CV_DEFAULT, 10);
-CVAR(size_t, ow_vehicle_row_length, CV_DEFAULT, 10);
-CVAR(float, ow_vehicle_distance_x, CV_DEFAULT, 10.0f);
-CVAR(float, ow_vehicle_distance_y, CV_DEFAULT, 10.0f);
-CVAR(size_t, ow_vehicle_spawn_interval, CV_DEFAULT, 120);
+CVAR(size_t, ow_vehicle_count, CV_CONST, 10);
+CVAR(size_t, ow_vehicle_row_length, CV_CONST, 10);
+CVAR(float, ow_vehicle_distance_x, CV_CONST, 10.0f);
+CVAR(float, ow_vehicle_distance_y, CV_CONST, 10.0f);
+CVAR(size_t, ow_vehicle_spawn_interval, CV_CONST, 120);
 
 // npcs
-CVAR(size_t, ow_npc_count, CV_DEFAULT, 10, 0, 10000);
-CVAR(size_t, ow_npc_spawn_time_fast, CV_DEFAULT, 40);
-CVAR(size_t, ow_npc_spawn_time_slow_min, CV_DEFAULT, 40);
-CVAR(size_t, ow_npc_spawn_time_slow_max, CV_DEFAULT, 40);
+CVAR(size_t, ow_npc_count, CV_NONE, 10, 0, 10000);
+CVAR(size_t, ow_npc_spawn_time_fast, CV_NONE, 40);
+CVAR(size_t, ow_npc_spawn_time_slow_min, CV_NONE, 40);
+CVAR(size_t, ow_npc_spawn_time_slow_max, CV_NONE, 40);
 
-CVAR(size_t, ow_npc_abandoned_vehicle_despawn_time, CV_DEFAULT, 5000);
-CVAR(size_t, ow_npc_boredom_death_time, CV_DEFAULT, 5000);
-CVAR(size_t, ow_npc_dead_despawn_time, CV_DEFAULT, 5000);
+CVAR(size_t, ow_npc_abandoned_vehicle_despawn_time, CV_NONE, 5000);
+CVAR(size_t, ow_npc_boredom_death_time, CV_NONE, 5000);
+CVAR(size_t, ow_npc_dead_despawn_time, CV_NONE, 5000);
 
-CVAR(float, ow_npc_driver_armed_chance, CV_DEFAULT, 0.4f, 0.0f, 1.0f);
-CVAR(float, ow_npc_passenger_chance, CV_DEFAULT, 0.3f, 0.0f, 1.0f);
-CVAR(float, ow_npc_passenger_armed_chance, CV_DEFAULT, 0.8f, 0.0f, 1.0f);
+CVAR(float, ow_npc_driver_armed_chance, CV_NONE, 0.4f, 0.0f, 1.0f);
+CVAR(float, ow_npc_passenger_chance, CV_NONE, 0.3f, 0.0f, 1.0f);
+CVAR(float, ow_npc_passenger_armed_chance, CV_NONE, 0.8f, 0.0f, 1.0f);
 
 namespace game
 {
@@ -123,8 +123,6 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo
         });
     }
 
-    daytime_offset_ = ow_start_daytime.Get() < 0.0f ? static_cast<float>(rand() % 24) : ow_start_daytime.Get();
-
     for (auto locs = GetMap().GetLocations("tuning"); const auto& loc : locs)
     {
         CreateTuningGarage(loc.transform.position, glm::eulerAngles(loc.transform.rotation).x);
@@ -161,10 +159,6 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo
 void game::OpenWorld::Update(int64_t delta_time)
 {
     Super::Update(delta_time);
-
-    const float day_seconds_irl = 60.0f * ow_day_mins.Get();
-    const float timespeed = 24.0f / day_seconds_irl;
-    SetDayTime(static_cast<float>(GetTime()) * 0.001f * timespeed + daytime_offset_); 
 }
 
 void game::OpenWorld::PlayerInput(Player& player, PlayerInputType type, bool enabled)

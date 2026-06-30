@@ -14,10 +14,11 @@ bool sv::Client::ProcessMessage(net::InMessage& msg)
         if (!msg.Read(type))
             return true;
 
-        if (type == net::MSG_NONE || type >= net::MSG_COUNT)
-            return false; 
-
-        ProcessSingleMessage(type, msg);
+        if (type == net::MSG_NONE || type >= net::MSG_COUNT || !ProcessSingleMessage(type, msg))
+        {
+            SendChat("^f55obdržena podivná zpráva typu " + std::to_string(type));
+            return false;
+        }
     }
 }
 

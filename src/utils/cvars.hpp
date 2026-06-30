@@ -12,11 +12,14 @@
 using CVarFlags = uint8_t;
 enum CVarFlag : CVarFlags
 {
-    CV_DEFAULT = 0,
-    CV_SAVE = 1,
+    CV_NONE = 0,
 
-    CV_MODIFIED = 2,
-    CV_UNSAVED = 4,
+    CV_CONST = 1,
+    CV_CONFIDENTIAL = 2,
+    CV_SAVE = 4,
+
+    CV_MODIFIED = 64,
+    CV_UNSAVED = 128,
 };
 
 class CVarBase;
@@ -26,6 +29,7 @@ class CVarRegistry
 public:
     static void Register(const std::string& name, CVarBase* cvar);
 
+    static bool IsCVarName(const std::string& name);
     static CVarBase& GetCVar(const std::string& name);
     static void Set(const std::string& name, const std::string& val);
     static std::string Get(const std::string& name);
@@ -52,6 +56,9 @@ public:
 
     const std::string& GetName() const { return name_; }
     const CVarFlags& GetFlags() const { return flags_; }
+
+    bool IsConst() const { return flags_ & CV_CONST; }
+    bool IsConfidential() const { return flags_ & CV_CONFIDENTIAL; }
 
     void ClearUnsaved() { flags_ &= ~CV_UNSAVED; }
 
@@ -90,8 +97,10 @@ public:
     CVar(const std::string& name, CVarFlags flags, const T& initial,
          CVarRangeType<T> min = std::numeric_limits<CVarRangeType<T>>().lowest(),
          CVarRangeType<T> max = std::numeric_limits<CVarRangeType<T>>().max())
-        : CVarBase(name, flags), value_(initial), min_(min), max_(max)
+        : CVarBase(name, flags), value_{}, min_(min), max_(max)
     {
+        SetInternal(initial);
+        flags_ |= CV_MODIFIED;
     }
 
     void Set(T value)
@@ -99,19 +108,7 @@ public:
         if (value == value_)
             return;
 
-        if constexpr (CVarNumberType<T>)
-        {
-            value = glm::clamp(value, min_, max_);
-        }
-        else // string
-        {
-            if (value.size() < min_ || value.size() > max_)
-            {
-                throw std::runtime_error("Invalid cvar string value length");
-            }
-        }
-
-        value_ = std::move(value);
+        SetInternal(value);
         flags_ |= CV_MODIFIED | CV_UNSAVED;
     }
 
@@ -154,6 +151,24 @@ public:
         {
             return std::to_string(value_);
         }
+    }
+
+private:
+    void SetInternal(T value)
+    {
+        if constexpr (CVarNumberType<T>)
+        {
+            value = glm::clamp(value, min_, max_);
+        }
+        else // string
+        {
+            if (value.size() < min_ || value.size() > max_)
+            {
+                throw std::runtime_error("Invalid cvar string value length");
+            }
+        }
+
+        value_ = std::move(value);
     }
 
 private:

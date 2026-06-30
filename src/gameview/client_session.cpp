@@ -97,6 +97,12 @@ void game::view::ClientSession::ProcessMouseMove(float delta_yaw, float delta_pi
     camera_controller_.SetViewAngles(yaw, pitch);
 }
 
+void game::view::ClientSession::ChatInput(std::string_view line)
+{
+    auto msg = BeginMsg(net::MSG_CHAT);
+    msg.Write(net::ChatMessage(line));
+}
+
 void game::view::ClientSession::Update(const UpdateInfo& info)
 {
     if (world_)
@@ -157,7 +163,8 @@ bool game::view::ClientSession::ProcessChatMsg(net::InMessage& msg)
     if (!msg.Read(chatm))
         return false;
 
-    app_.AddChatMessagePrefix("Server", chatm);
+    // app_.AddChatMessagePrefix("Server", chatm);
+    app_.AddChatMessage(chatm);
     return true;
 }
 

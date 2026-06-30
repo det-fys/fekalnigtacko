@@ -107,6 +107,9 @@ public:
     void SetInvulnerable(bool invulnerable) { invulnerable_ = invulnerable; }
     void SetDestroyedRemoveTime(int64_t time) { destroyed_remove_time_ = time; }
 
+    float GetHealth() const { return health_; }
+    float GetWindowHealth() const { return window_health_; }
+
 private:
     void UpdateDestruction();
     void ProcessInput();

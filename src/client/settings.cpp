@@ -13,7 +13,7 @@
 
 static uint32_t settings_version = 1;
 
-CVAR(float, save_interval, CV_DEFAULT, 10.0f, 0.0f);
+CVAR(float, save_interval, CV_NONE, 10.0f, 0.0f);
 
 static std::vector<char> LoadFile(const std::string& filename)
 {

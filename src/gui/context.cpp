@@ -2,6 +2,8 @@
 
 #include "assets/cache.hpp"
 
+#include "utils/utf8.hpp"
+
 gui::Context::Context(gfx::DrawList& dlist, std::shared_ptr<const Font> default_font) :
     dlist_(dlist),
     font_(std::move(default_font)),
@@ -16,7 +18,29 @@ void gui::Context::Begin(const glm::vec2& viewport_size)
     indices_.clear();
     ranges_.clear();
 
+    clip_rects_.clear();
+
     viewport_size_ = viewport_size;
+}
+
+void gui::Context::PushClipRect(const glm::vec2& p0, const glm::vec2& p1)
+{
+    Rect rect{p0, p1};
+
+    if (!clip_rects_.empty())
+    {
+        const auto& clip_rect = clip_rects_.back();
+        rect.min = glm::max(rect.min, clip_rect.min);
+        rect.max = glm::min(rect.max, clip_rect.max);
+    }
+
+    clip_rects_.push_back(rect);
+}
+
+void gui::Context::PopClipRect()
+{
+    if (!clip_rects_.empty())
+        clip_rects_.pop_back();
 }
 
 void gui::Context::DrawRect(const glm::vec2& p0, const glm::vec2& p1, uint32_t color, const gfx::Texture* texture)
@@ -32,76 +56,80 @@ void gui::Context::DrawRectUV(const glm::vec2& p0, const glm::vec2& p1, const gl
     PushRect(p0, uv0, p1, uv1, color);
 }
 
-static uint32_t DecodeUTF8Codepoint(const char*& p, const char* end)
+void gui::Context::BeginGlyphs(const Font* font)
 {
-    if (p == end)
-        return 0;
+    if (!font)
+        font = font_.get();
 
-    if ((*p & 0b10000000) == 0)
-    { // 1-byte sequence
-        return *p++;
-    }
-
-    uint32_t codepoint = 0;
-
-    if ((*p & 0b11100000) == 0b11000000)
-    { // 2-byte seq
-        codepoint = (*p++ & 0b00011111) << 6;
-        if (p == end)
-            return 0;
-        codepoint |= (*p++ & 0b00111111);
-    }
-    else if ((*p & 0b11110000) == 0b11100000)
-    { // 3-byte seq
-        codepoint = (*p++ & 0b00001111) << 12;
-        if (p == end)
-            return 0;
-        codepoint |= (*p++ & 0b00111111) << 6;
-        if (p == end)
-            return 0;
-        codepoint |= (*p++ & 0b00111111);
-    }
-    else if ((*p & 0b11111000) == 0b11110000)
-    { // 4-byte seq
-        codepoint = (*p++ & 0b00000111) << 18;
-        if (p == end)
-            return 0;
-        codepoint |= (*p++ & 0b00111111) << 12;
-        if (p == end)
-            return 0;
-        codepoint |= (*p++ & 0b00111111) << 6;
-        if (p == end)
-            return 0;
-        codepoint |= (*p++ & 0b00111111);
-    }
-
-    return codepoint;
+    BeginTexture(font->GetTexture().get());
+    current_font_ = font;
 }
 
-glm::vec2 gui::Context::MeasureText(std::string_view text)
+void gui::Context::DrawGlyph(glm::vec2& cursor, uint32_t cp, uint32_t color, float scale)
 {
+    if (cp == ' ')
+    {
+        cursor.x += current_font_->GetSpaceSize();
+        return;
+    }
+
+    const FontGlyphData* glyph = current_font_->GetCodepointGlyph(cp);
+
+    if (!glyph)
+    {
+        return;
+    }
+
+    glm::vec2 p0 = cursor + glyph->offset * scale;
+    glm::vec2 p1 = p0 + glyph->size * scale;
+
+    PushRect(p0, glyph->uv0, p1, glyph->uv1, color);
+    
+    cursor.x += glyph->advance * scale;
+}
+
+float gui::Context::MeasureGlyph(uint32_t cp, const Font* font) const
+{
+    if (!font)
+    {
+        font = font_.get();
+    }
+
+    if (cp == ' ')
+    {
+        return font->GetSpaceSize();
+    }
+
+    const FontGlyphData* glyph = font->GetCodepointGlyph(cp);
+
+    if (!glyph)
+    {
+        return 0.0f;
+    }
+
+    return glyph->advance;
+}
+
+glm::vec2 gui::Context::MeasureText(std::string_view text, const Font* font)
+{
+    if (!font)
+    {
+        font = font_.get();
+    }
+
     glm::vec2 size(0.0f);
 
-    const char* p = text.data();
-    const char* end = p + text.size();
-
-    if (p == end) // empty string
+    if (text.empty())
         return size;
 
     uint32_t cp = 0;
-    const float line_height = font_->GetLineHeight();
-    float space_size = glm::floor(line_height * 0.3f);
+    const float line_height = font->GetLineHeight();
 
     glm::vec2 cursor(0.0f);
 
-    while ((cp = DecodeUTF8Codepoint(p, end)))
+    while ((cp = DecodeUTF8Codepoint(text)))
     {
-        if (cp == ' ')
-        {
-            cursor.x += space_size; // Move cursor for space
-            continue;
-        }
-        else if (cp == '\n')
+        if (cp == '\n')
         {
             size.x = glm::max(size.x, cursor.x);
             cursor.x = 0.0f;
@@ -110,7 +138,7 @@ glm::vec2 gui::Context::MeasureText(std::string_view text)
         }
         else if (cp == '^')
         {
-            if (!(cp = DecodeUTF8Codepoint(p, end)))
+            if (!(cp = DecodeUTF8Codepoint(text)))
                 break;
 
             if (cp == 'r')
@@ -119,17 +147,12 @@ glm::vec2 gui::Context::MeasureText(std::string_view text)
             // parse color
             for (size_t i = 0; i < 3; ++i)
             {
-                if (!(cp = DecodeUTF8Codepoint(p, end)))
+                if (!(cp = DecodeUTF8Codepoint(text)))
                     break;
             }
         }
 
-        const FontGlyphData* glyph = font_->GetCodepointGlyph(cp);
-
-        if (!glyph)
-            continue; // Dont even have "missing" glyph, font is shit
-
-        cursor.x += glyph->advance;
+        cursor.x += MeasureGlyph(cp, font);
     }
 
     size.x = glm::max(size.x, cursor.x);
@@ -140,17 +163,13 @@ glm::vec2 gui::Context::MeasureText(std::string_view text)
 
 void gui::Context::DrawText(std::string_view text, const glm::vec2& pos, uint32_t color, float scale)
 {
-    const char* p = text.data();
-    const char* end = p + text.size();
-
-    if (p == end) // empty string
+    if (text.empty())
         return;
 
-    BeginTexture(font_->GetTexture().get());
+    BeginGlyphs(font_.get());
 
     uint32_t cp = 0;
     const float line_height = font_->GetLineHeight() * scale;
-    float space_size = glm::floor(line_height * 0.3f);
 
     glm::vec2 cursor = pos;
 
@@ -159,14 +178,9 @@ void gui::Context::DrawText(std::string_view text, const glm::vec2& pos, uint32_
 
     uint32_t curr_color = color;
 
-    while ((cp = DecodeUTF8Codepoint(p, end)))
+    while ((cp = DecodeUTF8Codepoint(text)))
     {
-        if (cp == ' ')
-        {
-            cursor.x += space_size; // Move cursor for space
-            continue;
-        }
-        else if (cp == '\n')
+        if (cp == '\n')
         {
             cursor.x = 0.0f;
             cursor.y += line_height;
@@ -174,7 +188,7 @@ void gui::Context::DrawText(std::string_view text, const glm::vec2& pos, uint32_
         }
         else if (cp == '^')
         {
-            if (!(cp = DecodeUTF8Codepoint(p, end)))
+            if (!(cp = DecodeUTF8Codepoint(text)))
                 break;
 
             if (cp == 'r') // reset color
@@ -200,23 +214,14 @@ void gui::Context::DrawText(std::string_view text, const glm::vec2& pos, uint32_
                 curr_color |= (ch << 16);
                 curr_color |= (ch << 20);
 
-                if (!(cp = DecodeUTF8Codepoint(p, end)))
+                if (!(cp = DecodeUTF8Codepoint(text)))
                     break;
             }
 
             curr_color |= (color & 0xFF000000); // preserve alpha
         }
 
-        const FontGlyphData* glyph = font_->GetCodepointGlyph(cp);
-
-        if (!glyph)
-            continue; // Dont even have "missing" glyph, font is shit
-
-        glm::vec2 p0 = cursor + glyph->offset * scale;
-        glm::vec2 p1 = p0 + glyph->size * scale;
-
-        PushRect(p0, glyph->uv0, p1, glyph->uv1, curr_color);
-        cursor.x += glyph->advance * scale;
+        DrawGlyph(cursor, cp, curr_color, scale);
     }
 }
 
@@ -259,7 +264,79 @@ void gui::Context::BeginTexture(const gfx::Texture* texture)
     range.texture = texture;
 }
 
-void gui::Context::PushRect(const glm::vec2& p0, const glm::vec2& uv0, const glm::vec2& p1, const glm::vec2& uv1, uint32_t color)
+void gui::Context::PushRect(const glm::vec2& p0, const glm::vec2& uv0, const glm::vec2& p1, const glm::vec2& uv1,
+                            uint32_t color)
+{
+    if (!clip_rects_.empty())
+    {
+        const auto& clip_rect = clip_rects_.back();
+
+        // is completely outside?
+        if (p1.x < clip_rect.min.x || p0.x > clip_rect.max.x || p1.y < clip_rect.min.y || p0.y > clip_rect.max.y)
+        {
+            return;
+        }
+
+        // needs clip?
+        if (p0.x < clip_rect.min.x || p1.x > clip_rect.max.x || p0.y < clip_rect.min.y || p1.y > clip_rect.max.y)
+        {
+            auto new_p0 = p0;
+            auto new_p1 = p1;
+            auto new_uv0 = uv0;
+            auto new_uv1 = uv1;
+
+            auto uv_matters = ranges_.back().texture != white_tex_.get();
+
+            if (new_p0.x < clip_rect.min.x)
+            {
+                if (uv_matters)
+                {
+                    float t = (clip_rect.min.x - new_p0.x) / (new_p1.x - new_p0.x);
+                    new_uv0.x = glm::mix(uv0.x, uv1.x, t);
+                }
+                new_p0.x = clip_rect.min.x;
+            }
+
+            if (new_p1.x > clip_rect.max.x)
+            {
+                if (uv_matters)
+                {
+                    float t = (clip_rect.max.x - new_p0.x) / (new_p1.x - new_p0.x);
+                    new_uv1.x = glm::mix(uv0.x, uv1.x, t);
+                }
+                new_p1.x = clip_rect.max.x;
+            }
+
+            if (new_p0.y < clip_rect.min.y)
+            {
+                if (uv_matters)
+                {
+                    float t = (clip_rect.min.y - new_p0.y) / (new_p1.y - new_p0.y);
+                    new_uv0.y = glm::mix(uv0.y, uv1.y, t);
+                }
+                new_p0.y = clip_rect.min.y;
+            }
+
+            if (new_p1.y > clip_rect.max.y)
+            {
+                if (uv_matters)
+                {
+                    float t = (clip_rect.max.y - new_p0.y) / (new_p1.y - new_p0.y);
+                    new_uv1.y = glm::mix(uv0.y, uv1.y, t);
+                }
+                new_p1.y = clip_rect.max.y;
+            }
+
+            PushRectNoClip(new_p0, new_uv0, new_p1, new_uv1, color);
+            return;
+        }
+    }
+
+    PushRectNoClip(p0, uv0, p1, uv1, color);
+}
+
+void gui::Context::PushRectNoClip(const glm::vec2& p0, const glm::vec2& uv0, const glm::vec2& p1, const glm::vec2& uv1,
+                                  uint32_t color)
 {
     uint32_t base_index = vertices_.size();
 

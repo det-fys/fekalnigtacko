@@ -18,14 +18,14 @@ public:
         return view_.empty() || view_.front() == '#';
     }
 
-    CmdLineStream& operator>>(std::string& out)
+    bool Read(std::string& out)
     {
-        SkipWhitespace();
-
         out.clear();
 
-        if (view_.empty() || view_.front() == '#')
-            return *this;
+        if (Eol())
+        {
+            return false;
+        }
 
         if (view_.front() == '"')
         {
@@ -49,35 +49,46 @@ public:
             view_.remove_prefix(end);
         }
 
-        return *this;
+        return true;
     }
 
     template <typename T>
         requires std::is_integral_v<T>
-    CmdLineStream& operator>>(T& value)
+    bool Read(T& value)
     {
         SkipWhitespace();
 
         auto result = std::from_chars(view_.data(), view_.data() + view_.size(), value);
 
         if (result.ec != std::errc{})
-            throw std::runtime_error("Invalid integer");
+            return false;
 
         view_.remove_prefix(static_cast<size_t>(result.ptr - view_.data()));
 
-        return *this;
+        return true;
     }
 
-    CmdLineStream& operator>>(float& value)
+    bool Read(float& value)
     {
         SkipWhitespace();
 
         auto result = std::from_chars(view_.data(), view_.data() + view_.size(), value);
 
         if (result.ec != std::errc{})
-            throw std::runtime_error("Invalid float");
+            return false;
 
         view_.remove_prefix(static_cast<size_t>(result.ptr - view_.data()));
+
+        return true;
+    }
+
+    template <typename T>
+    CmdLineStream& operator>>(T& out)
+    {
+        if (!Read(out))
+        {
+            throw std::runtime_error("Invalid value");
+        }
 
         return *this;
     }
