@@ -3,9 +3,24 @@
 #include "drivable_vehicle.hpp"
 #include "utils/random.hpp"
 #include "player_character.hpp"
+#include "utils/cvars.hpp"
 
 #include <array>
 #include <iostream>
+
+CVAR(float, npc_ignore_damage_chance, CV_NONE, 0.05f, 0.0f, 1.0f);
+CVAR(float, npc_follow_enemy_chance, CV_NONE, 0.8f, 0.0f, 1.0f);
+CVAR(float, npc_keep_enemy_chance, CV_NONE, 0.3f, 0.0f, 1.0f);
+CVAR(float, npc_ignore_npc_shots_chance, CV_NONE, 0.2f, 0.0f, 1.0f);
+CVAR(float, npc_max_enemy_distance, CV_NONE, 200.0f, 0.0f);
+CVAR(float, npc_driver_speed_mult, CV_NONE, 1.0f, 0.0f);
+CVAR(float, npc_driver_speed_mult_hurry, CV_NONE, 4.0f, 0.0f);
+CVAR(float, npc_driver_lookahead_min, CV_NONE, 2.0f, 0.0f);
+CVAR(float, npc_driver_lookahead_per_kmh, CV_NONE, 0.2f, 0.0f);
+CVAR(int64_t, npc_min_enemy_time, CV_NONE, 5000, 0);
+
+// debug
+CVAR(uint8_t, npc_path_beams, CV_NONE, 0, 0, 1);
 
 static constexpr size_t PATH_NEXT_WAYPOINTS = 16;
 
@@ -94,39 +109,39 @@ void game::NpcCharacter::SpawnLoot()
 void game::NpcCharacter::MakeEnemy(net::EntNum enemy_num)
 {
     // it must have been a mistake
-    // if (Chance(0.05f))
-    // {
-    //     return;
-    // }
-
-    // cant switch enemies that fast
-    auto time = GetWorld().GetTime();
-    if (enemy_num_ > 0 && enemy_num != enemy_num_ && time - enemy_time_ < 5000)
-    {
-        return; 
-    }
-
-    // increase anger
-    // if (Chance(0.85f))
-    // {
-    //     follow_enemy_ = true;
-    // }
-
-    // this mf is already my current enemy
-    if (enemy_num == enemy_num_)
+    if (Chance(npc_ignore_damage_chance.Get()))
     {
         return;
     }
 
+    // cant switch enemies that fast
+    auto time = GetWorld().GetTime();
+    if (enemy_num_ > 0 && enemy_num != enemy_num_ && time - enemy_time_ < npc_min_enemy_time.Get())
+    {
+        return; 
+    }
+
+    // this mf is already my current enemy
+    if (enemy_num == enemy_num_)
+    {
+        // increase anger
+        if (Chance(npc_follow_enemy_chance.Get()))
+        {
+            follow_enemy_ = true;
+        }
+
+        return;
+    }
+
     // already have another enemy, likely stay focused on him
-    if (enemy_num_ != 0 && Chance(0.3f))
+    if (enemy_num_ != 0 && Chance(npc_keep_enemy_chance.Get()))
     {
         return;
     }
 
     // he is npc and i am not his target, was SURELY a missclick
     auto enemy_npc = dynamic_cast<NpcCharacter*>(GetWorld().GetEntity(enemy_num));
-    if (enemy_npc && enemy_npc->enemy_num_ != GetEntNum() && Chance(0.1f))
+    if (enemy_npc && enemy_npc->enemy_num_ != GetEntNum() && Chance(npc_ignore_npc_shots_chance.Get()))
     {
         return;
     }
@@ -134,7 +149,7 @@ void game::NpcCharacter::MakeEnemy(net::EntNum enemy_num)
     // OK this one is now my enemy
     enemy_num_ = enemy_num;
     enemy_time_ = time;
-    follow_enemy_ = true;
+    follow_enemy_ = Chance(npc_follow_enemy_chance.Get());
     UpdateEnemy();
 }
 
@@ -204,7 +219,7 @@ bool game::NpcCharacter::CheckEnemyLost()
         return true; // may he rest in peace
     }
 
-    const float max_dist = 250.0f;
+    const float max_dist = npc_max_enemy_distance.Get();
     auto dist2 = glm::distance2(root_.GetGlobalPosition(), enemy_->GetRoot().GetGlobalPosition());
     if (dist2 > (max_dist * max_dist))
         return true; // too far
@@ -415,7 +430,8 @@ void game::NpcCharacter::UpdateVehicleInput(std::span<glm::vec3> actual_path)
     auto vehicle_pos = vehicle->GetRoot().GetGlobalPosition();
     const auto& vehicle_rot = vehicle->GetRoot().local.rotation;
 
-    auto target_pos = LookAhead(actual_path, glm::max(2.0f, vehicle->GetSpeed() * 0.2f));
+    auto target_pos = LookAhead(actual_path, glm::max(npc_driver_lookahead_min.Get(),
+                                                      vehicle->GetSpeed() * npc_driver_lookahead_per_kmh.Get()));
     // auto target_speed = 10.0f;
     std::span<glm::vec3> speed_path = actual_path;
     if (glm::distance2(actual_path[0], actual_path[1]) < 4.0f)
@@ -423,11 +439,11 @@ void game::NpcCharacter::UpdateVehicleInput(std::span<glm::vec3> actual_path)
         speed_path = { actual_path.begin() + 1, actual_path.end() };
     }
 
-    auto target_speed = CalculateNPCTargetSpeed(speed_path, vehicle_rot);
+    auto target_speed = CalculateNPCTargetSpeed(speed_path, vehicle_rot) * npc_driver_speed_mult.Get();
 
     if (in_hurry_)
     {
-        target_speed *= 4.0f;
+        target_speed *= npc_driver_speed_mult_hurry.Get();
     }
 
     // set steering
@@ -458,28 +474,30 @@ void game::NpcCharacter::UpdateVehicleInput(std::span<glm::vec3> actual_path)
         vehicle_in_ &= ~(1<<VIN_BACKWARD);
     }
 
+    if (npc_path_beams.Get() > 0)
+    {
+        // debug draw path
+        float beam_dist = 30.0f;
+        for (size_t i = 0; i < actual_path.size() - 1; ++i)
+        {
+            const auto& p0 = actual_path[i];
+            auto p1 = actual_path[i + 1];
 
-    // debug draw path
-    // float beam_dist = 30.0f;
-    // for (size_t i = 0; i < actual_path.size() - 1; ++i)
-    // {
-    //     const auto& p0 = actual_path[i];
-    //     auto p1 = actual_path[i + 1];
+            auto dist = glm::distance(p0, p1);
+            if (beam_dist < dist)
+            {
+                p1 = glm::mix(p0, p1, beam_dist / dist);
+            }
 
-    //     auto dist = glm::distance(p0, p1);
-    //     if (beam_dist < dist)
-    //     {
-    //         p1 = glm::mix(p0, p1, beam_dist / dist);
-    //     }
-
-    //     GetWorld().Beam(p0, p1, i % 2 == 0 ? 0xFF0000FF : 0xFF0077FF, 1.5f / 25.0f);
-    
-    //     beam_dist -= dist;
-    //     if (beam_dist <= 0.0f)
-    //         break;
-    // }
-    // GetWorld().Beam(vehicle_pos, target_pos, 0xFFFF00FF, 1.5f / 25.0f);
-    // GetWorld().BeamBox(target_pos - 0.05f, target_pos + 0.05f, 0xFFFF00FF, 1.5f / 25.0f);
+            GetWorld().Beam(p0, p1, i % 2 == 0 ? 0xFF0000FF : 0xFF0077FF, 1.5f / 25.0f);
+        
+            beam_dist -= dist;
+            if (beam_dist <= 0.0f)
+                break;
+        }
+        GetWorld().Beam(vehicle_pos, target_pos, 0xFFFF00FF, 1.5f / 25.0f);
+        GetWorld().BeamBox(target_pos - 0.05f, target_pos + 0.05f, 0xFFFF00FF, 1.5f / 25.0f);
+    }
 }
 
 void game::NpcCharacter::UpdateVehicleInputToFollowPath() 

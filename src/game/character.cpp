@@ -5,7 +5,10 @@
 #include "utils/math.hpp"
 #include "world.hpp"
 #include "utils/random.hpp"
+#include "utils/cvars.hpp"
 
+CVAR(uint8_t, ch_hitbone_beams, CV_NONE, 0, 0, 1);
+CVAR(uint8_t, ch_aim_beams, CV_NONE, 0, 0, 1);
 
 game::Character::Character(World& world, const CharacterTuning& tuning)
     : Super(world, net::ET_CHARACTER), tuning_(tuning), bt_shape_(tuning_.shape.radius, tuning_.shape.height)
@@ -487,7 +490,10 @@ void game::Character::UpdateAimDirection()
         aim_dir_ = glm::normalize(parent_->GetRoot().matrix * glm::vec4(aim_dir_, 0.0f));
     }
 
-    // GetWorld().Beam(eye_pos_, eye_pos_ + aim_dir_ * 100.0f, 0x0000FF, 1.0f / 25.0f);
+    if (ch_aim_beams.Get() > 0)
+    {
+        GetWorld().Beam(eye_pos_, eye_pos_ + aim_dir_ * 100.0f, 0x0000FF, 1.0f / 25.0f);
+    }
 }
 
 void game::Character::UpdatePain()
@@ -738,8 +744,11 @@ void game::Character::UpdateHitBoneTransforms()
         hitbone.col_obj.setWorldTransform(BtTransformFromMat4(hitbone.node.matrix));
 
         // debug boxes
-        // GetWorld().BeamBox(hitbone.node.GetGlobalPosition() - 0.05f, hitbone.node.GetGlobalPosition() + 0.05f, 0xFFFF00,
-        //                    1.5f / 25.0f);
+        if (ch_hitbone_beams.Get() > 0)
+        {
+            GetWorld().BeamBox(hitbone.node.GetGlobalPosition() - 0.05f, hitbone.node.GetGlobalPosition() + 0.05f, 0xFFFF00,
+                               1.5f / 25.0f);
+        }
     }
 }
 

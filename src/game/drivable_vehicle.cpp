@@ -3,6 +3,10 @@
 #include "npc_character.hpp"
 #include "utils/random.hpp"
 #include "input_mapping.hpp"
+#include "utils/cvars.hpp"
+
+CVAR(float, npc_crash_enemy_chance, CV_NONE, 0.01f, 0.0f, 1.0f);
+CVAR(float, npc_crash_enemy_chance_player, CV_NONE, 0.1f, 0.0f, 1.0f);
 
 game::DrivableVehicle::DrivableVehicle(World& world, const VehicleSpawnInfo& info) : Vehicle(world, info), Usable(GetRoot().matrix), Rideable(*this, RIDEABLE_VEHICLE)
 {
@@ -76,7 +80,7 @@ void game::DrivableVehicle::OnContact(const collision::ContactInfo& info)
     contact_ = true;
 
     auto is_player = dynamic_cast<PlayerCharacter*>(other_driver) != nullptr;
-    if (!Chance(is_player ? 0.1f : 0.01f))
+    if (!Chance(is_player ? npc_crash_enemy_chance_player.Get() : npc_crash_enemy_chance.Get()))
         return;
 
     auto my_driver = dynamic_cast<NpcCharacter*>(GetPassenger(0));

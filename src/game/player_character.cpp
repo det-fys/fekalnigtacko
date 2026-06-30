@@ -3,6 +3,13 @@
 #include "world.hpp"
 #include "input_mapping.hpp"
 #include "utils/random.hpp"
+#include "utils/cvars.hpp"
+
+CVAR(float, plc_damage_mult, CV_NONE, 0.8f, 0.0f);
+CVAR(float, plc_damage_mult_bullet, CV_NONE, 0.25f, 0.0f);
+
+// debug
+CVAR(uint8_t, plc_aim_beams, CV_NONE, 0, 0, 1);
 
 game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const HumanCharacterTuning& tuning) : Super(world, tuning), player_(&player)
 {
@@ -140,7 +147,7 @@ void game::PlayerCharacter::OnDamageDealt(bool was_kill)
 
 float game::PlayerCharacter::GetDamageMultiplier(const DamageInfo& damage, std::string_view hitbone)
 {
-    float mult = damage.type == DAMAGE_BULLET ? 0.25f : 0.8f;
+    float mult = damage.type == DAMAGE_BULLET ? plc_damage_mult_bullet.Get() : plc_damage_mult.Get();
     return mult * Super::GetDamageMultiplier(damage, hitbone);
 }
 
@@ -296,8 +303,11 @@ void game::PlayerCharacter::UpdateAimTarget()
         SetAimTarget(target);
     }
 
-    // GetWorld().Beam(eye, target, 0xFFFF00, 1.0 / 25.0f);
-    // GetWorld().BeamBox(target - 0.05f, target + 0.05f, 0xFFFF00, 1.5f / 25.0f);
+    if (plc_aim_beams.Get() > 0)
+    {
+        GetWorld().Beam(eye, target, 0xFFFF00, 1.0 / 25.0f);
+        GetWorld().BeamBox(target - 0.05f, target + 0.05f, 0xFFFF00, 1.5f / 25.0f);
+    }
 }
 
 void game::PlayerCharacter::CheckItemSwitch()

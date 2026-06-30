@@ -10,7 +10,7 @@
 #include "utils/cvars.hpp"
 #include "utils/chatcolors.hpp"
 
-CVAR(uint8_t, pl_autoadmin, CV_NONE, 0);
+CVAR(uint8_t, pl_autoadmin, CV_NONE, 0, 0, 1);
 
 game::Player::Player(Game& game, std::string name) : game_(game), name_(std::move(name))
 {
