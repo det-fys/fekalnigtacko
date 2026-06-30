@@ -58,6 +58,7 @@ struct DrawHudCmd
     const Texture* texture = nullptr;
     size_t first = 0;
     size_t count = 0;
+    const glm::mat3* matrix = nullptr;
 };
 
 struct DrawList

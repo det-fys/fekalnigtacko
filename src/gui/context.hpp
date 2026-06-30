@@ -56,7 +56,8 @@ public:
 
     const std::shared_ptr<const Font>& GetFont() const { return font_; }
 
-    const glm::vec2& GetViewportSize() const { return viewport_size_; }
+    const glm::vec2& GetViewportSize() const { return viewport_size_virtual_; }
+    float GetScale() const { return scale_; }
 
 private:
     void BeginTexture(const gfx::Texture* texture);
@@ -83,6 +84,11 @@ private:
     const Font* current_font_ = nullptr;
 
     glm::vec2 viewport_size_ = glm::vec2(1.0f);
+    glm::vec2 viewport_size_virtual_ = glm::vec2(1.0f); // scale applied
+
+    // render
+    float scale_ = 1.0f;
+    glm::mat3 matrix_{1.0f};
 };
 
 } // namespace gui

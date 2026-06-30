@@ -332,7 +332,8 @@ void App::UpdateStats()
 
 void App::DrawStats()
 {
-	glm::vec2 pos(viewport_size_.x - 5.0f, 5.0f);
+	auto& viewport_size = gui_.GetViewportSize();
+	glm::vec2 pos(viewport_size.x - 5.0f, 5.0f);
 	gui_.DrawTextAligned(fps_text_, pos, glm::vec2(-1.0f, 0.0f));
 	pos.y += 30.0f;
 	gui_.DrawTextAligned(msglen_text_, pos, glm::vec2(-1.0f, 0.0f));

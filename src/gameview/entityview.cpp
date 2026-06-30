@@ -128,7 +128,7 @@ void game::view::EntityView::DrawNametag(const DrawArgs& args)
 
     glm::vec2 anchor = ndc_pos * 0.5f + 0.5f;
     anchor.y = 1.0f - anchor.y;
-    anchor *= args.screen_size;
+    anchor *= args.gui.GetViewportSize();
     
     float scale = 0.7f;
     glm::vec2 pos = anchor + args.gui.MeasureText(nametag_) * glm::vec2(-0.5f, -1.0f) * scale;

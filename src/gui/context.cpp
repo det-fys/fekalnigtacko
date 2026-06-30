@@ -3,6 +3,9 @@
 #include "assets/cache.hpp"
 
 #include "utils/utf8.hpp"
+#include "utils/cvars.hpp"
+
+CVAR(float, ui_scale, CV_SAVE, 1.0f, 0.1f, 2.0f);
 
 gui::Context::Context(gfx::DrawList& dlist, std::shared_ptr<const Font> default_font) :
     dlist_(dlist),
@@ -21,6 +24,8 @@ void gui::Context::Begin(const glm::vec2& viewport_size)
     clip_rects_.clear();
 
     viewport_size_ = viewport_size;
+    scale_ = ui_scale.Get();
+    viewport_size_virtual_ = viewport_size_ / scale_;
 }
 
 void gui::Context::PushClipRect(const glm::vec2& p0, const glm::vec2& p1)
@@ -233,16 +238,26 @@ void gui::Context::DrawTextAligned(std::string_view text, const glm::vec2& pos, 
 
 void gui::Context::Render()
 {
+    const glm::mat3* matrix_ptr = nullptr;
+    if (glm::epsilonNotEqual(scale_, 1.0f, 0.01f))
+    {
+        matrix_ = glm::mat3(1.0f);
+        matrix_[0][0] = scale_;
+        matrix_[1][1] = scale_;
+        matrix_ptr = &matrix_;
+    }
+
     va_.SetVBOData(vertices_.data(), vertices_.size() * sizeof(vertices_[0]));
     va_.SetIndices(indices_.data(), indices_.size());
 
     for (const auto& range : ranges_)
     {
-        gfx::DrawHudCmd hudcmd;
+        gfx::DrawHudCmd hudcmd{};
         hudcmd.va = &va_;
         hudcmd.texture = range.texture;
         hudcmd.first = range.start;
         hudcmd.count = range.count;
+        hudcmd.matrix = matrix_ptr;
         dlist_.AddHUD(hudcmd);
     }
 }

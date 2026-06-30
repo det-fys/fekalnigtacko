@@ -567,6 +567,7 @@ void gfx::Renderer::DrawHudList(std::span<DrawHudCmd> queue, const DrawListParam
 
 	const gfx::Texture* last_texture = nullptr;
 	const gfx::VertexArray* last_vao = nullptr;
+	const glm::mat3* last_matrix = nullptr;
 
 	glActiveTexture(GL_TEXTURE0);
 
@@ -575,6 +576,13 @@ void gfx::Renderer::DrawHudList(std::span<DrawHudCmd> queue, const DrawListParam
 		if (!cmd.va || !cmd.texture)
 		{
             throw std::runtime_error("invalid hud draw");
+		}
+
+		// update matrix
+		if (last_matrix != cmd.matrix)
+		{
+			glUniformMatrix3fv(shader->U(SU_MODEL), 1, GL_FALSE, &(matrix * *cmd.matrix)[0][0]);
+			last_matrix = cmd.matrix;
 		}
 
 		// bind texture

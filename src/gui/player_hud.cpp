@@ -141,11 +141,11 @@ void gui::PlayerHud::DrawCrosshair(Context& ctx) const
     if (color.a < 0.25f)
         return;
 
-    const float crosshair_size = 32.0f;
+    float crosshair_size = 32.0f / ctx.GetScale();
 
     auto& viewport_size = ctx.GetViewportSize();
 
-    auto p0 = viewport_size * 0.5f - crosshair_size * 0.5f;
+    auto p0 = glm::round(viewport_size * 0.5f - crosshair_size * 0.5f);
     auto p1 = p0 + crosshair_size;
 
     ctx.DrawRect(p0, p1, glm::packUnorm4x8(GetCrosshairColor()), crosshair_texture_.get());
