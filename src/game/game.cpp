@@ -116,20 +116,31 @@ void game::Game::RegisterCommands()
                 cmd.SendMessage(COL_LABEL + cvar.GetName() + "^r=" + (col + val));
             };
 
-            cmd.line.Read(cvar_name);
-            cmd.line.Read(value);
+            if ((!cmd.line.Eol() && !cmd.line.Read(cvar_name)) || (!cmd.line.Eol() && !cmd.line.Read(value)))
+            {
+                cmd.SendError("máš tam nějaký guvno");
+                return;
+            }
 
             if (cvar_name.empty() || value.empty())
             {
+                size_t count = 0;
+
                 // no value - list cvars with the prefix
                 CVarRegistry::ProcessCVars([&](CVarBase& cvar) {
                     if (cvar.GetName().starts_with(cvar_name))
                     {
                         DumpCVar(cvar);
+                        ++count;
                     }
 
                     return false;
                 });
+
+                if (count == 0)
+                {
+                    cmd.SendError("na to nic nezačíná");
+                }
 
                 return;
             }

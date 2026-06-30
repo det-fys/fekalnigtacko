@@ -29,25 +29,23 @@ public:
 
         if (view_.front() == '"')
         {
-            ParseQuoted(out);
+            return ParseQuoted(out);
         }
-        else
+
+        size_t end = 0;
+
+        while (end < view_.size())
         {
-            size_t end = 0;
+            char c = view_[end];
 
-            while (end < view_.size())
-            {
-                char c = view_[end];
+            if (std::isspace(static_cast<unsigned char>(c)) || c == '#')
+                break;
 
-                if (std::isspace(static_cast<unsigned char>(c)) || c == '#')
-                    break;
-
-                ++end;
-            }
-
-            out.assign(view_.substr(0, end));
-            view_.remove_prefix(end);
+            ++end;
         }
+
+        out.assign(view_.substr(0, end));
+        view_.remove_prefix(end);
 
         return true;
     }
@@ -109,7 +107,7 @@ private:
         }
     }
 
-    void ParseQuoted(std::string& out)
+    bool ParseQuoted(std::string& out)
     {
         // remove opening quote
         view_.remove_prefix(1);
@@ -120,7 +118,7 @@ private:
             view_.remove_prefix(1);
 
             if (c == '"')
-                return;
+                return true;
 
             if (c != '\\')
             {
@@ -164,7 +162,7 @@ private:
             }
         }
 
-        throw std::runtime_error("Unterminated quoted string");
+        return false;
     }
 
 private:
