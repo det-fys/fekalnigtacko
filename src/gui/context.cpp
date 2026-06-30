@@ -74,7 +74,7 @@ void gui::Context::DrawGlyph(glm::vec2& cursor, uint32_t cp, uint32_t color, flo
 {
     if (cp == ' ')
     {
-        cursor.x += current_font_->GetSpaceSize();
+        cursor.x += current_font_->GetSpaceSize() * scale;
         return;
     }
 
