@@ -291,7 +291,7 @@ void game::NpcCharacter::FindVehiclePath(const glm::vec3& position)
         const auto& last = roads_->nodes[last_waypoint_idx_];
         if (last.num_nbs == 0)
         {
-            throw std::runtime_error("dead end from waypoint: " + last_waypoint_idx_);
+            throw std::runtime_error("dead end from waypoint: " + std::to_string(last_waypoint_idx_));
         }
         
         size_t random_next_idx = rand() % last.num_nbs;
