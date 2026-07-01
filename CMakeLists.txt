@@ -149,6 +149,7 @@ set(CLIENT_ONLY_SOURCES
     "src/gui/player_hud.hpp"
     "src/gui/player_hud.cpp"
     "src/net/client_ws_easywsclient.cpp"
+    "src/net/client_ws_emscripten.cpp"
     "src/net/client.cpp"
     "src/utils/files.cpp"
 )

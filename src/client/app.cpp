@@ -13,7 +13,7 @@
 #include "utils/keys.hpp"
 #include "utils/chatcolors.hpp"
 
-#include "net/client_ws_easywsclient.hpp"
+#include "net/client_ws.hpp"
 
 CVAR(float, sensitivity, CV_SAVE, 0.5f);
 CVAR(float, volume, CV_SAVE, 0.2f, 0.0f);
@@ -379,7 +379,7 @@ void App::Connect()
 {
 	connecting_ = true;
 	connected_ = false;
-	interface_ = std::make_unique<net::EasyWsClientWSClientInterface>(*this, url_);
+	interface_ = std::make_unique<net::WSClientInterface>(*this, url_);
 }
 
 void App::UpdateState()
