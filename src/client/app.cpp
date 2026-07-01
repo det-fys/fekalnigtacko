@@ -391,9 +391,18 @@ void App::ConnectLocal()
 	auto channel_pair = std::make_shared<net::LocalChannelPair>();
 
     server_thread_ = std::jthread([channel_pair] {
-		sv::LoadCfg();
-		sv::Server server(std::make_unique<net::LocalServerInterface>(channel_pair));
-		server.Run();
+		std::cout << "Launching local server..." << std::endl;
+
+		try 
+		{
+			sv::LoadCfg();
+			sv::Server server(std::make_unique<net::LocalServerInterface>(channel_pair));
+			server.Run();
+		}
+		catch (const std::exception& e)
+		{
+            std::cout << "LOCAL SERVER ERROR: " << e.what() << std::endl;
+        }
 	});
 
 	connecting_ = true;

@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <deque>
+#include <thread>
 
 #include "game/player_input.hpp"
 #include "gfx/renderer.hpp"

@@ -271,6 +271,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
     target_compile_options(${MAIN_NAME} PRIVATE 
         "-sUSE_SDL=2"
         "-sNO_DISABLE_EXCEPTION_CATCHING=1"
+        "-pthread"
     )
 
     target_compile_definitions(${MAIN_NAME} PRIVATE EMSCRIPTEN)
@@ -279,6 +280,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
         "-lwebsocket.js"
         "-lidbfs.js"
         "-lopenal"
+        "-pthread"
+        "-sPTHREAD_POOL_SIZE=4"
         "-sUSE_SDL=2"
         "-sASYNCIFY"
         "-sUSE_WEBGL2=1"

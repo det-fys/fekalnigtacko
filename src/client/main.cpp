@@ -247,6 +247,17 @@ static void Frame()
     SDL_GL_SwapWindow(s_window);
 }
 
+static void FrameSafe()
+{
+    try {
+        Frame();
+    }
+    catch (const std::exception& e) {
+        std::cerr << "[ERROR] " << e.what() << std::endl;
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", e.what(), nullptr);
+    }
+}
+
 // #ifdef EMSCRIPTEN
 
 // static void Update(void* args)
@@ -290,7 +301,7 @@ static void Main() {
     can_update = true;
 
 #ifdef EMSCRIPTEN
-    emscripten_set_main_loop(Frame, 0, false);
+    emscripten_set_main_loop(FrameSafe, 0, false);
     // Update(nullptr);
 #else
 
