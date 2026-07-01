@@ -29,10 +29,11 @@ void sv::Server::Run()
 
 #ifndef NDEBUG
     std::cout << "Running DEBUG build!" << std::endl;
+#else
+    std::cout << "Running RELEASE build!" << std::endl;
 #endif
 
-    bool exit = false;
-    while (!exit)
+    while (!exit_)
     {
         auto t_now = std::chrono::steady_clock::now();
         while (t_now > t_next && !exit_)
@@ -56,6 +57,8 @@ void sv::Server::Run()
             t_now = std::chrono::steady_clock::now();
         }
     }
+
+    std::cout << "Server shut down" << std::endl;
 }
 
 void sv::Server::Send(Client& client, std::string msg)
@@ -89,7 +92,7 @@ void sv::Server::PollWSEvents()
 
         case net::SVE_EXIT:
             exit_ = true;
-            break;
+            return;
 
         default:
             break;

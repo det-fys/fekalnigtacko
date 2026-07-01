@@ -12,6 +12,10 @@
 #include "utils/cvars.hpp"
 #include "utils/keys.hpp"
 #include "utils/chatcolors.hpp"
+#include "net/client_local.hpp"
+#include "net/server_local.hpp"
+#include "server/server.hpp"
+#include "server/server_cfg.hpp"
 
 #include "net/client_ws.hpp"
 
@@ -72,6 +76,8 @@ void App::OnClientConnect()
 {
     connected_ = true;
     connecting_ = false;
+
+	session_ = std::make_unique<game::view::ClientSession>(*this);	
 }
 
 void App::OnClientMessage(std::string_view data)
@@ -96,10 +102,7 @@ void App::OnClientMessage(std::string_view data)
 
 void App::OnClientDisconnect()
 {
-    connected_ = false;
-    connecting_ = false;
-
-	interface_.reset();
+	Disconnect();
 }
 
 void App::Frame()
@@ -379,7 +382,37 @@ void App::Connect()
 {
 	connecting_ = true;
 	connected_ = false;
+
 	interface_ = std::make_unique<net::WSClientInterface>(*this, url_);
+}
+
+void App::ConnectLocal()
+{
+	auto channel_pair = std::make_shared<net::LocalChannelPair>();
+
+    server_thread_ = std::jthread([channel_pair] {
+		sv::LoadCfg();
+		sv::Server server(std::make_unique<net::LocalServerInterface>(channel_pair));
+		server.Run();
+	});
+
+	connecting_ = true;
+	connected_ = false;
+
+    interface_ = std::make_unique<net::LocalClientInterface>(*this, channel_pair);
+}
+
+void App::Disconnect() 
+{
+	connected_ = false;
+    connecting_ = false;
+	interface_.reset();
+	session_.reset();
+
+	if (server_thread_.joinable())
+	{
+		server_thread_.join();
+	}
 }
 
 void App::UpdateState()
@@ -414,14 +447,38 @@ void App::EnterState(AppState state)
 
 	case APP_STATE_CONNECTED:
 		AddChatMessagePrefix("WebSocket", COL_SUCCESS "připojeno");
-		session_ = std::make_unique<game::view::ClientSession>(*this);	
+		break;
+
+	case APP_STATE_DISCONNECT:
+		Disconnect();
+		AddChatMessagePrefix("WebSocket", "vodpojeno");
 		break;
 
 	case APP_STATE_DISCONNECTED:
+		Disconnect();
 		AddChatMessagePrefix("WebSocket", COL_ERROR "spojení je píči");
-		session_.reset();
 		AddChatMessagePrefix("WebSocket", "další pokus za 10 s");
 		break;
+
+	case APP_STATE_CONNECT_LOCAL:
+		AddChatMessage("připojování na lokální servr");
+		ConnectLocal();
+		break;
+
+	case APP_STATE_CONNECTED_LOCAL:
+		AddChatMessage(COL_SUCCESS "připojeno");
+		session_ = std::make_unique<game::view::ClientSession>(*this);	
+		break;
+
+	case APP_STATE_DISCONNECT_LOCAL:
+		Disconnect();
+		AddChatMessage("vodpojeno");
+		break;
+
+	case APP_STATE_DISCONNECTED_LOCAL:
+		Disconnect();
+		break;
+
 
 	default:
 		break;
@@ -444,9 +501,12 @@ AppState App::CheckStateTransition()
 		return APP_STATE_LOADING;
 
 	case APP_STATE_IDLE:
-		return APP_STATE_CONNECT;
+		return run_local_server_ ? APP_STATE_CONNECT_LOCAL : APP_STATE_CONNECT;
 
 	case APP_STATE_CONNECT:
+		if (run_local_server_)
+			return APP_STATE_DISCONNECT;
+
 		if (connected_)
 			return APP_STATE_CONNECTED;
 
@@ -456,16 +516,55 @@ AppState App::CheckStateTransition()
 		return APP_STATE_CONNECT;
 
 	case APP_STATE_CONNECTED:
+		if (run_local_server_)
+			return APP_STATE_DISCONNECT;
+
 		if (!connected_)
 			return APP_STATE_DISCONNECTED;
 
 		return APP_STATE_CONNECTED;
 
+	case APP_STATE_DISCONNECT:
+		return APP_STATE_IDLE;
+
 	case APP_STATE_DISCONNECTED:
+		if (run_local_server_)
+			return APP_STATE_IDLE;
+
 		if (GetCurrentStateDuration() >= 10.0f)
-			return APP_STATE_CONNECT;
+			return APP_STATE_IDLE;
 
 		return APP_STATE_DISCONNECTED;
+
+	case APP_STATE_CONNECT_LOCAL:
+		if (!run_local_server_)
+			return APP_STATE_DISCONNECT_LOCAL;
+
+		if (connected_)
+			return APP_STATE_CONNECTED_LOCAL;
+
+		if (!connecting_)
+			return APP_STATE_DISCONNECTED_LOCAL;
+
+		return APP_STATE_CONNECT_LOCAL;
+
+	case APP_STATE_CONNECTED_LOCAL:
+		if (!run_local_server_)
+			return APP_STATE_DISCONNECT_LOCAL;
+
+		if (!connected_)
+			return APP_STATE_DISCONNECTED_LOCAL;
+
+		return APP_STATE_CONNECTED_LOCAL;
+
+	case APP_STATE_DISCONNECT_LOCAL:
+		return APP_STATE_IDLE;
+
+	case APP_STATE_DISCONNECTED_LOCAL:
+		if (GetCurrentStateDuration() >= 1.0f)
+			return APP_STATE_IDLE;
+
+		return APP_STATE_DISCONNECTED_LOCAL;
 
 	default:
 		return state_;
@@ -515,6 +614,10 @@ void App::ProcessLocalCommand(std::string_view line)
 		{
 			ProcessSetCmd(iss);
 		}
+		else if (cmd == "server")
+		{
+			ProcessServerCmd(iss);
+		}
 		else
 		{
 			throw std::runtime_error("neznámej příkaz: " + cmd);
@@ -555,4 +658,25 @@ void App::ProcessSetCmd(CmdLineStream& line)
 	CVarRegistry::Set(cvar_name, val);
 
 	chat_.AddMessage(COL_LABEL + cvar_name + "^r nastaveno na " COL_VALUE + CVarRegistry::Get(cvar_name));
+}
+
+void App::ProcessServerCmd(CmdLineStream& line)
+{
+	std::string server_cmd;
+	line >> server_cmd;
+
+	if (server_cmd == "start")
+	{
+		run_local_server_ = true;
+	}
+	else if (server_cmd == "stop")
+	{
+		run_local_server_ = false;
+	}
+	else
+	{
+		throw std::runtime_error("start nebo stop");
+	}
+
+	AddChatMessage(COL_SUCCESS "ok");
 }

@@ -33,7 +33,12 @@ enum AppState
     APP_STATE_IDLE,
     APP_STATE_CONNECT,
     APP_STATE_CONNECTED,
+    APP_STATE_DISCONNECT,
     APP_STATE_DISCONNECTED,
+    APP_STATE_CONNECT_LOCAL,
+    APP_STATE_CONNECTED_LOCAL,
+    APP_STATE_DISCONNECT_LOCAL,
+    APP_STATE_DISCONNECTED_LOCAL,
 };
 
 class App : public net::ClientInterfaceCallback
@@ -82,7 +87,9 @@ private:
     void DrawStats();
 
     void Connect();
+    void ConnectLocal();
     void ProcessWsMessage(std::span<const char> data);
+    void Disconnect();
 
     void UpdateState();
     void EnterState(AppState state);
@@ -93,6 +100,7 @@ private:
 
     void ProcessLocalCommand(std::string_view line);
     void ProcessSetCmd(CmdLineStream& line);
+    void ProcessServerCmd(CmdLineStream& line);
 
 private:
     Settings settings_;
@@ -107,6 +115,9 @@ private:
     gfx::DrawList dlist_;
     gui::Context gui_;
     audio::Master audiomaster_;
+
+    std::jthread server_thread_;
+    bool run_local_server_ = false;
 
     std::unique_ptr<net::ClientInterface> interface_;
     std::string url_;
