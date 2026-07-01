@@ -5,7 +5,7 @@
 
 #include "net/defs.hpp"
 #include "net/outmessage.hpp"
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 #include "gameview/worldview.hpp"
 #include "gameview/utils.hpp"
 #include "gui/loading_screen.hpp"
@@ -49,7 +49,7 @@ static const std::map<KeyCode, game::PlayerInputType> s_inputmap = {
 };
 
 App::App(const std::string& settings_path)
-    : settings_(settings_path), gui_(dlist_, assets::CacheManager::GetFont("data/comic32.font")),
+    : settings_(settings_path), gui_(dlist_, assets::AssetManager::GetInstance().Get<gui::Font>("comic32")),
       precache_("data/precache"), chat_(gui_, time_)
 {
 	std::cout << "Initializing App..." << std::endl;

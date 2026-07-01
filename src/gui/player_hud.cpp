@@ -3,7 +3,7 @@
 #include "player_hud.hpp"
 #include "utils/math.hpp"
 
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 
 static uint32_t COLOR_ACTIVE = 0xFF00FFFF;
 static uint32_t COLOR_NORMAL = 0xFFFFFFFF;
@@ -22,8 +22,8 @@ static uint32_t COLOR_ERROR = 0xFF7777FF;
 
 gui::PlayerHud::PlayerHud(const float& time) : time_(time)
 {
-    crosshair_texture_ = assets::CacheManager::GetTexture("data/crosshair.png");
-    scope_texture_ = assets::CacheManager::GetTexture("data/scope.png");
+    crosshair_texture_ = assets::AssetManager::GetInstance().Get<gfx::Texture>("crosshair");
+    scope_texture_ = assets::AssetManager::GetInstance().Get<gfx::Texture>("scope");
 
     UpdateWeaponSlotsText();
 }

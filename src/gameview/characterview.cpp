@@ -1,5 +1,5 @@
 #include "characterview.hpp"
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 #include "assets/model.hpp"
 #include "net/utils.hpp"
 #include "worldview.hpp"
@@ -11,7 +11,7 @@ game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) 
     if (!msg.Read(model_name))
         throw EntityInitError();;
 
-    basemodel_ = assets::CacheManager::GetModel("data/" + std::string(model_name) + ".mdl");
+    basemodel_ = assets::AssetManager::GetInstance().Get<assets::Model>(std::string(model_name));
     sk_ = SkeletonInstance(basemodel_->GetSkeleton(), &root_);
     ubo_.Update();
     ubo_valid_ = true;
@@ -319,12 +319,12 @@ void game::view::CharacterView::AddClothes(const std::string& name, const glm::v
 
     if (name == "tshirt")
     {
-        c.model = assets::CacheManager::GetModel("data/tshirt.mdl");
+        c.model = assets::AssetManager::GetInstance().Get<assets::Model>("tshirt");
         c.surfacemask = GetSurfaceMask("upperbody");
     }
     else if (name == "shorts")
     {
-        c.model = assets::CacheManager::GetModel("data/shorts.mdl");
+        c.model = assets::AssetManager::GetInstance().Get<assets::Model>("shorts");
         c.surfacemask = GetSurfaceMask("upperlegs");
     }
     else
@@ -368,7 +368,7 @@ void game::view::CharacterView::SetItem(const std::string& item_name)
         return;
     }
 
-    item_ = assets::CacheManager::GetItem("data/" + item_name + ".item");
+    item_ = assets::AssetManager::GetInstance().Get<assets::Item>(item_name);
 
     auto bone_node = sk_.GetBoneNodeByName(item_->bone);
     item_node_.parent = bone_node ? bone_node : &root_;
@@ -380,13 +380,13 @@ void game::view::CharacterView::SetItem(const std::string& item_name)
     // snd
     if (!item_->fire_snd.empty())
     {
-        fire_snd_ = assets::CacheManager::GetSound("data/" + item_->fire_snd + ".snd");
+        fire_snd_ = assets::AssetManager::GetInstance().Get<audio::Sound>(item_->fire_snd);
     }
 
     // fx
     if (!item_->fire_fx.empty())
     {
-        fire_fx_ = assets::CacheManager::GetEffect("data/" + item_->fire_fx + ".fx");
+        fire_fx_ = assets::AssetManager::GetInstance().Get<assets::Effect>(item_->fire_fx);
         auto loc = item_->model->GetLocation(item_->fire_fx_loc);
         fire_fx_offset_ = loc ? loc->position : glm::vec3(0.0f);
     }

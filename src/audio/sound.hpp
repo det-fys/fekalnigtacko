@@ -3,15 +3,17 @@
 #include "master.hpp"
 
 #include <memory>
+#include "assets/asset_manager.hpp"
 
 namespace audio
 {
 
-class Sound
+class Sound : public assets::Asset
 {
 public:
     Sound();
-    static std::shared_ptr<const Sound> LoadFromFile(const std::string& path);
+    static std::shared_ptr<Sound> Load(const std::string& name);
+    static std::shared_ptr<Sound> LoadFromFile(const std::string& path);
 
     unsigned int GetBufferId() const { return buffer_; }
 

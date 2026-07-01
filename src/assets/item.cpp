@@ -1,7 +1,11 @@
 #include "item.hpp"
 
-#include "cache.hpp"
 #include "cmdfile.hpp"
+
+std::shared_ptr<assets::Item> assets::Item::Load(const std::string& name)
+{
+    return LoadFromFile("data/" + name + ".item");
+}
 
 std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path)
 {
@@ -19,10 +23,6 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
                 item->type = ITEM_WEAPON;
             else
                 throw std::runtime_error("Unknown item type " + type_str);
-        }
-        else if (command == "name")
-        {
-            iss >> item->name;
         }
         else if (command == "displayname")
         {
@@ -53,7 +53,7 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
         else if (command == "model")
         {
             iss >> item->model_name;
-            item->model = CacheManager::GetModel("data/" + item->model_name + ".mdl");    
+            item->model = AssetManager::GetInstance().Get<Model>(item->model_name);    
         }
         else if (command == "attach")
         {
@@ -65,7 +65,7 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
                 std::string sk_name, loc_name;
                 iss >> sk_name >> loc_name;
                 
-                auto sk = assets::CacheManager::GetSkeleton("data/" + sk_name + ".sk");
+                auto sk = AssetManager::GetInstance().Get<Skeleton>(sk_name);
                 auto loc = sk->GetLocation(loc_name);
                 if (!loc)
                     throw std::runtime_error("Invalid skeleton location: " + loc_name);
@@ -210,10 +210,5 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
         }
     });
 
-    if (item->displayname.empty())
-    {
-        item->displayname = item->name;
-    }
-    
     return item;
 }

@@ -64,6 +64,11 @@ gfx::Texture::~Texture() {
 	glDeleteTextures(1, &m_id);
 }
 
+std::shared_ptr<gfx::Texture> gfx::Texture::Load(const std::string& name)
+{
+    return LoadFromFile("data/" + name + ".png");
+}
+
 std::shared_ptr<gfx::Texture> gfx::Texture::LoadFromFile(const std::string& filename)
 {
 	printf("Loading texture from file: %s\n", filename.c_str());

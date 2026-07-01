@@ -1,9 +1,13 @@
 #include "vehiclemdl.hpp"
 
-#include "cache.hpp"
 #include "cmdfile.hpp"
 
-std::shared_ptr<const assets::VehicleModel> assets::VehicleModel::LoadFromFile(const std::string& filename)
+std::shared_ptr<assets::VehicleModel> assets::VehicleModel::Load(const std::string& name)
+{
+    return LoadFromFile("data/" + name + ".veh");
+}
+
+std::shared_ptr<assets::VehicleModel> assets::VehicleModel::LoadFromFile(const std::string& filename)
 {
     auto veh = std::make_shared<VehicleModel>();
 
@@ -13,7 +17,7 @@ std::shared_ptr<const assets::VehicleModel> assets::VehicleModel::LoadFromFile(c
             std::string model_name;
             iss >> model_name;
 
-            veh->basemodel_ = CacheManager::GetModel("data/" + model_name + ".mdl");
+            veh->basemodel_ = AssetManager::GetInstance().Get<Model>(model_name);
         }
         else if (command == "wheel")
         {
@@ -32,7 +36,7 @@ std::shared_ptr<const assets::VehicleModel> assets::VehicleModel::LoadFromFile(c
             else if (type_str == "RR")
                 wheel.type = WHEEL_RR;
 
-            wheel.model = assets::CacheManager::GetModel("data/" + model_name + ".mdl");
+            wheel.model = AssetManager::GetInstance().Get<Model>(model_name);
 
             iss >> wheel.position.x >> wheel.position.y >> wheel.position.z;
             iss >> wheel.radius;

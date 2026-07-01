@@ -8,8 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(COMMON_SOURCES
     "src/assets/animation.hpp"
     "src/assets/animation.cpp"
-    "src/assets/cache.hpp"
-    "src/assets/cache.cpp"
+    "src/assets/asset_manager.hpp"
+    "src/assets/asset_manager.cpp"
     "src/assets/cmdfile.hpp"
     "src/assets/cmdfile.cpp"
     "src/assets/item.hpp"

@@ -1,12 +1,12 @@
 #include "worldenv.hpp"
 
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 
 game::view::WorldEnv::WorldEnv()
 {
-    sunmodel_ = assets::CacheManager::GetModel("data/env_sun.mdl");
-    moonmodel_ = assets::CacheManager::GetModel("data/env_moon.mdl");
-    halfspheremodel_ = assets::CacheManager::GetModel("data/env_halfsphere.mdl");
+    sunmodel_ = assets::AssetManager::GetInstance().Get<assets::Model>("env_sun");
+    moonmodel_ = assets::AssetManager::GetInstance().Get<assets::Model>("env_moon");
+    halfspheremodel_ = assets::AssetManager::GetInstance().Get<assets::Model>("env_halfsphere");
 }
 
 static const glm::vec4 color1(1.0f);

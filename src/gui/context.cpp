@@ -1,6 +1,6 @@
 #include "context.hpp"
 
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 
 #include "utils/utf8.hpp"
 #include "utils/cvars.hpp"
@@ -12,7 +12,7 @@ gui::Context::Context(gfx::DrawList& dlist, std::shared_ptr<const Font> default_
     font_(std::move(default_font)),
     va_(gfx::VA_POSITION | gfx::VA_UV | gfx::VA_COLOR, gfx::VF_CREATE_EBO | gfx::VF_DYNAMIC)
 {
-    white_tex_ = assets::CacheManager::GetTexture("data/white.png");
+    white_tex_ = assets::AssetManager::GetInstance().Get<gfx::Texture>("white");
 }
 
 void gui::Context::Begin(const glm::vec2& viewport_size)

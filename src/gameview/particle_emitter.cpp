@@ -1,14 +1,12 @@
 #include "particle_emitter.hpp"
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 #include "utils/random.hpp"
 #include "utils/math.hpp"
 
 game::view::ParticleEmitter::ParticleEmitter(audio::Player* audioplayer) : audioplayer_(audioplayer)
 {
-    quad_model_ = assets::CacheManager::GetModel("data/quad.mdl");
+    quad_model_ = assets::AssetManager::GetInstance().Get<assets::Model>("quad");
 }
-
-
 
 void game::view::ParticleEmitter::Update(float delta_time)
 {

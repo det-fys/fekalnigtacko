@@ -1,7 +1,7 @@
 #include "markerview.hpp"
 
 #include "net/utils.hpp"
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 
 game::view::MarkerView::MarkerView(WorldView& world, net::InMessage& msg) : Super(world, msg)
 {
@@ -60,12 +60,12 @@ bool game::view::MarkerView::Init(net::InMessage& msg)
     std::string model_name_str = model_name;
     if (!model_name_str.empty())
     {
-        model_ = assets::CacheManager::GetModel("data/" + model_name_str + ".mdl");
+        model_ = assets::AssetManager::GetInstance().Get<assets::Model>(model_name_str);
     }
 
     if (marker_type_ == MARKER_FOOT || marker_type_ == MARKER_VEHICLE)
     {
-        base_model_ = assets::CacheManager::GetModel("data/marker_base.mdl");
+        base_model_ = assets::AssetManager::GetInstance().Get<assets::Model>("marker_base");
     }
 
 

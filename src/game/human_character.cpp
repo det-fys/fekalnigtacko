@@ -316,7 +316,7 @@ void game::HumanCharacter::UpdateItemStuff()
     // update view item
     if (item_)
     {
-        SetViewItem(item_->def->name);
+        SetViewItem(item_->def->GetAssetName());
         SetWeightSpeedMult(item_->def->walk_speed_mult);
     }
     else

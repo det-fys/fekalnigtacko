@@ -1,9 +1,13 @@
 #include "font.hpp"
 
-#include "assets/cache.hpp"
 #include "assets/cmdfile.hpp"
 
-std::shared_ptr<const gui::Font> gui::Font::LoadFromFile(const std::string& path)
+std::shared_ptr<gui::Font> gui::Font::Load(const std::string& name)
+{
+    return LoadFromFile("data/" + name + ".font");
+}
+
+std::shared_ptr<gui::Font> gui::Font::LoadFromFile(const std::string& path)
 {
     auto font = std::make_shared<Font>();
 
@@ -34,7 +38,7 @@ std::shared_ptr<const gui::Font> gui::Font::LoadFromFile(const std::string& path
             std::string tex_name;
             iss >> tex_name >> size.x >> size.y;
 
-            font->texture_ = assets::CacheManager::GetTexture("data/" + tex_name + ".png");
+            font->texture_ = assets::AssetManager::GetInstance().Get<gfx::Texture>(tex_name);
         }
         else if (cmd == "size")
         {

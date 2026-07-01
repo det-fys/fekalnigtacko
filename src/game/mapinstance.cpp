@@ -2,12 +2,12 @@
 
 #include <stdexcept>
 
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 
 game::MapInstance::MapInstance(collision::DynamicsWorld& world, std::string mapname)
     : world_(world), mapname_(std::move(mapname))
 {
-    map_ = assets::CacheManager::GetMap("data/" + mapname_ + ".map");
+    map_ = assets::AssetManager::GetInstance().Get<assets::Map>(mapname_);
 
     // add basemodel col
     const auto& basemodel = map_->GetBaseModel();

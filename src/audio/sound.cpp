@@ -16,6 +16,11 @@ audio::Sound::Sound()
         throw std::runtime_error("Failed to generate OpenAL buffer");
 }
 
+std::shared_ptr<audio::Sound> audio::Sound::Load(const std::string& name)
+{
+    return LoadFromFile("data/" + name + ".snd");
+}
+
 static void LoadBufferOGG(ALuint buffer, const char* path)
 {
     audio::OggFile ogg_file(path);
@@ -27,7 +32,7 @@ static void LoadBufferOGG(ALuint buffer, const char* path)
     alBufferData(buffer, format, data.data(), static_cast<ALsizei>(data.size()), sample_rate);
 }
 
-std::shared_ptr<const audio::Sound> audio::Sound::LoadFromFile(const std::string& path)
+std::shared_ptr<audio::Sound> audio::Sound::LoadFromFile(const std::string& path)
 {
     auto sound = std::make_shared<Sound>();
 

@@ -36,10 +36,9 @@ enum WeaponFireType
     FIRETYPE_PROJECTILE,
 };
 
-struct Item
+struct Item : public Asset
 {
     ItemType type = ITEM_NONE;
-    std::string name;
     std::string displayname;
 
     size_t slot = 0;
@@ -94,6 +93,7 @@ struct Item
     std::string fire_fx;
     std::string fire_fx_loc;
 
+    static std::shared_ptr<Item> Load(const std::string& name);
     static std::shared_ptr<Item> LoadFromFile(const std::string& path);
 };
 

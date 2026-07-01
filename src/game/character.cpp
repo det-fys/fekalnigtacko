@@ -1,6 +1,6 @@
 #include "character.hpp"
 
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 #include "net/utils.hpp"
 #include "utils/math.hpp"
 #include "world.hpp"
@@ -15,7 +15,7 @@ game::Character::Character(World& world, const CharacterTuning& tuning)
 {
     z_offset_ = tuning_.shape.height * 0.5f + tuning_.shape.radius - 0.05f;
 
-    sk_ = SkeletonInstance(assets::CacheManager::GetSkeleton("data/" + tuning.model_name + ".sk"), &root_);
+    sk_ = SkeletonInstance(assets::AssetManager::GetInstance().Get<assets::Skeleton>(tuning.model_name), &root_);
     SetupHitBones();
 }
 

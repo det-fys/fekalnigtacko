@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 #include "player.hpp"
 #include "vehicle.hpp"
 #include "player_character.hpp"
@@ -432,7 +432,7 @@ void game::OpenWorld::CreatePermaItemPickups(const std::string& item_name)
 
 void game::OpenWorld::CreatePermaItemPickup(const glm::vec3& position, const std::string& item_name)
 {
-    auto item_def = assets::CacheManager::GetItem("data/" + item_name + ".item");
+    auto item_def = assets::AssetManager::GetInstance().Get<assets::Item>(item_name);
     CreateItemPickup(position, std::make_shared<ItemInstance>(item_def), 0, 5000, item_def->clip_size * 15);
 }
 

@@ -4,7 +4,7 @@
 #include "utils/math.hpp"
 
 game::Projectile::Projectile(World& world, const ProjectileInfo& info)
-    : Super(world, "data/" + info.model_name + ".mdl"), info_(info)
+    : Super(world, info.model_name), info_(info)
 {
     spawn_time_ = GetWorld().GetTime();
     root_.local.position = info.start_pos;

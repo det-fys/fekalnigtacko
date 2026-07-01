@@ -5,7 +5,12 @@
 
 #include <stdexcept>
 
-std::shared_ptr<const assets::Skeleton> assets::Skeleton::LoadFromFile(const std::string& filename)
+std::shared_ptr<assets::Skeleton> assets::Skeleton::Load(const std::string& name)
+{
+    return LoadFromFile("data/" + name + ".sk");
+}
+
+std::shared_ptr<assets::Skeleton> assets::Skeleton::LoadFromFile(const std::string& filename)
 {
     auto skeleton = std::make_shared<Skeleton>();
 

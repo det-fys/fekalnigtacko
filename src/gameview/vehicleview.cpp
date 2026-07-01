@@ -1,6 +1,6 @@
 #include "vehicleview.hpp"
 
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 #include "net/utils.hpp"
 #include "worldview.hpp"
 #include "utils/random.hpp"
@@ -16,7 +16,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
     if (!msg.Read(modelname))
         throw EntityInitError();
 
-    model_ = assets::CacheManager::GetVehicleModel("data/" + std::string(modelname) + ".veh");
+    model_ = assets::AssetManager::GetInstance().Get<assets::VehicleModel>(std::string(modelname));
     mesh_ = *model_->GetModel()->GetMesh();
     InitMesh();
     InitHeadlights();
@@ -36,7 +36,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
     root_trans_[0] = root_trans_[1];
     root_.local = root_trans_[0];
 
-    snd_accel_ = assets::CacheManager::GetSound("data/auto.snd");
+    snd_accel_ = assets::AssetManager::GetInstance().Get<audio::Sound>("auto");
 
     radius_ = 3.0f;
     
@@ -227,7 +227,9 @@ bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
 
         std::string wheel_model_name = wheelmodel_fixed;
 
-        wheels_[i].model = !wheel_model_name.empty() ? assets::CacheManager::GetModel("data/" + wheel_model_name + ".mdl") : model_->GetWheels()[i].model;
+        wheels_[i].model = !wheel_model_name.empty()
+                               ? assets::AssetManager::GetInstance().Get<assets::Model>(wheel_model_name)
+                               : model_->GetWheels()[i].model;
         wheels_[i].color = recv_colors[1]; // TODO: dynamic?;
         wheels_[i].color.a = 0.0f;
     }
@@ -389,7 +391,7 @@ void game::view::VehicleView::InitHeadlights()
 
         if (!light_cone_mdl_)
         {
-            light_cone_mdl_ = assets::CacheManager::GetModel("data/headlightcone.mdl");
+            light_cone_mdl_ = assets::AssetManager::GetInstance().Get<assets::Model>("headlightcone");
         }
 
         light_cone_node_[i].parent = &root_;
@@ -428,7 +430,8 @@ void game::view::VehicleView::UpdateWindows()
         if (it != mesh_.surface_names.end())
         {
             size_t idx = it->second;
-            mesh_.surfaces[idx].texture = assets::CacheManager::GetTexture("data/carbrokenwindows.png");
+            mesh_.surfaces[idx].texture =
+                assets::AssetManager::GetInstance().Get<gfx::Texture>("carbrokenwindows");
         }
     }
 }

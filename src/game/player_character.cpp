@@ -112,7 +112,7 @@ void game::PlayerCharacter::GiveItem(std::shared_ptr<ItemInstance> item, bool ca
 
     bool equip = can_equip && (!GetHeldItem() || GetHeldItem() == slot);
 
-    if (!slot || slot->def->name != item->def->name)
+    if (!slot || slot->def->GetAssetName() != item->def->GetAssetName())
     {
         // current item in the slot is other item or none
         slot = std::move(item);
@@ -165,7 +165,7 @@ void game::PlayerCharacter::OnAimingChanged()
 void game::PlayerCharacter::OnHeldItemChanged()
 {
     const auto& item = GetHeldItem();
-    hud_data_.held_item = item ? item->def->name : "";
+    hud_data_.held_item = item ? item->def->GetAssetName() : "";
 
     // UpdatePlayerCamera(); // might be required?
 }

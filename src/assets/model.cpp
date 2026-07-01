@@ -1,7 +1,6 @@
 #include "model.hpp"
 
 #include "cmdfile.hpp"
-#include "cache.hpp"
 
 #include <BulletCollision/CollisionShapes/btShapeHull.h>
 
@@ -29,7 +28,12 @@ static collision::Material GetMaterialByName(const std::string& name)
         return collision::PM_STONE;
 }
 
-std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::string& filename)
+std::shared_ptr<assets::Model> assets::Model::Load(const std::string& name)
+{
+    return LoadFromFile("data/" + name + ".mdl");
+}
+
+std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& filename)
 {
     auto model = std::make_shared<Model>();
     model->name_ = filename; // TODO: name not filename
@@ -165,7 +169,7 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
                 std::shared_ptr<const gfx::Texture> texture;
                 if (!texture_name.empty())
                 {
-                    texture = CacheManager::GetTexture("data/" + texture_name + ".png");
+                    texture = assets::AssetManager::GetInstance().Get<gfx::Texture>(texture_name);
                 }
     
                 mb.BeginSurface(sflags, surface_name, texture);
@@ -183,7 +187,7 @@ std::shared_ptr<const assets::Model> assets::Model::LoadFromFile(const std::stri
         {
             std::string skel_name;
             iss >> skel_name;
-            model->skeleton_ = CacheManager::GetSkeleton("data/" + skel_name + ".sk");
+            model->skeleton_ = AssetManager::GetInstance().Get<Skeleton>(skel_name);
             CLIENT_ONLY(mb.SetMeshFlag(gfx::MF_SKELETAL));
         }
         else if (command == "col")

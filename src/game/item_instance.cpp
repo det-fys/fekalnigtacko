@@ -1,5 +1,4 @@
 #include "item_instance.hpp"
-#include "assets/cache.hpp"
 
 game::ItemInstance::ItemInstance(std::shared_ptr<const assets::Item> def) : def(std::move(def))
 {
@@ -7,6 +6,6 @@ game::ItemInstance::ItemInstance(std::shared_ptr<const assets::Item> def) : def(
 }
 
 game::ItemInstance::ItemInstance(const std::string& name)
-    : ItemInstance(assets::CacheManager::GetItem("data/" + name + ".item"))
+    : ItemInstance(assets::AssetManager::GetInstance().Get<assets::Item>(name))
 {
 }

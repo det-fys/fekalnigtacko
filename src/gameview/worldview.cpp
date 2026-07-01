@@ -1,6 +1,6 @@
 #include "worldview.hpp"
 
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 
 #include "simple_entity_view.hpp"
 #include "characterview.hpp"
@@ -334,7 +334,8 @@ bool game::view::WorldView::ProcessFxMsg(net::InMessage& msg)
     if (glm::length2(dir) < 0.3f)
         return true;// weird
 
-    emitter_.Emit(assets::CacheManager::GetEffect("data/" + std::string(name) + ".fx"), pos, glm::normalize(dir));
+    emitter_.Emit(assets::AssetManager::GetInstance().Get<assets::Effect>(std::string(name)), pos,
+                  glm::normalize(dir));
     return true;
 
 }

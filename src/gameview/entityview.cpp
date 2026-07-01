@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "worldview.hpp"
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 
 game::view::EntityView::EntityView(WorldView& world, net::InMessage& msg) : 
     world_(world),
@@ -102,7 +102,7 @@ bool game::view::EntityView::ProcessPlaySoundMsg(net::InMessage& msg)
     if (!world_.IsLoaded())
         return true; // dont play if not loaded yet
 
-    auto sound = assets::CacheManager::GetSound("data/" + std::string(name) + ".snd");
+    auto sound = assets::AssetManager::GetInstance().Get<audio::Sound>(std::string(name));
     auto snd = audioplayer_.PlaySound(sound, &root_);
     snd->SetVolume(volume);
     snd->SetPitch(pitch);

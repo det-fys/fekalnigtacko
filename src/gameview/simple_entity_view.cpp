@@ -1,6 +1,6 @@
 #include "simple_entity_view.hpp"
 #include "net/defs.hpp"
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 #include "worldview.hpp"
 #include "net/utils.hpp"
 
@@ -12,7 +12,7 @@ game::view::SimpleEntityView::SimpleEntityView(WorldView& world, net::InMessage&
 
     if (modelname.len > 0)
     {
-        model_ = assets::CacheManager::GetModel(std::string(modelname));
+        model_ = assets::AssetManager::GetInstance().Get<assets::Model>(std::string(modelname));
         if (!model_)
             throw EntityInitError();
     }

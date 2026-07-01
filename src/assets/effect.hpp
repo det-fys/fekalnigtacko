@@ -4,6 +4,7 @@
 
 #include "gfx/texture.hpp"
 #include "audio/sound.hpp"
+#include "asset_manager.hpp"
 
 namespace assets
 {
@@ -59,11 +60,12 @@ struct EffectSound
 
 };
 
-class Effect
+class Effect : public Asset
 {
 public:
     Effect() = default;
-    static std::shared_ptr<const Effect> LoadFromFile(const std::string& path);
+    static std::shared_ptr<Effect> Load(const std::string& name);
+    static std::shared_ptr<Effect> LoadFromFile(const std::string& path);
 
     const std::vector<ParticleDef>& GetParticleDefs() const { return particle_defs_; }
     const std::vector<EffectSound>& GetSounds() const { return sounds_; }

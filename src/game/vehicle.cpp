@@ -1,6 +1,6 @@
 #include "vehicle.hpp"
 
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
 #include "net/utils.hpp"
 #include "player.hpp"
 #include "player_input.hpp"
@@ -12,7 +12,7 @@
 
 static std::shared_ptr<const assets::VehicleModel> LoadVehicleModelByName(const std::string& model_name)
 {
-    return assets::CacheManager::GetVehicleModel("data/" + model_name + ".veh");
+    return assets::AssetManager::GetInstance().Get<assets::VehicleModel>(model_name);
 }
 
 game::Vehicle::Vehicle(World& world, const VehicleSpawnInfo& info)

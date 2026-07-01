@@ -1,7 +1,17 @@
 #include "precache.hpp"
 
 #include "cmdfile.hpp"
-#include "cache.hpp"
+#include "asset_manager.hpp"
+
+#include "assets/effect.hpp"
+#include "assets/item.hpp"
+#include "assets/map.hpp"
+#include "assets/model.hpp"
+#include "assets/skeleton.hpp"
+#include "assets/vehiclemdl.hpp"
+#include "audio/sound.hpp"
+#include "gfx/texture.hpp"
+#include "gui/font.hpp"
 
 assets::Precache::Precache(const std::string& path)
 {
@@ -14,24 +24,26 @@ assets::Precache::Precache(const std::string& path)
 
 static std::any LoadItem(const assets::PrecacheItem& item)
 {
+    auto& am = assets::AssetManager::GetInstance();
+
     if (item.type == "fx")
-        return assets::CacheManager::GetEffect("data/" + item.name + ".fx");
+        return am.Get<assets::Effect>(item.name);
     else if (item.type == "font")
-        return assets::CacheManager::GetFont("data/" + item.name + ".font");
+        return am.Get<gui::Font>(item.name);
     else if (item.type == "item")
-        return assets::CacheManager::GetItem("data/" + item.name + ".item");
+        return am.Get<assets::Item>(item.name);
     else if (item.type == "map")
-        return assets::CacheManager::GetMap("data/" + item.name + ".map");
+        return am.Get<assets::Map>(item.name);
     else if (item.type == "model")
-        return assets::CacheManager::GetModel("data/" + item.name + ".mdl");
+        return am.Get<assets::Model>(item.name);
     else if (item.type == "skeleton")
-        return assets::CacheManager::GetSkeleton("data/" + item.name + ".sk");
+        return am.Get<assets::Skeleton>(item.name);
     else if (item.type == "sound")
-        return assets::CacheManager::GetSound("data/" + item.name + ".snd");
+        return am.Get<audio::Sound>(item.name);
     else if (item.type == "texture")
-        return assets::CacheManager::GetTexture("data/" + item.name + ".png");
+        return am.Get<gfx::Texture>(item.name);
     else if (item.type == "vehicle")
-        return assets::CacheManager::GetVehicleModel("data/" + item.name + ".veh");
+        return am.Get<assets::VehicleModel>(item.name);
     else
         throw std::runtime_error("Precache: invalid asset type: " + item.type);
 }

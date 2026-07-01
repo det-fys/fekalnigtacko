@@ -7,6 +7,7 @@
 
 #include "animation.hpp"
 #include "utils/transform.hpp"
+#include "asset_manager.hpp"
 
 namespace assets
 {
@@ -46,11 +47,12 @@ struct SkeletonLocation
     Transform offset;
 };
 
-class Skeleton
+class Skeleton : public Asset
 {
 public:
     Skeleton() = default;
-    static std::shared_ptr<const Skeleton> LoadFromFile(const std::string& filename);
+    static std::shared_ptr<Skeleton> Load(const std::string& name);
+    static std::shared_ptr<Skeleton> LoadFromFile(const std::string& filename);
 
     int GetBoneIndex(const std::string& name) const;
 

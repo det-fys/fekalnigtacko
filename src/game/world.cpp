@@ -3,7 +3,6 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "assets/cache.hpp"
 #include "collision/object_info.hpp"
 #include "destroyed_object.hpp"
 #include "utils/allocnum.hpp"
@@ -462,7 +461,7 @@ void game::World::CreateItemPickup(const glm::vec3& position, std::shared_ptr<It
 
             if (respawn_time > 0)
             {
-                Schedule(respawn_time, [this, position, item_name = item->def->name, despawn_time, respawn_time, ammo_count] {
+                Schedule(respawn_time, [this, position, item_name = item->def->GetAssetName(), despawn_time, respawn_time, ammo_count] {
                     CreateItemPickup(position, std::make_shared<ItemInstance>(item_name), despawn_time, respawn_time, ammo_count);
                 });
             }

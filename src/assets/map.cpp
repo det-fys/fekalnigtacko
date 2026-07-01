@@ -2,7 +2,6 @@
 
 #include <algorithm>
 
-#include "cache.hpp"
 #include "cmdfile.hpp"
 #include "utils/files.hpp"
 
@@ -26,7 +25,12 @@ static AABB3 TransformAABB(const AABB3& aabb, const glm::mat4& mat)
     return new_aabb;
 }
 
-std::shared_ptr<const assets::Map> assets::Map::LoadFromFile(const std::string& filename)
+std::shared_ptr<assets::Map> assets::Map::Load(const std::string& name)
+{
+    return LoadFromFile("data/" + name + ".map");
+}
+
+std::shared_ptr<assets::Map> assets::Map::LoadFromFile(const std::string& filename)
 {
     MapLoader loader(filename);
     while (loader.Next()) {}
@@ -114,7 +118,7 @@ int assets::MapLoader::GetPercent() const
     }
 }
 
-std::shared_ptr<const assets::Map> assets::MapLoader::GetMap() const
+std::shared_ptr<assets::Map> assets::MapLoader::GetMap() const
 {
     if (state_ != ML_FINISHED)
         return nullptr;
@@ -146,7 +150,7 @@ void assets::MapLoader::ReadModels()
 
 void assets::MapLoader::LoadBaseModel()
 {
-    map_->basemodel_ = CacheManager::GetModel("data/" + basemodel_name_ + ".mdl");
+    map_->basemodel_ = AssetManager::GetInstance().Get<Model>(basemodel_name_);
 }
 
 bool assets::MapLoader::LoadNextModel()
@@ -155,7 +159,7 @@ bool assets::MapLoader::LoadNextModel()
         return false;
 
     const auto& model_name = model_names_[models_.size()];
-    models_.push_back(assets::CacheManager::GetModel("data/" + model_name + ".mdl"));
+    models_.push_back(AssetManager::GetInstance().Get<Model>(model_name));
     
     return true;
 }

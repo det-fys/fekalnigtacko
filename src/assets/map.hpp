@@ -56,11 +56,12 @@ struct MapLocation
     Transform transform;
 };
 
-class Map
+class Map : public Asset
 {
 public:
     Map() = default;
-    static std::shared_ptr<const Map> LoadFromFile(const std::string& filename);
+    static std::shared_ptr<Map> Load(const std::string& name);
+    static std::shared_ptr<Map> LoadFromFile(const std::string& filename);
 
     const std::shared_ptr<const Model>& GetBaseModel() const { return basemodel_; }
     const std::vector<Chunk>& GetChunks() const { return chunks_; }
@@ -96,7 +97,7 @@ public:
     bool Next();
     int GetPercent() const;
 
-    std::shared_ptr<const Map> GetMap() const;
+    std::shared_ptr<Map> GetMap() const;
 
 private:
     void ReadModels();

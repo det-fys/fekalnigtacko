@@ -7,6 +7,7 @@
 #include "utils/defs.hpp"
 #include "utils/aabb.hpp"
 #include "collision/trianglemesh.hpp"
+#include "asset_manager.hpp"
 
 #ifdef CLIENT
 #include "mesh_builder.hpp"
@@ -34,11 +35,12 @@ namespace assets
 //     };
 // };
 
-class Model
+class Model : public Asset
 {
 public:
     Model() = default;
-    static std::shared_ptr<const Model> LoadFromFile(const std::string& filename);
+    static std::shared_ptr<Model> Load(const std::string& name);
+    static std::shared_ptr<Model> LoadFromFile(const std::string& filename);
 
     const std::string& GetName() const { return name_; }
     

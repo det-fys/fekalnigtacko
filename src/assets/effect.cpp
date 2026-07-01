@@ -1,9 +1,13 @@
 #include "effect.hpp"
 
 #include "cmdfile.hpp"
-#include "assets/cache.hpp"
 
-std::shared_ptr<const assets::Effect> assets::Effect::LoadFromFile(const std::string& path)
+std::shared_ptr<assets::Effect> assets::Effect::Load(const std::string& name)
+{
+    return LoadFromFile("data/" + name + ".fx");
+}
+
+std::shared_ptr<assets::Effect> assets::Effect::LoadFromFile(const std::string& path)
 {
     auto fx = std::make_shared<Effect>();
 
@@ -15,7 +19,7 @@ std::shared_ptr<const assets::Effect> assets::Effect::LoadFromFile(const std::st
             std::string sound_name;
             iss >> sound_name;
 
-            auto sound = assets::CacheManager::GetSound("data/" + sound_name + ".snd");
+            auto sound = AssetManager::GetInstance().Get<audio::Sound>(sound_name);
 
             auto& fx_sound = fx->sounds_.emplace_back();
             fx_sound.sound = std::move(sound);
@@ -41,7 +45,7 @@ std::shared_ptr<const assets::Effect> assets::Effect::LoadFromFile(const std::st
             {
                 std::string texture_name;
                 iss >> texture_name;
-                particle->texture = assets::CacheManager::GetTexture("data/" + texture_name + ".png");
+                particle->texture = AssetManager::GetInstance().Get<gfx::Texture>(texture_name);
             }
             else if (command == "blend")
             {

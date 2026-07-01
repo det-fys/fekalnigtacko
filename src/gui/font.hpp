@@ -75,11 +75,12 @@ struct FontGlyphData
     float advance = 0.0f; // Advance width for the codepoint
 };
 
-class Font
+class Font : public assets::Asset
 {
 public:
     Font() = default;
-    static std::shared_ptr<const Font> LoadFromFile(const std::string& path);
+    static std::shared_ptr<Font> Load(const std::string& name);
+    static std::shared_ptr<Font> LoadFromFile(const std::string& path);
 
     const FontGlyphData* GetCodepointGlyph(Codepoint codepoint) const
     {

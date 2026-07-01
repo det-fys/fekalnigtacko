@@ -7,7 +7,8 @@
 #include "utils/version.hpp"
 #include "utils.hpp"
 #include "vehicleview.hpp"
-#include "assets/cache.hpp"
+#include "assets/asset_manager.hpp"
+#include "assets/item.hpp"
 #include "game/player_hud_data.hpp"
 
 game::view::ClientSession::ClientSession(App& app) : app_(app), hud_(app.GetTime())
@@ -206,7 +207,7 @@ bool game::view::ClientSession::ProcessHudMsg(net::InMessage& msg)
         size_t item_slot = 0;
         if (!hud_data.held_item.empty())
         {
-            auto item = assets::CacheManager::GetItem("data/" + hud_data.held_item + ".item");
+            auto item = assets::AssetManager::GetInstance().Get<assets::Item>(hud_data.held_item);
             displayname = item->displayname;
             clip_size = item->clip_size;
             item_slot = item->slot;

@@ -2,7 +2,7 @@
 #include "utils/random.hpp"
 
 game::DestroyedObject::DestroyedObject(World& world, std::unique_ptr<MapObjectCollision> col)
-    : Super(world, col->GetModel()->GetName()), col_(std::move(col))
+    : Super(world, col->GetModel()->GetAssetName()), col_(std::move(col))
 {
     auto destr_snd_str = col_->GetModel()->GetParam("destr_snd");
     if (destr_snd_str)
