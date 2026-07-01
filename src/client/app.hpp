@@ -12,7 +12,7 @@
 #include "net/inmessage.hpp"
 #include "gui/menu.hpp"
 #include "gameview/client_session.hpp"
-#include "wsclient.hpp"
+#include "net/client.hpp"
 #include "assets/precache.hpp"
 #include "settings.hpp"
 #include "gui/chat.hpp"
@@ -36,10 +36,14 @@ enum AppState
     APP_STATE_DISCONNECTED,
 };
 
-class App
+class App : public net::ClientInterfaceCallback
 {
 public:
     App(const std::string& settings_path);
+
+    virtual void OnClientConnect() override;
+    virtual void OnClientMessage(std::string_view data) override;
+    virtual void OnClientDisconnect() override;
 
     void Frame();
 
@@ -104,7 +108,7 @@ private:
     gui::Context gui_;
     audio::Master audiomaster_;
 
-    WsClient ws_;
+    std::unique_ptr<net::ClientInterface> interface_;
     std::string url_;
     std::string username_;
     bool connecting_ = false;

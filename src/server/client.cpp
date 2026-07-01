@@ -4,7 +4,7 @@
 #include "utils/validate.hpp"
 #include "utils/version.hpp"
 
-sv::Client::Client(Server& server, WSConnId id) : server_(server), id_(id) {}
+sv::Client::Client(Server& server, net::ConnId id) : server_(server), id_(id) {}
 
 bool sv::Client::ProcessMessage(net::InMessage& msg)
 {

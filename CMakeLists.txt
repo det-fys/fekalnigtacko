@@ -88,9 +88,6 @@ set(CLIENT_ONLY_SOURCES
     "src/client/settings.hpp"
     "src/client/settings.cpp"
     "src/client/utils.hpp"
-    "src/client/wsclient.hpp"
-    "src/client/wsclient_easywsclient.cpp"
-    "src/client/wsclient_emscripten.cpp"
     "src/gameview/characterview.hpp"
     "src/gameview/characterview.cpp"
     "src/gameview/client_session.hpp"
@@ -151,6 +148,8 @@ set(CLIENT_ONLY_SOURCES
     "src/gui/menu.cpp"
     "src/gui/player_hud.hpp"
     "src/gui/player_hud.cpp"
+    "src/net/client_ws_easywsclient.cpp"
+    "src/net/client.cpp"
     "src/utils/files.cpp"
 )
 
@@ -206,6 +205,7 @@ set(SERVER_ONLY_SOURCES
     "src/game/vehicle.cpp"
     "src/game/world.hpp"
     "src/game/world.cpp"
+    "src/net/server_ws_crow.cpp"
     "src/server/client.hpp"
     "src/server/client.cpp"
     "src/server/main.cpp"
@@ -213,8 +213,6 @@ set(SERVER_ONLY_SOURCES
     "src/server/server.cpp"
     "src/server/server_cfg.hpp"
     "src/server/server_cfg.cpp"
-    "src/server/wsserver.hpp"
-    "src/server/wsserver.cpp"
     "src/utils/files_server.cpp"
 )
 

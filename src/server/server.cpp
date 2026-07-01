@@ -11,7 +11,9 @@
 #pragma comment(lib, "winmm.lib")
 #endif
 
-sv::Server::Server(uint16_t port) : ws_(port) {}
+sv::Server::Server(std::unique_ptr<net::ServerInterface> iface) : interface_(std::move(iface))
+{
+}
 
 void sv::Server::Run()
 {
@@ -58,34 +60,34 @@ void sv::Server::Run()
 
 void sv::Server::Send(Client& client, std::string msg)
 {
-    ws_.Send(client.GetConnId(), std::move(msg));
+    interface_->Send(client.GetConnId(), std::move(msg));
 }
 
 void sv::Server::Disconnect(Client& client)
 {
-    ws_.Close(client.GetConnId());
+    interface_->CloseConnection(client.GetConnId());
 }
 
 void sv::Server::PollWSEvents()
 {
-    WSEvent event;
-    while (ws_.PollEvent(event))
+    net::ServerInterfaceEvent event;
+    while (interface_->PollEvent(event))
     {
         switch (event.type)
         {
-        case WSE_CONNECTED:
+        case net::SVE_CONNECTED:
             HandleWSConnect(event.conn);
             break;
 
-        case WSE_MESSAGE:
+        case net::SVE_MESSAGE:
             HandleWSMessage(event.conn, event.data);
             break;
 
-        case WSE_DISCONNECTED:
+        case net::SVE_DISCONNECTED:
             HandleWSDisconnect(event.conn);
             break;
 
-        case WSE_EXIT:
+        case net::SVE_EXIT:
             exit_ = true;
             break;
 
@@ -95,12 +97,12 @@ void sv::Server::PollWSEvents()
     }
 }
 
-void sv::Server::HandleWSConnect(WSConnId conn) 
+void sv::Server::HandleWSConnect(net::ConnId conn) 
 {
     clients_[conn] = std::make_unique<Client>(*this, conn);
 }
 
-void sv::Server::HandleWSMessage(WSConnId conn, const std::string& data)
+void sv::Server::HandleWSMessage(net::ConnId conn, const std::string& data)
 {
     net::InMessage msg(data.data(), data.size());
     auto& client = clients_.at(conn);
@@ -110,7 +112,7 @@ void sv::Server::HandleWSMessage(WSConnId conn, const std::string& data)
     }    
 }
 
-void sv::Server::HandleWSDisconnect(WSConnId conn)
+void sv::Server::HandleWSDisconnect(net::ConnId conn)
 {
     clients_.erase(conn);
 }

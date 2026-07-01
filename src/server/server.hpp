@@ -4,7 +4,7 @@
 #include <memory>
 #include <set>
 
-#include "wsserver.hpp"
+#include "net/server.hpp"
 #include "client.hpp"
 
 #include "game/game.hpp"
@@ -15,7 +15,7 @@ namespace sv
 class Server
 {
 public:
-    Server(uint16_t port);
+    Server(std::unique_ptr<net::ServerInterface> iface);
 
     void Run();
 
@@ -29,18 +29,18 @@ public:
 
 private:
     void PollWSEvents();
-    void HandleWSConnect(WSConnId conn);
-    void HandleWSMessage(WSConnId conn, const std::string& data);
-    void HandleWSDisconnect(WSConnId conn);
+    void HandleWSConnect(net::ConnId conn);
+    void HandleWSMessage(net::ConnId conn, const std::string& data);
+    void HandleWSDisconnect(net::ConnId conn);
 
     void Update();
 
 private:
-    WSServer ws_;
+    std::unique_ptr<net::ServerInterface> interface_;
     bool exit_ = false;
 
     game::Game game_;
-    std::unordered_map<WSConnId, std::unique_ptr<Client>> clients_;
+    std::unordered_map<net::ConnId, std::unique_ptr<Client>> clients_;
 
     int64_t time_ = 0;
     

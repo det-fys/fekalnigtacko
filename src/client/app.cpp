@@ -13,6 +13,8 @@
 #include "utils/keys.hpp"
 #include "utils/chatcolors.hpp"
 
+#include "net/client_ws_easywsclient.hpp"
+
 CVAR(float, sensitivity, CV_SAVE, 0.5f);
 CVAR(float, volume, CV_SAVE, 0.2f, 0.0f);
 
@@ -66,9 +68,44 @@ App::App(const std::string& settings_path)
 	}
 }
 
+void App::OnClientConnect()
+{
+    connected_ = true;
+    connecting_ = false;
+}
+
+void App::OnClientMessage(std::string_view data)
+{
+	if (!session_)
+		return;
+
+	// record stats
+	size_t s = data.size();
+	++stat_msgs_;
+	stat_msglen_total_ += s;
+	stat_msglen_min_ = std::min(stat_msglen_min_, s);
+	stat_msglen_max_ = std::max(stat_msglen_max_, s);
+
+	net::InMessage msg(data.data(), data.size());
+	if (!session_->ProcessMessage(msg))
+	{
+        std::cerr << "FAILED to process message!" << std::endl;
+		local_error_ = true;
+	}
+}
+
+void App::OnClientDisconnect()
+{
+    connected_ = false;
+    connecting_ = false;
+
+	interface_.reset();
+}
+
 void App::Frame()
 {
-	ws_.Poll();
+	if (interface_)
+		interface_->Poll();
 
 	Update();
 	Draw();
@@ -275,8 +312,6 @@ void App::UpdateVolume()
 	volume.ClearModified();
 }
 
-
-
 void App::UpdateSession()
 {
 	if (!session_)
@@ -287,12 +322,13 @@ void App::UpdateSession()
 	updinfo.delta_time = delta_time_;
 	session_->Update(updinfo);
 
-	if (connected_)
+	if (connected_ && interface_)
 	{
 		auto msg = session_->GetMsg();
 		if (!msg.empty())
 		{
-			ws_.Send(msg);
+			std::string_view data(msg.data(), msg.size_bytes());
+			interface_->Send(data);
 		}
 
 		session_->ResetMsg();
@@ -341,41 +377,9 @@ void App::DrawStats()
 
 void App::Connect()
 {
-	ws_.SetOnConnect([this]{
-		connected_ = true;
-		connecting_ = false;
-	});
-
-	ws_.SetOnMessage([this](std::span<const char> data) {
-		ProcessWsMessage(data);
-	});
-
-	ws_.SetOnDisconnect([this]{
-		connected_ = false;
-		connecting_ = false;
-	});
-
-	connecting_ = ws_.Connect(url_);
-}
-
-void App::ProcessWsMessage(std::span<const char> data)
-{
-	if (!session_)
-		return;
-
-	// record stats
-	size_t s = data.size();
-	++stat_msgs_;
-	stat_msglen_total_ += s;
-	stat_msglen_min_ = std::min(stat_msglen_min_, s);
-	stat_msglen_max_ = std::max(stat_msglen_max_, s);
-
-	net::InMessage msg(data.data(), data.size());
-	if (!session_->ProcessMessage(msg))
-	{
-        std::cerr << "FAILED to process message!" << std::endl;
-		local_error_ = true;
-	}
+	connecting_ = true;
+	connected_ = false;
+	interface_ = std::make_unique<net::EasyWsClientWSClientInterface>(*this, url_);
 }
 
 void App::UpdateState()
