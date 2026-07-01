@@ -6,7 +6,6 @@
 #include "utils/defs.hpp"
 
 #include <iostream>
-#include <syncstream>
 
 namespace assets
 {
@@ -67,7 +66,7 @@ public:
         }
 
         // load
-        std::osyncstream(std::cout) << "loading <" << typeid(T).name() << "> \"" << name << "\"" << std::endl;
+        std::cout << "loading <" << typeid(T).name() << "> \"" << name << "\"" << std::endl;
         auto ptr = T::Load(name);
         static_cast<Asset*>(ptr.get())->name_ = name;
 
