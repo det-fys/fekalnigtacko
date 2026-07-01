@@ -37,7 +37,9 @@ void game::MapInstance::SpawnObj(net::ObjNum objnum)
         return; // already spawned
 
     const auto& objs = map_->GetStaticObjects();
-    obj_cols_[i] = std::make_unique<MapObjectCollision>(world_, objs[i].model, static_cast<net::ObjNum>(i), objs[i].node.local, MAPOBJ_DESTRUCTIBLE);
+    obj_cols_[i] =
+        std::make_unique<MapObjectCollision>(world_, map_->GetObjModels()[objs[i].model_idx],
+                                             static_cast<net::ObjNum>(i), objs[i].node.local, MAPOBJ_DESTRUCTIBLE);
 }
 
 std::unique_ptr<game::MapObjectCollision> game::MapInstance::DestroyObj(net::ObjNum objnum, const MapObjectBreakInfo& info)

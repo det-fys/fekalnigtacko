@@ -6,6 +6,7 @@
 #include "draw_args.hpp"
 #include "net/defs.hpp"
 #include "utils/defs.hpp"
+#include "modelview.hpp"
 
 namespace game::view
 {
@@ -41,14 +42,18 @@ public:
     void EnableObj(net::ObjNum num, bool enable);
 
 private:
+    void InitModelViews();
     void InitObjsAndCollisions();
 
-    void DrawChunk(const game::view::DrawArgs& args, const assets::Mesh& basemesh, const assets::Chunk& chunk) const;
+    void DrawChunk(const game::view::DrawArgs& args, const assets::Chunk& chunk) const;
 
 private:
     collision::DynamicsWorld& world_;
     std::unique_ptr<assets::MapLoader> loader_;
     std::shared_ptr<const assets::Map> map_;
+
+    std::shared_ptr<const ModelView> basemodel_view_;
+    std::vector<std::shared_ptr<const ModelView>> obj_models_view_;
 
     std::unique_ptr<MapObjectCollisionView> basemodel_col_;
 

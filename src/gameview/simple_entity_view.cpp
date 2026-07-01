@@ -12,7 +12,7 @@ game::view::SimpleEntityView::SimpleEntityView(WorldView& world, net::InMessage&
 
     if (modelname.len > 0)
     {
-        model_ = assets::AssetManager::GetInstance().Get<assets::Model>(std::string(modelname));
+        model_ = assets::AssetManager::GetInstance().Get<ModelView>(std::string(modelname));
         if (!model_)
             throw EntityInitError();
     }
@@ -60,8 +60,8 @@ void game::view::SimpleEntityView::Draw(const DrawArgs& args)
     if (!model_)
         return;
 
-    const auto& mesh = *model_->GetMesh();
-    for (const auto& surface : mesh.surfaces)
+    auto surfaces = model_->GetSurfaces();
+    for (const auto& surface : surfaces)
     {
         gfx::DrawSurfaceCmd cmd;
         cmd.surface = &surface;

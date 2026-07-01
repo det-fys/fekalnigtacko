@@ -108,7 +108,7 @@ int assets::MapLoader::GetPercent() const
         return 10;
 
     case ML_LOAD_MODELS:
-        return 60 + (model_names_.size() > 0 ? (models_.size() * 30 / model_names_.size()) : 30);
+        return 60 + (model_names_.size() > 0 ? (map_->obj_models_.size() * 30 / model_names_.size()) : 30);
 
     case ML_STRUCTS:
         return 90;
@@ -155,11 +155,11 @@ void assets::MapLoader::LoadBaseModel()
 
 bool assets::MapLoader::LoadNextModel()
 {
-    if (models_.size() >= model_names_.size())
+    if (map_->obj_models_.size() >= model_names_.size())
         return false;
 
-    const auto& model_name = model_names_[models_.size()];
-    models_.push_back(AssetManager::GetInstance().Get<Model>(model_name));
+    const auto& model_name = model_names_[map_->obj_models_.size()];
+    map_->obj_models_.push_back(AssetManager::GetInstance().Get<Model>(model_name));
     
     return true;
 }
@@ -195,10 +195,10 @@ void assets::MapLoader::LoadStructs()
             size_t model_idx;
             iss >> model_idx;
 
-            if (model_idx >= models_.size())
+            if (model_idx >= map_->obj_models_.size())
                 throw std::runtime_error("static in map with out of range model idx");
 
-            obj.model = models_[model_idx];
+            obj.model_idx = model_idx;
 
             glm::vec3 angles;
 
@@ -207,7 +207,7 @@ void assets::MapLoader::LoadStructs()
 
             obj.node.UpdateMatrix();
 
-            obj.aabb = TransformAABB(obj.model->GetAABB(), obj.node.matrix);
+            obj.aabb = TransformAABB(map_->obj_models_[model_idx]->GetAABB(), obj.node.matrix);
             chunk->aabb.AddAABB(obj.aabb);
 
             std::string flag;
@@ -247,20 +247,13 @@ void assets::MapLoader::LoadStructs()
             if (!map_->basemodel_)
                 throw std::runtime_error("surface in map with no basemodel");
 
-            auto mesh = map_->basemodel_->GetMesh();
-
-            if (!mesh)
-                throw std::runtime_error("surface in map with no basemodel mesh");
-
-            auto it = mesh->surface_names.find(name);
-            if (it == mesh->surface_names.end())
+            size_t idx = 0;
+            if (!map_->basemodel_->GetSurfaceIndex(name, idx))
+            {
                 throw std::runtime_error("surface name not found");
+            }
 
-            if (first + count > mesh->surfaces[it->second].count)
-                throw std::runtime_error("surface invalid range");
-
-            chunk->surfaces.emplace_back(it->second, first, count);
-
+            chunk->surfaces.emplace_back(idx, first, count);
 #endif /* CLIENT */
         }
 

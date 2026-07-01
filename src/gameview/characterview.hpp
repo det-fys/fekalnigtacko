@@ -1,7 +1,7 @@
 #pragma once
 
 #include "entityview.hpp"
-#include "assets/model.hpp"
+#include "modelview.hpp"
 #include "assets/item.hpp"
 #include "assets/effect.hpp"
 #include "game/skeletoninstance.hpp"
@@ -27,7 +27,7 @@ struct CharacterViewState
 
 struct CharacterViewClothes
 {
-    std::shared_ptr<const assets::Model> model;
+    std::shared_ptr<const ModelView> model;
     glm::vec4 color = glm::vec4(1.0f);
     uint32_t surfacemask = 0;
 };
@@ -67,7 +67,7 @@ private:
 private:
     float yaw_ = 0.0f;
 
-    std::shared_ptr<const assets::Model> basemodel_;
+    std::shared_ptr<const ModelView> basemodel_;
     SkeletonInstance sk_;
     SkinningUBO ubo_;
     bool ubo_valid_ = false;
@@ -86,6 +86,7 @@ private:
     TransformNode item_node_;
     TransformNode fire_snd_node_;
     std::shared_ptr<const assets::Item> item_;
+    std::shared_ptr<const ModelView> item_model_;
     std::shared_ptr<const audio::Sound> fire_snd_;
     std::shared_ptr<const assets::Effect> fire_fx_;
     glm::vec3 fire_fx_offset_{};

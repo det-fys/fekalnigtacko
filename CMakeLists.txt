@@ -62,8 +62,6 @@ set(COMMON_SOURCES
 set(CLIENT_ONLY_SOURCES
     "src/assets/effect.hpp"
     "src/assets/effect.cpp"
-    "src/assets/mesh_builder.hpp"
-    "src/assets/mesh_builder.cpp"
     "src/assets/precache.hpp"
     "src/assets/precache.cpp"
     "src/audio/defs.hpp"
@@ -98,6 +96,8 @@ set(CLIENT_ONLY_SOURCES
     "src/gameview/mapinstanceview.cpp"
     "src/gameview/markerview.hpp"
     "src/gameview/markerview.cpp"
+    "src/gameview/modelview.hpp"
+    "src/gameview/modelview.cpp"
     "src/gameview/particle_emitter.hpp"
     "src/gameview/particle_emitter.cpp"
     "src/gameview/remote_menu_view.hpp"

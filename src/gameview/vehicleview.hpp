@@ -5,6 +5,7 @@
 #include "assets/vehiclemdl.hpp"
 #include "game/vehicle_sync.hpp"
 #include "game/deform_grid.hpp"
+#include "modelview.hpp"
 
 #include <chrono>
 
@@ -13,7 +14,7 @@ namespace game::view
 
 struct VehicleWheelViewInfo
 {
-    std::shared_ptr<const assets::Model> model;
+    std::shared_ptr<const ModelView> model;
     glm::vec4 color;
 
     TransformNode node;
@@ -77,7 +78,8 @@ private:
 
 private:
     std::shared_ptr<const assets::VehicleModel> model_;
-    assets::Mesh mesh_;
+    std::shared_ptr<const ModelView> model_view_;
+    std::vector<gfx::Surface> surfaces_;
     glm::vec4 colors_[SD_MAX_COLORS];
     glm::vec4 destroyed_colors_[SD_MAX_COLORS];
     glm::vec3 headlight_color_;
@@ -104,7 +106,7 @@ private:
     float reverse_light_factor_ = 0.0f;
 
     size_t num_headlights = 0;
-    std::shared_ptr<const assets::Model> light_cone_mdl_;
+    std::shared_ptr<const ModelView> light_cone_mdl_;
     TransformNode light_cone_node_[2];
     glm::vec4 headlight_cone_color_;
 

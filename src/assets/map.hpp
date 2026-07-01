@@ -17,7 +17,7 @@ struct MapStaticObject
 {
     game::TransformNode node;
     AABB3 aabb;
-    std::shared_ptr<const Model> model;
+    size_t model_idx = 0;
     glm::vec3 color = glm::vec3(1.0f);
 };
 
@@ -64,6 +64,7 @@ public:
     static std::shared_ptr<Map> LoadFromFile(const std::string& filename);
 
     const std::shared_ptr<const Model>& GetBaseModel() const { return basemodel_; }
+    const std::vector<std::shared_ptr<const Model>>& GetObjModels() const { return obj_models_; }
     const std::vector<Chunk>& GetChunks() const { return chunks_; }
     const std::vector<MapStaticObject>& GetStaticObjects() const { return objs_; }
     const MapGraph* GetGraph(const std::string& name) const;
@@ -71,6 +72,7 @@ public:
 
 private:
     std::shared_ptr<const Model> basemodel_;
+    std::vector<std::shared_ptr<const Model>> obj_models_;
     std::vector<Chunk> chunks_;
     std::vector<MapStaticObject> objs_;
     std::map<std::string, MapGraph> graphs_;
@@ -112,7 +114,6 @@ private:
 
     std::string basemodel_name_;
     std::vector<std::string> model_names_;
-    std::vector<std::shared_ptr<const Model>> models_;
 
     std::shared_ptr<Map> map_;
 };

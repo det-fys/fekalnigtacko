@@ -60,12 +60,12 @@ bool game::view::MarkerView::Init(net::InMessage& msg)
     std::string model_name_str = model_name;
     if (!model_name_str.empty())
     {
-        model_ = assets::AssetManager::GetInstance().Get<assets::Model>(model_name_str);
+        model_ = assets::AssetManager::GetInstance().Get<ModelView>(model_name_str);
     }
 
     if (marker_type_ == MARKER_FOOT || marker_type_ == MARKER_VEHICLE)
     {
-        base_model_ = assets::AssetManager::GetInstance().Get<assets::Model>("marker_base");
+        base_model_ = assets::AssetManager::GetInstance().Get<ModelView>("marker_base");
     }
 
 
@@ -73,10 +73,10 @@ bool game::view::MarkerView::Init(net::InMessage& msg)
     return true;
 }
 
-void game::view::MarkerView::DrawModel(const DrawArgs& args, const assets::Model& model, const TransformNode& node)
+void game::view::MarkerView::DrawModel(const DrawArgs& args, const ModelView& model, const TransformNode& node)
 {
-    const auto& mesh = *model.GetMesh();
-    for (const auto& surface : mesh.surfaces)
+    auto surfaces = model.GetSurfaces();
+    for (const auto& surface : surfaces)
     {
         gfx::DrawSurfaceCmd cmd;
         cmd.surface = &surface;

@@ -11,8 +11,8 @@ game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) 
     if (!msg.Read(model_name))
         throw EntityInitError();;
 
-    basemodel_ = assets::AssetManager::GetInstance().Get<assets::Model>(std::string(model_name));
-    sk_ = SkeletonInstance(basemodel_->GetSkeleton(), &root_);
+    basemodel_ = assets::AssetManager::GetInstance().Get<ModelView>(std::string(model_name));
+    sk_ = SkeletonInstance(basemodel_->GetModel()->GetSkeleton(), &root_);
     ubo_.Update();
     ubo_valid_ = true;
 
@@ -151,8 +151,8 @@ void game::view::CharacterView::Draw(const DrawArgs& args)
     // draw clothes
     for (const auto& clothes : clothes_)
     {
-        const auto& mesh = *clothes.model->GetMesh();
-        for (const auto& surface : mesh.surfaces)
+        auto surfaces = clothes.model->GetSurfaces();
+        for (const auto& surface : surfaces)
         {
             gfx::DrawSurfaceCmd cmd;
             cmd.surface = &surface;
@@ -164,14 +164,14 @@ void game::view::CharacterView::Draw(const DrawArgs& args)
     }
 
     // draw basemodel
-    const auto& mesh = *basemodel_->GetMesh();
-    for (size_t i = 0; i < mesh.surfaces.size(); ++i)
+    auto surfaces = basemodel_->GetSurfaces();
+    for (size_t i = 0; i < surfaces.size(); ++i)
     {
         if (!(surfacemask_ & (1 << i))) // hidden by clothes?
             continue;
 
         gfx::DrawSurfaceCmd cmd;
-        cmd.surface = &mesh.surfaces[i];
+        cmd.surface = &surfaces[i];
         cmd.matrices = &root_.matrix;
         cmd.skinning = &ubo_;
         args.dlist.AddSurface(cmd);
@@ -292,11 +292,10 @@ bool game::view::CharacterView::ReadState(net::InMessage* msg)
 
 game::view::CharacterView::SurfaceMask game::view::CharacterView::GetSurfaceMask(const std::string& name)
 {
-    const auto& surface_names = basemodel_->GetMesh()->surface_names;
-    auto it = surface_names.find(name);
-    if (it != surface_names.end())
+    size_t idx = 0;
+    if (basemodel_->GetModel()->GetSurfaceIndex(name, idx))
     {
-        return 1 << it->second;
+        return 1 << idx;
     }
 
     return 0;
@@ -319,12 +318,12 @@ void game::view::CharacterView::AddClothes(const std::string& name, const glm::v
 
     if (name == "tshirt")
     {
-        c.model = assets::AssetManager::GetInstance().Get<assets::Model>("tshirt");
+        c.model = assets::AssetManager::GetInstance().Get<ModelView>("tshirt");
         c.surfacemask = GetSurfaceMask("upperbody");
     }
     else if (name == "shorts")
     {
-        c.model = assets::AssetManager::GetInstance().Get<assets::Model>("shorts");
+        c.model = assets::AssetManager::GetInstance().Get<ModelView>("shorts");
         c.surfacemask = GetSurfaceMask("upperlegs");
     }
     else
@@ -369,6 +368,7 @@ void game::view::CharacterView::SetItem(const std::string& item_name)
     }
 
     item_ = assets::AssetManager::GetInstance().Get<assets::Item>(item_name);
+    item_model_ = assets::AssetManager::GetInstance().Get<ModelView>(item_->model_name);
 
     auto bone_node = sk_.GetBoneNodeByName(item_->bone);
     item_node_.parent = bone_node ? bone_node : &root_;
@@ -397,8 +397,8 @@ void game::view::CharacterView::DrawItem(const DrawArgs& args)
     if (!item_ || !item_->model)
         return;
 
-    const auto& mesh = *item_->model->GetMesh();
-    for (const auto& surface : mesh.surfaces)
+    auto surfaces = item_model_->GetSurfaces();
+    for (const auto& surface : surfaces)
     {
         gfx::DrawSurfaceCmd cmd;
         cmd.surface = &surface;

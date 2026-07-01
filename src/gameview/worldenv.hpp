@@ -1,4 +1,4 @@
-#include "assets/model.hpp"
+#include "modelview.hpp"
 #include "draw_args.hpp"
 
 namespace game::view
@@ -29,14 +29,14 @@ public:
     float GetDayTime() const { return daytime_; }
 
 private:
-    void DrawEnvModel(const DrawArgs& args, const assets::Model& model, const glm::mat4& matrix, const glm::vec4& color, float dist);
+    void DrawEnvModel(const DrawArgs& args, const ModelView& model, const glm::mat4& matrix, const glm::vec4& color, float dist);
 
 private:
     float daytime_ = 0.0f; // 0 - 24
 
-    std::shared_ptr<const assets::Model> sunmodel_;
-    std::shared_ptr<const assets::Model> moonmodel_;
-    std::shared_ptr<const assets::Model> halfspheremodel_;
+    std::shared_ptr<const ModelView> sunmodel_;
+    std::shared_ptr<const ModelView> moonmodel_;
+    std::shared_ptr<const ModelView> halfspheremodel_;
 
     glm::mat4 sun_matrix_;
     glm::vec4 sun_color_;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "assets/model.hpp"
+#include "modelview.hpp"
 #include "entityview.hpp"
 #include "game/simple_entity_sync.hpp"
 
@@ -28,7 +28,7 @@ private:
     bool ReadState(net::InMessage* msg);
 
 private:
-    std::shared_ptr<const assets::Model> model_;
+    std::shared_ptr<const ModelView> model_;
 
     SimpleEntitySyncState sync_;
     SimpleEntityViewState states_[2];

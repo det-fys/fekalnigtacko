@@ -2,7 +2,7 @@
 
 #include "entityview.hpp"
 #include "game/marker_info.hpp"
-#include "assets/model.hpp"
+#include "modelview.hpp"
 
 namespace game::view
 {
@@ -22,14 +22,14 @@ public:
 private:
     bool Init(net::InMessage& msg);
 
-    void DrawModel(const DrawArgs& args, const assets::Model& model, const TransformNode& node);
+    void DrawModel(const DrawArgs& args, const ModelView& model, const TransformNode& node);
 
 private:
     MarkerType marker_type_;
     glm::vec4 color_;
 
-    std::shared_ptr<const assets::Model> base_model_;
-    std::shared_ptr<const assets::Model> model_;
+    std::shared_ptr<const ModelView> base_model_;
+    std::shared_ptr<const ModelView> model_;
     TransformNode icon_node_;
 
 };

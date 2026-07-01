@@ -4,9 +4,9 @@
 
 game::view::WorldEnv::WorldEnv()
 {
-    sunmodel_ = assets::AssetManager::GetInstance().Get<assets::Model>("env_sun");
-    moonmodel_ = assets::AssetManager::GetInstance().Get<assets::Model>("env_moon");
-    halfspheremodel_ = assets::AssetManager::GetInstance().Get<assets::Model>("env_halfsphere");
+    sunmodel_ = assets::AssetManager::GetInstance().Get<ModelView>("env_sun");
+    moonmodel_ = assets::AssetManager::GetInstance().Get<ModelView>("env_moon");
+    halfspheremodel_ = assets::AssetManager::GetInstance().Get<ModelView>("env_halfsphere");
 }
 
 static const glm::vec4 color1(1.0f);
@@ -216,12 +216,11 @@ void game::view::WorldEnv::Draw(const DrawArgs& args)
     DrawEnvModel(args, *sunmodel_, sun_matrix_, sun_color_, dist - 3.0f);
 }
 
-void game::view::WorldEnv::DrawEnvModel(const DrawArgs& args, const assets::Model& model, const glm::mat4& matrix,
+void game::view::WorldEnv::DrawEnvModel(const DrawArgs& args, const ModelView& model, const glm::mat4& matrix,
                                         const glm::vec4& color, float dist)
 {
-    const auto& mesh = model.GetMesh();
-
-    for (const auto& surface : mesh->surfaces)
+    auto surfaces = model.GetSurfaces();
+    for (const auto& surface : surfaces)
     {
         gfx::DrawSurfaceCmd cmd{};
         cmd.surface = &surface;

@@ -5,7 +5,7 @@
 
 game::view::ParticleEmitter::ParticleEmitter(audio::Player* audioplayer) : audioplayer_(audioplayer)
 {
-    quad_model_ = assets::AssetManager::GetInstance().Get<assets::Model>("quad");
+    quad_model_ = assets::AssetManager::GetInstance().Get<ModelView>("quad");
 }
 
 void game::view::ParticleEmitter::Update(float delta_time)
@@ -80,7 +80,7 @@ void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effec
             continue;
 
         // steal a quad surface from quad model
-        gfx::Surface surface = quad_model_->GetMesh()->surfaces[0];
+        gfx::Surface surface = quad_model_->GetSurfaces()[0];
         surface.texture = def.texture;
         surface.sflags = gfx::SF_2SIDED | gfx::SF_OBJECT_COLOR | gfx::SF_OBJECT_COLOR_MULT;
 

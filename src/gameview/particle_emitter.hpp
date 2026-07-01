@@ -1,7 +1,7 @@
 #pragma once
 
 #include "assets/effect.hpp"
-#include "assets/model.hpp"
+#include "modelview.hpp"
 #include "draw_args.hpp"
 #include "audio/player.hpp"
 
@@ -44,7 +44,7 @@ public:
 private:
     audio::Player* audioplayer_;
 
-    std::shared_ptr<const assets::Model> quad_model_; // to steal quad VAO from
+    std::shared_ptr<const ModelView> quad_model_; // to steal quad VAO from
     
     std::vector<Particle> particles_;
 

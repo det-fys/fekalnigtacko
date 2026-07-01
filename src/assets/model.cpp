@@ -36,10 +36,8 @@ std::shared_ptr<assets::Model> assets::Model::Load(const std::string& name)
 std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& filename)
 {
     auto model = std::make_shared<Model>();
-    model->name_ = filename; // TODO: name not filename
     std::vector<glm::vec3> vert_pos; // rember for collision trimesh
     
-    CLIENT_ONLY(MeshBuilder mb(gfx::MF_NONE);)
     std::unique_ptr<btConvexHullShape> temp_hull;
     std::unique_ptr<btCompoundShape> compound;
 
@@ -48,11 +46,11 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
     LoadCMDFile(filename, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "v")
         {
-            glm::vec3 pos;
+            glm::vec3 pos{};
             iss >> pos.x >> pos.y >> pos.z;
 
             CLIENT_ONLY(
-                MeshVertex v;
+                ModelVertex v{};
                 v.pos = pos;
                 iss >> v.normal.x >> v.normal.y >> v.normal.z;
                 iss >> v.uv.x >> v.uv.y;
@@ -69,7 +67,7 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
                     }
                 }
     
-                mb.AddVertex(v);
+                model->vertices_.emplace_back(v);
             )
 
             if (model->cmesh_)
@@ -91,12 +89,18 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             iss >> indices[0] >> indices[1] >> indices[2];
             
             CLIENT_ONLY(
-                MeshTriangle t;
+                ModelTriangle t;
                 t.vert[0] = indices[0];
                 t.vert[1] = indices[1];
                 t.vert[2] = indices[2];
 
-                mb.AddTriangle(t);
+                if (model->surfaces_.empty())
+                {
+                    throw std::runtime_error("Face without surface in model");
+                }
+
+                model->tris_.emplace_back(t);
+                ++model->surfaces_.back().num_tris;
             )
 
             if (model->cmesh_)
@@ -116,10 +120,18 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
         }
         else if (command == "surface")
         {
-            std::string surface_name, texture_name;
-            CLIENT_ONLY(gfx::SurfaceFlags sflags = gfx::SF_NONE;)
-
+            std::string surface_name;
             iss >> surface_name;
+
+            size_t first = 0;
+            if (!model->surfaces_.empty())
+            {
+                first = model->surfaces_.back().first_tri + model->surfaces_.back().num_tris;
+            }
+
+            model->surface_indices_[surface_name] = model->surfaces_.size();
+            auto& surface = model->surfaces_.emplace_back();
+            surface.first_tri = first;
 
             // Optional flags
             std::string flag;
@@ -129,51 +141,39 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
 
                 if (flag == "+texture")
                 {
-                    iss >> texture_name;
+                    iss >> surface.texture_name;
                 }
                 else if (flag == "+2sided")
                 {
-                    CLIENT_ONLY(sflags |= gfx::SF_2SIDED;)
+                    surface.two_sided = true;
                 }
                 else if (flag == "+ocolor")
                 {
-                    CLIENT_ONLY(sflags |= gfx::SF_OBJECT_COLOR;)
+                    surface.object_color = true;
                 }
                 else if (flag == "+ocolor_mult")
                 {
-                    CLIENT_ONLY(sflags |= gfx::SF_OBJECT_COLOR;)
-                    CLIENT_ONLY(sflags |= gfx::SF_OBJECT_COLOR_MULT;)
+                    surface.object_color = true;
+                    surface.object_color_mult = true;
                 }
                 else if (flag == "+multicolor")
                 {
-                    CLIENT_ONLY(sflags |= gfx::SF_MULTICOLOR;)
+                    surface.multicolor = true;
                 }
                 else if (flag == "+blend")
                 {
                     std::string blend_str;
                     iss >> blend_str;
 
-                    CLIENT_ONLY(
-                        sflags |= gfx::SF_BLEND;
-                        if (blend_str == "additive")
-                            sflags |= gfx::SF_BLEND_ADDITIVE;
-                    )
+                    surface.blend = true;
+                    if (blend_str == "additive")
+                        surface.blend_additive = true;
                 }
                 else if (flag == "+unlit")
                 {
-                    CLIENT_ONLY(sflags |= gfx::SF_UNLIT;)
+                    surface.unlit = true;
                 }
             }
-
-            CLIENT_ONLY(
-                std::shared_ptr<const gfx::Texture> texture;
-                if (!texture_name.empty())
-                {
-                    texture = assets::AssetManager::GetInstance().Get<gfx::Texture>(texture_name);
-                }
-    
-                mb.BeginSurface(sflags, surface_name, texture);
-            )
         }
         else if (command == "makecoltrimesh")
         {
@@ -188,7 +188,6 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             std::string skel_name;
             iss >> skel_name;
             model->skeleton_ = AssetManager::GetInstance().Get<Skeleton>(skel_name);
-            CLIENT_ONLY(mb.SetMeshFlag(gfx::MF_SKELETAL));
         }
         else if (command == "col")
         {
@@ -259,11 +258,6 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
         }
     });
     
-    CLIENT_ONLY(
-        mb.Build();
-        model->mesh_ = mb.GetMesh();
-    )
-
     // tri mesh
     if (model->cmesh_)
         model->cmesh_->Build();
@@ -291,6 +285,16 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
     }
 
     return model;
+}
+
+bool assets::Model::GetSurfaceIndex(const std::string& name, size_t & idx) const
+{
+    auto it = surface_indices_.find(name);
+    if (it == surface_indices_.end())
+        return false;
+
+    idx = it->second;
+    return true;
 }
 
 const std::string* assets::Model::GetParam(const std::string& key) const

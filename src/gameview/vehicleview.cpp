@@ -17,7 +17,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
         throw EntityInitError();
 
     model_ = assets::AssetManager::GetInstance().Get<assets::VehicleModel>(std::string(modelname));
-    mesh_ = *model_->GetModel()->GetMesh();
+    model_view_ = assets::AssetManager::GetInstance().Get<ModelView>(model_->GetModel()->GetAssetName());
     InitMesh();
     InitHeadlights();
     
@@ -110,7 +110,7 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
     
     // base model
     const glm::vec4* colors = exploded ? &destroyed_colors_[0] : &colors_[0]; 
-    for (const auto& surface : mesh_.surfaces)
+    for (const auto& surface : surfaces_)
     {
         gfx::DrawSurfaceCmd cmd;
         cmd.surface = &surface;
@@ -126,9 +126,8 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
         const auto& wheels = model_->GetWheels();
         for (size_t i = 0; i < wheels.size(); ++i)
         {
-            const auto& mesh = *wheels_[i].model->GetMesh();
-    
-            for (const auto& surface : mesh.surfaces)
+            auto surfaces = wheels_[i].model->GetSurfaces();
+            for (const auto& surface : surfaces)
             {
                 gfx::DrawSurfaceCmd cmd;
                 cmd.surface = &surface;
@@ -161,9 +160,8 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
         // cones
         for (size_t i = 0; i < num_headlights; ++i)
         {
-            auto& cone_surfaces = light_cone_mdl_->GetMesh()->surfaces;
-            
-            for (const auto& surface : cone_surfaces)
+            auto surfaces = light_cone_mdl_->GetSurfaces();
+            for (const auto& surface : surfaces)
             {
                 gfx::DrawSurfaceCmd cmd;
                 cmd.surface = &surface;
@@ -177,6 +175,9 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
 
 void game::view::VehicleView::InitMesh()
 {
+    auto orig_surfaces = model_view_->GetSurfaces();
+    surfaces_.assign(orig_surfaces.begin(), orig_surfaces.end());
+
     gfx::DeformGridInfo info{};
     info.min = glm::vec3(-1.0f, -2.5f, 0.10f);
     info.max = glm::vec3(1.0f, 2.0f, 1.8f);
@@ -184,7 +185,7 @@ void game::view::VehicleView::InitMesh()
     info.max_offset = 0.1f;
     deform_ = std::make_unique<VehicleDeformView>(info);
 
-    for (auto& surface : mesh_.surfaces)
+    for (auto& surface : surfaces_)
     {
         surface.deform_tex = deform_->tex;
         surface.sflags |= gfx::SF_DEFORM_GRID;
@@ -227,9 +228,10 @@ bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
 
         std::string wheel_model_name = wheelmodel_fixed;
 
-        wheels_[i].model = !wheel_model_name.empty()
-                               ? assets::AssetManager::GetInstance().Get<assets::Model>(wheel_model_name)
-                               : model_->GetWheels()[i].model;
+        wheels_[i].model =
+            !wheel_model_name.empty()
+                ? assets::AssetManager::GetInstance().Get<ModelView>(wheel_model_name)
+                : assets::AssetManager::GetInstance().Get<ModelView>(model_->GetWheels()[i].model->GetAssetName());
         wheels_[i].color = recv_colors[1]; // TODO: dynamic?;
         wheels_[i].color.a = 0.0f;
     }
@@ -391,7 +393,7 @@ void game::view::VehicleView::InitHeadlights()
 
         if (!light_cone_mdl_)
         {
-            light_cone_mdl_ = assets::AssetManager::GetInstance().Get<assets::Model>("headlightcone");
+            light_cone_mdl_ = assets::AssetManager::GetInstance().Get<ModelView>("headlightcone");
         }
 
         light_cone_node_[i].parent = &root_;
@@ -426,12 +428,10 @@ void game::view::VehicleView::UpdateWindows()
     {
         windows_broken_ = true;
 
-        auto it = mesh_.surface_names.find("carwindows"); 
-        if (it != mesh_.surface_names.end())
+        size_t idx;
+        if (model_->GetModel()->GetSurfaceIndex("carwindows", idx))
         {
-            size_t idx = it->second;
-            mesh_.surfaces[idx].texture =
-                assets::AssetManager::GetInstance().Get<gfx::Texture>("carbrokenwindows");
+            surfaces_[idx].texture = assets::AssetManager::GetInstance().Get<gfx::Texture>("carbrokenwindows");
         }
     }
 }

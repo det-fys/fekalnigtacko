@@ -21,6 +21,7 @@ void game::view::MapInstanceView::LoadNext()
     map_ = loader_->GetMap();
     loader_.reset();
     
+    InitModelViews();
     InitObjsAndCollisions();
 }
 
@@ -39,10 +40,8 @@ void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args) const
 
     const auto& basemodel = map_->GetBaseModel();
 
-    if (!basemodel || !basemodel->GetMesh())
+    if (!basemodel_view_)
         return;
-
-    const auto& mesh = *basemodel->GetMesh();
 
     const float max_dist = args.render_distance + 200.0f;
     const float max_dist2 = max_dist * max_dist;
@@ -56,7 +55,7 @@ void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args) const
         if (!args.frustum.IsAABBVisible(chunk.aabb))
             continue;
 
-        DrawChunk(args, mesh, chunk);
+        DrawChunk(args, chunk);
     }
 
 }
@@ -77,6 +76,18 @@ void game::view::MapInstanceView::EnableObj(net::ObjNum num, bool enable)
     }
 }
 
+void game::view::MapInstanceView::InitModelViews()
+{
+    basemodel_view_ = assets::AssetManager::GetInstance().Get<ModelView>(map_->GetBaseModel()->GetAssetName());
+
+    const auto& obj_models = map_->GetObjModels();
+    obj_models_view_.reserve(obj_models.size());
+    for (const auto& obj_model : obj_models)
+    {
+        obj_models_view_.emplace_back(assets::AssetManager::GetInstance().Get<ModelView>(obj_model->GetAssetName()));
+    }
+}
+
 void game::view::MapInstanceView::InitObjsAndCollisions()
 {
     // add basemodel col
@@ -94,17 +105,19 @@ void game::view::MapInstanceView::InitObjsAndCollisions()
 
     for (size_t i = 0; i < objs.size(); ++i)
     {
-        obj_cols_[i] = std::make_unique<MapObjectCollisionView>(world_, objs[i].model, objs[i].node.local);
+        obj_cols_[i] = std::make_unique<MapObjectCollisionView>(world_, map_->GetObjModels()[objs[i].model_idx],
+                                                                objs[i].node.local);
         obj_cols_[i]->SetEnabled(objs_visible_[i]);
     }
 }
 
-void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, const assets::Mesh& basemesh,
-                                            const assets::Chunk& chunk) const
+void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, const assets::Chunk& chunk) const
 {
+    auto surfaces = basemodel_view_->GetSurfaces();
+
     for (const auto& surface_range : chunk.surfaces)
     {
-        auto& surface = basemesh.surfaces[surface_range.idx];
+        auto& surface = surfaces[surface_range.idx];
 
         gfx::DrawSurfaceCmd cmd;
         cmd.surface = &surface;
@@ -127,13 +140,10 @@ void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, co
 
         const auto& obj = objs[abs_i];
 
-        if (!obj.model || !obj.model->GetMesh())
-            continue;
-
         if (!args.frustum.IsAABBVisible(obj.aabb))
             continue;
 
-        const auto& surfaces = obj.model->GetMesh()->surfaces;
+        auto surfaces = obj_models_view_[obj.model_idx]->GetSurfaces();
 
         for (const auto& surface : surfaces)
         {
