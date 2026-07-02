@@ -12,6 +12,7 @@
 #include "audio/sound.hpp"
 #include "gfx/texture.hpp"
 #include "gui/font.hpp"
+#include "gameview/modelview.hpp" // thats a bit weird but ok
 
 assets::Precache::Precache(const std::string& path)
 {
@@ -35,7 +36,7 @@ static std::any LoadItem(const assets::PrecacheItem& item)
     else if (item.type == "map")
         return am.Get<assets::Map>(item.name);
     else if (item.type == "model")
-        return am.Get<assets::Model>(item.name);
+        return am.Get<game::view::ModelView>(item.name); // this is only used only in client, load full model with textures etc.
     else if (item.type == "skeleton")
         return am.Get<assets::Skeleton>(item.name);
     else if (item.type == "sound")
