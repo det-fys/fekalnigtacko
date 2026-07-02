@@ -277,6 +277,8 @@ static void FrameSafe()
 // #endif
 
 static void Main() {
+    srand(time(NULL));
+
     if (s_url.empty())
         s_url = WS_URL;
 
