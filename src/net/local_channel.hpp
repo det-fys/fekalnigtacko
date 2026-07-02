@@ -10,15 +10,15 @@ namespace net
 class LocalChannel
 {
 public:
-    LocalChannel() = default;
+    LocalChannel(size_t max_size);
 
-    void Send(std::string data);
+    bool Send(std::string data);
     bool Poll(std::string& data);
 
 private:
     std::deque<std::string> queue_;
     std::mutex mtx_;
-
+    size_t max_size_;
 };
 
 

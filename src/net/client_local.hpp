@@ -18,6 +18,8 @@ public:
     virtual ~LocalClientInterface() override;
 
 private:
+    void Disconnect();
+
     std::shared_ptr<LocalChannelPair> chan_;
     bool connected_ = false;
 };

@@ -11,7 +11,10 @@ void net::LocalClientInterface::Send(std::string_view data)
     if (!connected_)
         return;
     
-    chan_->client2server.Send(std::string(data));
+    if (!chan_->client2server.Send(std::string(data)))
+    {
+        Disconnect();
+    }
 }
 
 void net::LocalClientInterface::Poll()
@@ -25,8 +28,8 @@ void net::LocalClientInterface::Poll()
     }
     else if (!server_connected && connected_)
     {
-        RaiseOnDisconnect();
-        connected_ = false;
+        Disconnect();
+        return;
     }
 
     if (connected_)
@@ -42,4 +45,10 @@ void net::LocalClientInterface::Poll()
 net::LocalClientInterface::~LocalClientInterface()
 {
     chan_->client_connected.store(false);
+}
+
+void net::LocalClientInterface::Disconnect()
+{
+    connected_ = false;
+    RaiseOnDisconnect();
 }

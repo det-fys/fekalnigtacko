@@ -14,6 +14,8 @@ struct LocalChannelPair
 
     std::atomic_bool client_connected;
     std::atomic_bool server_connected;
+
+    LocalChannelPair() : client2server(512), server2client(512) {}
 };
 
 }

@@ -56,7 +56,10 @@ void net::LocalServerInterface::Send(ConnId conn, std::string_view data)
     if (!connected_ || !client_connected_ || conn != LOCAL_CONN_ID)
         return;
 
-    chan_->server2client.Send(std::string(data));
+    if (!chan_->server2client.Send(std::string(data)))
+    {
+        CloseConnection(LOCAL_CONN_ID);
+    }
 }
 
 void net::LocalServerInterface::CloseConnection(ConnId conn)
