@@ -89,7 +89,6 @@ private:
 
     void Connect();
     void ConnectLocal();
-    void ProcessWsMessage(std::span<const char> data);
     void Disconnect();
 
     void UpdateState();
@@ -102,6 +101,7 @@ private:
     void ProcessLocalCommand(std::string_view line);
     void ProcessSetCmd(CmdLineStream& line);
     void ProcessServerCmd(CmdLineStream& line);
+    void ProcessConnectOrDisconnectCmd(CmdLineStream& line, bool connect);
 
 private:
     Settings settings_;
@@ -123,6 +123,7 @@ private:
     std::unique_ptr<net::ClientInterface> interface_;
     std::string url_;
     std::string username_;
+    bool connect_ = false;
     bool connecting_ = false;
     bool connected_ = false;
     bool local_error_ = false;

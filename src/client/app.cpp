@@ -22,6 +22,9 @@
 CVAR_CL(float, sensitivity, CV_SAVE, 0.5f);
 CVAR_CL(float, volume, CV_SAVE, 0.2f, 0.0f);
 
+CVAR_CL(uint8_t, app_autoconnect, CV_SAVE, 1, 0, 1);
+CVAR_CL(uint8_t, app_autostartserver, CV_SAVE, 0, 0, 1);
+
 static const std::map<KeyCode, game::PlayerInputType> s_inputmap = {
 	{ KEY_LMB, game::IN_ATTACK_PRIMARY },
 	{ KEY_RMB, game::IN_ATTACK_SECONDARY },
@@ -70,6 +73,12 @@ App::App(const std::string& settings_path)
 	{
 		AddChatMessagePrefix("Nastavení", "chyba při načítání: " + std::string(e.what()));
 	}
+
+	run_local_server_ = app_autostartserver.Get() > 0;
+    if (run_local_server_)
+    {
+        AddChatMessage("poznámka: app_autostartserver = 1");
+    }
 }
 
 void App::OnClientConnect()
@@ -447,6 +456,10 @@ void App::EnterState(AppState state)
 		break;
 
 	case APP_STATE_IDLE:
+        if (app_autoconnect.Get() > 0 && !run_local_server_)
+        {
+            connect_ = true;
+        }
 		break;
 
 	case APP_STATE_CONNECT:
@@ -466,7 +479,8 @@ void App::EnterState(AppState state)
 	case APP_STATE_DISCONNECTED:
 		Disconnect();
 		AddChatMessagePrefix("WebSocket", COL_ERROR "spojení je píči");
-		AddChatMessagePrefix("WebSocket", "další pokus za 10 s");
+		//AddChatMessagePrefix("WebSocket", "další pokus za 10 s");
+        connect_ = false;
 		break;
 
 	case APP_STATE_CONNECT_LOCAL:
@@ -510,10 +524,16 @@ AppState App::CheckStateTransition()
 		return APP_STATE_LOADING;
 
 	case APP_STATE_IDLE:
-		return run_local_server_ ? APP_STATE_CONNECT_LOCAL : APP_STATE_CONNECT;
+        if (run_local_server_)
+            return APP_STATE_CONNECT_LOCAL;
+
+		if (connect_)
+            return APP_STATE_CONNECT;
+
+		return APP_STATE_IDLE;
 
 	case APP_STATE_CONNECT:
-		if (run_local_server_)
+		if (run_local_server_ || !connect_)
 			return APP_STATE_DISCONNECT;
 
 		if (connected_)
@@ -525,7 +545,7 @@ AppState App::CheckStateTransition()
 		return APP_STATE_CONNECT;
 
 	case APP_STATE_CONNECTED:
-		if (run_local_server_)
+		if (run_local_server_ || !connect_)
 			return APP_STATE_DISCONNECT;
 
 		if (!connected_)
@@ -537,7 +557,7 @@ AppState App::CheckStateTransition()
 		return APP_STATE_IDLE;
 
 	case APP_STATE_DISCONNECTED:
-		if (run_local_server_)
+		if (run_local_server_ || !connect_)
 			return APP_STATE_IDLE;
 
 		if (GetCurrentStateDuration() >= 10.0f)
@@ -546,7 +566,7 @@ AppState App::CheckStateTransition()
 		return APP_STATE_DISCONNECTED;
 
 	case APP_STATE_CONNECT_LOCAL:
-		if (!run_local_server_)
+		if (!run_local_server_ || connect_)
 			return APP_STATE_DISCONNECT_LOCAL;
 
 		if (connected_)
@@ -558,7 +578,7 @@ AppState App::CheckStateTransition()
 		return APP_STATE_CONNECT_LOCAL;
 
 	case APP_STATE_CONNECTED_LOCAL:
-		if (!run_local_server_)
+		if (!run_local_server_ || connect_)
 			return APP_STATE_DISCONNECT_LOCAL;
 
 		if (!connected_)
@@ -627,6 +647,14 @@ void App::ProcessLocalCommand(std::string_view line)
 		{
 			ProcessServerCmd(iss);
 		}
+		else if (cmd == "connect")
+		{
+            ProcessConnectOrDisconnectCmd(iss, true);
+		}
+		else if (cmd == "disconnect")
+		{
+            ProcessConnectOrDisconnectCmd(iss, false);
+		}
 		else
 		{
 			throw std::runtime_error("neznámej příkaz: " + cmd);
@@ -663,6 +691,7 @@ void App::ProcessSetCmd(CmdLineStream& line)
 	{
 		// no value - only print current
         chat_.AddMessage(COL_LABEL + cvar_name + "^r=" COL_VALUE + cvar.GetString());
+        return;
 	}
 
 	std::string val;
@@ -692,4 +721,16 @@ void App::ProcessServerCmd(CmdLineStream& line)
 	}
 
 	AddChatMessage(COL_SUCCESS "ok");
+}
+
+void App::ProcessConnectOrDisconnectCmd(CmdLineStream& line, bool connect)
+{
+	if (connect == connect_)
+	{
+        AddChatMessage(COL_ERROR "tak už to je");
+        return;
+	}
+
+	connect_ = connect;
+    AddChatMessage(COL_SUCCESS "ok");
 }
