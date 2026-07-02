@@ -28,26 +28,22 @@ CVAR(float, ow_aabb_max_x, CV_CONST, 0.0f);
 CVAR(float, ow_aabb_max_y, CV_CONST, 0.0f);
 CVAR(float, ow_aabb_max_z, CV_CONST, 0.0f);
 
-// time
-// CVAR(float, ow_day_mins, CV_NONE, 1.0f, 0.0f);
-// CVAR(float, ow_start_daytime, CV_NONE, 1.0f, -1.0f, 24.0f);
-
 // vehicles
-CVAR(size_t, ow_vehicle_count, CV_CONST, 10);
-CVAR(size_t, ow_vehicle_row_length, CV_CONST, 10);
-CVAR(float, ow_vehicle_distance_x, CV_CONST, 10.0f);
-CVAR(float, ow_vehicle_distance_y, CV_CONST, 10.0f);
-CVAR(size_t, ow_vehicle_spawn_interval, CV_CONST, 120);
+CVAR(size_t, ow_vehicle_count, CV_NONE, 10);
+CVAR(size_t, ow_vehicle_row_length, CV_NONE, 20);
+CVAR(float, ow_vehicle_distance_x, CV_NONE, 4.0f);
+CVAR(float, ow_vehicle_distance_y, CV_NONE, 7.0f);
+CVAR(size_t, ow_vehicle_spawn_interval, CV_NONE, 160);
 
 // npcs
-CVAR(size_t, ow_npc_count, CV_NONE, 10, 0, 10000);
-CVAR(size_t, ow_npc_spawn_time_fast, CV_NONE, 40);
-CVAR(size_t, ow_npc_spawn_time_slow_min, CV_NONE, 40);
-CVAR(size_t, ow_npc_spawn_time_slow_max, CV_NONE, 40);
+CVAR(size_t, ow_npc_count, CV_NONE, 180, 0, 10000);
+CVAR(size_t, ow_npc_spawn_time_fast, CV_NONE, 80);
+CVAR(size_t, ow_npc_spawn_time_slow_min, CV_NONE, 2000);
+CVAR(size_t, ow_npc_spawn_time_slow_max, CV_NONE, 10000);
 
-CVAR(size_t, ow_npc_abandoned_vehicle_despawn_time, CV_NONE, 5000);
-CVAR(size_t, ow_npc_boredom_death_time, CV_NONE, 5000);
-CVAR(size_t, ow_npc_dead_despawn_time, CV_NONE, 5000);
+CVAR(size_t, ow_npc_abandoned_vehicle_despawn_time, CV_NONE, 300000);
+CVAR(size_t, ow_npc_boredom_death_time, CV_NONE, 300000);
+CVAR(size_t, ow_npc_dead_despawn_time, CV_NONE, 15000);
 
 CVAR(float, ow_npc_driver_armed_chance, CV_NONE, 0.4f, 0.0f, 1.0f);
 CVAR(float, ow_npc_passenger_chance, CV_NONE, 0.3f, 0.0f, 1.0f);

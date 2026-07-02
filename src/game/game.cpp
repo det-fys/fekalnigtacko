@@ -10,7 +10,7 @@
 CVAR(std::string, g_adminpassword, CV_CONST | CV_CONFIDENTIAL, "", 0, 64);
 
 CVAR(float, g_daytime, CV_NONE, -1.0f, -1.0f, 24.0f);
-CVAR(float, g_day_mins, CV_NONE, 1.0f);
+CVAR(float, g_day_mins, CV_NONE, 30.0f);
 
 static uint32_t GetRandomColor24()
 {

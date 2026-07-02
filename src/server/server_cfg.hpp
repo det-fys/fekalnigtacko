@@ -8,6 +8,6 @@
 namespace sv
 {
 
-void LoadCfg();
+void LoadCfg(const std::string& path);
 
 }

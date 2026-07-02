@@ -90,13 +90,13 @@ static void ProcessCmd(const std::string& cmd, CmdLineStream& iss)
     }
 }
 
-void sv::LoadCfg()
+void sv::LoadCfg(const std::string& path)
 {
     std::cout << "Loading server.cfg..." << std::endl;
 
     InitConds();
 
-    assets::LoadCMDFile("server.cfg", [](const std::string& cmd, CmdLineStream& iss){
+    assets::LoadCMDFile(path, [](const std::string& cmd, CmdLineStream& iss){
         ProcessCmd(cmd, iss);
     });
 

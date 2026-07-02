@@ -14,12 +14,13 @@ int main()
     
     try
     {
-        sv::LoadCfg();
+        sv::LoadCfg("server.cfg");
         
         auto ws = std::make_unique<net::CrowWSServerInterface>(sv_port.Get());
         sv::Server server(std::move(ws));
         server.Run();
-    } catch (const std::exception& e)
+    }
+    catch (const std::exception& e)
     {
         std::cerr << "FATAL ERROR: " << e.what() << std::endl;
         return 1;

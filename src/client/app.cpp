@@ -404,7 +404,7 @@ void App::ConnectLocal()
 
 		try 
 		{
-			sv::LoadCfg();
+            sv::LoadCfg("server_local.cfg");
 			sv::Server server(std::make_unique<net::LocalServerInterface>(channel_pair));
 			server.Run();
 		}
