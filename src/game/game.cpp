@@ -122,12 +122,14 @@ void game::Game::RegisterCommands()
                 return;
             }
 
+            auto& registry = CVarRegistry::GetServerInstance();
+
             if (cvar_name.empty() || value.empty())
             {
                 size_t count = 0;
 
                 // no value - list cvars with the prefix
-                CVarRegistry::ProcessCVars([&](CVarBase& cvar) {
+                registry.ProcessCVars([&](CVarBase& cvar) {                   
                     if (cvar.GetName().starts_with(cvar_name))
                     {
                         DumpCVar(cvar);
@@ -145,13 +147,13 @@ void game::Game::RegisterCommands()
                 return;
             }
 
-            if (!CVarRegistry::IsCVarName(cvar_name))
+            if (!registry.IsCVarName(cvar_name))
             {
                 cmd.SendError("to neexistuje");
                 return;
             }
 
-            auto& cvar = CVarRegistry::GetCVar(cvar_name);
+            auto& cvar = registry.GetCVar(cvar_name);
 
             if (cvar.IsConst())
             {

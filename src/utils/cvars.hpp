@@ -27,18 +27,20 @@ class CVarBase;
 class CVarRegistry
 {
 public:
-    static void Register(const std::string& name, CVarBase* cvar);
+    static CVarRegistry& GetClientInstance();
+    static CVarRegistry& GetServerInstance();
 
-    static bool IsCVarName(const std::string& name);
-    static CVarBase& GetCVar(const std::string& name);
-    static void Set(const std::string& name, const std::string& val);
-    static std::string Get(const std::string& name);
+    void Register(const std::string& name, CVarBase* cvar);
 
-    static bool ProcessCVars(std::function<bool(CVarBase&)> func, CVarFlags filter = 0);
+    bool IsCVarName(const std::string& name);
+    CVarBase& GetCVar(const std::string& name);
+    void Set(const std::string& name, const std::string& val);
+    std::string Get(const std::string& name);
+
+    bool ProcessCVars(std::function<bool(CVarBase&)> func, CVarFlags filter = 0);
 
 private:
     CVarRegistry() = default;
-    static CVarRegistry& GetInstance();
 
     std::map<std::string, CVarBase*> cvars_;
 };
@@ -46,9 +48,9 @@ private:
 class CVarBase
 {
 public:
-    CVarBase(const std::string& name, CVarFlags flags) : name_(name), flags_(flags)
+    CVarBase(bool client, const std::string& name, CVarFlags flags) : name_(name), flags_(flags)
     {
-        CVarRegistry::Register(name, this);
+        (client ? CVarRegistry::GetClientInstance() : CVarRegistry::GetServerInstance()).Register(name, this);
     }
 
     virtual void SetString(const std::string& val) = 0;
@@ -94,10 +96,10 @@ template <CVarType T>
 class CVar : public CVarBase
 {
 public:
-    CVar(const std::string& name, CVarFlags flags, const T& initial,
+    CVar(bool client, const std::string& name, CVarFlags flags, const T& initial,
          CVarRangeType<T> min = std::numeric_limits<CVarRangeType<T>>().lowest(),
          CVarRangeType<T> max = std::numeric_limits<CVarRangeType<T>>().max())
-        : CVarBase(name, flags), value_{}, min_(min), max_(max)
+        : CVarBase(client, name, flags), value_{}, min_(min), max_(max)
     {
         SetInternal(initial);
         flags_ |= CV_MODIFIED;
@@ -176,5 +178,5 @@ private:
     CVarRangeType<T> min_, max_;
 };
 
-#define CVAR(type, name, ...) static CVar<type> name{#name, __VA_ARGS__}
-
+#define CVAR(type, name, ...) static CVar<type> name{false, #name, __VA_ARGS__}
+#define CVAR_CL(type, name, ...) static CVar<type> name{true, #name, __VA_ARGS__}

@@ -19,8 +19,8 @@
 
 #include "net/client_ws.hpp"
 
-CVAR(float, sensitivity, CV_SAVE, 0.5f);
-CVAR(float, volume, CV_SAVE, 0.2f, 0.0f);
+CVAR_CL(float, sensitivity, CV_SAVE, 0.5f);
+CVAR_CL(float, volume, CV_SAVE, 0.2f, 0.0f);
 
 static const std::map<KeyCode, game::PlayerInputType> s_inputmap = {
 	{ KEY_LMB, game::IN_ATTACK_PRIMARY },
@@ -273,7 +273,7 @@ static void AddSlider(gui::Menu& menu, std::string text, int& value, int min, in
 
 static void CreatePercentSlider(gui::Menu& menu, std::string text, const std::string& cvar_name, float max)
 {
-	auto cvar = dynamic_cast<CVar<float>*>(&CVarRegistry::GetCVar(cvar_name));
+    auto cvar = dynamic_cast<CVar<float>*>(&CVarRegistry::GetClientInstance().GetCVar(cvar_name));
 	if (!cvar)
 		return; // not float cvar
 
@@ -640,14 +640,16 @@ void App::ProcessLocalCommand(std::string_view line)
 
 void App::ProcessSetCmd(CmdLineStream& line)
 {
+    auto& registry = CVarRegistry::GetClientInstance();
+
 	if (line.Eol())
 	{
 		// no args - list cvars
 
-		CVarRegistry::ProcessCVars([this](CVarBase& cvar) {
-			chat_.AddMessage(COL_LABEL + cvar.GetName() + "^r=" COL_VALUE + cvar.GetString());
-			return false;
-		});
+        registry.ProcessCVars([this](CVarBase& cvar) {
+            chat_.AddMessage(COL_LABEL + cvar.GetName() + "^r=" COL_VALUE + cvar.GetString());
+            return false;
+        });
 	
 		return;
 	}
@@ -655,18 +657,20 @@ void App::ProcessSetCmd(CmdLineStream& line)
 	std::string cvar_name;
 	line >> cvar_name;
 
+	auto& cvar = registry.GetCVar(cvar_name);
+
 	if (line.Eol())
 	{
 		// no value - only print current
-		chat_.AddMessage(COL_LABEL + cvar_name + "^r=" COL_VALUE + CVarRegistry::Get(cvar_name));
+        chat_.AddMessage(COL_LABEL + cvar_name + "^r=" COL_VALUE + cvar.GetString());
 	}
 
 	std::string val;
 	line >> val;
 
-	CVarRegistry::Set(cvar_name, val);
+	cvar.SetString(val);
 
-	chat_.AddMessage(COL_LABEL + cvar_name + "^r nastaveno na " COL_VALUE + CVarRegistry::Get(cvar_name));
+	chat_.AddMessage(COL_LABEL + cvar_name + "^r nastaveno na " COL_VALUE + cvar.GetString());
 }
 
 void App::ProcessServerCmd(CmdLineStream& line)

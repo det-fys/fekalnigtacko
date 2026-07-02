@@ -7,10 +7,10 @@ class Settings
 public:
     Settings(const std::string& path);
 
-    void Load();
+    void Load() const;
 
     void TrySave(float time);
-    void Save();
+    void Save() const;
 
 private:
     std::string path_;

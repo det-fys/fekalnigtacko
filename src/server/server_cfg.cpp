@@ -58,7 +58,7 @@ static void ProcessSetCmd(CmdLineStream& iss)
 
     try
     {
-        CVarRegistry::Set(var_name, value_str);
+        CVarRegistry::GetServerInstance().Set(var_name, value_str);       
     }
     catch(const std::exception& e)
     {

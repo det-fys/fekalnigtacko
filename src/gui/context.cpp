@@ -5,7 +5,7 @@
 #include "utils/utf8.hpp"
 #include "utils/cvars.hpp"
 
-CVAR(float, ui_scale, CV_SAVE, 1.0f, 0.1f, 2.0f);
+CVAR_CL(float, ui_scale, CV_SAVE, 1.0f, 0.1f, 2.0f);
 
 gui::Context::Context(gfx::DrawList& dlist, std::shared_ptr<const Font> default_font) :
     dlist_(dlist),

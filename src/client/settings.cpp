@@ -13,7 +13,7 @@
 
 static uint32_t settings_version = 1;
 
-CVAR(float, save_interval, CV_NONE, 1.0f, 0.0f);
+CVAR_CL(float, save_interval, CV_NONE, 1.0f, 0.0f);
 
 static std::vector<char> LoadFile(const std::string& filename)
 {
@@ -51,7 +51,7 @@ Settings::Settings(const std::string& path) : path_(path) {}
 using SaveKey = net::FixedStr<128>;
 using SaveValue = net::FixedStr<1024>;
 
-void Settings::Load()
+void Settings::Load() const
 {
     auto data = LoadFile(path_);
     if (data.empty())
@@ -80,7 +80,7 @@ void Settings::Load()
 
         try
         {
-            auto& cvar = CVarRegistry::GetCVar(key_str);
+            auto& cvar = CVarRegistry::GetClientInstance().GetCVar(key_str);
             cvar.SetString(value_str);
             cvar.ClearUnsaved(); // its literally saved
         }
@@ -100,20 +100,20 @@ void Settings::TrySave(float time)
     last_save_time_ = time;
 
     // check any unsaved cvars
-    if (!CVarRegistry::ProcessCVars(nullptr, CV_SAVE | CV_UNSAVED))
+    if (!CVarRegistry::GetClientInstance().ProcessCVars(nullptr, CV_SAVE | CV_UNSAVED))
         return;
 
     Save();
 }
 
-void Settings::Save()
+void Settings::Save() const
 {
     std::vector<char> data;
     net::OutMessage msg(data);
 
     msg.Write(settings_version);
 
-    CVarRegistry::ProcessCVars([&](CVarBase& cvar) {
+    CVarRegistry::GetClientInstance().ProcessCVars([&](CVarBase& cvar) {
         msg.Write(SaveKey(cvar.GetName()));
         msg.Write(SaveValue(cvar.GetString()));
         cvar.ClearUnsaved();

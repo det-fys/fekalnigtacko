@@ -2,9 +2,21 @@
 
 #include <stdexcept>
 
+CVarRegistry& CVarRegistry::GetClientInstance()
+{
+    static CVarRegistry reg;
+    return reg;
+}
+
+CVarRegistry& CVarRegistry::GetServerInstance()
+{
+    static CVarRegistry reg;
+    return reg;
+}
+
 void CVarRegistry::Register(const std::string& name, CVarBase* cvar)
 {
-    GetInstance().cvars_[name] = cvar;
+    cvars_[name] = cvar;
 }
 
 void CVarRegistry::Set(const std::string& name, const std::string& val)
@@ -28,7 +40,7 @@ std::string CVarRegistry::Get(const std::string& name)
 
 bool CVarRegistry::ProcessCVars(std::function<bool(CVarBase&)> func, CVarFlags filter)
 {
-    const auto& cvars = GetInstance().cvars_;
+    const auto& cvars = cvars_;
     for (const auto& entry : cvars)
     {
         if (filter > 0 && (entry.second->GetFlags() & filter) != filter)
@@ -43,22 +55,15 @@ bool CVarRegistry::ProcessCVars(std::function<bool(CVarBase&)> func, CVarFlags f
     return false;
 }
 
-CVarRegistry& CVarRegistry::GetInstance()
-{
-    static CVarRegistry reg;
-    return reg;
-}
-
 bool CVarRegistry::IsCVarName(const std::string& name)
 {
-    return GetInstance().cvars_.contains(name);
+    return cvars_.contains(name);
 }
 
 CVarBase& CVarRegistry::GetCVar(const std::string& name)
 {
-    auto& cvars = GetInstance().cvars_;
-    auto it = cvars.find(name);
-    if (it == cvars.end())
+    auto it = cvars_.find(name);
+    if (it == cvars_.end())
     {
         throw std::runtime_error("Invalid cvar name: " + name);
     }
