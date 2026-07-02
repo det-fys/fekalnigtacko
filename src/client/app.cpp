@@ -444,6 +444,8 @@ void App::UpdateState()
 
 void App::EnterState(AppState state)
 {
+	std::cout << "Entering app state " << std::to_string(state) << std::endl;
+
 	state_ = state;
 	state_time_ = time_;
 
@@ -484,6 +486,7 @@ void App::EnterState(AppState state)
 		break;
 
 	case APP_STATE_CONNECT_LOCAL:
+		connect_ = false;
 		AddChatMessage("připojování na lokální servr");
 		ConnectLocal();
 		break;
@@ -495,13 +498,14 @@ void App::EnterState(AppState state)
 
 	case APP_STATE_DISCONNECT_LOCAL:
 		Disconnect();
+		run_local_server_ = false;
 		AddChatMessage("vodpojeno");
 		break;
 
 	case APP_STATE_DISCONNECTED_LOCAL:
 		Disconnect();
+		run_local_server_ = false;
 		break;
-
 
 	default:
 		break;
@@ -557,7 +561,7 @@ AppState App::CheckStateTransition()
 		return APP_STATE_IDLE;
 
 	case APP_STATE_DISCONNECTED:
-		if (run_local_server_ || !connect_)
+		if (run_local_server_ || connect_)
 			return APP_STATE_IDLE;
 
 		if (GetCurrentStateDuration() >= 10.0f)
