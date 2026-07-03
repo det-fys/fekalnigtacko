@@ -68,6 +68,7 @@ public:
 
     const float& GetTime() const { return time_; }
     float GetDeltaTime() const { return delta_time_; }
+    bool IsFullscreenRequested() const { return fullscreen_; }
 
     audio::Master& GetAudioMaster() { return audiomaster_; }
 
@@ -108,6 +109,7 @@ private:
 
     float time_ = 0.0f;
     glm::ivec2 viewport_size_ = {800, 600};
+    bool fullscreen_ = false;
 
     float prev_time_ = 0.0f;
     float delta_time_ = 0.0f;

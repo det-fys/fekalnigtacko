@@ -229,9 +229,29 @@ static void PollEvents()
 
 static bool can_update = false;
 static Uint32 last_update = 0;
+static bool fullscreen = false;
+
+static void UpdateFullscreen()
+{
+    if (fullscreen == s_app->IsFullscreenRequested())
+        return;
+
+    fullscreen = s_app->IsFullscreenRequested();
+
+    if (fullscreen)
+    {
+        SDL_SetWindowFullscreen(s_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+    }
+    else
+    {
+        SDL_SetWindowFullscreen(s_window, 0);
+    }
+}
 
 static void Frame()
 {
+    UpdateFullscreen();
+
     Uint32 current_time = SDL_GetTicks();
     last_update = current_time;
     s_app->SetTime(current_time / 1000.0f); // Set time in seconds
@@ -239,7 +259,12 @@ static void Frame()
     PollEvents();
 
 	int width, height;
+#ifdef EMSCRIPTEN
+    emscripten_get_canvas_element_size("#canvas", &width, &height);
+#else
 	SDL_GetWindowSize(s_window, &width, &height);
+#endif
+
 	s_app->SetViewportSize(width, height);
 
     s_app->Frame();
