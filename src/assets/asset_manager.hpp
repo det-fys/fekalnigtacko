@@ -2,10 +2,10 @@
 
 #include <map>
 #include <mutex>
+#include <memory>
+#include <iostream>
 
 #include "utils/defs.hpp"
-
-#include <iostream>
 
 namespace assets
 {
