@@ -24,6 +24,7 @@ CVAR_CL(float, volume, CV_SAVE, 0.2f, 0.0f);
 
 CVAR_CL(uint8_t, app_autoconnect, CV_SAVE, 1, 0, 1);
 CVAR_CL(uint8_t, app_autostartserver, CV_SAVE, 0, 0, 1);
+CVAR_CL(uint8_t, app_showviewportsize, CV_SAVE, 0, 0, 1);
 
 static const std::map<KeyCode, game::PlayerInputType> s_inputmap = {
 	{ KEY_LMB, game::IN_ATTACK_PRIMARY },
@@ -164,6 +165,12 @@ bool App::KeyInput(KeyCode key, bool pressed, size_t repeat)
 	{
 		if (chat_.KeyInput(key))
 			return true;
+
+		if (key == KEY_F)
+		{
+			fullscreen_ = !fullscreen_;
+			return true;
+		}
 
 		// TODO: menu controls here
 	}
@@ -385,6 +392,13 @@ void App::DrawStats()
 	gui_.DrawTextAligned(fps_text_, pos, glm::vec2(-1.0f, 0.0f));
 	pos.y += 30.0f;
 	gui_.DrawTextAligned(msglen_text_, pos, glm::vec2(-1.0f, 0.0f));
+	
+	if (app_showviewportsize.Get() > 0)
+	{
+		pos.y += 30.0f;
+		std::string text = "^f70" + std::to_string(viewport_size_.x) + "x" + std::to_string(viewport_size_.y);
+		gui_.DrawTextAligned(text, pos, glm::vec2(-1.0f, 0.0f));
+	}
 }
 
 void App::Connect()

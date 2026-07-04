@@ -7,16 +7,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
     <style>
+        * {
+            font-family: "Comic Sans MS", Verdana, Geneva, Tahoma, sans-serif;
+        }
+
         html,
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
             height: 100%;
-            background: black;
-            color: aqua;
-            font-family: Verdana, Geneva, Tahoma, sans-serif;
+            background: #222;
+            color: #fff;
             text-align: center;
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000;
+        }
+
+        h1 {
+            color: #ff0
+        }
+
+        input[type=text] {
+            background-color: #444;
+            color: #fff;
+            border-style: none;
         }
 
         canvas {
@@ -59,7 +73,7 @@
             kdo <input type="text" name="name" id="name" placeholder="vyplnit"><br>
             <p id="vyplnitmeno" style="display:none">^ vyplnit</p>
             
-            kam <input type="text" name="url" id="url" value="ws://deadfish.cz:11200/ws"><br>
+            kam <input type="text" name="url" id="url" value="wss://test.deadfish.cz"><br>
             <input id="okbut" type="button" value="probíhá získávání" onclick="ok()" disabled>
         </form>
     </div>
@@ -81,21 +95,18 @@
             }
         };
 
-        // Resize canvas to fit the window and inform SDL (via Emscripten)
-        function resizeCanvas() {
-            const canvas = document.getElementById('canvas');
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+        // function resizeCanvas() {
+        //     const canvas = document.getElementById('canvas');
+        //     canvas.width = window.innerWidth;
+        //     canvas.height = window.innerHeight;
+        //     console.log(window.innerWidth, window.innerHeight);
+        //     console.log(screen.width, screen.height);
+        // }
 
-            // // Notify Emscripten SDL2
-            // if (typeof Module !== 'undefined' && Module.canvas) {
-            //     const evt = new CustomEvent('resize');
-            //     window.dispatchEvent(evt);
-            // }
-        }
-
-        window.addEventListener('resize', resizeCanvas);
-        window.addEventListener('load', resizeCanvas);
+        // window.addEventListener('resize', resizeCanvas);
+        // window.addEventListener('load', resizeCanvas);
+        // document.addEventListener('fullscreenchange', resizeCanvas);
+        // document.addEventListener('webkitfullscreenchange', resizeCanvas); // Safari
 
         function ok()
         {
