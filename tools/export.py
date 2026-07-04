@@ -7,6 +7,10 @@ import math
 
 CHUNK_SIZE = 250.0
 
+BONE_MASKS = {
+    "action": ["DEF-spine.001", "MCH-spine.002", "tag_weapon"]
+}
+
 @dataclass
 class Vec3:
     x: float
@@ -75,14 +79,21 @@ class Surface:
     texture: str
     twosided: bool
     ocolor: bool
+    ocolor_mult: bool
+    multicolor: bool
     blend: str|None
+    unlit: bool
+    pm: str|None
 
     def __init__(self, name: str):
         self.tris = []
         self.texture = name
         self.twosided = False
         self.ocolor = False
+        self.ocolor_mult = False
         self.blend = None
+        self.unlit = False
+        self.pm = None
 
 class Model:
     skeleton: Skeleton|None
@@ -92,8 +103,10 @@ class Model:
     make_col_trimesh: bool
     make_convex_hull: bool
     cols: list[tuple[str, Transform, float, float]]
+    col_pm: str|None
     centerofmass: tuple[float, float, float]|None
     params: list[tuple[str, str]]
+    locations: list[tuple[str, Transform]]
 
     def __init__(self, skeleton=None):
         self.skeleton = skeleton
@@ -103,8 +116,10 @@ class Model:
         self.make_col_trimesh = False
         self.make_convex_hull = False
         self.cols = []
+        self.col_pm = None
         self.centerofmass = None
         self.params = []
+        self.locations = []
 
     def add_vertex(self, vertex: Vertex) -> int:
         if vertex in self.vertex_map:
@@ -184,18 +199,34 @@ class Chunk:
 class Map:
     basemodel: Model
     basemodel_name: str
-    static_objects: list[tuple[str, Transform]]
+    static_models: list
+    static_models_idx: dict[str, int]
+    static_objects: list[tuple[int, Transform]]
     graphs: list[Graph]
     chunks: dict[tuple[int, int], Chunk]
     max_chunk: tuple[int, int]
+    locations: list[tuple[str, Transform]]
 
     def __init__(self):
         self.basemodel = Model()
         self.basemodel_name = ""
+        self.static_models = []
+        self.static_models_idx = {}
         self.static_objects = []
         self.graphs = []
         self.chunks = None
         self.max_chunk = (0, 0)
+        self.locations = []
+
+    def get_static_model_idx(self, name: str) -> int:
+        if name in self.static_models_idx:
+            return self.static_models_idx[name]
+        
+        idx = len(self.static_models)
+        self.static_models.append(name)
+        self.static_models_idx[name] = idx
+
+        return idx
 
     def create_chunks(self):
         self.chunks = {}
@@ -258,9 +289,11 @@ class Map:
             name, trans = obj
             pos = Vec3(*trans.position)
 
+            idx = self.get_static_model_idx(name)
+
             chunk = get_chunk(pos_to_chunk(pos))
             chunk.extend_aabb(pos)
-            chunk.static_objects.append(obj)
+            chunk.static_objects.append((idx, trans))
 
         # min/max
         min_chunk = (100000, 100000)
@@ -324,18 +357,38 @@ class Animation:
     fps: float
     frames: int
     channels: list[AnimChannel]
+    cyclic: bool
 
     def __init__(self, name: str, fps: float, frames: int):
         self.name = name
         self.fps = fps
         self.frames = frames
         self.channels = []
+        self.cyclic = False
+
+class HitBone:
+    name: str
+    bone: str
+    shape: str
+    transform: Transform
+    sy: float
+    sz: float
+    
+    def __init__(self, name: str, bone: str, shape: str, transform: Transform, sy: float, sz: float):
+        self.name = name
+        self.bone = bone
+        self.shape = shape
+        self.transform = transform
+        self.sy = sy
+        self.sz = sz
 
 class Skeleton:
     name: str
     bones: list[Bone]
     bone_indices: dict[str, int]
     anims: list[Animation]
+    hitbones: list[HitBone]
+    locations: list[tuple[str, str, Transform]]
 
     def __init__(self, name, armature):
         self.name = name
@@ -343,6 +396,8 @@ class Skeleton:
         self.bone_indices = {}
         self.armature = armature
         self.anims = []
+        self.hitbones = []
+        self.locations = []
 
 class Exporter:
     skeletons: dict[str, Skeleton]
@@ -433,6 +488,9 @@ class Exporter:
                 surface = Surface(mat_name)
                 surface.twosided = "2S" in mat_params
                 surface.ocolor = "OCOLOR" in mat_params
+                surface.ocolor_mult = "OCOLOR_MULT" in mat_params
+                surface.multicolor = "MULTICOLOR" in mat_params
+                surface.unlit = "UNLIT" in mat_params
                 
                 blend = mat_params.get("BLEND")
                 if isinstance(blend, str):
@@ -441,6 +499,10 @@ class Exporter:
                 texture = mat_params.get("T")
                 if isinstance(texture, str):
                     surface.texture = texture
+
+                pm = mat_params.get("PM")
+                if isinstance(pm, str):
+                    surface.pm = pm
 
                 model.materials[mat_name] = surface
 
@@ -486,6 +548,9 @@ class Exporter:
             if model.make_convex_hull:
                 f.write("makeconvexhull\n")
 
+            if model.col_pm is not None:
+                f.write(f"cpm {model.col_pm}\n")
+
             if model.centerofmass is not None:
                 x, y, z = model.centerofmass
                 f.write(f"centerofmass {x:.3f} {y:.3f} {z:.3f}\n")
@@ -500,6 +565,9 @@ class Exporter:
             for param_name, param_value in model.params:
                 f.write(f"param {param_name} {param_value}\n")
 
+            for loc_name, loc_trans in model.locations:
+                f.write(f"loc {loc_name} {self.transform_str(loc_trans)}\n")
+
             for v in model.vertices:
                 color_str = f" {v.color[0]} {v.color[1]} {v.color[2]}" if v.color else ""
                 bones_str = f" {len(v.bone_indices)} " + " ".join(f"{i} {w}" for i, w in zip(v.bone_indices, v.bone_weights)) if model.skeleton is not None else ""
@@ -511,9 +579,19 @@ class Exporter:
                     f.write(" +2sided")
                 if surface.ocolor:
                     f.write(" +ocolor")
+                if surface.ocolor_mult:
+                    f.write(" +ocolor_mult")
+                if surface.multicolor:
+                    f.write(" +multicolor")
+                if surface.unlit:
+                    f.write(" +unlit")
                 if surface.blend is not None:
                     f.write(f" +blend {surface.blend}")
                 f.write("\n")
+
+                pm = surface.pm if surface.pm is not None else "none"
+                f.write(f"pm {pm}\n")
+
                 for tri in surface.tris:
                     f.write(f"f {tri[0]} {tri[1]} {tri[2]}\n")
     
@@ -521,6 +599,12 @@ class Exporter:
         with open(filepath, "w") as f:
             f.write(f"basemodel {map.basemodel_name}\n")
             
+            # static models
+            for name in map.static_models:
+                f.write(f"model {name}\n")
+
+            f.write(f"endmodels\n")
+
             # graphs
             for graph in map.graphs:
                 f.write(f"graph {graph.name}\n")
@@ -528,6 +612,10 @@ class Exporter:
                     f.write(f"n {node.pos[0]} {node.pos[1]} {node.pos[2]}\n")
                 for edge in graph.edges:
                     f.write(f"e {edge.nodes[0]} {edge.nodes[1]}\n")
+
+            # locations
+            for name, trans in map.locations:
+                f.write(f"loc {name} {self.transform_str(trans)}\n")
 
             # # static
             # for obj_name, transform in map.static_objects:
@@ -544,8 +632,8 @@ class Exporter:
                 for name, first, count in chunk.surface_ranges:
                     f.write(f"surface {name} {first} {count}\n")
 
-                for obj_name, transform in chunk.static_objects:
-                    f.write(f"static {obj_name} {self.transform_str(transform)}\n")
+                for model_idx, transform in chunk.static_objects:
+                    f.write(f"static {model_idx} {self.transform_str(transform)}\n")
 
     def export_veh(self, veh: Vehicle, filepath: str):
         with open(filepath, "w") as f:
@@ -564,6 +652,12 @@ class Exporter:
                 parent_str = bone.parent if bone.parent is not None else "NONE"
                 f.write(f"b {bone.name} {parent_str} {self.transform_str(bone.trans)}\n")
 
+            for hitbone in sk.hitbones:
+                f.write(f"hitbone {hitbone.name} {hitbone.bone} {hitbone.shape} {self.transform_str(hitbone.transform)} {hitbone.sy:.6f} {hitbone.sz:.6f}\n")
+
+            for loc, bone_name, trans in sk.locations:
+                f.write(f"loc {loc} {bone_name} {self.transform_str(trans)}\n")
+
             for anim in sk.anims:
                 f.write(f"anim {anim.name} {sk.name}_{anim.name}\n")
                 
@@ -571,6 +665,9 @@ class Exporter:
         with open(filepath, 'w') as f:
             f.write(f"frames {anim.frames}\n")
             f.write(f"fps {anim.fps}\n")
+
+            if anim.cyclic:
+                f.write("cyclic\n")
 
             for chan in anim.channels:
                 f.write(f"ch {chan.name}\n")
@@ -620,6 +717,9 @@ class Exporter:
                 elif C == "convex":
                     model.make_convex_hull = True
 
+        if "CPM" in params:
+            model.col_pm = params["CPM"]
+
         for obj in col.objects:
             type, obj_name, obj_params = self.extract_name(obj.name)
 
@@ -637,8 +737,10 @@ class Exporter:
             elif type == "P":
                 if not "V" in obj_params:
                     continue
-
                 model.params.append((obj_name, obj_params["V"]))
+            elif type == "LOC":
+                trans = self.get_obj_transform(obj)
+                model.locations.append((obj_name, trans))
 
         mdl_filepath = os.path.join(self.out_path, f"{name}.mdl")
         self.export_mdl(model, mdl_filepath)
@@ -662,6 +764,8 @@ class Exporter:
                     graph = Graph(obj_name)
                     self.add_mesh_to_graph(obj, graph)
                     map.graphs.append(graph)
+                elif type == "LOC":
+                    map.locations.append((obj_name, self.get_obj_transform(obj)))
 
             for child_col in col.children:
                 proc_col(child_col)
@@ -712,7 +816,7 @@ class Exporter:
         for bone in armature.data.bones:
             #bone_name = bone.name
 
-            if bone.use_deform: # or is_tag:
+            if bone.use_deform or bone.name.startswith("tag_"): # or is_tag:
                 keep_bones.add(bone)
 
                 while bone.parent:
@@ -720,6 +824,27 @@ class Exporter:
                     keep_bones.add(bone)
 
         return keep_bones
+    
+    def get_masked_bones(self, mask: str|None, skeleton: Skeleton) -> set[str]:
+        if mask is None:
+            return set(bonename for bonename in skeleton.bone_indices)
+        
+        parent_list = BONE_MASKS[mask]
+        bones = set()
+
+        for bonename in skeleton.bone_indices:
+            parentname: str|None = bonename
+            while True:
+                if parentname in parent_list:
+                    bones.add(bonename)
+                    break
+
+                parentname = skeleton.bones[skeleton.bone_indices[parentname]].parent
+
+                if parentname is None:
+                    break
+
+        return bones
 
     def matrix_decompose(self, matrix):
         t, r, s = matrix.decompose()
@@ -756,14 +881,36 @@ class Exporter:
         self.skeletons[name] = sk
 
         # export meshes
-        for obj in obj.children:
-            type, obj_name, _ = self.extract_name(obj.name)
+        for child in obj.children:
+            type, obj_name, child_params = self.extract_name(child.name)
 
             if type == "SKM":
                 model = Model(sk)
-                self.add_mesh_to_model(obj, model)
+                self.add_mesh_to_model(child, model)
                 mdl_filepath = os.path.join(self.out_path, f"{obj_name}.mdl")
                 self.export_mdl(model, mdl_filepath)
+            elif type == "HIT":
+                bone_name = child.parent_bone
+                pose_bone = obj.pose.bones[bone_name]
+                bone_world = obj.matrix_world @ pose_bone.matrix
+                obj_world = child.matrix_world
+                relative_matrix = bone_world.inverted() @ obj_world
+                
+                t, r, s = relative_matrix.decompose()
+                trans = Transform((t.x, t.y, t.z), (r.x, r.y, r.z, r.w), s.x)
+                shape = child_params["S"] if "S" in child_params else "capsule"
+                sk.hitbones.append(HitBone(obj_name, bone_name, shape, trans, s.y, s.z))
+
+            elif type == "LOC":
+                bone_name = child.parent_bone
+                pose_bone = obj.pose.bones[bone_name]
+                bone_world = obj.matrix_world @ pose_bone.matrix
+                obj_world = child.matrix_world
+                relative_matrix = bone_world.inverted() @ obj_world
+                
+                t, r, s = relative_matrix.decompose()
+                trans = Transform((t.x, t.y, t.z), (r.x, r.y, r.z, r.w), s.x)
+                sk.locations.append((obj_name, bone_name, trans))
 
     def process_A(self, action, name, params):
         if not "_" in name:
@@ -783,7 +930,9 @@ class Exporter:
 
         sk.armature.animation_data.action = action
 
-        bone_frames = {bonename: [] for bonename in sk.bone_indices}
+        anim_bones = self.get_masked_bones(params["M"] if "M" in params else None, sk)
+
+        bone_frames = {bonename: [] for bonename in anim_bones}
 
         _, end = map(int, action.frame_range)
         fps = bpy.context.scene.render.fps
@@ -809,11 +958,14 @@ class Exporter:
 
             return True
 
-        for frame in range(0, end):
+        cyclic = "C" in params
+        numframes = end if cyclic else end + 1
+
+        for frame in range(0, numframes):
             bpy.context.scene.frame_set(frame)
             bpy.context.view_layer.update()
 
-            for bonename in sk.bone_indices:
+            for bonename in anim_bones:
                 pose_bone = sk.armature.pose.bones.get(bonename)
 
                 if not pose_bone:
@@ -834,7 +986,8 @@ class Exporter:
 
                 frame_list.append(current_frame)
 
-        anim = Animation(anim_name, fps, end)
+        anim = Animation(anim_name, fps, numframes)
+        anim.cyclic = cyclic
 
         for bone_name, frames in bone_frames.items():
             chan = AnimChannel(bone_name)
