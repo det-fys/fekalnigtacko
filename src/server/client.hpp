@@ -38,6 +38,8 @@ public:
     game::Player* GetPlayer() { return player_.get(); }
     const game::Player* GetPlayer() const { return player_.get(); }
 
+    ~Client();
+
 private:
     void Send(std::string msg);
 
@@ -49,6 +51,7 @@ private:
     ClientState state_ = CS_INIT;
 
     std::unique_ptr<game::Player> player_;
+    db::PlayerId player_id_ = 0;
 };
 
 }

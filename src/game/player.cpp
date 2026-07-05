@@ -25,6 +25,8 @@ game::Player::Player(Game& game, db::PlayerId id) : game_(game), id_(id)
         SendChat(COL_SUCCESS "jsi automaticky admin (pl_autoadmin = 1)");
     }
 
+    std::cout << "player connected: " << name_ << std::endl;
+
     game_.PlayerJoined(*this);
 }
 
@@ -183,6 +185,7 @@ bool game::Player::ChangeBalance(int64_t delta, const std::string& desc)
 game::Player::~Player()
 {
     game_.PlayerLeft(*this);
+    std::cout << "player disconnected: " << name_ << std::endl;
 }
 
 void game::Player::SyncWorld()

@@ -69,6 +69,24 @@ void sv::Server::Disconnect(Client& client)
     interface_->CloseConnection(client.GetConnId());
 }
 
+void sv::Server::SetPlayerConnected(db::PlayerId player_id, bool connected)
+{
+    if (connected)
+    {
+        connected_players_.insert(player_id);
+    }
+    else
+    {
+        connected_players_.erase(player_id);
+    }
+
+}
+
+bool sv::Server::IsPlayerConnected(db::PlayerId player_id) const
+{
+    return connected_players_.contains(player_id);
+}
+
 void sv::Server::PollWSEvents()
 {
     net::ServerInterfaceEvent event;

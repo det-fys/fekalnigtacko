@@ -75,6 +75,14 @@ void sv::Client::Disconnect()
     server_.Disconnect(*this);
 }
 
+sv::Client::~Client()
+{
+    if (player_id_)
+    {
+        server_.SetPlayerConnected(player_id_, false);
+    }
+}
+
 void sv::Client::Send(std::string msg)
 {
     server_.Send(*this, std::move(msg));
@@ -113,6 +121,16 @@ bool sv::Client::ProcessLoginMsg(net::InMessage& msg)
         SendChat(COL_ERROR "chyba při přihlašování: " + std::string(db::GetResultDescription(res)));
         return false;
     }
+
+    // check already connected
+    if (server_.IsPlayerConnected(player_id))
+    {
+        SendChat(COL_ERROR "chyba: tento hráč je již připojen");
+        return false;
+    }
+
+    player_id_ = player_id;
+    server_.SetPlayerConnected(player_id, true);
 
     player_ = std::make_unique<game::Player>(server_.GetGame(), player_id);
     state_ = CS_PLAYER;

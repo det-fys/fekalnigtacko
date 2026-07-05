@@ -34,6 +34,9 @@ public:
 
     int64_t GetTime() const { return time_; }
 
+    void SetPlayerConnected(db::PlayerId player_id, bool connected);
+    bool IsPlayerConnected(db::PlayerId player_id) const;
+
 private:
     void PollWSEvents();
     void HandleWSConnect(net::ConnId conn);
@@ -50,6 +53,8 @@ private:
     std::unordered_map<net::ConnId, std::unique_ptr<Client>> clients_;
 
     int64_t time_ = 0;
+
+    std::set<db::PlayerId> connected_players_;
     
 };
 
