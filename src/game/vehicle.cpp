@@ -679,30 +679,60 @@ void game::Vehicle::SendDeformSyncMsg()
     WriteDeformSync(msg);
 }
 
-void game::Vehicle::ApplyTuning(const VehicleTuning& tuning)
+static bool IsTuningPhysicsDifferent(const game::VehicleTuningContext& a, const game::VehicleTuningContext& b)
 {
-    tuning_ = tuning;
+    if (glm::epsilonNotEqual(a.mass, b.mass, 0.001f))
+        return true;
 
-    tuning_ctx_ = VehicleTuningContext{};
+    if (a.wheels.size() != b.wheels.size())
+        return true; // not rly possible but to be safe
+
+    for (size_t i = 0; i < a.wheels.size(); ++i)
+    {
+        const auto& wa = a.wheels[i];
+        const auto& wb = b.wheels[i];
+
+        if (glm::epsilonNotEqual(wa.friction, wb.friction, 0.001f) ||
+            glm::epsilonNotEqual(wa.suspension_stiffness, wb.suspension_stiffness, 0.001f) ||
+            glm::epsilonNotEqual(wa.suspension_max_force, wb.suspension_max_force, 0.001f) ||
+            glm::epsilonNotEqual(wa.suspension_rest_length, wb.suspension_rest_length, 0.001f) ||
+            glm::epsilonNotEqual(wa.suspension_travel, wb.suspension_travel, 0.001f) ||
+            glm::epsilonNotEqual(wa.roll_influence, wb.roll_influence, 0.001f) ||
+            glm::epsilonNotEqual(wa.z_offset, wb.z_offset, 0.001f) ||
+            glm::epsilonNotEqual(wa.radius, wb.radius, 0.001f))
+        {
+            return true;
+        }
+    }
+
+    return false;// same
+}
+
+static game::VehicleTuningContext EvaluateTuning(const game::VehicleTuning& tuning,
+                                                 const game::VehicleTuningList& tuning_list,
+                                                 const assets::VehicleModel& model)
+{
+
+    game::VehicleTuningContext tuning_ctx{};
 
     // setup wheels
-    const auto& model_wheels = model_->GetWheels();
-    tuning_ctx_.wheels.resize(model_wheels.size());
+    const auto& model_wheels = model.GetWheels();
+    tuning_ctx.wheels.resize(model_wheels.size());
     for (size_t i = 0; i < model_wheels.size(); ++i)
     {
-        tuning_ctx_.wheels[i].front = !(model_wheels[i].type & assets::WHEEL_REAR);
+        tuning_ctx.wheels[i].front = !(model_wheels[i].type & assets::WHEEL_REAR);
     }
 
     // apply tunning to ctx
-    for (const auto& func : tuninglist_->default_funcs)
+    for (const auto& func : tuning_list.default_funcs)
     {
-        func(tuning_ctx_);
+        func(tuning_ctx);
     }
 
-    for (const auto& group : tuninglist_->groups)
+    for (const auto& group : tuning_list.groups)
     {
-        auto group_it = tuning_.parts.find(group.id);
-        if (group_it == tuning_.parts.end())
+        auto group_it = tuning.parts.find(group.id);
+        if (group_it == tuning.parts.end())
             continue;
 
         const auto& part_name = group_it->second;
@@ -710,28 +740,41 @@ void game::Vehicle::ApplyTuning(const VehicleTuning& tuning)
 
         for (const auto& func : part.funcs)
         {
-            func(tuning_ctx_);
+            func(tuning_ctx);
         }
     }
 
-    if (tuning_ctx_.colors[2] == 0) // secondary <- primary
+    if (tuning_ctx.colors[2] == 0) // secondary <- primary
     {
-        tuning_ctx_.colors[2] = tuning_ctx_.colors[0];
+        tuning_ctx.colors[2] = tuning_ctx.colors[0];
     }
+
+    return tuning_ctx;
+}
+
+void game::Vehicle::ApplyTuning(const VehicleTuning& tuning)
+{
+    tuning_ = tuning;
+    auto tuning_ctx = EvaluateTuning(tuning, *tuninglist_, *model_);
+
+    bool recreate_physics = !physics_ || IsTuningPhysicsDifferent(tuning_ctx_, tuning_ctx);
+    tuning_ctx_ = std::move(tuning_ctx);
 
     health_ = tuning_ctx_.health;
     window_health_ = health_;
     steering_speed_ = tuning_ctx_.steering;
 
     // (re)create physics
-    physics_.reset();
-    physics_ = std::make_unique<VehiclePhysics>(world_, root_.local, *this, *model_, tuning_ctx_);
-    if (exploded_)
+    if (recreate_physics)
     {
-        physics_->DisableAction();
+        physics_.reset();
+        physics_ = std::make_unique<VehiclePhysics>(world_, root_.local, *this, *model_, tuning_ctx_);
+        if (exploded_)
+        {
+            physics_->DisableAction();
+        }
+        OnPhysicsChanged();
     }
-
-    OnPhysicsChanged();
 }
 
 void game::Vehicle::WriteTuning(net::OutMessage& msg) const

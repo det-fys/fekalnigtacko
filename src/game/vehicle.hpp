@@ -144,7 +144,7 @@ private:
     std::shared_ptr<const assets::VehicleModel> model_;
     std::shared_ptr<const VehicleTuningList> tuninglist_;
 
-    VehicleTuningContext tuning_ctx_;
+    VehicleTuningContext tuning_ctx_{};
 
     std::unique_ptr<VehiclePhysics> physics_;
 
