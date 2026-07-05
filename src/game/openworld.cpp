@@ -231,7 +231,7 @@ game::DrivableVehicle& game::OpenWorld::SpawnRandomVehicle(const glm::vec3& pos,
 
         for (const auto& part : group.parts)
         {
-            if (part.second.stock || add_nonstock)
+            if (part.second.stock || (add_nonstock && !part.second.reserved))
                 suitable_part_ids.push_back(part.first);
         }
         

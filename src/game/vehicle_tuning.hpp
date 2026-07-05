@@ -47,6 +47,7 @@ struct VehicleTuningPart
     std::string displayname;
     int64_t price;
     bool stock;
+    bool reserved;
 
     std::vector<VehicleTuningFunction> funcs;
 };

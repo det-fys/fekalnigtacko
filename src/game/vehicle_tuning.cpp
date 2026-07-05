@@ -209,18 +209,22 @@ std::unique_ptr<const game::VehicleTuningList> game::VehicleTuningList::LoadFrom
 
             return true;
         }
-        else if (command == "stock")
+        else if (command == "stock" || command == "reserved")
         {
             if (!current_group)
-                throw std::runtime_error("tuning list: stock without active group");
+                throw std::runtime_error("tuning list: stock/reserved without active group");
 
             std::string part_id;
             iss >> part_id;
             auto part_it = current_group->parts.find(part_id);
             if (part_it == current_group->parts.end())
-                throw std::runtime_error("tuning list: stock references unknown part " + part_id);
+                throw std::runtime_error("tuning list: stock/reserved references unknown part: " + part_id);
 
-            part_it->second.stock = true;
+            if (command == "stock")
+                part_it->second.stock = true;
+            else
+                part_it->second.reserved = true;
+        
         }
         else if (command == "default")
         {
