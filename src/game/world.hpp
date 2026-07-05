@@ -128,6 +128,8 @@ private:
                                                  glm::vec3* out_hit_normal = nullptr,
                                                  collision::Material* out_hit_material = nullptr);
 
+    glm::vec3 GetGroundPosition(const glm::vec3& pos);
+
 private:
     MapInstance map_;
     std::set<net::ObjNum> destroyed_objs_;

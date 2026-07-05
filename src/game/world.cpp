@@ -12,6 +12,7 @@
 #include "utils/math.hpp"
 #include "utils/chatcolors.hpp"
 #include "utils/format.hpp"
+#include "utils/random.hpp"
 
 game::World::World(const collision::DynamicsWorldInfo& info, std::string mapname)
     : DynamicsWorld(info), Scheduler(time_ms_), map_(*this, std::move(mapname))
@@ -428,8 +429,14 @@ void game::World::SendChat(const std::string& text)
 void game::World::CreateItemPickup(const glm::vec3& position, std::shared_ptr<ItemInstance> item, int64_t despawn_time,
                                    int64_t respawn_time, size_t ammo_count)
 {
+    auto ground_pos = GetGroundPosition(position);
+    if (respawn_time == 0)
+    {
+        ground_pos.z += RandomFloat(-0.1f, 0.1f);
+    }
+
     MarkerInfo marker_info{};
-    marker_info.position = position;
+    marker_info.position = ground_pos;
     marker_info.type = MARKER_PICKUP;
     marker_info.color = 0xFFFFFF;
     marker_info.model = item->def->model_name;
@@ -443,7 +450,7 @@ void game::World::CreateItemPickup(const glm::vec3& position, std::shared_ptr<It
             res.error_text = nullptr;
             return true;
         },
-        [this, position, item, despawn_time, respawn_time, ammo_count, &marker](PlayerCharacter& character) {
+        [this, ground_pos, item, despawn_time, respawn_time, ammo_count, &marker](PlayerCharacter& character) {
             auto player = character.GetPlayer();
             if (!player)
                 return;
@@ -463,8 +470,10 @@ void game::World::CreateItemPickup(const glm::vec3& position, std::shared_ptr<It
 
             if (respawn_time > 0)
             {
-                Schedule(respawn_time, [this, position, item_name = item->def->GetAssetName(), despawn_time, respawn_time, ammo_count] {
-                    CreateItemPickup(position, std::make_shared<ItemInstance>(item_name), despawn_time, respawn_time, ammo_count);
+                Schedule(respawn_time, [this, ground_pos, item_name = item->def->GetAssetName(), despawn_time,
+                                        respawn_time, ammo_count] {
+                    CreateItemPickup(ground_pos, std::make_shared<ItemInstance>(item_name), despawn_time, respawn_time,
+                                     ammo_count);
                 });
             }
         });
@@ -496,8 +505,14 @@ static std::string_view GetCashModel(int64_t amount)
 void game::World::CreateCashPickup(const glm::vec3& position, int64_t amount, int64_t despawn_time,
                                    int64_t respawn_time)
 {
+    auto ground_pos = GetGroundPosition(position);
+    if (respawn_time == 0)
+    {
+        ground_pos.z += RandomFloat(-0.1f, 0.1f);
+    }
+
     MarkerInfo marker_info{};
-    marker_info.position = position;
+    marker_info.position = ground_pos;
     marker_info.type = MARKER_PICKUP;
     marker_info.color = 0xFFFFFF;
     marker_info.model = GetCashModel(amount);
@@ -511,7 +526,7 @@ void game::World::CreateCashPickup(const glm::vec3& position, int64_t amount, in
             res.error_text = nullptr;
             return true;
         },
-        [this, position, amount, despawn_time, respawn_time, &marker](PlayerCharacter& character) {
+        [this, ground_pos, amount, despawn_time, respawn_time, &marker](PlayerCharacter& character) {
             auto player = character.GetPlayer();
             if (!player)
                 return;
@@ -526,8 +541,8 @@ void game::World::CreateCashPickup(const glm::vec3& position, int64_t amount, in
 
             if (respawn_time > 0)
             {
-                Schedule(respawn_time, [this, position, amount, despawn_time, respawn_time] {
-                    CreateCashPickup(position, amount, despawn_time, respawn_time);
+                Schedule(respawn_time, [this, ground_pos, amount, despawn_time, respawn_time] {
+                    CreateCashPickup(ground_pos, amount, despawn_time, respawn_time);
                 });
             }
         });
@@ -791,4 +806,24 @@ const btCollisionObject* game::World::TraceBulletInternal(const glm::vec3& start
     }
 
     return cb.m_collisionObject;
+}
+
+glm::vec3 game::World::GetGroundPosition(const glm::vec3& pos)
+{
+    btVector3 bt_from(pos.x, pos.y, pos.z + 1.0f);
+    btVector3 bt_to(pos.x, pos.y, pos.z - 5.0f);
+
+
+    btCollisionWorld::ClosestRayResultCallback cb(bt_from, bt_to);
+    cb.m_collisionFilterGroup = collision::OG_DEFAULT;
+    cb.m_collisionFilterMask = collision::OG_STATIC;
+
+    GetBtWorld().rayTest(bt_from, bt_to, cb);
+
+    if (!cb.hasHit())
+    {
+        return pos;
+    }
+
+    return glm::vec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
 }
