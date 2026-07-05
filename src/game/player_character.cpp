@@ -15,6 +15,8 @@ game::PlayerCharacter::PlayerCharacter(World& world, Player& player, const Human
 {
     EnablePhysics(true);
     UpdatePlayerCamera();
+    UpdateHudSlots();
+    UpdateHudData();
     SetNametag(player.GetName());
     SendUseTargetInfo();
 
@@ -164,8 +166,11 @@ void game::PlayerCharacter::OnAimingChanged()
 
 void game::PlayerCharacter::OnHeldItemChanged()
 {
-    const auto& item = GetHeldItem();
-    hud_data_.held_item = item ? item->def->GetAssetName() : "";
+    if (player_)
+    {
+        const auto& item = GetHeldItem();
+        player_->GetCharacterHudData().held_item = item ? item->def->GetAssetName() : "";
+    }
 
     // UpdatePlayerCamera(); // might be required?
 }
@@ -208,7 +213,7 @@ void game::PlayerCharacter::SpawnLoot()
             continue;
 
         size_t ammo = GetAmmo(slot->def->clip_size * 5, slot->def->ammo_type);
-        auto pos = root_.GetGlobalPosition() + glm::vec3(RandomFloat(-1.0f, 1.0f), RandomFloat(-1.0f, 1.0f), RandomFloat(-0.1f, 1.0f));
+        auto pos = root_.GetGlobalPosition() + glm::vec3(RandomFloat(-1.0f, 1.0f), RandomFloat(-1.0f, 1.0f), RandomFloat(-0.3f, 0.1f));
         GetWorld().CreateItemPickup(pos, std::move(slot), RandomInt(59000, 61000), 0, ammo);
     }
 
@@ -434,32 +439,37 @@ void game::PlayerCharacter::UpdateHudData()
     if (!player_)
         return;
 
+    auto& hud_data = player_->GetCharacterHudData();
+
     // general
-    hud_data_.health = static_cast<uint8_t>(GetHealth());
+    hud_data.health = static_cast<uint8_t>(GetHealth());
 
     // item
     const auto& item = GetHeldItem();
-    hud_data_.ammo_loaded = item ? item->ammo : 0;
+    hud_data.ammo_loaded = item ? item->ammo : 0;
 
-    hud_data_.ammo_total = 0;
+    hud_data.ammo_total = 0;
     if (item && inventory_)
     {
         auto it = inventory_->ammo.find(item->def->ammo_type);
         if (it != inventory_->ammo.end())
         {
-            hud_data_.ammo_total = it->second;
+            hud_data.ammo_total = it->second;
         }
     }
 
     // death
-    hud_data_.dead = IsDead() ? 1 : 0;
-
-    player_->SetHudData(hud_data_);
+    hud_data.dead = IsDead() ? 1 : 0;
 }
 
 void game::PlayerCharacter::UpdateHudSlots()
 {
-    hud_data_.weapon_slots = 0;
+    if (!player_)
+        return;
+
+    auto& hud_data = player_->GetCharacterHudData();
+
+    hud_data.weapon_slots = 0;
 
     if (!inventory_ || IsDead())
         return;
@@ -467,10 +477,8 @@ void game::PlayerCharacter::UpdateHudSlots()
     for (size_t i = 0; i < 10; ++i)
     {
         if (inventory_->slots[i])
-            hud_data_.weapon_slots |= 1 << i;
+            hud_data.weapon_slots |= 1 << i;
     }
-
-
 }
 
 static const std::array<std::string_view, 6> suicide_messages{

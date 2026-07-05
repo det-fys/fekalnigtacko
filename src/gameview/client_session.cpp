@@ -53,7 +53,7 @@ bool game::view::ClientSession::ProcessSingleMessage(net::MessageType type, net:
     case net::MSG_HUD:
         return ProcessHudMsg(msg);
 
-    case net::MSG_DAMAGE:
+    case net::MSG_HUDEVENT:
         return ProcessDamageMsg(msg);
 
     case net::MSG_USETARGET:
@@ -177,20 +177,28 @@ bool game::view::ClientSession::ProcessHudMsg(net::InMessage& msg)
 
     PlayerHudData hud_data{};
 
-    if (fields & PHUD_HEALTH)
+    if (fields & PHUD_BALANCE)
     {
-        if (!msg.Read(hud_data.health))
+        if (!msg.Read(hud_data.balance))
             return false;
 
-        hud_.SetHealth(static_cast<float>(hud_data.health));
+        hud_.SetBalance(hud_data.balance);
+    }
+
+    if (fields & PHUD_HEALTH)
+    {
+        if (!msg.Read(hud_data.character.health))
+            return false;
+
+        hud_.SetHealth(static_cast<float>(hud_data.character.health));
     }
 
     if (fields & PHUD_WEAPON_SLOTS)
     {
-        if (!msg.Read(hud_data.weapon_slots))
+        if (!msg.Read(hud_data.character.weapon_slots))
             return false;
         
-        hud_.SetWeaponSlots(hud_data.weapon_slots);
+        hud_.SetWeaponSlots(hud_data.character.weapon_slots);
     }
 
     if (fields & PHUD_ITEM)
@@ -199,15 +207,15 @@ bool game::view::ClientSession::ProcessHudMsg(net::InMessage& msg)
         if (!msg.Read(item_name))
             return false;
 
-        hud_data.held_item = item_name;
+        hud_data.character.held_item = item_name;
 
         // determine clip size
-        std::string displayname = hud_data.held_item;
+        std::string displayname = hud_data.character.held_item;
         size_t clip_size = 0;
         size_t item_slot = 0;
-        if (!hud_data.held_item.empty())
+        if (!hud_data.character.held_item.empty())
         {
-            auto item = assets::AssetManager::GetInstance().Get<assets::Item>(hud_data.held_item);
+            auto item = assets::AssetManager::GetInstance().Get<assets::Item>(hud_data.character.held_item);
             displayname = item->displayname;
             clip_size = item->clip_size;
             item_slot = item->slot;
@@ -218,26 +226,26 @@ bool game::view::ClientSession::ProcessHudMsg(net::InMessage& msg)
 
     if (fields & PHUD_AMMO_LOADED)
     {
-        if (!msg.Read(hud_data.ammo_loaded))
+        if (!msg.Read(hud_data.character.ammo_loaded))
             return false;
 
-        hud_.SetLoadedAmmo(static_cast<size_t>(hud_data.ammo_loaded));
+        hud_.SetLoadedAmmo(static_cast<size_t>(hud_data.character.ammo_loaded));
     }
 
     if (fields & PHUD_AMMO_TOTAL)
     {
-        if (!msg.Read(hud_data.ammo_total))
+        if (!msg.Read(hud_data.character.ammo_total))
             return false;
 
-        hud_.SetTotalAmmo(static_cast<size_t>(hud_data.ammo_total));
+        hud_.SetTotalAmmo(static_cast<size_t>(hud_data.character.ammo_total));
     }
 
     if (fields & PHUD_DEATH)
     {
-        if (!msg.Read(hud_data.dead))
+        if (!msg.Read(hud_data.character.dead))
             return false;
 
-        hud_.SetDead(hud_data.dead > 0);
+        hud_.SetDead(hud_data.character.dead > 0);
     }
 
     return true;

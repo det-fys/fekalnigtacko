@@ -2,6 +2,7 @@
 #include "player_character.hpp"
 #include "utils/colors.hpp"
 #include "game.hpp"
+#include "utils/format.hpp"
 
 game::TuningWorld::TuningWorld(Game& game, EnterableWorld& exit_world, const glm::vec3& exit_pos, float exit_yaw,
                                std::string mapname)
@@ -103,6 +104,7 @@ void game::TuningWorld::OpenGroupMenu(const VehicleTuningGroup& group)
     CloseMenu();
 
     preview_tuning_ = tuning_;
+    curr_group_ = &group;
 
     auto& menu = player_->DisplayMenu(group.displayname);
     menu_ = &menu;
@@ -121,23 +123,27 @@ void game::TuningWorld::OpenGroupMenu(const VehicleTuningGroup& group)
             vehicle_->SetTuning(preview_tuning_);
         });
 
-        btn.SetOnClick([this, &btn, &group_id = group.id, &part_id]() {
-            std::string prev_part_id = GetCurrentPartId(group_id);
+        btn.SetOnClick([this, &btn, &group, &part]() {
+            auto prev_part = GetCurrentPart();
 
-            if (prev_part_id == part_id)
+            if (prev_part == &part)
                 return;
-                
-            tuning_.parts[group_id] = part_id; // apply
+            
+            // pay
+            if (!player_->ChangeBalance(-part.price, "tunírna: " + group.displayname + "^r: " + part.displayname))
+                return;
+            
+            tuning_.parts[group.id] = part.id; // apply
 
             std::string state_text;
             
-            if (mounted_part_menu_item_)
+            if (mounted_part_menu_item_ && prev_part)
             {
-                GetPartState(group_id, prev_part_id, &state_text);
+                GetPartState(*prev_part, &state_text);
                 mounted_part_menu_item_->SetSelection(state_text);
             }
             
-            GetPartState(group_id, part_id, &state_text);
+            GetPartState(part, &state_text);
             btn.SetSelection(state_text);
 
             mounted_part_menu_item_ = &btn;
@@ -146,7 +152,7 @@ void game::TuningWorld::OpenGroupMenu(const VehicleTuningGroup& group)
             vehicle_->PlaySound("tuning");
         });
 
-        if (GetPartState(group.id, part_id, &state_text))
+        if (GetPartState(part, &state_text))
         {
             current_idx = i;
             mounted_part_menu_item_ = &btn;
@@ -170,25 +176,37 @@ void game::TuningWorld::OpenGroupMenu(const VehicleTuningGroup& group)
 
 }
 
-std::string game::TuningWorld::GetCurrentPartId(const std::string& group_id)
+const game::VehicleTuningPart* game::TuningWorld::GetCurrentPart()
 {
-    auto part_it = tuning_.parts.find(group_id);
-    if (part_it != tuning_.parts.end())
-    {
-        return part_it->second;
-    }
+    if (!curr_group_)
+        return nullptr;
 
-    return std::string();
+    auto part_it = tuning_.parts.find(curr_group_->id);
+    if (part_it == tuning_.parts.end())
+        return nullptr;
+
+    auto gr_it = curr_group_->parts.find(part_it->second);
+    if (gr_it == curr_group_->parts.end())
+        return nullptr;
+
+    return &gr_it->second;
 }
 
-bool game::TuningWorld::GetPartState(const std::string& group_name, const std::string& part_id,
-                                     std::string* state_text)
+bool game::TuningWorld::GetPartState(const VehicleTuningPart& part, std::string* state_text)
 {
-    bool mounted = part_id == GetCurrentPartId(group_name);
+    bool mounted = &part == GetCurrentPart();
 
     if (state_text)
     {
-        *state_text = mounted ? "aktuální" : "0 Kč";
+        if (mounted)
+        {
+            *state_text = "aktuální";
+        }
+        else
+        {
+            // get price
+            *state_text = FormatBalance(curr_group_->parts.at(part.id).price);
+        }
     }
 
     return mounted;

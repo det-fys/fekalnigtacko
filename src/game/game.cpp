@@ -21,7 +21,7 @@ static uint32_t GetRandomColor24()
     return (b << 16) | (g << 8) | r;
 }
 
-game::Game::Game()
+game::Game::Game(GameInfo info) : db_(std::move(info.db))
 {
     RegisterCommands();
 
@@ -265,6 +265,23 @@ void game::Game::RegisterCommands()
                 cmd.SendMessage(text);
             }
 
+        }
+    );
+
+    // /money
+    cmds_.RegisterCommand(
+        "money",
+        CMDF_ADMIN_ONLY,
+        "zobrazí seznam příkazů",
+        [this](const CommandData& cmd) {
+            int64_t delta;
+            if (!cmd.line.Read(delta))
+            {
+                cmd.SendError("neplatný množství");
+                return;
+            }
+
+            cmd.player.ChangeBalance(delta, "cheaty");
         }
     );
 }

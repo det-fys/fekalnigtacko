@@ -9,11 +9,16 @@
 #include "game.hpp"
 #include "utils/cvars.hpp"
 #include "utils/chatcolors.hpp"
+#include "db/db.hpp"
+#include "utils/format.hpp"
 
 CVAR(uint8_t, pl_autoadmin, CV_NONE, 0, 0, 1);
 
-game::Player::Player(Game& game, std::string name) : game_(game), name_(std::move(name))
+game::Player::Player(Game& game, db::PlayerId id) : game_(game), id_(id)
 {
+    LoadName();
+    LoadBalance();
+
     if (pl_autoadmin.Get() > 0)
     {
         is_admin_ = true;
@@ -49,6 +54,7 @@ void game::Player::Update()
     SyncWorld();
     SendMenuMsgs();
     UpdateCamera();
+    SendHudUpdate();
     SendDamageEvents();
 
     // reset for next frame
@@ -116,67 +122,14 @@ void game::Player::CloseMenu(const RemoteMenu& menu)
     remote_menu_.reset();
 }
 
-void game::Player::SetHudData(const PlayerHudData& hud_data)
+game::PlayerCharacterHudData& game::Player::GetCharacterHudData()
 {
-    PlayerHudFields fields = 0;
-
-    auto msg = BeginMsg(net::MSG_HUD);
-    auto fields_pos = msg.Reserve<PlayerHudFields>();
-
-    if (hud_data.health != hud_data_.health)
-    {
-        fields |= PHUD_HEALTH;
-        hud_data_.health = hud_data.health;
-        msg.Write(hud_data.health);
-    }
-
-    if (hud_data.weapon_slots != hud_data_.weapon_slots)
-    {
-        fields |= PHUD_WEAPON_SLOTS;
-        hud_data_.weapon_slots = hud_data.weapon_slots;
-        msg.Write(hud_data.weapon_slots);
-    }
-
-    if (hud_data.held_item != hud_data_.held_item)
-    {
-        fields |= PHUD_ITEM;
-        hud_data_.held_item = hud_data.held_item;
-        msg.Write(net::ModelName(hud_data.held_item));
-    }
-
-    if (hud_data.ammo_loaded != hud_data_.ammo_loaded)
-    {
-        fields |= PHUD_AMMO_LOADED;
-        hud_data_.ammo_loaded = hud_data.ammo_loaded;
-        msg.Write(hud_data.ammo_loaded);
-    }
-
-    if (hud_data.ammo_total != hud_data_.ammo_total)
-    {
-        fields |= PHUD_AMMO_TOTAL;
-        hud_data_.ammo_total = hud_data.ammo_total;
-        msg.Write(hud_data.ammo_total);
-    }
-
-    if (hud_data.dead != hud_data_.dead)
-    {
-        fields |= PHUD_DEATH;
-        hud_data_.dead = hud_data.dead;
-        msg.Write(hud_data.dead);
-    }
-
-    if (fields == 0)
-    {
-        DiscardMsg();
-        return;
-    }
-
-    msg.WriteAt(fields_pos, fields);
+    return hud_data_[1].character;
 }
 
-void game::Player::ResetHudData()
+void game::Player::ResetCharacterHudData()
 {
-    SetHudData(PlayerHudData{});
+    GetCharacterHudData() = PlayerCharacterHudData{};
 }
 
 void game::Player::DisplayDamageEvent(DamageEventType type)
@@ -199,6 +152,31 @@ bool game::Player::GetView(glm::vec3& eye, glm::vec3& forward)
 
     eye = camera_controller_.GetEye();
     forward = camera_controller_.GetForward();
+    return true;
+}
+
+bool game::Player::ChangeBalance(int64_t delta, const std::string& desc)
+{
+    if (delta == 0)
+        return true;
+    
+    auto res = game_.GetDb().ChangePlayerBalance(id_, delta);
+    if (res != db::QR_OK)
+    {
+        SendChat(COL_ERROR "chyba: " + std::string(db::GetResultDescription(res)));
+        return false;
+    }
+
+    if (delta < 0)
+    {
+        SendChat("výdaj " + FormatBalance(-delta) + ": " + desc);
+    }
+    else
+    {
+        SendChat("příjem " + FormatBalance(delta) + ": " + desc);
+    }
+
+    LoadBalance();
     return true;
 }
 
@@ -261,6 +239,74 @@ void game::Player::SendWorldUpdateMsg()
     world_->PickLocalMsgs(*this, cull_pos_);
 }
 
+void game::Player::SendHudUpdate()
+{
+    PlayerHudFields fields = 0;
+
+    auto msg = BeginMsg(net::MSG_HUD);
+    auto fields_pos = msg.Reserve<PlayerHudFields>();
+
+    auto& prev_data = hud_data_[0];
+    auto& curr_data = hud_data_[1];
+
+    if (curr_data.balance != prev_data.balance)
+    {
+        fields |= PHUD_BALANCE;
+        prev_data.balance = curr_data.balance;
+        msg.Write(curr_data.balance);
+    }
+
+    if (curr_data.character.health != prev_data.character.health)
+    {
+        fields |= PHUD_HEALTH;
+        prev_data.character.health = curr_data.character.health;
+        msg.Write(curr_data.character.health);
+    }
+
+    if (curr_data.character.weapon_slots != prev_data.character.weapon_slots)
+    {
+        fields |= PHUD_WEAPON_SLOTS;
+        prev_data.character.weapon_slots = curr_data.character.weapon_slots;
+        msg.Write(curr_data.character.weapon_slots);
+    }
+
+    if (curr_data.character.held_item != prev_data.character.held_item)
+    {
+        fields |= PHUD_ITEM;
+        prev_data.character.held_item = curr_data.character.held_item;
+        msg.Write(net::ModelName(curr_data.character.held_item));
+    }
+
+    if (curr_data.character.ammo_loaded != prev_data.character.ammo_loaded)
+    {
+        fields |= PHUD_AMMO_LOADED;
+        prev_data.character.ammo_loaded = curr_data.character.ammo_loaded;
+        msg.Write(curr_data.character.ammo_loaded);
+    }
+
+    if (curr_data.character.ammo_total != prev_data.character.ammo_total)
+    {
+        fields |= PHUD_AMMO_TOTAL;
+        prev_data.character.ammo_total = curr_data.character.ammo_total;
+        msg.Write(curr_data.character.ammo_total);
+    }
+
+    if (curr_data.character.dead != prev_data.character.dead)
+    {
+        fields |= PHUD_DEATH;
+        prev_data.character.dead = curr_data.character.dead;
+        msg.Write(curr_data.character.dead);
+    }
+
+    if (fields == 0)
+    {
+        DiscardMsg();
+        return;
+    }
+
+    msg.WriteAt(fields_pos, fields);
+}
+
 void game::Player::SendDamageEvents()
 {
     if (dmg_event_flags_ & (1 << DAMAGE_EVENT_RECEIVED))
@@ -277,7 +323,7 @@ void game::Player::SendDamageEvents()
 
 void game::Player::SendDamageEvent(DamageEventType type)
 {
-    auto msg = BeginMsg(net::MSG_DAMAGE);
+    auto msg = BeginMsg(net::MSG_HUDEVENT);
     msg.Write(type);
 }
 
@@ -503,7 +549,6 @@ void game::Player::SendMenuMsgs()
     msg.Write(menu_msg);
 
     remote_menu_->ResetMsg();
-
 }
 
 void game::Player::UpdateCamera()
@@ -511,4 +556,27 @@ void game::Player::UpdateCamera()
     camera_controller_.SetAiming(camera_info_.flags & CAM_AIMING);
     camera_controller_.SetAimType(camera_info_.flags & CAM_AIM_CROSSHAIR, camera_info_.flags & CAM_AIM_SCOPE);
     camera_controller_.Update(1.0f / 25.0f);
+}
+
+void game::Player::LoadName()
+{
+    auto res = game_.GetDb().GetPlayerName(id_, name_);
+    if (res != db::QR_OK)
+    {
+        SendChat(COL_ERROR "chyba při načítání jména: " + std::string(db::GetResultDescription(res)));
+        name_ = "<chyba při načítání jména>";
+    }
+}
+
+void game::Player::LoadBalance()
+{
+    db::MoneyAmount balance;
+    auto res = game_.GetDb().GetPlayerBalance(id_, balance);
+    if (res != db::QR_OK)
+    {
+        SendChat(COL_ERROR "nepovedlo se načíst zůstatek: " + std::string(db::GetResultDescription(res)));
+        return;
+    }
+
+    hud_data_[1].balance = balance;
 }

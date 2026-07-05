@@ -6,6 +6,7 @@
 #include "tuning_world.hpp"
 #include "openworld.hpp"
 #include "commands.hpp"
+#include "db/db.hpp"
 
 namespace game
 {
@@ -20,10 +21,15 @@ struct PlayerGameInfo
     PlayerGameInfo(Player& player) : player(player) {}
 };
 
+struct GameInfo
+{
+    std::unique_ptr<db::GameDatabase> db;
+};
+
 class Game
 {
 public:
-    Game();
+    Game(GameInfo info);
     DELETE_COPY_MOVE(Game);
 
     void RegisterCommands();
@@ -41,6 +47,8 @@ public:
 
     void MovePlayerToWorld(Player& player, EnterableWorld& world, bool with_vehicle, const glm::vec3& pos, float yaw);
 
+    db::GameDatabase& GetDb() const { return *db_; }
+
 private:
     void UpdateDaytime();
     void UpdateWorlds();
@@ -56,6 +64,7 @@ private:
     EnterableWorld* FindPlayerWorld(Player& player) const;
 
 private:
+    std::unique_ptr<db::GameDatabase> db_;
     CommandList cmds_;
 
     std::shared_ptr<OpenWorld> openworld_;

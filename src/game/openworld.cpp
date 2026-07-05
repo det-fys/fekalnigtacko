@@ -301,6 +301,8 @@ game::NpcCharacter& game::OpenWorld::SpawnRandomNpc()
         CheckNpcBoredom(npc);
     });
 
+    npc.SetMoney(static_cast<int64_t>(RandomFloat(0.0f, 6000.0f)) * 100);
+
     ++num_npcs_;
 
     return npc;

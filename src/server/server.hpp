@@ -12,10 +12,17 @@
 namespace sv
 {
 
+struct ServerInfo
+{
+    std::unique_ptr<net::ServerInterface> iface;
+    std::unique_ptr<game::Game> game;
+};
+
 class Server
 {
 public:
-    Server(std::unique_ptr<net::ServerInterface> iface);
+    Server(ServerInfo info);
+    DELETE_COPY_MOVE(Server);
 
     void Run();
 
@@ -23,7 +30,7 @@ public:
 
     void Disconnect(Client& client);
 
-    game::Game& GetGame() { return game_; }
+    game::Game& GetGame() { return *game_; }
 
     int64_t GetTime() const { return time_; }
 
@@ -39,7 +46,7 @@ private:
     std::unique_ptr<net::ServerInterface> interface_;
     bool exit_ = false;
 
-    game::Game game_;
+    std::unique_ptr<game::Game> game_;
     std::unordered_map<net::ConnId, std::unique_ptr<Client>> clients_;
 
     int64_t time_ = 0;

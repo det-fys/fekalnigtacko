@@ -20,7 +20,7 @@ void game::view::MarkerView::Update(const UpdateInfo& info)
 
     if (marker_type_ == MARKER_PICKUP)
     {
-        icon_node_.local.position.z = 0.6f + glm::sin(info.time * 2.0f) * 0.1f;
+        icon_node_.local.position.z = 0.6f + glm::sin(info.time * 2.0f) * 0.05f;
     }
     else
     {

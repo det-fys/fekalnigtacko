@@ -99,11 +99,44 @@ void game::NpcCharacter::OnRideableDamaged(const DamageInfo& damage)
 
 void game::NpcCharacter::SpawnLoot()
 {
+    auto& world = GetWorld();
+
     if (weapon_)
     {
         size_t ammo = weapon_->def->clip_size * 5;
-        GetWorld().CreateItemPickup(root_.GetGlobalPosition(), std::move(weapon_), 60000, 0, ammo);
+        world.CreateItemPickup(root_.GetGlobalPosition(), std::move(weapon_), 60000, 0, ammo);
     }
+
+    // spawn cash
+    auto balance = money_;
+    auto create_cash = [&world, &balance, pos = root_.GetGlobalPosition()](int64_t amount) {
+        if (balance < amount)
+            return false;
+        
+        auto cash_pos = pos + glm::vec3(RandomFloat(-0.5f, 0.5f), RandomFloat(-0.5f, 0.5f), RandomFloat(-0.3f, 0.1f));
+        world.CreateCashPickup(cash_pos, amount, RandomInt(30000, 65000), 0);
+        balance -= amount;
+        return true;
+    };
+    
+    while (true)
+    {
+        if (create_cash(5000'00))
+            continue;
+        if (create_cash(2000'00))
+            continue;
+        if (create_cash(1000'00))
+            continue;
+        if (create_cash(500'00))
+            continue;
+        if (create_cash(200'00))
+            continue;
+        if (create_cash(100'00))
+            continue;
+
+        break;
+    }
+
 }
 
 void game::NpcCharacter::MakeEnemy(net::EntNum enemy_num)

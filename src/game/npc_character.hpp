@@ -40,6 +40,7 @@ public:
     virtual void ReceiveDamage(const DamageInfo& damage) override;
 
     void SetWeapon(std::shared_ptr<ItemInstance> weapon);
+    void SetMoney(int64_t amount) { money_ = amount; }
 
     bool IsBored(int64_t time) const;
     void Die();
@@ -117,6 +118,8 @@ private:
     glm::vec3 last_enemy_pos_{};
 
     bool follow_enemy_ = false;
+
+    int64_t money_ = 0;
 };
 
 }

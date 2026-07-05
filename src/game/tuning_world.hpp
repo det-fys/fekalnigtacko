@@ -32,8 +32,8 @@ private:
 
     void OpenMainTuningMenu();
     void OpenGroupMenu(const VehicleTuningGroup& group);
-    std::string GetCurrentPartId(const std::string& group_id);
-    bool GetPartState(const std::string& group_id, const std::string& part_id, std::string* state_text); // mounted?
+    const VehicleTuningPart* GetCurrentPart();
+    bool GetPartState(const VehicleTuningPart& part, std::string* state_text); // mounted?
     void CloseMenu();
 
     void Reset();
@@ -57,6 +57,7 @@ private:
     VehicleTuning preview_tuning_;
 
     RemoteMenuItem* mounted_part_menu_item_ = nullptr;
+    const VehicleTuningGroup* curr_group_ = nullptr;
 
     std::function<void()> exit_cb_;
 

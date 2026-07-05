@@ -75,8 +75,6 @@ private:
 
     std::unique_ptr<Inventory> inventory_;
 
-    PlayerHudData hud_data_;
-
     bool aim_assist_ = true;
 };
 

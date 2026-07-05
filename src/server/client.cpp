@@ -3,6 +3,10 @@
 #include "server.hpp"
 #include "utils/validate.hpp"
 #include "utils/version.hpp"
+#include "utils/chatcolors.hpp"
+#include "utils/cvars.hpp"
+
+CVAR(uint8_t, sv_require_alphanumeric_names, CV_NONE, 0, 0, 1);
 
 sv::Client::Client(Server& server, net::ConnId id) : server_(server), id_(id) {}
 
@@ -88,11 +92,29 @@ bool sv::Client::ProcessLoginMsg(net::InMessage& msg)
         return false;
     }
 
-    net::PlayerName name;
-    if (!msg.Read(name) || !utils::IsAlphanumeric(name))
+    // read "token": TODO: really token
+    net::PlayerName name_token;
+    if (!msg.Read(name_token))
         return false;
-    
-    player_ = std::make_unique<game::Player>(server_.GetGame(), name);
+
+    if (sv_require_alphanumeric_names.Get() > 0 && !utils::IsAlphanumeric(name_token))
+    {
+        SendChat(COL_ERROR "chyba: máš nahovno jméno - musí bejt písmena, čísla nebo _");
+        return false;
+    }
+
+    auto& db = server_.GetGame().GetDb();
+
+    // login
+    db::PlayerId player_id;
+    auto res = db.VerifyPlayer(name_token, player_id);
+    if (res != db::QR_OK)
+    {
+        SendChat(COL_ERROR "chyba při přihlašování: " + std::string(db::GetResultDescription(res)));
+        return false;
+    }
+
+    player_ = std::make_unique<game::Player>(server_.GetGame(), player_id);
     state_ = CS_PLAYER;
     return true;
 }

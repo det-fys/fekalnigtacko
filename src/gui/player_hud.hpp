@@ -12,6 +12,8 @@ class PlayerHud
 public:
     PlayerHud(const float& time);
 
+    void SetBalance(int64_t balance);
+
     void SetHealth(float health) { health_ = health; }
     void SetWeaponSlots(uint8_t slots);
     void SetItemInfo(std::string item_name, size_t slot, size_t clip_size);
@@ -35,6 +37,7 @@ private:
 
     glm::vec4 GetCrosshairColor() const;
 
+    void DrawBalance(Context& ctx) const;
     void DrawPain(Context& ctx) const;
     void DrawCrosshair(Context& ctx) const;
     void DrawScope(Context& ctx) const;
@@ -49,6 +52,9 @@ private:
     // resources
     std::shared_ptr<const gfx::Texture> crosshair_texture_;
     std::shared_ptr<const gfx::Texture> scope_texture_;
+
+    // non-character
+    std::string balance_str_;
 
     // general
     float health_ = 0.0f;

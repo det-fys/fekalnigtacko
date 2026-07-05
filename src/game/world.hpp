@@ -111,6 +111,8 @@ public:
     void CreateItemPickup(const glm::vec3& position, std::shared_ptr<ItemInstance> item, int64_t despawn_time,
                           int64_t respawn_time, size_t ammo_count);
 
+    void CreateCashPickup(const glm::vec3& position, int64_t amount, int64_t despawn_time, int64_t respawn_time);
+
     virtual ~World() = default;
 
 private:

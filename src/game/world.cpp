@@ -10,6 +10,8 @@
 #include "net/utils.hpp"
 #include "marker.hpp"
 #include "utils/math.hpp"
+#include "utils/chatcolors.hpp"
+#include "utils/format.hpp"
 
 game::World::World(const collision::DynamicsWorldInfo& info, std::string mapname)
     : DynamicsWorld(info), Scheduler(time_ms_), map_(*this, std::move(mapname))
@@ -472,6 +474,67 @@ void game::World::CreateItemPickup(const glm::vec3& position, std::shared_ptr<It
         marker.Schedule(despawn_time, [&marker]{
             marker.Remove();
         });
+    }
+}
+
+static std::string_view GetCashModel(int64_t amount)
+{
+    if (amount >= 5000'00)
+        return "cash5000";
+    else if (amount >= 2000'00)
+        return "cash2000";
+    else if (amount >= 1000'00)
+        return "cash1000";
+    else if (amount >= 500'00)
+        return "cash500";
+    else if (amount >= 200'00)
+        return "cash200";
+    else
+        return "cash100";
+}
+
+void game::World::CreateCashPickup(const glm::vec3& position, int64_t amount, int64_t despawn_time,
+                                   int64_t respawn_time)
+{
+    MarkerInfo marker_info{};
+    marker_info.position = position;
+    marker_info.type = MARKER_PICKUP;
+    marker_info.color = 0xFFFFFF;
+    marker_info.model = GetCashModel(amount);
+
+    auto& marker = Spawn<Marker>(marker_info);
+    marker.SetUseTarget(
+        "sebrat " COL_MONEY + FormatBalance(amount),
+        [](PlayerCharacter& character, UseTargetQueryResult& res) {
+            res.enabled = true;
+            res.delay = 0.01f;
+            res.error_text = nullptr;
+            return true;
+        },
+        [this, position, amount, despawn_time, respawn_time, &marker](PlayerCharacter& character) {
+            auto player = character.GetPlayer();
+            if (!player)
+                return;
+
+            if (!player->ChangeBalance(amount, "hotovost"))
+                return;
+
+            character.PlaySound("pickup_cash");
+
+            marker.SetUseable(false);
+            marker.Remove();
+
+            if (respawn_time > 0)
+            {
+                Schedule(respawn_time, [this, position, amount, despawn_time, respawn_time] {
+                    CreateCashPickup(position, amount, despawn_time, respawn_time);
+                });
+            }
+        });
+
+    if (despawn_time > 0)
+    {
+        marker.Schedule(despawn_time, [&marker] { marker.Remove(); });
     }
 }
 

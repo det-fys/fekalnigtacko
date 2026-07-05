@@ -11,9 +11,7 @@
 #pragma comment(lib, "winmm.lib")
 #endif
 
-sv::Server::Server(std::unique_ptr<net::ServerInterface> iface) : interface_(std::move(iface))
-{
-}
+sv::Server::Server(ServerInfo info) : interface_(std::move(info.iface)), game_(std::move(info.game)) {}
 
 void sv::Server::Run()
 {
@@ -123,7 +121,7 @@ void sv::Server::HandleWSDisconnect(net::ConnId conn)
 void sv::Server::Update()
 {
     // update game
-    game_.Update();
+    game_->Update();
 
     // update players
     for (const auto& [conn, client] : clients_)
@@ -131,5 +129,5 @@ void sv::Server::Update()
         client->Update();
     }
 
-    game_.FinishFrame();
+    game_->FinishFrame();
 }

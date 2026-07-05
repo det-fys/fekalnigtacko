@@ -45,7 +45,7 @@ struct VehicleTuningPart
 {
     std::string id;
     std::string displayname;
-    uint32_t price;
+    int64_t price;
     bool stock;
 
     std::vector<VehicleTuningFunction> funcs;

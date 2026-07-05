@@ -58,6 +58,8 @@ set(COMMON_SOURCES
     "src/utils/transform.hpp"
     "src/utils/validate.hpp"
 
+    "src/db/db.cpp"
+    "src/db/db_memory.cpp"
     "src/game/animal.hpp"
     "src/game/animal.cpp"
     "src/game/character.hpp"

@@ -16,6 +16,7 @@
 #include "net/server_local.hpp"
 #include "server/server.hpp"
 #include "server/server_cfg.hpp"
+#include "db/db_memory.hpp"
 
 #include "net/client_ws.hpp"
 
@@ -24,6 +25,9 @@ CVAR_CL(float, volume, CV_SAVE, 0.2f, 0.0f);
 
 CVAR_CL(uint8_t, app_autoconnect, CV_SAVE, 1, 0, 1);
 CVAR_CL(uint8_t, app_autostartserver, CV_SAVE, 0, 0, 1);
+
+CVAR_CL(uint8_t, app_showfps, CV_NONE, 1, 0, 1);
+CVAR_CL(uint8_t, app_shownetstats, CV_NONE, 1, 0, 1);
 CVAR_CL(uint8_t, app_showviewportsize, CV_SAVE, 0, 0, 1);
 
 static const std::map<KeyCode, game::PlayerInputType> s_inputmap = {
@@ -389,9 +393,16 @@ void App::DrawStats()
 {
 	auto& viewport_size = gui_.GetViewportSize();
 	glm::vec2 pos(viewport_size.x - 5.0f, 5.0f);
-	gui_.DrawTextAligned(fps_text_, pos, glm::vec2(-1.0f, 0.0f));
-	pos.y += 30.0f;
-	gui_.DrawTextAligned(msglen_text_, pos, glm::vec2(-1.0f, 0.0f));
+	if (app_showfps.Get() > 0)
+	{
+		gui_.DrawTextAligned(fps_text_, pos, glm::vec2(-1.0f, 0.0f), 0xFFFFFFFF, 0.8f);
+		pos.x -= 100.0f;
+	}
+
+	if (app_shownetstats.Get() > 0)
+	{
+		gui_.DrawTextAligned(msglen_text_, pos, glm::vec2(-1.0f, 0.0f), 0xFFFFFFFF, 0.8f);
+	}
 	
 	if (app_showviewportsize.Get() > 0)
 	{
@@ -419,7 +430,19 @@ void App::ConnectLocal()
 		try 
 		{
             sv::LoadCfg("server_local.cfg");
-			sv::Server server(std::make_unique<net::LocalServerInterface>(channel_pair));
+		
+			// setup game
+			game::GameInfo g_info{};
+            g_info.db = std::make_unique<db::MemoryGameDatabase>();
+            auto game = std::make_unique<game::Game>(std::move(g_info));
+
+			// setup server
+			sv::ServerInfo sv_info{};
+            sv_info.iface = std::make_unique<net::LocalServerInterface>(channel_pair);
+            sv_info.game = std::move(game);
+			sv::Server server(std::move(sv_info));
+
+			// run server
 			server.Run();
 		}
 		catch (const std::exception& e)

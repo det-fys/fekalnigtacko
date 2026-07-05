@@ -2,6 +2,8 @@
 
 #include "player_hud.hpp"
 #include "utils/math.hpp"
+#include "utils/format.hpp"
+#include "utils/chatcolors.hpp"
 
 #include "assets/asset_manager.hpp"
 
@@ -25,7 +27,14 @@ gui::PlayerHud::PlayerHud(const float& time) : time_(time)
     crosshair_texture_ = assets::AssetManager::GetInstance().Get<gfx::Texture>("crosshair");
     scope_texture_ = assets::AssetManager::GetInstance().Get<gfx::Texture>("scope");
 
+    SetBalance(0);
+
     UpdateWeaponSlotsText();
+}
+
+void gui::PlayerHud::SetBalance(int64_t balance)
+{
+    balance_str_ = COL_MONEY + FormatBalance(balance);
 }
 
 void gui::PlayerHud::SetWeaponSlots(uint8_t slots)
@@ -77,6 +86,7 @@ void gui::PlayerHud::Draw(Context& ctx) const
     DrawCrosshair(ctx);
     DrawScope(ctx);
     DrawPain(ctx);
+    DrawBalance(ctx);
     DrawHealthBar(ctx);
     DrawItemInfo(ctx);
     DrawUseTarget(ctx);
@@ -121,6 +131,13 @@ glm::vec4 gui::PlayerHud::GetCrosshairColor() const
     }
 
     return color;
+}
+
+void gui::PlayerHud::DrawBalance(Context& ctx) const
+{
+    const float padding = 30.0f;
+    glm::vec2 pos(ctx.GetViewportSize().x - padding, padding);
+    ctx.DrawTextAligned(balance_str_, pos, glm::vec2(-1.0f, 0.0f));
 }
 
 void gui::PlayerHud::DrawPain(Context& ctx) const

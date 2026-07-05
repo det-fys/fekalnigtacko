@@ -14,6 +14,7 @@
 #include "camera_info.hpp"
 #include "camera_controller.hpp"
 #include "player_hud_data.hpp"
+#include "db/db.hpp"
 
 namespace game
 {
@@ -25,7 +26,7 @@ class Entity;
 class Player : public net::MsgProducer
 {
 public:
-    Player(Game& game, std::string name);
+    Player(Game& game, db::PlayerId id);
     DELETE_COPY_MOVE(Player)
 
     bool ProcessMsg(net::MessageType type, net::InMessage& msg);
@@ -41,8 +42,8 @@ public:
     void CloseMenu(const RemoteMenu& menu);
     bool HasOpenMenu() const { return (bool)remote_menu_; }
 
-    void SetHudData(const PlayerHudData& hud_data);
-    void ResetHudData();
+    PlayerCharacterHudData& GetCharacterHudData();
+    void ResetCharacterHudData();
 
     void DisplayDamageEvent(DamageEventType type);
 
@@ -59,6 +60,8 @@ public:
     void SetAdmin(bool admin) { is_admin_ = admin; }
     bool IsAdmin() const { return is_admin_; }
 
+    bool ChangeBalance(int64_t delta, const std::string& desc);
+
     ~Player();
 
 private:
@@ -67,6 +70,7 @@ private:
     void UpdateCullPos();
     void SendWorldMsg();
     void SendWorldUpdateMsg();
+    void SendHudUpdate();
     void SendDamageEvents();
     void SendDamageEvent(DamageEventType type);
     void SendEnv();
@@ -91,8 +95,14 @@ private:
 
     void UpdateCamera();
 
+    // db
+    void LoadName();
+    void LoadBalance();
+
 private:
     Game& game_;
+
+    db::PlayerId id_ = 0;
     std::string name_;
 
     World* world_ = nullptr;
@@ -113,7 +123,7 @@ private:
     std::unique_ptr<RemoteMenu> remote_menu_;
 
     // hud
-    PlayerHudData hud_data_;
+    PlayerHudData hud_data_[2];
     uint8_t dmg_event_flags_ = 0;
 
     bool is_admin_ = false;

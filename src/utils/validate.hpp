@@ -13,7 +13,7 @@ inline bool IsAlphanumeric(const char* str, size_t len)
     for (; str < end; ++str)
     {
         const char c = *str;
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' || c <= 'Z') || (c >= '0' && c <= '9') || c == '_'))
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'))
             return false;
     }
 
