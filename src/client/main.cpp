@@ -26,6 +26,8 @@
 #include "utils/cvars.hpp"
 #include "key_map.hpp"
 
+CVAR_CL(uint16_t, cl_maxfps, CV_SAVE, 0);
+
 static std::string s_username;
 static std::string s_url;
 
@@ -337,21 +339,20 @@ static void Main() {
 #endif
     SDL_GL_SetSwapInterval(0);
 
-    //auto frame_dur = std::chrono::milliseconds(0);
-    
     while (!s_quit)
     {
-        //auto t_start = std::chrono::steady_clock::now();
+        auto frame_dur = std::chrono::milliseconds(cl_maxfps.Get() > 0 ? (1000 / cl_maxfps.Get()) : 0);
+        auto t_start = std::chrono::steady_clock::now();
         
         Frame();
     
-        //auto t_next = t_start + frame_dur;
-        //auto t_now = std::chrono::steady_clock::now();
+        auto t_next = t_start + frame_dur;
+        auto t_now = std::chrono::steady_clock::now();
         
-        //if (t_now < t_next)
-        //{
-            //std::this_thread::sleep_for(t_next - t_now);
-        //}
+        if (t_now < t_next)
+        {
+            std::this_thread::sleep_for(t_next - t_now);
+        }
     }
 
     s_app.reset();
