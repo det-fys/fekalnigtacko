@@ -57,6 +57,12 @@ void game::view::ParticleEmitter::Draw(const DrawArgs& args)
         cmd.color = &particle.color;
         cmd.dist = glm::dot(dir, dir);
         args.dlist.AddSurface(cmd);
+
+        if (particle.lightcolor.a > 0.01f)
+        {
+            args.dlist.AddLight(particle.position, glm::vec3(particle.lightcolor) * particle.color.a,
+                                particle.lightcolor.a);
+        }
     }
 
 
@@ -118,6 +124,11 @@ void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effec
             particle.fade_start = particle.lifetime - RandomFloat(def.fadetime_min, def.fadetime_max);
 
             particle.color = glm::vec4(1.0f);
+
+            particle.lightcolor.r = RandomFloat(def.lightcolor_min.r, def.lightcolor_max.r);
+            particle.lightcolor.g = RandomFloat(def.lightcolor_min.g, def.lightcolor_max.g);
+            particle.lightcolor.b = RandomFloat(def.lightcolor_min.b, def.lightcolor_max.b);
+            particle.lightcolor.a = RandomFloat(def.lightcolor_min.a, def.lightcolor_max.a);
         }
     }
 

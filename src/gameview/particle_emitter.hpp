@@ -29,6 +29,7 @@ struct Particle
     // for drawing
     glm::mat4 matrix;
     glm::vec4 color;
+    glm::vec4 lightcolor;
 };
 
 class ParticleEmitter

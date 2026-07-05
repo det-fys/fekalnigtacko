@@ -95,6 +95,12 @@ std::shared_ptr<assets::Effect> assets::Effect::LoadFromFile(const std::string& 
             {
                 iss >> particle->rotation_speed_min >> particle->rotation_speed_min;
             }
+            else if (command == "lightcolor")
+            {
+                auto& min = particle->lightcolor_min;
+                auto& max = particle->lightcolor_max;
+                iss >> min.r >> min.g >> min.b >> min.a >> max.r >> max.g >> max.b >> max.a;
+            }
         }
         else
         {

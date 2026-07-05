@@ -48,6 +48,9 @@ struct ParticleDef
 
     float rotation_speed_min = 0.0f;
     float rotation_speed_max = 0.0f;
+
+    glm::vec4 lightcolor_min{0.0f};
+    glm::vec4 lightcolor_max{0.0f};
 };
 
 struct EffectSound
