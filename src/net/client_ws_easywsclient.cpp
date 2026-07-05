@@ -76,8 +76,8 @@ void net::EasyWsClientWSClientInterface::Poll()
     auto ws_state = ws_->getReadyState();
     if (ws_state != easywsclient::WebSocket::OPEN)
     {
-        RaiseOnDisconnect();
         ws_.reset();
+        RaiseOnDisconnect();
         return;
     }
 }
