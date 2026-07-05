@@ -88,7 +88,7 @@ void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effec
         // steal a quad surface from quad model
         gfx::Surface surface = quad_model_->GetSurfaces()[0];
         surface.texture = def.texture;
-        surface.sflags = gfx::SF_2SIDED | gfx::SF_OBJECT_COLOR | gfx::SF_OBJECT_COLOR_MULT;
+        surface.sflags = gfx::SF_2SIDED | gfx::SF_OBJECT_COLOR | gfx::SF_OBJECT_COLOR_MULT | gfx::SF_VERTEX_LIT;
 
         // setup blending
         if (def.blend == assets::PTB_BLEND_NORMAL)

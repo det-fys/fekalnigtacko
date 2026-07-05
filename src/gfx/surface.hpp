@@ -16,19 +16,20 @@ enum MeshFlag : MeshFlags
     MF_SKELETAL = 0x02,
 };
 
-using SurfaceFlags = uint8_t;
+using SurfaceFlags = uint16_t;
 
 enum SurfaceFlag : SurfaceFlags
 {
     SF_NONE = 0x00,
-    SF_2SIDED = 0x01,         // disable backface culling
-    SF_BLEND = 0x02,          // enable blending, disable depth write
-    SF_BLEND_ADDITIVE = 0x04, // use additive blending instead of opacity
-    SF_OBJECT_COLOR = 0x08,   // use object color for background instead of alpha culling
-    SF_DEFORM_GRID = 0x10,    // use deform grid
-    SF_UNLIT = 0x20,          // dont apply lighting
-    SF_OBJECT_COLOR_MULT = 0x40, // object color multiplies instead of acting as background
-    SF_MULTICOLOR = 0x80,     // multiple color slots encoded in alpha
+    SF_2SIDED = 1,              // disable backface culling
+    SF_BLEND = 2,               // enable blending, disable depth write
+    SF_BLEND_ADDITIVE = 4,      // use additive blending instead of opacity
+    SF_OBJECT_COLOR = 8,        // use object color for background instead of alpha culling
+    SF_DEFORM_GRID = 16,        // use deform grid
+    SF_UNLIT = 32,              // dont apply lighting
+    SF_VERTEX_LIT = 64,         // force vertex lighting (only if not SF_UNLIT)
+    SF_OBJECT_COLOR_MULT = 128, // object color multiplies instead of acting as background
+    SF_MULTICOLOR = 256,        // multiple color slots encoded in alpha
 };
 
 struct Surface

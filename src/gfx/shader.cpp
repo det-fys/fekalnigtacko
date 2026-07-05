@@ -1,6 +1,9 @@
+#include "shader.hpp"
+
 #include <stdexcept>
 #include <string>
-#include "shader.hpp"
+#include <iostream>
+
 #define LOG_LENGTH 1024
 
 // Nazvy uniformnich promennych v shaderech
@@ -18,8 +21,7 @@ static const char* const s_uni_names[] = {
     "u_sun_direction",      // SU_SUN_DIRECTION
     "u_fog",                // SU_FOG
     "u_num_lights",
-    "u_light_positions",
-    "u_light_colors_rs",
+    "u_light_data",
     "u_camera_pos",
 };
 
@@ -37,6 +39,8 @@ static GLuint CreateShader(const char* src, GLenum type) {
         glGetShaderInfoLog(id, LOG_LENGTH, NULL, log);
 
         glDeleteShader(id);
+
+        std::cerr << "CANNOT COMPILE: " << src << std::endl;
 
         throw std::runtime_error(std::string("Nelze zkompilovat shader: ") + log);
     }

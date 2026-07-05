@@ -9,6 +9,7 @@
 #include "game/transform_node.hpp"
 #include "model.hpp"
 #include "utils/aabb.hpp"
+#include "gfx/light_cell.hpp"
 
 namespace assets
 {
@@ -36,6 +37,8 @@ struct Chunk
     std::vector<ChunkSurfaceRange> surfaces;
     size_t first_obj = 0;
     size_t num_objs = 0;
+
+    gfx::LightCellCoordHash light_hash = 0;
 };
 
 struct MapGraphNode
@@ -66,6 +69,7 @@ public:
     const std::shared_ptr<const Model>& GetBaseModel() const { return basemodel_; }
     const std::vector<std::shared_ptr<const Model>>& GetObjModels() const { return obj_models_; }
     const std::vector<Chunk>& GetChunks() const { return chunks_; }
+    float GetChunkSize() const { return chunk_size_; }
     const std::vector<MapStaticObject>& GetStaticObjects() const { return objs_; }
     const MapGraph* GetGraph(const std::string& name) const;
     std::span<const MapLocation> GetLocations(const std::string& name) const;
@@ -74,6 +78,7 @@ private:
     std::shared_ptr<const Model> basemodel_;
     std::vector<std::shared_ptr<const Model>> obj_models_;
     std::vector<Chunk> chunks_;
+    float chunk_size_ = 1.0f;
     std::vector<MapStaticObject> objs_;
     std::map<std::string, MapGraph> graphs_;
     std::map<std::string, std::vector<MapLocation>> locations_;

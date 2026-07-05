@@ -45,7 +45,7 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
     )GLSL";
 
     frag_main = R"GLSL(
-        o_color = vec4(1.0);
+        o_color = vec4(v_color, 1.0);
     )GLSL";
 
     input_flags = 0;
@@ -109,7 +109,7 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
     // lighting
     if (flags & SRF_LIT)
     {
-        vert_uniforms += R"GLSL(
+        constexpr std::string_view light_uniforms = R"GLSL(
             // global
             uniform vec3 u_ambient_light;
             uniform vec3 u_sun_direction;
@@ -117,43 +117,99 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
 
             // local
             uniform int u_num_lights;
-            uniform vec3 u_light_positions[MAX_LIGHTS];
-            uniform vec4 u_light_colors_rs[MAX_LIGHTS]; // rgb = color, a = radius
+            uniform mat3x4 u_light_data[MAX_LIGHTS];
         )GLSL";
 
-        vert_funcs += R"GLSL(
-            vec3 ComputeLights(in vec3 sector_pos, in vec3 sector_normal)
+        constexpr std::string_view lights_function = R"GLSL(
+            vec3 ComputeLights(in vec3 world_pos, in vec3 world_normal)
             {
                 // Base ambient
                 vec3 color = u_ambient_light;
 
                 // Sunlight contribution
-                float sun_dot = max(dot(sector_normal, -u_sun_direction), 0.0);
+                float sun_dot = max(dot(world_normal, -u_sun_direction), 0.0);
                 color += u_sun_color * sun_dot;
 
-                // Point lights
+                // Point/spot lights
                 for (int i = 0; i < u_num_lights; ++i) {
-                    vec3 light_pos = u_light_positions[i];
-                    vec3 light_color = u_light_colors_rs[i].rgb;
-                    float light_radius = u_light_colors_rs[i].a;
-                    
-                    vec3 to_light = light_pos - sector_pos;
+
+                    vec4 data_p = u_light_data[i][0];
+                    vec4 data_c = u_light_data[i][1];
+                    vec4 data_d = u_light_data[i][2];
+
+                    vec3 light_pos = data_p.xyz;
+                    float light_radius = data_p.w;
+
+                    vec3 light_color = data_c.xyz;
+                    float light_cos_inner = data_c.w;
+
+                    vec3 light_dir = data_d.xyz;
+                    float light_cos_outer = data_d.w;
+
+                    vec3 to_light = light_pos - world_pos;
                     float dist2 = dot(to_light, to_light);
-                    if (dist2 < light_radius * light_radius) {
-                        float dist = sqrt(dist2);
-                        float attenuation = 1.0 - (dist / light_radius);
-                        //float dot_term = max(dot(sector_normal, normalize(to_light)), 0.0);
-                        color += light_color * attenuation;
+
+                    if (dist2 > light_radius * light_radius)
+                        continue;
+
+                    float dist = sqrt(dist2);
+                    vec3 L = to_light / dist;
+
+                    float attenuation = 1.0 - (dist / light_radius);
+                    attenuation *= attenuation;
+
+                    float ndotl = max(dot(world_normal, L), 0.0);
+                    //ndotl = mix(1.0, ndotl, 0.35);
+                    ndotl = sqrt(ndotl);
+
+                    float spot = 1.0;
+
+                    if (light_cos_inner > light_cos_outer) {
+
+                        float c = dot(-L, light_dir);
+                        float cone = smoothstep(light_cos_outer, light_cos_inner, c);
+
+                        // sharpen the beam a bit
+                        spot = cone * cone;
                     }
+
+                    color += light_color * (attenuation * ndotl * spot);
                 }
 
                 return color;
             }
         )GLSL";
 
-        vert_main += "v_color *= ComputeLights(world_pos.xyz, world_normal);\n";
+        if (flags & SRF_LIT_VERTEX)
+        {
+            vert_uniforms += light_uniforms;
+            vert_funcs += lights_function;
+            vert_outs += "out vec3 v_light_color;\n";
+            vert_main += "v_light_color = ComputeLights(world_pos.xyz, world_normal);\n";
+
+            frag_ins += "in vec3 v_light_color;\n";
+            frag_main += "vec3 light_color = v_light_color;\n";
+        }
+        else
+        {
+            vert_outs += "out vec3 v_world_normal;\n";
+            vert_main += "v_world_normal = world_normal;\n";
+
+            frag_ins += "in vec3 v_world_normal;\n";
+            frag_uniforms += light_uniforms;
+            frag_funcs += lights_function;
+
+            // this is currently weird with trees that have fake +Z normals
+            // TODO: make this another flag
+            //frag_main += "vec3 light_color = ComputeLights(v_world_pos, normalize(gl_FrontFacing ? v_world_normal : -v_world_normal));\n";
+            frag_main += "vec3 light_color = ComputeLights(v_world_pos, normalize(v_world_normal));\n";
+        }
 
         input_flags |= SIF_LIGHTING_DATA;
+    }
+    else
+    {
+        frag_main += "vec3 light_color = vec3(1.0);\n";
     }
 
     if (flags & SRF_SKELETAL) // skeletal deform
@@ -204,11 +260,11 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
 
     if (flags & SRF_MULTICOLOR)
     {
-        frag_main += "o_color.rgb *= mix(v_color, vec3(1.5), emis);\n";
+        frag_main += "o_color.rgb *= mix(light_color, vec3(1.5), emis);\n";
     }
     else
     {
-        frag_main += "o_color.rgb *= v_color;\n";
+        frag_main += "o_color.rgb *= light_color;\n";
     }
 
     if (flags & SRF_FOG)

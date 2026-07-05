@@ -43,6 +43,8 @@ void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args) const
     if (!basemodel_view_)
         return;
 
+    args.dlist.SetMapChunkSize(map_->GetChunkSize());
+
     const float max_dist = args.render_distance + 200.0f;
     const float max_dist2 = max_dist * max_dist;
 
@@ -119,10 +121,11 @@ void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, co
     {
         auto& surface = surfaces[surface_range.idx];
 
-        gfx::DrawSurfaceCmd cmd;
+        gfx::DrawSurfaceCmd cmd{};
         cmd.surface = &surface;
         cmd.first = surface_range.first;
         cmd.count = surface_range.count;
+        cmd.map_chunk_hash = chunk.light_hash;
         args.dlist.AddSurface(cmd);
     }
 
@@ -147,7 +150,7 @@ void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, co
 
         for (const auto& surface : surfaces)
         {
-            gfx::DrawSurfaceCmd cmd;
+            gfx::DrawSurfaceCmd cmd{};
             cmd.surface = &surface;
             cmd.matrices = &obj.node.matrix;
             // cmd.color_mod = glm::vec4(obj.color, 1.0f);

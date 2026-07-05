@@ -233,6 +233,10 @@ void assets::MapLoader::LoadStructs()
             iss >> chunk->aabb.max.x >> chunk->aabb.max.y >> chunk->aabb.max.z;
 
             chunk->first_obj = map_->objs_.size();
+
+            // compute light cell hash
+            chunk->light_hash =
+                gfx::HashCellCoord(gfx::GetCellCoord((chunk->aabb.min + chunk->aabb.max) * 0.5f, map_->chunk_size_));
         }
         else if (command == "surface")
         {
@@ -295,6 +299,11 @@ void assets::MapLoader::LoadStructs()
             iss >> loc_name;
             Transform& trans = map_->locations_[loc_name].emplace_back().transform;
             ParseTransform(iss, trans);
+        }
+        else if (command == "chunks")
+        {
+            int num_x, num_y; // unused currently
+            iss >> num_x >> num_y >> map_->chunk_size_;
         }
 
         return true;

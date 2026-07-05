@@ -6,6 +6,7 @@
 #include "draw_list.hpp"
 #include "shader.hpp"
 #include "surface_shader.hpp"
+#include "light_cell.hpp"
 
 namespace gfx
 {
@@ -26,17 +27,23 @@ struct DrawListParams
     glm::mat4 view_proj;
     size_t screen_width = 0;
     size_t screen_height = 0;
+    float map_chunk_size = 1.0f;
 };
 
 struct SurfaceShader
 {
     std::unique_ptr<Shader> shader;
-    SurfaceShaderInputFlags iflags;
+    SurfaceShaderInputFlags iflags = 0;
 
     // cached state to avoid redundant uniform updates which are expensive especially on WebGL
     bool global_setup = false;
     const glm::vec4* color = nullptr;
+    size_t num_lights = 0;
 };
+
+constexpr static size_t LIGHT_GRID_CELL_LIGHTS = SD_MAX_LIGHTS;
+using LightGridCell = LightArray<LIGHT_GRID_CELL_LIGHTS>;
+using LightGrid = std::map<LightCellCoordHash, LightGridCell>;
 
 class Renderer
 {
@@ -53,7 +60,8 @@ private:
     void SetupSurfaceShader(SurfaceShader& sshader, const DrawListParams& params);
     void InvalidateSurfaceShader(SurfaceShader& sshader);
 
-    void CreateLightGrid(std::span<DrawLightCmd> lights);
+    void CreateLightGrid(std::span<DrawLightCmd> lights, const DrawListParams& params);
+    void AddLightToGrid(const LightData& light, LightGrid& grid, float cell_size);
 
     void DrawSurfaceList(std::span<DrawSurfaceCmd> queue, const DrawListParams& params);
     void DrawBeamList(std::span<DrawBeamCmd> queue, const DrawListParams& params);
@@ -71,8 +79,10 @@ private:
 
     const Shader* current_shader_ = nullptr;
 
-    constexpr static size_t LIGHT_GRID_CELL_LIGHTS = SD_MAX_LIGHTS;
-    std::map<uint32_t, LightArray<LIGHT_GRID_CELL_LIGHTS>> light_grid_;
+    LightGrid light_grid_;
+    float light_grid_size_ = 20.0f;
+    LightGrid light_grid_chunks_;
+    float light_grid_chunks_size_ = 1.0f;
 
     size_t frame_ = 0;
 };

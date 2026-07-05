@@ -38,7 +38,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
 
     snd_accel_ = assets::AssetManager::GetInstance().Get<audio::Sound>("auto");
 
-    radius_ = 3.0f;
+    radius_ = 20.0f;
     
     colors_[VCS_OTHER] = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
 }
@@ -104,73 +104,25 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
 
 void game::view::VehicleView::Draw(const DrawArgs& args)
 {
-    Super::Draw(args);
-
-    bool exploded = (flags_ & VF_EXPLODED) > 0;
-    
-    // base model
-    const glm::vec4* colors = exploded ? &destroyed_colors_[0] : &colors_[0]; 
-    for (const auto& surface : surfaces_)
+    if (args.frustum.IsSphereVisible(Sphere{ root_.GetGlobalPosition(), 5.0f }))
     {
-        gfx::DrawSurfaceCmd cmd;
-        cmd.surface = &surface;
-        cmd.matrices = &root_.matrix;
-        cmd.color = colors;
-        cmd.num_colors = SD_MAX_COLORS;
-        args.dlist.AddSurface(cmd);
+        Super::Draw(args);
+        DrawBaseModel(args);
+        DrawWheels(args);
+
+        //// temp deforms
+        // for (const auto& [pos, deform] : debug_deforms_)
+        //{
+        //     glm::vec3 start = root_.matrix * glm::vec4(pos, 1.0f);
+        //     glm::vec3 end = root_.matrix * glm::vec4(pos + deform, 1.0f);
+        //     glm::vec3 end2 = end + glm::vec3(0.0f, 0.0f, 0.1f);
+
+        //    args.dlist.AddBeam(start, end, 0xFFFFFF00, 0.01f);
+        //    args.dlist.AddBeam(end, end2, 0xFFFF00FF, 0.01f);
+        //}
     }
 
-    // wheels
-    if ((flags_ & VF_NO_WHEELS) == 0)
-    {
-        const auto& wheels = model_->GetWheels();
-        for (size_t i = 0; i < wheels.size(); ++i)
-        {
-            auto surfaces = wheels_[i].model->GetSurfaces();
-            for (const auto& surface : surfaces)
-            {
-                gfx::DrawSurfaceCmd cmd;
-                cmd.surface = &surface;
-                cmd.matrices = &wheels_[i].node.matrix;
-                cmd.color = &wheels_[i].color;
-                cmd.num_colors = 1;
-                args.dlist.AddSurface(cmd);
-            }
-        }
-    }
-
-    // temp deforms
-    for (const auto& [pos, deform] : debug_deforms_)
-    {
-        glm::vec3 start = root_.matrix * glm::vec4(pos, 1.0f);
-        glm::vec3 end = root_.matrix * glm::vec4(pos + deform, 1.0f);
-        glm::vec3 end2 = end + glm::vec3(0.0f, 0.0f, 0.1f);
-
-        args.dlist.AddBeam(start, end, 0xFFFFFF00, 0.01f);
-        args.dlist.AddBeam(end, end2, 0xFFFF00FF, 0.01f);
-    }
-
-    // headlights
-    if (!exploded && headlights_factor_ >= 0.01f)
-    {
-        // light
-        auto light_pos = world_.CameraSweep(root_.GetGlobalPosition(), root_.matrix * glm::vec4(0.0f, 7.0f, 0.0f, 1.0f));
-        args.dlist.AddLight(light_pos, headlight_color_ * headlights_factor_, 5.0f);
-
-        // cones
-        for (size_t i = 0; i < num_headlights; ++i)
-        {
-            auto surfaces = light_cone_mdl_->GetSurfaces();
-            for (const auto& surface : surfaces)
-            {
-                gfx::DrawSurfaceCmd cmd;
-                cmd.surface = &surface;
-                cmd.matrices = &light_cone_node_[i].matrix;
-                cmd.color = &headlight_cone_color_;
-                args.dlist.AddSurface(cmd);
-            }
-        }
-    }
+    DrawHeadlights(args);
 }
 
 void game::view::VehicleView::InitMesh()
@@ -454,7 +406,7 @@ void game::view::VehicleView::UpdateLights(float delta_t)
     if (headlights_factor_ < 0.01f)
         return;
 
-    float intensity = headlights_factor_ * 0.3f;
+    float intensity = headlights_factor_ * 0.03f;
     headlight_cone_color_ = glm::vec4(headlight_color_ * intensity, 1.0f);
 
     for (size_t i = 0; i < num_headlights; ++i)
@@ -476,4 +428,77 @@ void game::view::VehicleView::UpdateDestroyedColors()
 
     destroyed_colors_[VCS_OTHER] = glm::vec4(0.2f, 0.2f, 0.2f, 0.0f);
 
+}
+
+void game::view::VehicleView::DrawBaseModel(const DrawArgs& args) const
+{
+    bool exploded = (flags_ & VF_EXPLODED) > 0;
+
+    // base model
+    const glm::vec4* colors = exploded ? &destroyed_colors_[0] : &colors_[0];
+    for (const auto& surface : surfaces_)
+    {
+        gfx::DrawSurfaceCmd cmd;
+        cmd.surface = &surface;
+        cmd.matrices = &root_.matrix;
+        cmd.color = colors;
+        cmd.num_colors = SD_MAX_COLORS;
+        args.dlist.AddSurface(cmd);
+    }
+}
+
+void game::view::VehicleView::DrawWheels(const DrawArgs& args) const
+{
+    if (flags_ & VF_NO_WHEELS)
+        return;
+
+    const auto& wheels = model_->GetWheels();
+    for (size_t i = 0; i < wheels.size(); ++i)
+    {
+        auto surfaces = wheels_[i].model->GetSurfaces();
+        for (const auto& surface : surfaces)
+        {
+            gfx::DrawSurfaceCmd cmd;
+            cmd.surface = &surface;
+            cmd.matrices = &wheels_[i].node.matrix;
+            cmd.color = &wheels_[i].color;
+            cmd.num_colors = 1;
+            args.dlist.AddSurface(cmd);
+        }
+    }
+}
+
+void game::view::VehicleView::DrawHeadlights(const DrawArgs& args) const
+{
+    if ((flags_ & VF_EXPLODED) > 0 || headlights_factor_ <= 0.01f)
+        return;
+
+    auto spotlight_color = headlight_color_ * headlights_factor_ * 2.0f;
+
+    glm::vec3 spotlight_pos(0.0f);
+
+    // cones
+    for (size_t i = 0; i < num_headlights; ++i)
+    {
+        auto surfaces = light_cone_mdl_->GetSurfaces();
+        for (const auto& surface : surfaces)
+        {
+            gfx::DrawSurfaceCmd cmd;
+            cmd.surface = &surface;
+            cmd.matrices = &light_cone_node_[i].matrix;
+            cmd.color = &headlight_cone_color_;
+            args.dlist.AddSurface(cmd);
+        }
+
+        spotlight_pos += light_cone_node_[i].GetGlobalPosition();
+    }
+
+    if (num_headlights > 0)
+    {
+        spotlight_pos /= static_cast<float>(num_headlights);
+
+        // spotlight
+        args.dlist.AddSpotLight(spotlight_pos, spotlight_color, 30.0f, glm::normalize(root_.matrix[1]),
+                                glm::radians(12.0f), glm::radians(30.0f));
+    }
 }

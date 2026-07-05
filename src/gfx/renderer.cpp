@@ -12,6 +12,10 @@
 #include "shader_sources.hpp"
 #include "shader_defs.hpp"
 
+#include "utils/cvars.hpp"
+
+CVAR_CL(uint8_t, r_vertex_lighting, CV_SAVE, 0, 0, 1);
+
 gfx::Renderer::Renderer()
 {
     ShaderSources::MakeShader(solid_shader_, SS_SOLID_VERT, SS_SOLID_FRAG);
@@ -30,7 +34,9 @@ void gfx::Renderer::DrawList(gfx::DrawList& list, const DrawListParams& params)
     glClearColor(params.env.clear_color.r, params.env.clear_color.g, params.env.clear_color.b, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	CreateLightGrid(list.lights);
+	light_grid_chunks_size_ = list.chunk_size;
+	CreateLightGrid(list.lights, params);
+
 	DrawSurfaceList(list.surfaces, params);
 	DrawBeamList(list.beams, params);
     DrawHudList(list.huds, params);
@@ -152,44 +158,51 @@ void gfx::Renderer::InvalidateSurfaceShader(SurfaceShader& sshader)
     sshader.color = nullptr;
 }
 
-static glm::u32vec3 GetLightCellCoords(const glm::vec3& pos)
-{
-	// grid cell size = 20m
-	// grid size = 1000x1000x1000
-	return glm::clamp(glm::u32vec3(glm::floor(pos * 0.05f) + 500.0f), 0U, 1000U);
-}
-
-static uint32_t HashLightGridPosition(const glm::u32vec3& coords)
-{
-    return (coords.x << 20) | (coords.y << 10); // | coords.z;
-}
-
-void gfx::Renderer::CreateLightGrid(std::span<DrawLightCmd> lights)
+void gfx::Renderer::CreateLightGrid(std::span<DrawLightCmd> light_cmds, const DrawListParams& params)
 {
 	light_grid_.clear();
+    light_grid_chunks_.clear();
 
-	for (const auto& light : lights)
+	// calc distance
+	for (auto& cmd : light_cmds)
 	{
-		auto coords = GetLightCellCoords(light.position);
-
-		for (uint32_t x = coords.x - 1; x <= coords.x + 1; ++x)
-		{
-			for (uint32_t y = coords.y - 1; y <= coords.y + 1; ++y)
-			{
-				auto hash = HashLightGridPosition(glm::u32vec3(x, y, 0));
-				auto& cell = light_grid_[hash];
-				
-				if (cell.num_lights >= LIGHT_GRID_CELL_LIGHTS)
-					continue;
-		
-				cell.positions[cell.num_lights] = light.position;
-				cell.colors_rs[cell.num_lights] = glm::vec4(light.color, light.radius);
-		
-				++cell.num_lights;
-			}
-		}
+        auto d = cmd.light.position - params.cam_pos;
+        cmd.dist2 = glm::dot(d, d);
 	}
 
+	// sort lights by distance so closer lights get rendered instead of random npc vehicle headlights in 2km
+	std::ranges::sort(light_cmds, [](const DrawLightCmd& a, const DrawLightCmd& b) { 
+		return a.dist2 < b.dist2;
+	});
+
+	for (const auto& cmd : light_cmds)
+	{
+        AddLightToGrid(cmd.light, light_grid_, light_grid_size_);
+        AddLightToGrid(cmd.light, light_grid_chunks_, light_grid_chunks_size_);
+	}
+}
+
+void gfx::Renderer::AddLightToGrid(const LightData& light, LightGrid& grid, float cell_size)
+{
+    float margin = light.radius + cell_size * 0.2f;
+
+    auto aabb_min = GetCellCoord(light.position - margin, cell_size);
+    auto aabb_max = GetCellCoord(light.position + margin, cell_size);
+
+	for (int y = aabb_min.y; y <= aabb_max.y; ++y)
+	{
+		for (int x = aabb_min.x; x <= aabb_max.x; ++x)
+		{
+            auto hash = HashCellCoord(LightCellCoord(static_cast<uint16_t>(x), static_cast<uint16_t>(y)));
+            auto& cell = grid[hash];
+
+			if (cell.num_lights >= LIGHT_GRID_CELL_LIGHTS)
+                continue;
+
+            cell.lights[cell.num_lights] = light;
+            ++cell.num_lights;
+		}
+	}
 }
 
 void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawListParams& params)
@@ -212,7 +225,12 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 			cmd.rflags |= SRF_DEFORM;
 
 		if ((cmd.surface->sflags & SF_UNLIT) == 0)
+		{
 			cmd.rflags |= SRF_LIT;
+
+			if ((r_vertex_lighting.Get() > 0) || (cmd.surface->sflags & SF_VERTEX_LIT))
+                cmd.rflags |= SRF_LIT_VERTEX;
+		}
 
 		if (cmd.color)
 		{
@@ -276,7 +294,6 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 	const gfx::VertexArray* last_vao = nullptr;
     const gfx::UniformBuffer<glm::mat4>* last_skin = nullptr;
 	const DeformTexture* last_deform = nullptr;
-	size_t last_numlights = -1;
 
 	InvalidateShaders();
 
@@ -375,34 +392,39 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		}
 
 		// sync lights
-		if ((cmd.rflags & SRF_LIT))
+		if (sshader->iflags & SIF_LIGHTING_DATA)
 		{
-			auto center = glm::vec3((*model)[3]);
-			auto it = light_grid_.find(HashLightGridPosition(GetLightCellCoords(center)));
-			
-			size_t numlights = 0;
-
-			if (it != light_grid_.end())
+			const LightGridCell* cell = nullptr;
+			if (cmd.map_chunk_hash > 0) // chunk mesh
 			{
-				numlights = it->second.num_lights;
-			}
-
-			if (numlights == 0)
-			{
-				if (last_numlights > 0)
+                auto it = light_grid_chunks_.find(cmd.map_chunk_hash);
+				if (it != light_grid_chunks_.end())
 				{
-					glUniform1i(shader->U(SU_NUMLIGHTS), 0);
+                    cell = &it->second;
 				}
 			}
 			else
 			{
-				auto& lights = it->second;
-				glUniform1i(shader->U(SU_NUMLIGHTS), numlights);
-				glUniform3fv(shader->U(SU_LIGHT_POSITIONS), numlights, &lights.positions[0][0]);
-				glUniform4fv(shader->U(SU_LIGHT_COLORS_RS), numlights, &lights.colors_rs[0][0]);
+				auto center = glm::vec3((*model)[3]);
+                //std::cerr << center.x << ' ' << center.y << ' ' << center.z << std::endl; 
+                auto it = light_grid_.find(HashCellCoord(GetCellCoord(center, light_grid_size_)));
+                if (it != light_grid_.end())
+                {
+                    cell = &it->second;
+                }
+			}
+			
+			size_t num_lights = cell ? cell->num_lights : 0;
+			if (num_lights != sshader->num_lights)
+			{
+                glUniform1i(shader->U(SU_NUM_LIGHTS), num_lights);
+				sshader->num_lights = num_lights;
 			}
 
-			last_numlights = numlights;
+			if (num_lights > 0)
+			{
+                glUniformMatrix3x4fv(shader->U(SU_LIGHT_DATA), num_lights, GL_FALSE, &cell->lights->position.x);
+			}
 		}
 
 		// bind texture

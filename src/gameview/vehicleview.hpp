@@ -76,6 +76,10 @@ private:
 
     void UpdateDestroyedColors();
 
+    void DrawBaseModel(const DrawArgs& args) const;
+    void DrawWheels(const DrawArgs& args) const;
+    void DrawHeadlights(const DrawArgs& args) const;
+
 private:
     std::shared_ptr<const assets::VehicleModel> model_;
     std::shared_ptr<const ModelView> model_view_;

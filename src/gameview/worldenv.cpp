@@ -14,9 +14,9 @@ static const glm::vec4 color1(1.0f);
 static const game::view::WorldEnvKeyframe env_kfs[] = {
     game::view::WorldEnvKeyframe{
         0.0f, // time
-        glm::vec3(0.1f, 0.15f, 0.3f), // clear color
-        glm::vec3(0.4f, 0.4f, 0.4f), // ambient color
-        glm::vec3(0.5f, 0.8f, 1.0f) * 0.4f, // sun color
+        glm::vec3(0.1f, 0.15f, 0.3f) * 0.3f, // clear color
+        glm::vec3(0.4f, 0.4f, 0.4f) * 0.3f, // ambient color
+        glm::vec3(0.5f, 0.8f, 1.0f) * 0.2f, // sun color
         -1.0f, // sun light source
         glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // sun disc color
         glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // sun halfsphere color
@@ -27,9 +27,9 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
 
     game::view::WorldEnvKeyframe{
         5.0f, // time
-        glm::vec3(0.15f, 0.2, 0.3f), // clear color
-        glm::vec3(0.5f, 0.5f, 0.5f) * 1.0f, // ambient color
-        glm::vec3(0.5f, 0.8f, 1.0f) * 0.4f, // sun color
+        glm::vec3(0.15f, 0.2, 0.3f) * 0.7f, // clear color
+        glm::vec3(0.5f, 0.5f, 0.5f) * 0.4f,  // ambient color
+        glm::vec3(0.5f, 0.8f, 1.0f) * 0.2f, // sun color
         -1.0f, // sun light source
         glm::vec4(1.0f, 0.9f, 0.8f, 1.0f), // sun disc color
         glm::vec4(1.0f, 0.8f, 0.6f, 0.2f), // sun halfsphere color
@@ -105,8 +105,8 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
 
     game::view::WorldEnvKeyframe{
         19.0f, // time
-        glm::vec3(0.1f, 0.15f, 0.3f), // clear color
-        glm::vec3(0.4f, 0.4f, 0.4f), // ambient color
+        glm::vec3(0.1f, 0.15f, 0.3f) * 0.7f, // clear color
+        glm::vec3(0.4f, 0.4f, 0.4f) * 0.5f,   // ambient color
         glm::vec3(1.0f, 0.7f, 0.6f) * 0.2f, // sun color
         0.0f, // sun light source
         glm::vec4(1.0f, 0.5f, 0.3f, 1.0f), // sun disc color
@@ -118,9 +118,9 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
 
     game::view::WorldEnvKeyframe{
         20.0f, // time
-        glm::vec3(0.1f, 0.15f, 0.3f), // clear color
-        glm::vec3(0.4f, 0.4f, 0.4f), // ambient color
-        glm::vec3(0.5f, 0.8f, 1.0f) * 0.4f, // sun color
+        glm::vec3(0.1f, 0.15f, 0.3f) * 0.3f, // clear color
+        glm::vec3(0.4f, 0.4f, 0.4f) * 0.4f,   // ambient color
+        glm::vec3(0.5f, 0.8f, 1.0f) * 0.2f, // sun color
         -1.0f, // sun light source
         glm::vec4(1.0f, 1.0f, 1.0f, 0.0f), // sun disc color
         glm::vec4(1.0f, 0.5f, 0.2f, 0.0f), // sun halfsphere color

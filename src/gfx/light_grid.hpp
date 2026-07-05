@@ -7,7 +7,6 @@
 #include "surface.hpp"
 #include "surface_render_flags.hpp"
 #include "uniform_buffer.hpp"
-#include "light_cell.hpp"
 
 namespace gfx
 {
@@ -23,14 +22,13 @@ struct DrawSurfaceCmd
     float dist = 0.0f;                                  // distance to camera - for transparnt sorting
     SurfaceRenderFlags rflags = 0;
     uint8_t num_colors = 0;                             // >0 for multicolor, requires array of colors in "color"
-    LightCellCoordHash map_chunk_hash = 0;              // 0 for regular objects, >0 for map chunk meshes
 };
 
 struct DrawLightCmd
 {
     LightData light;
-    float dist2 = 0.0f;
 
+    // point light
     DrawLightCmd(const glm::vec3& position, const glm::vec3& color, float radius)
     {
         light.position = position;
@@ -42,15 +40,17 @@ struct DrawLightCmd
         light.cos_outer = 0.0f;
     }
 
-    DrawLightCmd(const glm::vec3& position, const glm::vec3& color, float radius, const glm::vec3& dir, float angle_inner, float angle_outer)
+    // spot light
+    DrawLightCmd(const glm::vec3& position, const glm::vec3& color, float radius, const glm::vec3& dir,
+                 float inner_angle, float outer_angle)
     {
         light.position = position;
         light.color = color;
         light.radius = radius;
 
         light.dir = dir;
-        light.cos_inner = glm::cos(angle_inner);
-        light.cos_outer = glm::cos(angle_outer);
+        light.cos_inner = glm::cos(inner_angle);
+        light.cos_outer = glm::cos(outer_angle);
     }
 };
 
@@ -85,20 +85,21 @@ struct DrawList
     std::vector<DrawLightCmd> lights;
     std::vector<DrawBeamCmd> beams;
     std::vector<DrawHudCmd> huds;
-    float chunk_size = 1.0f;
 
     void AddSurface(const DrawSurfaceCmd& cmd) { surfaces.emplace_back(cmd); }
 
     void AddLight(const DrawLightCmd& cmd) { lights.emplace_back(cmd); }
+
+    // light - point
     void AddLight(const glm::vec3& position, const glm::vec3& color, float radius)
     {
         lights.emplace_back(position, color, radius);
     }
 
-    void AddSpotLight(const glm::vec3& position, const glm::vec3& color, float radius, const glm::vec3& dir,
-                      float angle_inner, float angle_outer)
+    // light - spot
+    void AddLight(const glm::vec3& position, const glm::vec3& color, float radius, const glm::vec3& dir, float inner_angle, float outer_angle)
     {
-        lights.emplace_back(position, color, radius, dir, angle_inner, angle_outer);
+        lights.emplace_back(position, color, radius, dir, inner_angle, outer_angle);
     }
 
     void AddBeam(const DrawBeamCmd& cmd) { beams.emplace_back(cmd); }
@@ -110,15 +111,12 @@ struct DrawList
 
     void AddHUD(const DrawHudCmd& cmd) { huds.emplace_back(cmd); }
 
-    void SetMapChunkSize(float size) { chunk_size = size; }
-
     void Clear()
     {
         surfaces.clear();
         lights.clear();
         beams.clear();
         huds.clear();
-        chunk_size = 1.0f;
     }
 };
 
