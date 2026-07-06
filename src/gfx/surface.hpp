@@ -8,7 +8,6 @@ namespace gfx
 {
 
 using MeshFlags = uint8_t;
-
 enum MeshFlag : MeshFlags
 {
     MF_NONE = 0x00,
@@ -17,19 +16,19 @@ enum MeshFlag : MeshFlags
 };
 
 using SurfaceFlags = uint16_t;
-
 enum SurfaceFlag : SurfaceFlags
 {
-    SF_NONE = 0x00,
+    SF_NONE = 0,
     SF_2SIDED = 1,              // disable backface culling
     SF_BLEND = 2,               // enable blending, disable depth write
-    SF_BLEND_ADDITIVE = 4,      // use additive blending instead of opacity
+    SF_BLEND_ADDITIVE = 4,      // use additive blending instead of opacity (only if SF_BLEND)
     SF_OBJECT_COLOR = 8,        // use object color for background instead of alpha culling
     SF_DEFORM_GRID = 16,        // use deform grid
     SF_UNLIT = 32,              // dont apply lighting
     SF_VERTEX_LIT = 64,         // force vertex lighting (only if not SF_UNLIT)
-    SF_OBJECT_COLOR_MULT = 128, // object color multiplies instead of acting as background
+    SF_OBJECT_COLOR_MULT = 128, // object color multiplies instead of acting as background (only if SF_OBJECT_COLOR)
     SF_MULTICOLOR = 256,        // multiple color slots encoded in alpha
+    SF_TRANSLUCENT = 512,       // mesh normals have less weight during lighting (only if not SF_UNLIT)
 };
 
 struct Surface

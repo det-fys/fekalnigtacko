@@ -45,6 +45,7 @@ struct ModelSurface
     bool blend = false;
     bool blend_additive = false;
     bool unlit = false;
+    bool translucent = false;
 };
 
 class Model : public Asset

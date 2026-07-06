@@ -173,6 +173,10 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
                 {
                     surface.unlit = true;
                 }
+                else if (flag == "+translucent")
+                {
+                    surface.translucent = true;
+                }
             }
         }
         else if (command == "makecoltrimesh")

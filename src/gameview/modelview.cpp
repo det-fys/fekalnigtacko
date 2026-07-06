@@ -115,6 +115,9 @@ void game::view::ModelView::CreateSurfaces()
         if (mdl_surface.unlit)
             surface.sflags |= gfx::SF_UNLIT;
 
+        if (mdl_surface.translucent)
+            surface.sflags |= gfx::SF_TRANSLUCENT;
+
         surfaces_.emplace_back(std::move(surface));
     }
 }

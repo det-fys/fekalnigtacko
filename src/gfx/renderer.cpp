@@ -230,6 +230,9 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 
 			if ((r_vertex_lighting.Get() > 0) || (cmd.surface->sflags & SF_VERTEX_LIT))
                 cmd.rflags |= SRF_LIT_VERTEX;
+
+			if (cmd.surface->sflags & SF_TRANSLUCENT)
+                cmd.rflags |= SRF_TRANSLUCENT;
 		}
 
 		if (cmd.color)

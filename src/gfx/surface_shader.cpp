@@ -120,6 +120,20 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
             uniform mat3x4 u_light_data[MAX_LIGHTS];
         )GLSL";
 
+        constexpr std::string_view light_normal_function = R"GLSL(
+            float GetNormalFactor(in vec3 world_normal, in vec3 dir) {
+                return max(dot(world_normal, dir), 0.0);
+            }
+
+        )GLSL";
+
+        constexpr std::string_view light_normal_translucent_function = R"GLSL(
+            float GetNormalFactor(in vec3 world_normal, in vec3 dir) {
+                return max(dot(world_normal, dir), 0.5);
+            }
+
+        )GLSL";
+
         constexpr std::string_view lights_function = R"GLSL(
             vec3 ComputeLights(in vec3 world_pos, in vec3 world_normal)
             {
@@ -127,8 +141,7 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
                 vec3 color = u_ambient_light;
 
                 // Sunlight contribution
-                float sun_dot = max(dot(world_normal, -u_sun_direction), 0.0);
-                color += u_sun_color * sun_dot;
+                color += u_sun_color * GetNormalFactor(world_normal, -u_sun_direction);
 
                 // Point/spot lights
                 for (int i = 0; i < u_num_lights; ++i) {
@@ -158,7 +171,7 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
                     float attenuation = 1.0 - (dist / light_radius);
                     attenuation *= attenuation;
 
-                    float ndotl = max(dot(world_normal, L), 0.0);
+                    float ndotl = GetNormalFactor(world_normal, L);
                     //ndotl = mix(1.0, ndotl, 0.35);
                     ndotl = sqrt(ndotl);
 
@@ -178,11 +191,13 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
 
                 return color;
             }
+
         )GLSL";
 
         if (flags & SRF_LIT_VERTEX)
         {
             vert_uniforms += light_uniforms;
+            vert_funcs += (flags & SRF_TRANSLUCENT) ? light_normal_translucent_function : light_normal_function;
             vert_funcs += lights_function;
             vert_outs += "out vec3 v_light_color;\n";
             vert_main += "v_light_color = ComputeLights(world_pos.xyz, world_normal);\n";
@@ -197,6 +212,7 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
 
             frag_ins += "in vec3 v_world_normal;\n";
             frag_uniforms += light_uniforms;
+            frag_funcs += (flags & SRF_TRANSLUCENT) ? light_normal_translucent_function : light_normal_function;
             frag_funcs += lights_function;
 
             // this is currently weird with trees that have fake +Z normals
