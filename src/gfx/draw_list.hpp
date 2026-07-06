@@ -54,6 +54,19 @@ struct DrawLightCmd
     }
 };
 
+struct DrawCoronaCmd
+{
+    glm::vec3 pos;
+    glm::vec3 dir;
+    glm::vec3 color;
+    float size;
+
+    DrawCoronaCmd(const glm::vec3& pos, const glm::vec3& dir, const glm::vec3& color, float size)
+        : pos(pos), dir(dir), color(color), size(size)
+    {
+    }
+};
+
 struct DrawBeamCmd
 {
     glm::vec3 start;
@@ -83,6 +96,7 @@ struct DrawList
 {
     std::vector<DrawSurfaceCmd> surfaces;
     std::vector<DrawLightCmd> lights;
+    std::vector<DrawCoronaCmd> coronas;
     std::vector<DrawBeamCmd> beams;
     std::vector<DrawHudCmd> huds;
     float chunk_size = 1.0f;
@@ -101,6 +115,11 @@ struct DrawList
         lights.emplace_back(position, color, radius, dir, angle_inner, angle_outer);
     }
 
+    void AddCorona(const glm::vec3& pos, const glm::vec3& dir, const glm::vec3& color, float size)
+    {
+        coronas.emplace_back(pos, dir, color, size);
+    }
+
     void AddBeam(const DrawBeamCmd& cmd) { beams.emplace_back(cmd); }
     void AddBeam(const glm::vec3& start, const glm::vec3& end, uint32_t color = 0xFFFFFFFF, float radius = 0.1f,
                  size_t num_segments = 1, float max_offset = 0.0f)
@@ -116,6 +135,7 @@ struct DrawList
     {
         surfaces.clear();
         lights.clear();
+        coronas.clear();
         beams.clear();
         huds.clear();
         chunk_size = 1.0f;

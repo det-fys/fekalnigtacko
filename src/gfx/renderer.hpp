@@ -24,10 +24,12 @@ struct DrawListParams
 {
     DrawListEnvironmentParams env;
     glm::vec3 cam_pos;
+    glm::mat4 view;
+    glm::mat4 proj;
     glm::mat4 view_proj;
     size_t screen_width = 0;
     size_t screen_height = 0;
-    float map_chunk_size = 1.0f;
+    //float map_chunk_size = 1.0f;
 };
 
 struct SurfaceShader
@@ -53,6 +55,7 @@ public:
 
 private:
     void SetupBeamVA();
+    void SetupCoronaVA();
 
     void InvalidateShaders();
 
@@ -65,6 +68,7 @@ private:
 
     void DrawSurfaceList(std::span<DrawSurfaceCmd> queue, const DrawListParams& params);
     void DrawBeamList(std::span<DrawBeamCmd> queue, const DrawListParams& params);
+    void DrawCoronaList(std::span<DrawCoronaCmd> queue, const DrawListParams& params);
     void DrawHudList(std::span<DrawHudCmd> queue, const DrawListParams& params);
 
 private:
@@ -74,6 +78,9 @@ private:
     std::unique_ptr<BufferObject> beam_segments_vbo_;
     std::unique_ptr<VertexArray> beam_va_;
     std::unique_ptr<Shader> beam_shader_;
+
+    std::unique_ptr<VertexArray> corona_va_;
+    std::shared_ptr<const Texture> corona_tex_;
 
     std::unique_ptr<Shader> hud_shader_;
 

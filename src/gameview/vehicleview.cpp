@@ -19,7 +19,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
     model_ = assets::AssetManager::GetInstance().Get<assets::VehicleModel>(std::string(modelname));
     model_view_ = assets::AssetManager::GetInstance().Get<ModelView>(model_->GetModel()->GetAssetName());
     InitMesh();
-    InitHeadlights();
+    InitLights();
     
     auto& modelwheels = model_->GetWheels();
     wheels_.resize(modelwheels.size());
@@ -122,7 +122,7 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
         //}
     }
 
-    DrawHeadlights(args);
+    DrawLights(args);
 }
 
 void game::view::VehicleView::InitMesh()
@@ -333,8 +333,9 @@ bool game::view::VehicleView::ProcessDeformSyncMsg(net::InMessage& msg)
     return ReadDeformSync(msg);
 }
 
-void game::view::VehicleView::InitHeadlights()
+void game::view::VehicleView::InitLights()
 {
+    // headlights
     for (size_t i = 0; i < 2; ++i)
     {
         std::string loc_name = std::string("headlight") + static_cast<char>('0' + i);
@@ -349,9 +350,50 @@ void game::view::VehicleView::InitHeadlights()
         }
 
         light_cone_node_[i].parent = &root_;
-        light_cone_node_[i].local.position = loc->position;
+        light_cone_node_[i].local.position = loc->position + glm::vec3(0.0f, -0.2f, 0.03f); // offset of cone
 
-        ++num_headlights;
+        headlight_pos_[i] = loc->position;
+
+        ++num_headlights_;
+    }
+
+    // rearlights
+    for (size_t i = 0; i < 2; ++i)
+    {
+        std::string loc_name = std::string("rearlight") + static_cast<char>('0' + i);
+        auto loc = model_->GetLocation(loc_name);
+
+        if (!loc)
+            break;
+
+        rearlight_pos_[i] = loc->position;
+        ++num_rearlights_;
+    }
+
+    // brakinglights
+    for (size_t i = 0; i < 2; ++i)
+    {
+        std::string loc_name = std::string("brakinglight") + static_cast<char>('0' + i);
+        auto loc = model_->GetLocation(loc_name);
+
+        if (!loc)
+            break;
+
+        brakinglights_pos_[i] = loc->position;
+        ++num_brakinglights_;
+    }
+
+    // reverselights
+    for (size_t i = 0; i < 2; ++i)
+    {
+        std::string loc_name = std::string("reverselight") + static_cast<char>('0' + i);
+        auto loc = model_->GetLocation(loc_name);
+
+        if (!loc)
+            break;
+
+        reverselights_pos_[i] = loc->position;
+        ++num_reverselights_;
     }
 }
 
@@ -409,7 +451,7 @@ void game::view::VehicleView::UpdateLights(float delta_t)
     float intensity = headlights_factor_ * 0.03f;
     headlight_cone_color_ = glm::vec4(headlight_color_ * intensity, 1.0f);
 
-    for (size_t i = 0; i < num_headlights; ++i)
+    for (size_t i = 0; i < num_headlights_; ++i)
     {
         light_cone_node_[i].UpdateMatrix();
     }
@@ -468,37 +510,76 @@ void game::view::VehicleView::DrawWheels(const DrawArgs& args) const
     }
 }
 
-void game::view::VehicleView::DrawHeadlights(const DrawArgs& args) const
+void game::view::VehicleView::DrawLights(const DrawArgs& args) const
 {
-    if ((flags_ & VF_EXPLODED) > 0 || headlights_factor_ <= 0.01f)
+    if ((flags_ & VF_EXPLODED) > 0)
         return;
-
-    auto spotlight_color = headlight_color_ * headlights_factor_ * 2.0f;
-
-    glm::vec3 spotlight_pos(0.0f);
-
-    // cones
-    for (size_t i = 0; i < num_headlights; ++i)
+    
+    auto forward = glm::normalize(root_.matrix[1]);
+    
+    if (headlights_factor_ > 0.01f)
     {
-        auto surfaces = light_cone_mdl_->GetSurfaces();
-        for (const auto& surface : surfaces)
+        auto spotlight_color = headlight_color_ * headlights_factor_ * 2.0f;
+        glm::vec3 spotlight_pos(0.0f);
+
+        // HEADLIGHTS
+        // cones & coronas
+        for (size_t i = 0; i < num_headlights_; ++i)
         {
-            gfx::DrawSurfaceCmd cmd;
-            cmd.surface = &surface;
-            cmd.matrices = &light_cone_node_[i].matrix;
-            cmd.color = &headlight_cone_color_;
-            args.dlist.AddSurface(cmd);
+            auto surfaces = light_cone_mdl_->GetSurfaces();
+            for (const auto& surface : surfaces)
+            {
+                gfx::DrawSurfaceCmd cmd;
+                cmd.surface = &surface;
+                cmd.matrices = &light_cone_node_[i].matrix;
+                cmd.color = &headlight_cone_color_;
+                args.dlist.AddSurface(cmd);
+            }
+
+            spotlight_pos += light_cone_node_[i].GetGlobalPosition();
+            args.dlist.AddCorona(root_.matrix * glm::vec4(headlight_pos_[i], 1.0f), forward, spotlight_color, 1.0f);
         }
 
-        spotlight_pos += light_cone_node_[i].GetGlobalPosition();
+        // spotlight
+        if (num_headlights_ > 0)
+        {
+            spotlight_pos /= static_cast<float>(num_headlights_);
+
+            // spotlight
+            args.dlist.AddSpotLight(spotlight_pos, spotlight_color, 30.0f, forward, glm::radians(12.0f),
+                                    glm::radians(30.0f));
+        }
     }
 
-    if (num_headlights > 0)
+    if (headlights_factor_ + braking_lights_factor_ > 0.01f)
     {
-        spotlight_pos /= static_cast<float>(num_headlights);
+        // REAR LIGHTS
+        for (size_t i = 0; i < num_rearlights_; ++i)
+        {
+            args.dlist.AddCorona(root_.matrix * glm::vec4(rearlight_pos_[i], 1.0f), -forward,
+                                 glm::vec3(1.0f, 0.2f, 0.2f) *
+                                     (headlights_factor_ * 0.5f + braking_lights_factor_ * 0.7f),
+                                 0.3f + braking_lights_factor_ * 0.7f);
+        }
+    }
 
-        // spotlight
-        args.dlist.AddSpotLight(spotlight_pos, spotlight_color, 30.0f, glm::normalize(root_.matrix[1]),
-                                glm::radians(12.0f), glm::radians(30.0f));
+    if (braking_lights_factor_ > 0.01f)
+    {
+        // BRAKING LIGHT
+        for (size_t i = 0; i < num_brakinglights_; ++i)
+        {
+            args.dlist.AddCorona(root_.matrix * glm::vec4(brakinglights_pos_[i], 1.0f), -forward,
+                                 glm::vec3(1.0f, 0.2f, 0.2f) * braking_lights_factor_, 1.0f);
+        }
+    }
+
+    if (reverse_light_factor_ > 0.01f)
+    {
+        // REVERSE LIGHT
+        for (size_t i = 0; i < num_reverselights_; ++i)
+        {
+            args.dlist.AddCorona(root_.matrix * glm::vec4(reverselights_pos_[i], 1.0f), -forward,
+                                 glm::vec3(reverse_light_factor_), 1.0f);
+        }
     }
 }

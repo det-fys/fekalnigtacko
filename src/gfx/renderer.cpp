@@ -13,6 +13,7 @@
 #include "shader_defs.hpp"
 
 #include "utils/cvars.hpp"
+#include "assets/asset_manager.hpp"
 
 CVAR_CL(uint8_t, r_vertex_lighting, CV_SAVE, 0, 0, 1);
 
@@ -23,6 +24,7 @@ gfx::Renderer::Renderer()
     ShaderSources::MakeShader(beam_shader_, SS_BEAM_VERT, SS_BEAM_FRAG);
 
 	SetupBeamVA();
+    SetupCoronaVA();
 }
 
 void gfx::Renderer::DrawList(gfx::DrawList& list, const DrawListParams& params)
@@ -32,6 +34,7 @@ void gfx::Renderer::DrawList(gfx::DrawList& list, const DrawListParams& params)
     current_shader_ = nullptr;
     glViewport(0, 0, params.screen_width, params.screen_height);
     glClearColor(params.env.clear_color.r, params.env.clear_color.g, params.env.clear_color.b, 1.0f);
+    glDepthMask(GL_TRUE);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	light_grid_chunks_size_ = list.chunk_size;
@@ -39,6 +42,7 @@ void gfx::Renderer::DrawList(gfx::DrawList& list, const DrawListParams& params)
 
 	DrawSurfaceList(list.surfaces, params);
 	DrawBeamList(list.beams, params);
+    DrawCoronaList(list.coronas, params);
     DrawHudList(list.huds, params);
 }
 
@@ -91,6 +95,19 @@ void gfx::Renderer::SetupBeamVA()
 	glVertexAttribDivisor(12, 1);
 
 	glBindVertexArray(0);
+}
+
+struct CoronaVertex
+{
+    glm::vec3 pos;
+    uint32_t color;
+	glm::vec2 uv;
+};
+
+void gfx::Renderer::SetupCoronaVA()
+{
+    corona_va_ = std::make_unique<VertexArray>(VA_POSITION | VA_COLOR | VA_UV, VF_CREATE_EBO | VF_DYNAMIC);
+    corona_tex_ = assets::AssetManager::GetInstance().Get<Texture>("corona");
 }
 
 void gfx::Renderer::InvalidateShaders()
@@ -207,6 +224,9 @@ void gfx::Renderer::AddLightToGrid(const LightData& light, LightGrid& grid, floa
 
 void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawListParams& params)
 {
+    if (list.empty())
+        return;
+
 	// determine render flags
 	for (auto& cmd : list)
 	{
@@ -480,10 +500,6 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 
 		last_rflags = cmd.rflags;
 	}
-
-	// reset this as it is rare and other stuff might not reset this
-	glDepthMask(GL_TRUE);
-
 }
 
 static float GetRandomOffset(float max_offset)
@@ -558,12 +574,110 @@ void gfx::Renderer::DrawBeamList(std::span<DrawBeamCmd> queue, const DrawListPar
 
 	glBindVertexArray(0);
 
-	glDepthMask(GL_TRUE);
+}
 
+void gfx::Renderer::DrawCoronaList(std::span<DrawCoronaCmd> queue, const DrawListParams& params)
+{
+    if (queue.empty())
+        return;
+
+	// create array
+    static std::vector<CoronaVertex> vertices;
+    static std::vector<uint32_t> indices;
+	vertices.clear();
+    indices.clear();
+
+	//auto cam_backward = glm::transpose(glm::mat3(params.view))[2];
+
+	auto aspect = static_cast<float>(params.screen_width) / static_cast<float>(params.screen_height);
+	glm::vec2 size_scale(1.0f, aspect);
+
+	for (const auto& corona : queue)
+	{
+        auto to_cam = params.cam_pos - corona.pos;
+        auto dist = glm::length(to_cam);
+        if (dist < 0.001f)
+            continue;
+
+        to_cam /= dist;
+
+		glm::vec4 clip_pos = params.view_proj * glm::vec4(corona.pos + to_cam * 0.1f, 1.0f);
+        if (clip_pos.w == 0.0f)
+            continue;
+
+        glm::vec3 ndc_pos = glm::vec3(clip_pos) / clip_pos.w;
+
+        if (ndc_pos.z < -1.0f || ndc_pos.z > 1.0f)
+            continue; // behind camera
+
+
+        float intensity = glm::sqrt(glm::max(glm::dot(corona.dir, to_cam), 0.0f));
+        float mult = glm::mix(0.0f, 0.7f, intensity);
+        float scale = glm::mix(0.3f, 1.0f, intensity);
+
+		dist = glm::max(dist, 0.1f);
+
+		constexpr float a = 1.0f;
+		constexpr float b = 0.15f;
+		float size = 0.1f * scale * (1.0f / (a + b * dist));
+        auto size_xy = size * size_scale;
+		
+        glm::vec4 color(corona.color * mult, 1.0f);
+        uint32_t color_u32 = glm::packUnorm4x8(color);
+
+		uint32_t base_index = vertices.size();
+
+        vertices.emplace_back(CoronaVertex{ndc_pos + glm::vec3(-size_xy.x, -size_xy.y, 0.0f), color_u32, glm::vec2(0.0f, 0.0f)});
+        vertices.emplace_back(CoronaVertex{ndc_pos + glm::vec3(size_xy.x, -size_xy.y, 0.0f), color_u32, glm::vec2(1.0, 0.0f)});
+        vertices.emplace_back(CoronaVertex{ndc_pos + glm::vec3(size_xy.x, size_xy.y, 0.0f), color_u32, glm::vec2(1.0f, 1.0f)});
+        vertices.emplace_back(CoronaVertex{ndc_pos + glm::vec3(-size_xy.x, size_xy.y, 0.0f), color_u32, glm::vec2(0.0f, 1.0f)});
+
+        indices.push_back(base_index + 0);
+        indices.push_back(base_index + 1);
+        indices.push_back(base_index + 2);
+        indices.push_back(base_index + 0);
+        indices.push_back(base_index + 2);
+        indices.push_back(base_index + 3);
+
+	}
+
+	if (indices.empty())
+        return;
+
+	// upload
+    corona_va_->SetVBOData(vertices.data(), vertices.size() * sizeof(vertices[0]));
+    corona_va_->SetIndices(indices.data(), indices.size());
+
+	// render
+
+    Shader* shader = hud_shader_.get();
+    current_shader_ = shader;
+    glUseProgram(shader->GetId());
+
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+
+	glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
+	glm::mat3 matrix(1.0f);
+	glUniformMatrix3fv(shader->U(SU_MODEL), 1, GL_FALSE, &matrix[0][0]);
+
+	glBindVertexArray(corona_va_->GetVAOId());
+
+
+	glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, corona_tex_->GetId());
+
+    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, (void*)0);
 }
 
 void gfx::Renderer::DrawHudList(std::span<DrawHudCmd> queue, const DrawListParams& params)
 {
+    if (queue.empty())
+        return;
+
 	// cannot sort anything here, must be drawn in FIFO order for correct overlay
 
 	Shader* shader = hud_shader_.get();

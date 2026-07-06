@@ -349,6 +349,8 @@ void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListPar
     glm::mat4 proj = glm::perspective(glm::radians(camera_controller_.GetFov() * 0.5f), aspect, 0.1f, farplane);
     glm::mat4 view = camera_controller_.GetViewMatrix();
 
+    params.view = view;
+    params.proj = proj;
     params.view_proj = proj * view;
     params.cam_pos = camera_controller_.GetEye();
 

@@ -49,6 +49,7 @@ enum VehicleColorSlot
 class VehicleView : public EntityView
 {
     using Super = EntityView;
+
 public:
     VehicleView(WorldView& world, net::InMessage& msg);
     DELETE_COPY_MOVE(VehicleView)
@@ -68,7 +69,7 @@ private:
     bool ProcessDeformMsg(net::InMessage& msg);
     bool ProcessDeformSyncMsg(net::InMessage& msg);
 
-    void InitHeadlights();
+    void InitLights();
 
     void UpdateSounds();
     void UpdateWindows();
@@ -78,7 +79,7 @@ private:
 
     void DrawBaseModel(const DrawArgs& args) const;
     void DrawWheels(const DrawArgs& args) const;
-    void DrawHeadlights(const DrawArgs& args) const;
+    void DrawLights(const DrawArgs& args) const;
 
 private:
     std::shared_ptr<const assets::VehicleModel> model_;
@@ -109,11 +110,20 @@ private:
     float orange_lights_factor_ = 0.0f;
     float reverse_light_factor_ = 0.0f;
 
-    size_t num_headlights = 0;
+    size_t num_headlights_ = 0;
     std::shared_ptr<const ModelView> light_cone_mdl_;
     TransformNode light_cone_node_[2];
+    glm::vec3 headlight_pos_[2];
     glm::vec4 headlight_cone_color_;
 
+    size_t num_rearlights_ = 0;
+    glm::vec3 rearlight_pos_[2];
+
+    size_t num_brakinglights_ = 0;
+    glm::vec3 brakinglights_pos_[2];
+
+    size_t num_reverselights_ = 0;
+    glm::vec3 reverselights_pos_[2];
 };
 
 }

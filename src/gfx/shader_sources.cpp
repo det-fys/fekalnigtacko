@@ -48,7 +48,7 @@ out vec2 v_uv;
 
 void main() {
     vec3 pos2d = u_model * vec3(a_pos.xy, 1.0);
-    gl_Position = vec4(pos2d.xy, 0.0, 1.0);
+    gl_Position = vec4(pos2d.xy, a_pos.z, 1.0);
     v_color = a_color;
     v_uv = a_uv;
 }	
