@@ -151,6 +151,7 @@ void gfx::Renderer::SetupSurfaceShader(SurfaceShader& sshader, const DrawListPar
 	}
 
 	glUniformMatrix4fv(shader.U(SU_VIEW_PROJ), 1, GL_FALSE, &params.view_proj[0][0]);
+    sshader.prev_decal = false;
 
 	if (sshader.iflags & SIF_FOG_DATA)
 	{
@@ -227,6 +228,11 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
     if (list.empty())
         return;
 
+	// setup view/proj matrix for decals
+	auto decal_proj = params.proj;
+    decal_proj[2][3] -= 0.0005f;
+    auto decal_view_proj = decal_proj * params.view;
+
 	// determine render flags
 	for (auto& cmd : list)
 	{
@@ -273,12 +279,15 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 
 		if ((cmd.surface->sflags & (SF_BLEND | SF_OBJECT_COLOR)) == 0)
 			cmd.rflags |= SRF_CULL_ALPHA;
+
+		if (cmd.surface->sflags & SF_DECAL)
+            cmd.rflags |= SRF_DECAL;
 	}
 
 	// sort the list to minimize state changes
 	std::ranges::sort(list, [](const DrawSurfaceCmd& a, const DrawSurfaceCmd& b) {
-		const bool blend_a = a.rflags & SRF_BLEND;
-		const bool blend_b = b.rflags & SRF_BLEND;
+        const bool blend_a = a.rflags & SRF_BLEND;
+        const bool blend_b = b.rflags & SRF_BLEND;
 		
 		if (blend_a != blend_b)
 			return blend_b; // opaque first
@@ -391,9 +400,9 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		}
 
 		// sync blending
-		if (rflags_diff & SRF_BLEND)
+		if (rflags_diff & SRF__ANY_BLEND) // this is two flags so not strictly correct but works
 		{
-			if (cmd.rflags & SRF_BLEND)
+            if (cmd.rflags & SRF__ANY_BLEND)
 			{
 				glEnable(GL_BLEND);
 				glDepthMask(GL_FALSE);
@@ -406,12 +415,27 @@ void gfx::Renderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawLi
 		}
 
 		// sync blending type
-		if ((cmd.rflags & SRF_BLEND) && (rflags_diff & SRF_BLEND_ADDITIVE))
+        if ((cmd.rflags & SRF__ANY_BLEND) && (rflags_diff & SRF_BLEND_ADDITIVE))
 		{
 			if (cmd.rflags & SRF_BLEND_ADDITIVE)
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 			else
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		}
+
+		// sync view_proj by SRF_DECAL
+        bool is_decal = cmd.rflags & SRF_DECAL;
+		if (is_decal != sshader->prev_decal)
+		{
+			if (is_decal)
+			{
+                glUniformMatrix4fv(shader->U(SU_VIEW_PROJ), 1, GL_FALSE, &decal_view_proj[0][0]);
+			}
+			else
+			{
+                glUniformMatrix4fv(shader->U(SU_VIEW_PROJ), 1, GL_FALSE, &params.view_proj[0][0]);
+            }
+			sshader->prev_decal = is_decal;
 		}
 
 		// sync lights

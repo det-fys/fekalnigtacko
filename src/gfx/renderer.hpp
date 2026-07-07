@@ -41,6 +41,7 @@ struct SurfaceShader
     bool global_setup = false;
     const glm::vec4* color = nullptr;
     size_t num_lights = 0;
+    bool prev_decal = false;
 };
 
 constexpr static size_t LIGHT_GRID_CELL_LIGHTS = SD_MAX_LIGHTS;

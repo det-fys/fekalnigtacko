@@ -29,6 +29,7 @@ enum SurfaceFlag : SurfaceFlags
     SF_OBJECT_COLOR_MULT = 128, // object color multiplies instead of acting as background (only if SF_OBJECT_COLOR)
     SF_MULTICOLOR = 256,        // multiple color slots encoded in alpha
     SF_TRANSLUCENT = 512,       // mesh normals have less weight during lighting (only if not SF_UNLIT)
+    SF_DECAL = 1024,            // blend + z offset
 };
 
 struct Surface

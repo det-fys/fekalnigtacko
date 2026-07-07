@@ -30,7 +30,10 @@ enum SurfaceRenderFlag : SurfaceRenderFlags
                   SRF_LIT_VERTEX | SRF_TRANSLUCENT | SRF_FOG | SRF_SKELETAL | SRF_DEFORM | SRF_TEXTURE,
 
     // order affects visual result
-    SRF_BLEND = 8192,
+    SRF_DECAL = 8192,
+    SRF_BLEND = 16384,
+
+    SRF__ANY_BLEND = SRF_DECAL | SRF_BLEND, // DECALs should be also blended, but cant have BLEND flag for correct order
 
 };
 
