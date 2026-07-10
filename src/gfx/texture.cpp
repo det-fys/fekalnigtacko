@@ -31,37 +31,50 @@ static void GetGLFilterModes(bool linear, bool mipmaps, GLenum& filter_min, GLen
 	}
 }
 
-gfx::Texture::Texture(GLuint width, GLuint height, const void* data, GLint internalformat, GLenum format, GLenum type, bool linear, bool mipmaps) {
-	glGenTextures(1, &m_id);
+gfx::Texture::Texture()
+{
+    glGenTextures(1, &m_id);
 
-	if (!m_id)
-		throw std::runtime_error("Nelze vytvorit texturu!");
+    if (!m_id)
+        throw std::runtime_error("Nelze vytvorit texturu!");
+}
 
-	glBindTexture(GL_TEXTURE_2D, m_id);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, internalformat, width, height, 0, format, type, data);
-
-	GLenum filter_min, filter_mag;
-	GetGLFilterModes(linear, mipmaps, filter_min, filter_mag);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter_min);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter_mag);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-	if (mipmaps)
-	{
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 3);
-
-		glGenerateMipmap(GL_TEXTURE_2D);
-	}
-
-	glBindTexture(GL_TEXTURE_2D, 0);
+gfx::Texture::Texture(GLuint width, GLuint height, const void* data, GLint internalformat, GLenum format, GLenum type,
+                      bool linear, bool mipmaps)
+    : Texture()
+{
+	SetData(width, height, data, internalformat, format, type, linear, mipmaps);
 }
 
 gfx::Texture::~Texture() {
 	glDeleteTextures(1, &m_id);
+}
+
+void gfx::Texture::SetData(GLuint width, GLuint height, const void* data, GLint internalformat, GLenum format,
+                           GLenum type, bool linear, bool mipmaps)
+{
+    glBindTexture(GL_TEXTURE_2D, m_id);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, internalformat, width, height, 0, format, type, data);
+
+    GLenum filter_min, filter_mag;
+    GetGLFilterModes(linear, mipmaps, filter_min, filter_mag);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter_min);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter_mag);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    if (mipmaps)
+    {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 3);
+
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
 }
 
 std::shared_ptr<gfx::Texture> gfx::Texture::Load(const std::string& name)

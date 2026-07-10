@@ -37,6 +37,7 @@ private:
     
     // std::vector<NpcCharacter*> npcs_;
     size_t num_npcs_ = 0;
+    size_t last_spz_ = 0;
 
 };
 

@@ -30,13 +30,14 @@ struct VehicleWheelTuningContext
 
 struct VehicleTuningContext
 {
-    std::array<uint32_t, 4> colors;
+    std::array<uint32_t, 5> colors;
     float mass;
     float engine_force;
     float braking_force;
     float health;
     float steering;
     std::vector<VehicleWheelTuningContext> wheels;
+    std::string spz;
 };
 
 using VehicleTuningFunction = std::function<void(VehicleTuningContext&)>;
@@ -70,6 +71,7 @@ struct VehicleTuningList
 struct VehicleTuning
 {
     std::string model;
+    std::string spz;
     std::map<std::string, std::string> parts; // group : part
 };
 

@@ -6,6 +6,7 @@
 #include "game/vehicle_sync.hpp"
 #include "game/deform_grid.hpp"
 #include "modelview.hpp"
+#include "spz_texture.hpp"
 
 #include <chrono>
 
@@ -15,7 +16,7 @@ namespace game::view
 struct VehicleWheelViewInfo
 {
     std::shared_ptr<const ModelView> model;
-    glm::vec4 color;
+    glm::vec4 color{};
 
     TransformNode node;
     float steering = 0.0f;
@@ -124,6 +125,9 @@ private:
 
     size_t num_reverselights_ = 0;
     glm::vec3 reverselights_pos_[2];
+
+    // spz
+    SpzTexture spz_;
 };
 
 }

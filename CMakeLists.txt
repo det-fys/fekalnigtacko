@@ -166,6 +166,8 @@ set(CLIENT_ONLY_SOURCES
     "src/gameview/simple_entity_view.cpp"
     "src/gameview/skinning_ubo.hpp"
     "src/gameview/skinning_ubo.cpp"
+    "src/gameview/spz_texture.hpp"
+    "src/gameview/spz_texture.cpp"
     "src/gameview/vehicleview.hpp"
     "src/gameview/vehicleview.cpp"
     "src/gameview/worldenv.hpp"

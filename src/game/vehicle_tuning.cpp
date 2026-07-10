@@ -129,7 +129,7 @@ static game::VehicleTuningFunction ParseTuningFunction(CmdLineStream& iss)
         std::string color_str;
         iss >> color_idx >> color_str;
 
-        if (color_idx >= 4)
+        if (color_idx >= 5)
             throw std::runtime_error("tuning list: invalid color index");
 
         color = ParseColor(color_str);

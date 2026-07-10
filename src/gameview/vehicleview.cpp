@@ -153,14 +153,21 @@ void game::view::VehicleView::InitMesh()
     // }
 
     deform_->tex->SetData(deform_->grid.GetData());
+
+    // spz
+    size_t idx;
+    if (model_->GetModel()->GetSurfaceIndex("spz", idx))
+    {
+        surfaces_[idx].texture = spz_.GetTexture();
+    }
 }
 
 bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
 {
-    glm::vec4 recv_colors[4];
+    glm::vec4 recv_colors[5];
 
     // read colors
-    for (size_t i = 0; i < 4; ++i)
+    for (size_t i = 0; i < 5; ++i)
     {
         uint32_t color;
 
@@ -193,6 +200,24 @@ bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
     headlight_color_ = recv_colors[3];
 
     UpdateDestroyedColors();
+
+    // read SPZ info
+    net::SpzText spz_text;
+    if (!msg.Read(spz_text))
+        return false;
+
+    //std::string_view spz_text = "1F00001";
+    uint32_t spz_mount_color = 0xFF000000 | glm::packUnorm4x8(recv_colors[4]);
+    uint32_t spz_bg = 0xFFFFFFFF;
+    uint32_t spz_fg = 0xFF000000;
+
+    if (spz_text.len == 0)
+    {
+        spz_bg = 0x33000000;
+        spz_fg = 0;
+    }
+
+    spz_.Render(spz_text, spz_mount_color, spz_bg, spz_fg);
 
     return true;
 }

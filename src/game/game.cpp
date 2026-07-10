@@ -29,6 +29,23 @@ game::Game::Game(GameInfo info) : db_(std::move(info.db))
     AddWorld(openworld_.get());
 }
 
+static bool ProcessCustomSpzText(std::string& text)
+{
+    if (text.size() != 8)
+        return false;
+
+    for (auto& c : text)
+    {
+        if (c >= 'a' && c <= 'z')
+            c += ('A' - 'a');
+
+        if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z')))
+            return false;
+    }
+
+    return true;
+}
+
 #define CMD_PREFIX_EVERYONE "^afa"
 #define CMD_PREFIX_ADMIN "^f44"
 
@@ -282,6 +299,42 @@ void game::Game::RegisterCommands()
             }
 
             cmd.player.ChangeBalance(delta, "cheaty");
+        }
+    );
+
+    // /setspz
+    cmds_.RegisterCommand(
+        "setspz",
+        CMDF_ADMIN_ONLY,
+        "nastaví custom spz",
+        [GetPlayerCharacter](const CommandData& cmd) {
+            auto character = GetPlayerCharacter(cmd);
+            if (!character)
+                return;
+
+            auto vehicle = character->GetVehicle();
+            if (!vehicle)
+            {
+                cmd.SendError("nejsi ve vehiklu");
+                return;
+            }
+
+            std::string spz_text;
+            if (!cmd.line.Read(spz_text))
+            {
+                cmd.SendError("nastavit na co??");
+                return;
+            }
+
+            if (!ProcessCustomSpzText(spz_text))
+            {
+                cmd.SendError("musí mít 8 znaků, písmena a číslice");
+                return;
+            }
+
+            auto tuning = vehicle->GetTuning();
+            tuning.spz = spz_text;
+            vehicle->SetTuning(tuning);
         }
     );
 }

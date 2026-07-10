@@ -213,4 +213,6 @@ using BeamTimeQ = Quantized<uint8_t, 0, 10>;
 
 using DirQ = Quantized<uint8_t, -1, 1>;
 
+using SpzText = FixedStr<8>;
+
 } // namespace net

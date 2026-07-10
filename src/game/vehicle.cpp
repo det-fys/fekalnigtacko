@@ -749,6 +749,8 @@ static game::VehicleTuningContext EvaluateTuning(const game::VehicleTuning& tuni
         tuning_ctx.colors[2] = tuning_ctx.colors[0];
     }
 
+    tuning_ctx.spz = tuning.spz;
+
     return tuning_ctx;
 }
 
@@ -790,6 +792,11 @@ void game::Vehicle::WriteTuning(net::OutMessage& msg) const
     {
         msg.Write(net::ModelName(wheel.modelname));
     }
+
+    // write spz
+    //net::WriteRGB(msg, 0xFFFFFFFF); // spz bg
+    //net::WriteRGB(msg, 0xFF000000); // spz fg
+    msg.Write(net::SpzText(tuning_ctx_.spz));
 }
 
 void game::Vehicle::Explode()

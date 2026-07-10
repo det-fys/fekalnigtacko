@@ -92,6 +92,15 @@ static collision::DynamicsWorldInfo GetOpenWorldDynamicsInfo()
     return info;
 }
 
+std::string GetSpzText(size_t num)
+{
+    num %= 900000;
+    num += 100000;
+
+    auto num_str = std::to_string(num);
+    return num_str.substr(0, 1) + "F" + num_str.substr(1, 5);
+}
+
 game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo(), "openworld"), game_(game)
 {
     SetSpawnPoint(glm::vec3(100.0f, 100.0f, 1.0f));
@@ -250,6 +259,8 @@ game::DrivableVehicle& game::OpenWorld::SpawnRandomVehicle(const glm::vec3& pos,
     // std::advance( item, random_color);
 
     // tuning.parts["primarycolor"] = item->second.id;
+
+    tuning.spz = GetSpzText(last_spz_++);
 
     vehicle.SetTuning(tuning);
 

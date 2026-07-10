@@ -15,8 +15,12 @@ class Texture : public assets::Asset
 	GLuint m_id;
 
 public:
+    Texture();
 	Texture(GLuint width, GLuint height, const void* data, GLint internalformat, GLenum format, GLenum type, bool linear, bool mipmaps);
 	~Texture();
+
+	void SetData(GLuint width, GLuint height, const void* data, GLint internalformat, GLenum format, GLenum type,
+                 bool linear, bool mipmaps);
 
 	GLuint GetId() const { return m_id; }
 
