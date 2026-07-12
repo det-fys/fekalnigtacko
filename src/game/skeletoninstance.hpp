@@ -1,5 +1,7 @@
 #pragma once
 
+#include <span>
+
 #include "assets/skeleton.hpp"
 #include "transform_node.hpp"
 #include "utils/defs.hpp"
@@ -21,8 +23,9 @@ public:
     void ApplyAim(float yaw, float pitch);
 
     void UpdateBoneMatrices();
+    void ComputeBoneMatrices(std::span<glm::mat4> data);
 
-    const std::vector<TransformNode> GetBoneNodes() const { return bone_nodes_; }
+    const std::vector<TransformNode>& GetBoneNodes() const { return bone_nodes_; }
 
     const std::shared_ptr<const assets::Skeleton>& GetSkeleton() const { return skeleton_; }
 

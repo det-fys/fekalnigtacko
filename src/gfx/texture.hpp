@@ -1,32 +1,29 @@
 #pragma once
-#include <memory>
-#include <string>
-#include "client/utils.hpp"
-#include "client/gl.hpp"
+
+#include "renderer.hpp"
+#include "utils/defs.hpp"
 #include "assets/asset_manager.hpp"
 
 namespace gfx
 {
-/**
- * \brief Wrapper pro OpenGL texturu
- */
+
 class Texture : public assets::Asset
 {
-	GLuint m_id;
-
 public:
-    Texture();
-	Texture(GLuint width, GLuint height, const void* data, GLint internalformat, GLenum format, GLenum type, bool linear, bool mipmaps);
-	~Texture();
+    Texture(const TextureDescriptor& desc);
+    DELETE_COPY_MOVE(Texture);
 
-	void SetData(GLuint width, GLuint height, const void* data, GLint internalformat, GLenum format, GLenum type,
-                 bool linear, bool mipmaps);
+    static std::shared_ptr<Texture> Load(const std::string& name);
+    static std::shared_ptr<Texture> LoadFromFile(const std::string& filename);
 
-	GLuint GetId() const { return m_id; }
+    void SetData(std::span<const uint8_t> data);
 
-	static std::shared_ptr<Texture> Load(const std::string& name);
-	static std::shared_ptr<Texture> LoadFromFile(const std::string& filename);
+    TextureID GetID() const { return id_; }
 
+    ~Texture();
+
+private:
+    TextureID id_;
 };
 
-}
+} // namespace gfx

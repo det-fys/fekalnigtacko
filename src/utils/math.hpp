@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 inline void MoveToward(float& val, float target, float max_delta)
 {

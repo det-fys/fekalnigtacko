@@ -68,20 +68,10 @@ bool game::view::MarkerView::Init(net::InMessage& msg)
         base_model_ = assets::AssetManager::GetInstance().Get<ModelView>("marker_base");
     }
 
-
-
     return true;
 }
 
 void game::view::MarkerView::DrawModel(const DrawArgs& args, const ModelView& model, const TransformNode& node)
 {
-    auto surfaces = model.GetSurfaces();
-    for (const auto& surface : surfaces)
-    {
-        gfx::DrawSurfaceCmd cmd;
-        cmd.surface = &surface;
-        cmd.matrices = &node.matrix;
-        cmd.color = &color_;
-        args.dlist.AddSurface(cmd);
-    }
+    model.Draw(args.ctx, node.matrix, {&color_, 1});
 }

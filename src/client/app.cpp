@@ -61,7 +61,7 @@ static const std::map<KeyCode, game::PlayerInputType> s_inputmap = {
 };
 
 App::App(const std::string& settings_path)
-    : settings_(settings_path), gui_(dlist_, assets::AssetManager::GetInstance().Get<gui::Font>("comic32")),
+    : settings_(settings_path), gui_(assets::AssetManager::GetInstance().Get<gui::Font>("comic32")),
       precache_("data/precache"), chat_(gui_, time_)
 {
 	std::cout << "Initializing App..." << std::endl;
@@ -119,11 +119,50 @@ void App::OnClientDisconnect()
 	Disconnect();
 }
 
+void App::Draw(const gfx::DrawContext& ctx)
+{
+    gui_.Begin(ctx.viewport_size);
+
+	// draw session
+    if (session_)
+    {
+        session_->Draw(ctx, gui_);
+    }
+
+	if (ctx.pass != gfx::DRAW_PASS_MAIN)
+        return;
+
+    // loading screen
+    if (!precache_.IsDone())
+    {
+        gui::DrawLoadingScreen(gui_, precache_.GetNumLoaded() * 100 / precache_.GetNumItems());
+    }
+
+    DrawStats();
+    chat_.Draw();
+
+    // draw menu
+    if (menu_)
+    {
+        auto menu_size = menu_->MeasureSize();
+        menu_->Draw(gui_, (glm::vec2(ctx.viewport_size) - menu_size) * 0.5f);
+    }
+
+    gui_.Render(ctx.dlist);
+}
+
+gfx::Environment App::GetSceneEnvironment()
+{
+    return session_ ? session_->GetEnv() : gfx::Environment{};
+}
+
+float App::GetMapChunkSize()
+{
+    return session_ ? session_->GetMapChunkSize() : 1.0f;
+}
+
 void App::Frame()
 {
-	if (interface_)
-		interface_->Poll();
-
 	Update();
 	Draw();
 }
@@ -211,6 +250,9 @@ App::~App() {}
 
 void App::Update()
 {
+    if (interface_)
+        interface_->Poll();
+
 	delta_time_ = time_ - prev_time_;
 	prev_time_ = time_;
 
@@ -234,40 +276,13 @@ void App::Update()
 
 void App::Draw()
 {
-
-    gfx::DrawListParams params{};
-	params.screen_width = viewport_size_.x;
-	params.screen_height = viewport_size_.y;
-    params.env.clear_color = glm::vec3(0.1f);
-	
-	dlist_.Clear();
-	gui_.Begin(viewport_size_);
-
-	// draw session
+    gfx::CameraParams cam{};
 	if (session_)
 	{
-        session_->Draw(dlist_, params, gui_);
+        cam = session_->GetCameraParams();
 	}
 
-	// loading screen
-	if (!precache_.IsDone())
-	{
-		gui::DrawLoadingScreen(gui_, precache_.GetNumLoaded() * 100 / precache_.GetNumItems());
-	}
-
-	DrawStats();
-	chat_.Draw();
-
-	// draw menu
-	if (menu_)
-	{
-		auto menu_size = menu_->MeasureSize();
-		menu_->Draw(gui_, (glm::vec2(viewport_size_) - menu_size) * 0.5f);
-	}
-
-	gui_.Render();
-	renderer_.DrawList(dlist_, params);
-
+	gfx::Renderer::GetInstance().Draw(*this, cam);
 	++stat_frames_;
 }
 
@@ -406,8 +421,9 @@ void App::DrawStats()
 	
 	if (app_showviewportsize.Get() > 0)
 	{
+        auto viewport_size = glm::ivec2(gui_.GetRealViewportSize());
 		pos.y += 30.0f;
-		std::string text = "^f70" + std::to_string(viewport_size_.x) + "x" + std::to_string(viewport_size_.y);
+		std::string text = "^f70" + std::to_string(viewport_size.x) + "x" + std::to_string(viewport_size.y);
 		gui_.DrawTextAligned(text, pos, glm::vec2(-1.0f, 0.0f));
 	}
 }

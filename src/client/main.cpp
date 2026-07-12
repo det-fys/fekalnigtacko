@@ -22,9 +22,10 @@
 #endif
 
 #include "app.hpp"
-#include "gl.hpp"
 #include "utils/cvars.hpp"
 #include "key_map.hpp"
+#include "gfx/renderer.hpp"
+#include "utils/sdl_utils.hpp"
 
 CVAR_CL(uint16_t, cl_maxfps, CV_SAVE, 0);
 
@@ -32,7 +33,6 @@ static std::string s_username;
 static std::string s_url;
 
 static SDL_Window *s_window = nullptr;
-static SDL_GLContext s_context = nullptr;
 static bool s_quit = false;
 static std::unique_ptr<App> s_app;
 
@@ -42,12 +42,6 @@ struct ClientConfig
     std::string url;
 };
 
-static void ThrowSDLError(const std::string& message)
-{
-    std::string error = SDL_GetError();
-    throw std::runtime_error(message + ": " + error);
-}
-
 static void InitSDL()
 {
 	std::cout << "Initializing SDL..." << std::endl;
@@ -56,85 +50,35 @@ static void InitSDL()
         ThrowSDLError("SDL_Init");
     }
 
+    Uint32 window_flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
+
+    if (gfx::Renderer::IsGL())
+    {
 #ifdef PG_GLES
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 #else
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 #endif
 
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+        SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-    //SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-    //SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 8); 
+        //SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+        //SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 8); 
+
+        window_flags |= SDL_WINDOW_OPENGL;
+    }
 
 	std::cout << "Creating SDL window..." << std::endl;
-    s_window =
-        SDL_CreateWindow("Fekalni gtacko", 100, 100, 640, 480,
-                         SDL_WINDOW_SHOWN /* | SDL_WINDOW_MAXIMIZED */| SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    s_window = SDL_CreateWindow("Fekalni gtacko", 100, 100, 640, 480, window_flags);
     if (!s_window)
     {
         ThrowSDLError("SDL_CreateWindow");
-    }
-}
-
-#ifndef PG_GLES
-static void APIENTRY GLDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
-    if (severity == 0x826b)
-        return;
-    
-    ////std::cout << message << std::endl;
-    fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
-        (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""),
-        type, severity, message);
-}
-
-#endif // PG_GLES
-
-
-static void InitGL()
-{
-	std::cout << "Creating OpenGL context..." << std::endl;
-    s_context = SDL_GL_CreateContext(s_window);
-    if (!s_context)
-    {
-        ThrowSDLError("SDL_GL_CreateContext");
-    }
-
-    // Make context current
-    if (SDL_GL_MakeCurrent(s_window, s_context) != 0)
-    {
-        SDL_GL_DeleteContext(s_context);
-        ThrowSDLError("SDL_GL_MakeCurrent");
-    }
-
-#ifndef PG_GLES
-	// Initialize GLAD
-	std::cout << "Initializing GLAD..." << std::endl;
-    if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress))
-    {
-        SDL_GL_DeleteContext(s_context);
-        throw std::runtime_error("Failed to initialize GLAD");
-    }
-    glEnable(GL_DEBUG_OUTPUT);
-    glDebugMessageCallback(GLDebugCallback, 0);
-
-    SDL_GL_SetSwapInterval(0);
-#endif // PG_GLES
-
-}
-
-static void ShutdownGL()
-{
-    if (s_context)
-    {
-        SDL_GL_DeleteContext(s_context);
-        s_context = nullptr;
     }
 }
 
@@ -260,15 +204,6 @@ static void Frame()
 
     PollEvents();
 
-	int width, height;
-#ifdef EMSCRIPTEN
-    emscripten_get_canvas_element_size("#canvas", &width, &height);
-#else
-	SDL_GetWindowSize(s_window, &width, &height);
-#endif
-
-	s_app->SetViewportSize(width, height);
-
     s_app->Frame();
 
     SDL_GL_SwapWindow(s_window);
@@ -313,7 +248,7 @@ static void Main() {
 
     try
     {
-        InitGL();
+        gfx::Renderer::Init(s_window);
     }
     catch (...)
     {
@@ -357,7 +292,7 @@ static void Main() {
 
     s_app.reset();
 
-    ShutdownGL();
+    gfx::Renderer::Uninit();
     ShutdownSDL();
 
 #endif // EMSCRIPTEN

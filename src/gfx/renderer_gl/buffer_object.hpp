@@ -1,13 +1,14 @@
 #pragma once
-#include "client/gl.hpp"
-#include "client/utils.hpp"
+#include "gl.hpp"
+
+#include "utils/defs.hpp"
 
 namespace gfx
 {
 /**
 * \brief Wrapper pro OpenGL buffer object
 */
-class BufferObject : public NonCopyableNonMovable
+class BufferObject
 {
     GLuint m_id;
     GLenum m_target;
@@ -16,6 +17,8 @@ class BufferObject : public NonCopyableNonMovable
 
 public:
     BufferObject(GLenum target, GLenum usage);
+    DELETE_COPY_MOVE(BufferObject);
+
     ~BufferObject();
 
     void Bind() const;

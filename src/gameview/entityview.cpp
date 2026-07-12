@@ -112,12 +112,12 @@ bool game::view::EntityView::ProcessPlaySoundMsg(net::InMessage& msg)
 
 void game::view::EntityView::DrawNametag(const DrawArgs& args)
 {
-    if (nametag_.empty())
+    if (args.ctx.pass != gfx::DRAW_PASS_MAIN || nametag_.empty())
         return;
 
     // calc screen position
     glm::vec4 world_pos = GetRoot().matrix * glm::vec4(glm::vec3(0.0f, 0.0f, 2.0f), 1.0f);
-    glm::vec4 clip_pos = args.view_proj * world_pos;
+    glm::vec4 clip_pos = args.ctx.view_proj * world_pos;
     if (clip_pos.w == 0.0f)
         return;
 
@@ -138,6 +138,9 @@ void game::view::EntityView::DrawNametag(const DrawArgs& args)
 
 void game::view::EntityView::DrawAxes(const DrawArgs& args)
 {
+    if (args.ctx.pass != gfx::DRAW_PASS_MAIN)
+        return;
+
     const float len = 5.0f;
     static const uint32_t colors[] = {0xFF0000FF, 0xFF00FF00, 0xFFFF0000};
 
@@ -149,6 +152,6 @@ void game::view::EntityView::DrawAxes(const DrawArgs& args)
         glm::vec3 beam_start = glm::vec3(root_.matrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         glm::vec3 beam_end = glm::vec3(root_.matrix * glm::vec4(end, 1.0f));
 
-        args.dlist.AddBeam(beam_start, beam_end, colors[i], 0.05f);
+        args.ctx.dlist.AddBeam(beam_start, beam_end, colors[i], 0.05f);
     }
 }

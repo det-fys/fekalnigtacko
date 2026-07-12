@@ -2,24 +2,16 @@
 
 #include <vector>
 
-#include "gfx/texture.hpp"
+#include "gfx/material.hpp"
 #include "audio/sound.hpp"
 #include "asset_manager.hpp"
 
 namespace assets
 {
 
-enum ParticleBlendType
-{
-    PTB_NONE,
-    PTB_BLEND_NORMAL,
-    PTB_BLEND_ADDITIVE,
-};
-
 struct ParticleDef
 {
-    std::shared_ptr<const gfx::Texture> texture;
-    ParticleBlendType blend = PTB_NONE;
+    std::shared_ptr<const gfx::Material> material;
     
     std::vector<float> probabilities;
 

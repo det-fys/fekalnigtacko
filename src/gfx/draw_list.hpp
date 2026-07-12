@@ -2,28 +2,34 @@
 
 #include <vector>
 
-#include "assets/skeleton.hpp"
-#include "light_cache.hpp"
-#include "surface.hpp"
-#include "surface_render_flags.hpp"
-#include "uniform_buffer.hpp"
+#include "mesh_desc.hpp"
+#include "material_desc.hpp"
+#include "skeleton_pose_desc.hpp"
+#include "deform_texture_desc.hpp"
+
 #include "light_cell.hpp"
+#include "light_data.hpp"
 
 namespace gfx
 {
 
 struct DrawSurfaceCmd
 {
-    const Surface* surface = nullptr;
-    const glm::mat4* matrices = nullptr;                // model matrix
-    const glm::vec4* color = nullptr;                   // optional tint
-    const UniformBuffer<glm::mat4>* skinning = nullptr; // skinning matrices for skeletal meshes
-    uint32_t first = 0;                                 // first triangle index
-    uint32_t count = 0;                                 // num triangles
-    float dist = 0.0f;                                  // distance to camera - for transparnt sorting
-    SurfaceRenderFlags rflags = 0;
-    uint8_t num_colors = 0;                             // >0 for multicolor, requires array of colors in "color"
-    LightCellCoordHash map_chunk_hash = 0;              // 0 for regular objects, >0 for map chunk meshes
+    // mesh
+    MeshID mesh = 0;
+    MeshIndex tri_offset = 0;
+    MeshIndex tri_count = 0;
+
+    // material
+    MaterialID material = 0;
+
+    // instance
+    const glm::mat4* matrix = nullptr;
+    std::span<const glm::vec4> colors;
+    SkeletonPoseID pose = 0;
+    DeformTextureID deform_tex = 0;
+    float dist = 0.0f;
+    LightCellCoordHash map_chunk_hash = 0;
 };
 
 struct DrawLightCmd
@@ -85,10 +91,15 @@ struct DrawBeamCmd
 
 struct DrawHudCmd
 {
-    const VertexArray* va = nullptr;
-    const Texture* texture = nullptr;
-    size_t first = 0;
-    size_t count = 0;
+    // mesh
+    MeshID mesh = 0;
+    MeshIndex tri_offset = 0;
+    MeshIndex tri_count = 0;
+
+    // texture
+    TextureID texture = 0;
+
+    // instance
     const glm::mat3* matrix = nullptr;
 };
 
@@ -99,7 +110,6 @@ struct DrawList
     std::vector<DrawCoronaCmd> coronas;
     std::vector<DrawBeamCmd> beams;
     std::vector<DrawHudCmd> huds;
-    float chunk_size = 1.0f;
 
     void AddSurface(const DrawSurfaceCmd& cmd) { surfaces.emplace_back(cmd); }
 
@@ -129,8 +139,6 @@ struct DrawList
 
     void AddHUD(const DrawHudCmd& cmd) { huds.emplace_back(cmd); }
 
-    void SetMapChunkSize(float size) { chunk_size = size; }
-
     void Clear()
     {
         surfaces.clear();
@@ -138,7 +146,6 @@ struct DrawList
         coronas.clear();
         beams.clear();
         huds.clear();
-        chunk_size = 1.0f;
     }
 };
 

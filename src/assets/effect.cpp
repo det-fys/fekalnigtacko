@@ -12,6 +12,15 @@ std::shared_ptr<assets::Effect> assets::Effect::LoadFromFile(const std::string& 
     auto fx = std::make_shared<Effect>();
 
     ParticleDef* particle = nullptr;
+    gfx::MaterialInfo material_info{};
+    
+    auto finalize_particle = [&]() {
+        if (particle)
+        {
+            particle->material = std::make_shared<gfx::Material>(material_info);
+            particle = nullptr;
+        }
+    };
 
     LoadCMDFile(path, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "sound")
@@ -27,6 +36,7 @@ std::shared_ptr<assets::Effect> assets::Effect::LoadFromFile(const std::string& 
         }
         else if (command == "particle")
         {
+            finalize_particle();
             particle = &fx->particle_defs_.emplace_back();
         
             size_t num = 0;
@@ -37,6 +47,12 @@ std::shared_ptr<assets::Effect> assets::Effect::LoadFromFile(const std::string& 
                 iss >> probability;
                 particle->probabilities.push_back(probability);
             }
+
+            material_info = {};
+            material_info.properties.twosided = true;
+            material_info.properties.color = gfx::MATERIAL_OBJECT_COLOR_TYPE_MULTIPLY;
+            material_info.properties.lighting = gfx::MATERIAL_LIGHTING_TYPE_VERTEX;
+            material_info.properties.translucent = true;
         
         }
         else if (particle)
@@ -45,7 +61,7 @@ std::shared_ptr<assets::Effect> assets::Effect::LoadFromFile(const std::string& 
             {
                 std::string texture_name;
                 iss >> texture_name;
-                particle->texture = AssetManager::GetInstance().Get<gfx::Texture>(texture_name);
+                material_info.texture = AssetManager::GetInstance().Get<gfx::Texture>(texture_name);
             }
             else if (command == "blend")
             {
@@ -53,9 +69,9 @@ std::shared_ptr<assets::Effect> assets::Effect::LoadFromFile(const std::string& 
                 iss >> blend_str;
 
                 if (blend_str == "normal")
-                    particle->blend = PTB_BLEND_NORMAL;
+                    material_info.properties.blend = gfx::MATERIAL_BLEND_TYPE_OPACITY;
                 else if (blend_str == "additive")
-                    particle->blend = PTB_BLEND_ADDITIVE;
+                    material_info.properties.blend = gfx::MATERIAL_BLEND_TYPE_ADDITIVE;
             }
             else if (command == "size")
             {
@@ -107,6 +123,8 @@ std::shared_ptr<assets::Effect> assets::Effect::LoadFromFile(const std::string& 
             throw std::runtime_error("Unknown or unexpected command in effect: " + command);
         }
     });
+
+    finalize_particle();
 
     return fx;
 }

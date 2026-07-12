@@ -1,7 +1,7 @@
 #pragma once
 
 #include "shader_defs.hpp"
-#include "client/gl.hpp"
+#include "gl.hpp"
 
 #ifndef PG_GLES
 #define GLSL_VERSION \

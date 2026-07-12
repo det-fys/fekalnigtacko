@@ -49,26 +49,40 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             glm::vec3 pos{};
             iss >> pos.x >> pos.y >> pos.z;
 
-            CLIENT_ONLY(
-                ModelVertex v{};
-                v.pos = pos;
-                iss >> v.normal.x >> v.normal.y >> v.normal.z;
-                iss >> v.uv.x >> v.uv.y;
-    
-                v.uv.y = 1.0f - v.uv.y; // FLIP FOR GL
-                
-                if (model->skeleton_)
+#ifdef CLIENT
+            glm::vec3 normal{};
+            glm::vec2 uv{};
+            iss >> normal.x >> normal.y >> normal.z;
+            iss >> uv.x >> uv.y;
+
+            uv.y = 1.0f - uv.y; // FLIP FOR GL // TODO: rly?
+
+            auto& vert_data = model->vertices_;
+            vert_data.positions.emplace_back(pos);
+            vert_data.normals.emplace_back(normal);
+            vert_data.uvs.emplace_back(uv);
+
+            if (model->skeleton_)
+            {
+                gfx::MeshVertexBoneData bones{};
+
+                size_t num_bones = 0;
+                iss >> num_bones;
+                for (size_t i = 0; i < gfx::MAX_VERTEX_BONE_INFLUENCES; ++i)
                 {
-                    size_t num_bones = 0;
-                    iss >> num_bones;
-                    for (size_t i = 0; i < num_bones; ++i)
+                    gfx::BoneIndex bone_idx = gfx::NO_BONE;
+                    float bone_weight = 0.0f;
+                    if (i < num_bones)
                     {
-                        iss >> v.bones[i].bone_index >> v.bones[i].weight;
+                        iss >> bone_idx >> bone_weight;
                     }
+                    bones.bone_indices[i] = bone_idx;
+                    bones.bone_weights[i] = bone_weight;
                 }
-    
-                model->vertices_.emplace_back(v);
-            )
+                vert_data.bones.emplace_back(bones);
+            }
+
+#endif // CLIENT
 
             if (model->cmesh_)
                 vert_pos.emplace_back(pos);
@@ -85,30 +99,25 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
         }
         else if (command == "f")
         {
-            uint32_t indices[3];
-            iss >> indices[0] >> indices[1] >> indices[2];
+            gfx::MeshTriangle t;
+            iss >> t.vertices[0] >> t.vertices[1] >> t.vertices[2];
             
-            CLIENT_ONLY(
-                ModelTriangle t;
-                t.vert[0] = indices[0];
-                t.vert[1] = indices[1];
-                t.vert[2] = indices[2];
+#ifdef CLIENT
+            if (model->surfaces_.empty())
+            {
+                throw std::runtime_error("Face without surface in model");
+            }
 
-                if (model->surfaces_.empty())
-                {
-                    throw std::runtime_error("Face without surface in model");
-                }
-
-                model->tris_.emplace_back(t);
-                ++model->surfaces_.back().num_tris;
-            )
+            model->tris_.emplace_back(t);
+            ++model->surfaces_.back().tri_count;
+#endif // CLIENT
 
             if (model->cmesh_)
             {
                 glm::vec3 p[3];
                 for (size_t i = 0; i < 3; ++i)
                 {
-                    size_t index = indices[i];
+                    size_t index = t.vertices[i];
                     if (index >= vert_pos.size())
                         throw std::runtime_error("Vertex index out of bounds in model");
                     
@@ -126,12 +135,12 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             size_t first = 0;
             if (!model->surfaces_.empty())
             {
-                first = model->surfaces_.back().first_tri + model->surfaces_.back().num_tris;
+                first = model->surfaces_.back().tri_offset + model->surfaces_.back().tri_count;
             }
 
             model->surface_indices_[surface_name] = model->surfaces_.size();
             auto& surface = model->surfaces_.emplace_back();
-            surface.first_tri = first;
+            surface.tri_offset = first;
 
             // Optional flags
             std::string flag;
@@ -145,37 +154,37 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
                 }
                 else if (flag == "+2sided")
                 {
-                    surface.two_sided = true;
+                    surface.properties.twosided = true;
                 }
                 else if (flag == "+ocolor")
                 {
-                    surface.object_color = true;
+                    surface.properties.color = gfx::MATERIAL_OBJECT_COLOR_TYPE_BACKGROUND;
                 }
                 else if (flag == "+ocolor_mult")
                 {
-                    surface.object_color = true;
-                    surface.object_color_mult = true;
+                    surface.properties.color = gfx::MATERIAL_OBJECT_COLOR_TYPE_MULTIPLY;
                 }
                 else if (flag == "+multicolor")
                 {
-                    surface.multicolor = true;
+                    surface.properties.color = gfx::MATERIAL_OBJECT_COLOR_TYPE_MULTICOLOR;
                 }
                 else if (flag == "+blend")
                 {
                     std::string blend_str;
                     iss >> blend_str;
 
-                    surface.blend = true;
                     if (blend_str == "additive")
-                        surface.blend_additive = true;
+                        surface.properties.blend = gfx::MATERIAL_BLEND_TYPE_ADDITIVE;
+                    else
+                        surface.properties.blend = gfx::MATERIAL_BLEND_TYPE_OPACITY;
                 }
                 else if (flag == "+unlit")
                 {
-                    surface.unlit = true;
+                    surface.properties.lighting = gfx::MATERIAL_LIGHTING_TYPE_UNLIT;
                 }
                 else if (flag == "+translucent")
                 {
-                    surface.translucent = true;
+                    surface.properties.translucent = true;
                 }
             }
         }

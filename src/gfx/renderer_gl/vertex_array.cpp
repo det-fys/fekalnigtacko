@@ -7,19 +7,20 @@ struct VertexAttribInfo {
     GLuint index;
     GLint size;
     GLenum type;
+    bool integer;
     GLboolean normalized;
     size_t byte_size;
 };
 
 // Informace o jednotlivych vertex atributech
 static const VertexAttribInfo s_ATTR_INFO[] = {
-    { 0, 3, GL_FLOAT,           GL_FALSE,   sizeof(float) * 3   }, // VA_POSITION
-    { 1, 3, GL_FLOAT,           GL_FALSE,   sizeof(float) * 3   }, // VA_NORMAL
-    { 2, 4, GL_UNSIGNED_BYTE,   GL_TRUE,    4                   }, // VA_COLOR
-    { 3, 2, GL_FLOAT,           GL_FALSE,   sizeof(float) * 2   }, // VA_UV
-	{ 4, 2, GL_FLOAT,           GL_FALSE,   sizeof(float) * 2   }, // VA_LIGHTMAP_UV
-    { 5, 4, GL_INT,             GL_FALSE,   sizeof(int32_t) * 4 }, // VA_BONE_INDICES
-	{ 6, 4, GL_FLOAT,           GL_FALSE,   sizeof(float) * 4   }, // VA_BONE_WEIGHTS
+    { 0, 3, GL_FLOAT,           false,  GL_FALSE,   sizeof(float) * 3   }, // VA_POSITION
+    { 1, 3, GL_FLOAT,           false,  GL_FALSE,   sizeof(float) * 3   }, // VA_NORMAL
+    { 2, 4, GL_UNSIGNED_BYTE,   false,  GL_TRUE,    4                   }, // VA_COLOR
+    { 3, 2, GL_FLOAT,           false,  GL_FALSE,   sizeof(float) * 2   }, // VA_UV
+	{ 4, 2, GL_FLOAT,           false,  GL_FALSE,   sizeof(float) * 2   }, // VA_LIGHTMAP_UV
+    { 5, 4, GL_UNSIGNED_BYTE,   true,   GL_FALSE,   4                   }, // VA_BONE_INDICES
+	{ 6, 4, GL_FLOAT,           false,  GL_FALSE,   sizeof(float) * 4   }, // VA_BONE_WEIGHTS
 };
 
 // Pocet typu vertex atributu
@@ -50,7 +51,7 @@ gfx::VertexArray::VertexArray(int attrs, int flags) : m_usage(GL_STATIC_DRAW), m
         if (attrs & (1 << i)) {
             glEnableVertexAttribArray(info.index);
 
-            if (info.type != GL_INT)
+            if (!info.integer)
             {
                 glVertexAttribPointer(info.index, info.size, info.type, info.normalized, stride, (const void*)offset);
             }

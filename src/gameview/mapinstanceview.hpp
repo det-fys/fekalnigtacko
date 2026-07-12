@@ -37,6 +37,8 @@ public:
     bool IsLoaded() const { return loader_.get() == nullptr; }
     int GetLoadingPercent() const;
 
+    float GetChunkSize() const { return (IsLoaded() && map_) ? map_->GetChunkSize() : 1.0f; }
+
     void Draw(const game::view::DrawArgs& args) const;
 
     void EnableObj(net::ObjNum num, bool enable);

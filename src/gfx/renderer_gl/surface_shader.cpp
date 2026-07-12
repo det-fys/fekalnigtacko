@@ -231,7 +231,7 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
     if (flags & SRF_SKELETAL) // skeletal deform
     {
         vert_attributes += R"GLSL(
-            layout (location = 5) in ivec4 a_bone_ids;
+            layout (location = 5) in uvec4 a_bone_ids;
             layout (location = 6) in vec4 a_bone_weights;
         )GLSL";
 
@@ -244,8 +244,8 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
         vert_pos_calc = R"GLSL(
             mat4 bone_transform = mat4(0.0);
             for (int i = 0; i < 4; ++i) {
-                int bone_id = a_bone_ids[i];
-                if (bone_id >= 0) {
+                uint bone_id = a_bone_ids[i];
+                if (bone_id < 255U) {
                     bone_transform += u_bone_matrices[bone_id] * a_bone_weights[i];
                 }
             }

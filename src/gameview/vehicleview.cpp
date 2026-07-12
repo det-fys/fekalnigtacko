@@ -98,13 +98,12 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
     }
 
     UpdateSounds();
-    UpdateWindows();
     UpdateLights(info.delta_time);
 }
 
 void game::view::VehicleView::Draw(const DrawArgs& args)
 {
-    if (args.frustum.IsSphereVisible(Sphere{ root_.GetGlobalPosition(), 5.0f }))
+    if (args.ctx.frustum.IsSphereVisible(Sphere{ root_.GetGlobalPosition(), 5.0f }))
     {
         Super::Draw(args);
         DrawBaseModel(args);
@@ -127,39 +126,31 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
 
 void game::view::VehicleView::InitMesh()
 {
-    auto orig_surfaces = model_view_->GetSurfaces();
-    surfaces_.assign(orig_surfaces.begin(), orig_surfaces.end());
-
-    gfx::DeformGridInfo info{};
-    info.min = glm::vec3(-1.0f, -2.5f, 0.10f);
-    info.max = glm::vec3(1.0f, 2.0f, 1.8f);
-    info.res = glm::ivec3(8, 16, 8);
-    info.max_offset = 0.1f;
-    deform_ = std::make_unique<VehicleDeformView>(info);
-
-    for (auto& surface : surfaces_)
+    // create broken window material
     {
-        surface.deform_tex = deform_->tex;
-        surface.sflags |= gfx::SF_DEFORM_GRID;
+        gfx::MaterialInfo info{};
+        info.texture = assets::AssetManager::GetInstance().Get<gfx::Texture>("carbrokenwindows");
+        info.properties.blend = gfx::MATERIAL_BLEND_TYPE_OPACITY;
+        info.properties.twosided = true;
+        broken_window_material_.emplace(info);
     }
 
-    // for (size_t i = 0; i < 20; ++i)
-    // {
-    //     glm::vec3 pos(RandomFloat(-1.0f, 1.0f), RandomFloat(-2.0f, 2.0f), RandomFloat(0.0f, 2.0f));
-    //     glm::vec3 impulse(RandomFloat(-1.0f, 1.0f), RandomFloat(-1.0f, 1.0f), RandomFloat(-1.0f, 1.0f));
-    //     impulse *= 0.05f;
+    // init deform
+    {
+        gfx::DeformGridInfo info{};
+        info.min = glm::vec3(-1.0f, -2.5f, 0.10f);
+        info.max = glm::vec3(1.0f, 2.0f, 1.8f);
+        info.res = glm::ivec3(8, 16, 8);
+        info.max_offset = 0.1f;
+        deform_.emplace(info);
+    }
 
-    //     deform_->grid.ApplyImpulse(pos, impulse, 1.0f);
-    // }
-
-    deform_->tex->SetData(deform_->grid.GetData());
+    deform_->UpdateTexture();
 
     // spz
-    size_t idx;
-    if (model_->GetModel()->GetSurfaceIndex("spz", idx))
-    {
-        surfaces_[idx].texture = spz_.GetTexture();
-    }
+    auto& model = *model_->GetModel();
+    model.GetSurfaceIndex("carwindows", window_surface_idx_);
+    model.GetSurfaceIndex("spz", spz_surface_idx_);
 }
 
 bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
@@ -327,7 +318,7 @@ bool game::view::VehicleView::ReadDeformSync(net::InMessage& msg)
         }
     }
 
-    deform_->tex->SetData(deform_->grid.GetData());
+    deform_->UpdateTexture();
 
     return true;
 }
@@ -338,13 +329,12 @@ bool game::view::VehicleView::ProcessDeformMsg(net::InMessage& msg)
     if (!net::ReadPositionQ(msg, pos_q) || !net::ReadPositionQ(msg, deform_q))
         return false;
 
-
     glm::vec3 pos, deform;
     net::DecodePosition(pos_q, pos);
     net::DecodePosition(deform_q, deform);
 
     deform_->grid.ApplyImpulse(pos, deform, 0.3f);
-    deform_->tex->SetData(deform_->grid.GetData());
+    deform_->UpdateTexture();
 
     //debug_deforms_.emplace_back(std::make_tuple(pos, deform));
 
@@ -441,20 +431,6 @@ void game::view::VehicleView::UpdateSounds()
     }
 }
 
-void game::view::VehicleView::UpdateWindows()
-{
-    if ((flags_ & VF_BROKENWINDOWS) && !windows_broken_)
-    {
-        windows_broken_ = true;
-
-        size_t idx;
-        if (model_->GetModel()->GetSurfaceIndex("carwindows", idx))
-        {
-            surfaces_[idx].texture = assets::AssetManager::GetInstance().Get<gfx::Texture>("carbrokenwindows");
-        }
-    }
-}
-
 void game::view::VehicleView::UpdateLights(float delta_t)
 {
     float max_delta = delta_t * 10.0f;
@@ -503,14 +479,34 @@ void game::view::VehicleView::DrawBaseModel(const DrawArgs& args) const
 
     // base model
     const glm::vec4* colors = exploded ? &destroyed_colors_[0] : &colors_[0];
-    for (const auto& surface : surfaces_)
+
+    gfx::DrawSurfaceCmd cmd{};
+    cmd.mesh = model_view_->GetMesh().GetID();
+    cmd.matrix = &root_.matrix;
+    cmd.colors = {colors, VCS__COUNT};
+
+    auto& dlist = args.ctx.dlist;
+    auto surfaces = model_view_->GetSurfaces();
+
+    for (size_t i = 0; i < surfaces.size(); ++i)
     {
-        gfx::DrawSurfaceCmd cmd;
-        cmd.surface = &surface;
-        cmd.matrices = &root_.matrix;
-        cmd.color = colors;
-        cmd.num_colors = SD_MAX_COLORS;
-        args.dlist.AddSurface(cmd);
+        auto& surface = surfaces[i];
+
+        cmd.tri_offset = surface.tri_offset;
+        cmd.tri_count = surface.tri_count;
+        cmd.material = surface.material->GetID();
+
+        if (i == window_surface_idx_)
+        {
+            if (flags_ & VF_BROKENWINDOWS)
+                cmd.material = broken_window_material_->GetID();
+        }
+        else if (i == spz_surface_idx_)
+        {
+            cmd.material = spz_.GetMaterialID();
+        }
+
+        dlist.AddSurface(cmd);
     }
 }
 
@@ -522,21 +518,14 @@ void game::view::VehicleView::DrawWheels(const DrawArgs& args) const
     const auto& wheels = model_->GetWheels();
     for (size_t i = 0; i < wheels.size(); ++i)
     {
-        auto surfaces = wheels_[i].model->GetSurfaces();
-        for (const auto& surface : surfaces)
-        {
-            gfx::DrawSurfaceCmd cmd;
-            cmd.surface = &surface;
-            cmd.matrices = &wheels_[i].node.matrix;
-            cmd.color = &wheels_[i].color;
-            cmd.num_colors = 1;
-            args.dlist.AddSurface(cmd);
-        }
+        wheels_[i].model->Draw(args.ctx, wheels_[i].node.matrix, {&wheels_[i].color, 1});
     }
 }
 
 void game::view::VehicleView::DrawLights(const DrawArgs& args) const
 {
+    auto& dlist = args.ctx.dlist;
+
     if ((flags_ & VF_EXPLODED) > 0)
         return;
     
@@ -551,18 +540,10 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
         // cones & coronas
         for (size_t i = 0; i < num_headlights_; ++i)
         {
-            auto surfaces = light_cone_mdl_->GetSurfaces();
-            for (const auto& surface : surfaces)
-            {
-                gfx::DrawSurfaceCmd cmd;
-                cmd.surface = &surface;
-                cmd.matrices = &light_cone_node_[i].matrix;
-                cmd.color = &headlight_cone_color_;
-                args.dlist.AddSurface(cmd);
-            }
+            light_cone_mdl_->Draw(args.ctx, light_cone_node_[i].matrix, {&headlight_cone_color_, 1});
 
             spotlight_pos += light_cone_node_[i].GetGlobalPosition();
-            args.dlist.AddCorona(root_.matrix * glm::vec4(headlight_pos_[i], 1.0f), forward, spotlight_color, 1.0f);
+            dlist.AddCorona(root_.matrix * glm::vec4(headlight_pos_[i], 1.0f), forward, spotlight_color, 1.0f);
         }
 
         // spotlight
@@ -571,8 +552,8 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
             spotlight_pos /= static_cast<float>(num_headlights_);
 
             // spotlight
-            args.dlist.AddSpotLight(spotlight_pos, spotlight_color, 30.0f, forward, glm::radians(12.0f),
-                                    glm::radians(30.0f));
+            dlist.AddSpotLight(spotlight_pos, spotlight_color, 30.0f, forward, glm::radians(12.0f),
+                               glm::radians(30.0f));
         }
     }
 
@@ -581,10 +562,9 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
         // REAR LIGHTS
         for (size_t i = 0; i < num_rearlights_; ++i)
         {
-            args.dlist.AddCorona(root_.matrix * glm::vec4(rearlight_pos_[i], 1.0f), -forward,
-                                 glm::vec3(1.0f, 0.2f, 0.2f) *
-                                     (headlights_factor_ * 0.5f + braking_lights_factor_ * 0.7f),
-                                 0.3f + braking_lights_factor_ * 0.7f);
+            dlist.AddCorona(root_.matrix * glm::vec4(rearlight_pos_[i], 1.0f), -forward,
+                            glm::vec3(1.0f, 0.2f, 0.2f) * (headlights_factor_ * 0.5f + braking_lights_factor_ * 0.7f),
+                            0.3f + braking_lights_factor_ * 0.7f);
         }
     }
 
@@ -593,8 +573,8 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
         // BRAKING LIGHT
         for (size_t i = 0; i < num_brakinglights_; ++i)
         {
-            args.dlist.AddCorona(root_.matrix * glm::vec4(brakinglights_pos_[i], 1.0f), -forward,
-                                 glm::vec3(1.0f, 0.2f, 0.2f) * braking_lights_factor_, 1.0f);
+            dlist.AddCorona(root_.matrix * glm::vec4(brakinglights_pos_[i], 1.0f), -forward,
+                            glm::vec3(1.0f, 0.2f, 0.2f) * braking_lights_factor_, 1.0f);
         }
     }
 
@@ -603,8 +583,8 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
         // REVERSE LIGHT
         for (size_t i = 0; i < num_reverselights_; ++i)
         {
-            args.dlist.AddCorona(root_.matrix * glm::vec4(reverselights_pos_[i], 1.0f), -forward,
-                                 glm::vec3(reverse_light_factor_), 1.0f);
+            dlist.AddCorona(root_.matrix * glm::vec4(reverselights_pos_[i], 1.0f), -forward,
+                            glm::vec3(reverse_light_factor_), 1.0f);
         }
     }
 }

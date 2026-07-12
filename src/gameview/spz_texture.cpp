@@ -4,10 +4,9 @@
 #include <tuple>
 #include <span>
 
-#include <stb_image.h>
 #include <glm/glm.hpp>
 
-#include "utils/files.hpp"
+#include "utils/image.hpp"
 
 constexpr size_t SPZ_ATLAS_WIDTH = 256;
 constexpr size_t SPZ_ATLAS_HEIGHT = 256;
@@ -21,18 +20,14 @@ static const std::vector<uint32_t>& GetSpzAtlasData()
 
     if (data.empty())
     {
-        std::string content = fs::ReadFileAsString("data/spz.png");
+        auto img = LoadImage("data/spz.png");
 
-        int width, height, channels;
-        unsigned char* data_u8 = stbi_load_from_memory(reinterpret_cast<const unsigned char*>(content.data()),
-                                                       content.size(), &width, &height, &channels, 4);
-
-        if (width != SPZ_ATLAS_WIDTH || height != SPZ_ATLAS_HEIGHT)
+        if (img.width != SPZ_ATLAS_WIDTH || img.height != SPZ_ATLAS_HEIGHT)
         {
             throw std::runtime_error("Invalid spz atlas dimensions!");
         }
 
-        auto data_view = std::span<const uint32_t>{reinterpret_cast<const uint32_t*>(data_u8), SPZ_ATLAS_WIDTH * SPZ_ATLAS_HEIGHT};
+        auto data_view = std::span<const uint32_t>{reinterpret_cast<const uint32_t*>(img.data.data()), SPZ_ATLAS_WIDTH * SPZ_ATLAS_HEIGHT};
         data.assign(data_view.begin(), data_view.end());
     }
 
@@ -41,7 +36,17 @@ static const std::vector<uint32_t>& GetSpzAtlasData()
 
 game::view::SpzTexture::SpzTexture()
 {
-    tex_ = std::make_shared<gfx::Texture>();
+    gfx::TextureDescriptor texture_desc{};
+    texture_desc.width = SPZ_TEXTURE_WIDTH;
+    texture_desc.height = SPZ_TEXTURE_HEIGHT;
+    texture_desc.filter = gfx::TEXTURE_FILTER_NEAREST;
+    texture_desc.mipmaps = gfx::TEXTURE_MIPMAP_TYPE_NONE;
+    texture_ = std::make_shared<gfx::Texture>(texture_desc);
+
+    gfx::MaterialInfo material_info{};
+    material_info.texture = texture_;
+    material_.emplace(material_info);
+
     Render("", 0, 0, 0);
 }
 
@@ -205,6 +210,5 @@ void game::view::SpzTexture::Render(std::string_view text, uint32_t color_mount,
         }
     }
 
-    tex_->SetData(SPZ_TEXTURE_WIDTH, SPZ_TEXTURE_HEIGHT, data.data(), GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, false, false);
-
+    texture_->SetData({reinterpret_cast<const uint8_t*>(data.data()), data.size() * sizeof(data[0])});
 }

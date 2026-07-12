@@ -5,7 +5,7 @@
 #include "assets/item.hpp"
 #include "assets/effect.hpp"
 #include "game/skeletoninstance.hpp"
-#include "skinning_ubo.hpp"
+#include "gfx/skeleton_pose.hpp"
 #include "game/character_anim_state.hpp"
 #include "game/character_sync.hpp"
 
@@ -53,7 +53,6 @@ private:
     bool ReadState(net::InMessage* msg);
 
     SurfaceMask GetSurfaceMask(const std::string& name);
-    void UpdateSurfaceMask();
 
     void AddClothes(const std::string& name, const glm::vec3& color);
 
@@ -69,12 +68,11 @@ private:
 
     std::shared_ptr<const ModelView> basemodel_;
     SkeletonInstance sk_;
-    SkinningUBO ubo_;
-    bool ubo_valid_ = false;
+    std::optional<gfx::SkeletonPose> skeleton_pose_;
+    bool pose_valid_ = false;
 
     CharacterAnimState animstate_;
 
-    uint32_t surfacemask_ = 0xFFFFFFFF;
     std::vector<CharacterViewClothes> clothes_;
 
     // sync

@@ -116,19 +116,41 @@ void game::view::ClientSession::Update(const UpdateInfo& info)
     hud_.Update(info.delta_time);
 }
 
-void game::view::ClientSession::Draw(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui)
+void game::view::ClientSession::Draw(const gfx::DrawContext& ctx, gui::Context& gui)
 {
     if (world_)
     {
-        DrawWorld(dlist, params, gui);
+        DrawWorld(ctx, gui);
 
-        if (world_->IsLoaded())
+        if (ctx.pass == gfx::DRAW_PASS_MAIN && world_->IsLoaded())
         {
             hud_.Draw(gui);
         }
     }
 
-    DrawMenus(gui);
+    if (ctx.pass == gfx::DRAW_PASS_MAIN)
+    {
+        DrawMenus(gui);
+    }
+}
+
+gfx::Environment game::view::ClientSession::GetEnv() const
+{
+    return world_ ? world_->GetEnv() : gfx::Environment{};
+}
+
+float game::view::ClientSession::GetMapChunkSize() const
+{
+    return world_ ? world_->GetMapChunkSize() : 1.0f;
+}
+
+gfx::CameraParams game::view::ClientSession::GetCameraParams() const
+{
+    gfx::CameraParams cam{};
+    cam.eye = camera_controller_.GetEye();
+    cam.dir = camera_controller_.GetForward();
+    cam.fov = camera_controller_.GetFov();
+    return cam;
 }
 
 audio::Master& game::view::ClientSession::GetAudioMaster() const
@@ -336,32 +358,16 @@ void game::view::ClientSession::UpdateCamera(const UpdateInfo& info)
     {
         character->SetVisible(!camera_controller_.ShouldDrawScope());
     }
+
+    // update audio
+    glm::mat4 camera_world = glm::inverse(camera_controller_.GetViewMatrix());
+    GetAudioMaster().SetListenerOrientation(camera_world);
 }
 
-void game::view::ClientSession::DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui)
+void game::view::ClientSession::DrawWorld(const gfx::DrawContext& ctx, gui::Context& gui)
 {
-    // glm::mat4 view = glm::lookAt(glm::vec3(15.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, -13.0f), glm::vec3(0.0f,
-    // 0.0f, 1.0f));
-    float aspect = static_cast<float>(params.screen_width) / static_cast<float>(params.screen_height);
-
-    const float farplane = 3000.0f;
-
-    glm::mat4 proj = glm::perspective(glm::radians(camera_controller_.GetFov() * 0.5f), aspect, 0.1f, farplane);
-    glm::mat4 view = camera_controller_.GetViewMatrix();
-
-    params.view = view;
-    params.proj = proj;
-    params.view_proj = proj * view;
-    params.cam_pos = camera_controller_.GetEye();
-
-    // glm::mat4 fake_view_proj = glm::perspective(glm::radians(30.0f), aspect, 0.1f, 3000.0f) * view;
-
-    game::view::DrawArgs draw_args(dlist, params.env, gui, params.view_proj, params.cam_pos,
-                                   glm::ivec2(params.screen_width, params.screen_height), farplane, 500.0f);
+    DrawArgs draw_args(ctx, gui);
     world_->Draw(draw_args);
-
-    glm::mat4 camera_world = glm::inverse(view);
-    GetAudioMaster().SetListenerOrientation(camera_world);
 }
 
 void game::view::ClientSession::SendInput(game::PlayerInputType type, bool enable)

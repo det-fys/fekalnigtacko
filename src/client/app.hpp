@@ -19,6 +19,7 @@
 #include "gui/chat.hpp"
 #include "utils/keys.hpp"
 #include "utils/cmdlinestream.hpp"
+#include "gfx/scene.hpp"
 
 struct ChatMessage
 {
@@ -42,19 +43,24 @@ enum AppState
     APP_STATE_DISCONNECTED_LOCAL,
 };
 
-class App : public net::ClientInterfaceCallback
+class App : public net::ClientInterfaceCallback, public gfx::Scene
 {
 public:
     App(const std::string& settings_path);
 
+    // ClientInterfaceCallback
     virtual void OnClientConnect() override;
     virtual void OnClientMessage(std::string_view data) override;
     virtual void OnClientDisconnect() override;
 
+    // Scene
+    virtual void Draw(const gfx::DrawContext& ctx) override;
+    virtual gfx::Environment GetSceneEnvironment() override;
+    virtual float GetMapChunkSize() override;
+
     void Frame();
 
     void SetTime(float time) { time_ = time; }
-    void SetViewportSize(int width, int height) { viewport_size_ = {width, height}; }
 
     void SetUrl(const std::string& url) { url_ = url; }
     void SetUserName(const std::string& username) { username_ = username; }
@@ -108,14 +114,11 @@ private:
     Settings settings_;
 
     float time_ = 0.0f;
-    glm::ivec2 viewport_size_ = {800, 600};
     bool fullscreen_ = false;
 
     float prev_time_ = 0.0f;
     float delta_time_ = 0.0f;
 
-    gfx::Renderer renderer_;
-    gfx::DrawList dlist_;
     gui::Context gui_;
     audio::Master audiomaster_;
 

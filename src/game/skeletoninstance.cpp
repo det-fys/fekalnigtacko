@@ -95,6 +95,18 @@ void game::SkeletonInstance::UpdateBoneMatrices()
     }
 }
 
+void game::SkeletonInstance::ComputeBoneMatrices(std::span<glm::mat4> data)
+{
+    size_t num_mats = std::min(skeleton_->GetNumBones(), static_cast<size_t>(data.size()));
+
+    for (size_t i = 0; i < num_mats; ++i)
+    {
+        const auto& bone = skeleton_->GetBone(i);
+        const TransformNode& node = GetBoneNode(i);
+        data[i] = node.matrix * bone.inv_bind_matrix;
+    }
+}
+
 void game::SkeletonInstance::SetupBoneNodes()
 {
     size_t num_bones = skeleton_->GetNumBones();

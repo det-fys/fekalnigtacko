@@ -1,7 +1,8 @@
 #pragma once
 
-#include "gfx/texture.hpp"
+#include "gfx/material.hpp"
 #include <string_view>
+#include <optional>
 
 namespace game::view
 {
@@ -13,13 +14,11 @@ public:
 
     void Render(std::string_view text, uint32_t color_mount, uint32_t color_bg, uint32_t color_fg);
 
-    std::shared_ptr<const gfx::Texture> GetTexture() { return tex_; }
+    gfx::MaterialID GetMaterialID() const { return material_->GetID(); }
 
 private:
-
-
-private:
-    std::shared_ptr<gfx::Texture> tex_;
+    std::shared_ptr<gfx::Texture> texture_;
+    std::optional<gfx::Material> material_;
 
 };
 

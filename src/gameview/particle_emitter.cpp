@@ -35,13 +35,22 @@ void game::view::ParticleEmitter::Update(float delta_time)
 
 void game::view::ParticleEmitter::Draw(const DrawArgs& args)
 {
+    const auto& quad_surface = quad_model_->GetSurfaces()[0];
+    
+    gfx::DrawSurfaceCmd cmd{};
+    cmd.mesh = quad_model_->GetMesh().GetID();
+    cmd.tri_offset = quad_surface.tri_offset;
+    cmd.tri_count = quad_surface.tri_count;
+    
+    auto& dlist = args.ctx.dlist;
+
     for (auto& particle : particles_)
     {
         // calc matrixa
         // auto forward = args.eye - particle.position;
         // auto right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 0.0f, 1.0f))); 
         // auto up = normalize(glm::cross(right, forward));
-        auto dir = args.eye - particle.position;
+        auto dir = args.ctx.eye - particle.position;
         auto basis = BasisFromDir(dir);
 
         particle.matrix = glm::rotate(glm::mat4(
@@ -51,21 +60,18 @@ void game::view::ParticleEmitter::Draw(const DrawArgs& args)
             glm::vec4(particle.position, 1.0f)
         ), particle.rotation, glm::vec3(0.0f, 1.0f, 0.0f));
 
-        gfx::DrawSurfaceCmd cmd{};
-        cmd.surface = &particle.surface;
-        cmd.matrices = &particle.matrix;
-        cmd.color = &particle.color;
+        cmd.material = particle.material;
+        cmd.matrix = &particle.matrix;
+        cmd.colors = {&particle.color, 1};
         cmd.dist = glm::dot(dir, dir);
-        args.dlist.AddSurface(cmd);
+
+        dlist.AddSurface(cmd);
 
         if (particle.lightcolor.a > 0.01f)
         {
-            args.dlist.AddLight(particle.position, glm::vec3(particle.lightcolor) * particle.color.a,
-                                particle.lightcolor.a);
+            dlist.AddLight(particle.position, glm::vec3(particle.lightcolor) * particle.color.a, particle.lightcolor.a);
         }
     }
-
-
 }
 
 void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effect>& fx, const glm::vec3& pos,
@@ -85,23 +91,12 @@ void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effec
         if (count <= 0)
             continue;
 
-        // steal a quad surface from quad model
-        gfx::Surface surface = quad_model_->GetSurfaces()[0];
-        surface.texture = def.texture;
-        surface.sflags = gfx::SF_2SIDED | gfx::SF_OBJECT_COLOR | gfx::SF_OBJECT_COLOR_MULT | gfx::SF_VERTEX_LIT | gfx::SF_TRANSLUCENT;
-
-        // setup blending
-        if (def.blend == assets::PTB_BLEND_NORMAL)
-            surface.sflags |= gfx::SF_BLEND;
-        else if (def.blend == assets::PTB_BLEND_ADDITIVE)
-            surface.sflags |= gfx::SF_BLEND | gfx::SF_BLEND_ADDITIVE | gfx::SF_UNLIT;
-
         for (int i = 0; i < count; ++i)
         {
             auto& particle = particles_.emplace_back();
             particle.fx = fx;
+            particle.material = def.material->GetID();
 
-            particle.surface = surface;
             particle.time = 0.0f;
 
             glm::vec3 offset_ps(RandomFloat(def.offset_min.x, def.offset_max.x),

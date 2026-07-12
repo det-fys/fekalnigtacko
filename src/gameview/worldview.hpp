@@ -36,6 +36,9 @@ public:
     void Update(const UpdateInfo& info);
     void Draw(const DrawArgs& args);
 
+    gfx::Environment GetEnv() const;
+    float GetMapChunkSize() const;
+
     EntityView* GetEntity(net::EntNum entnum);
 
     float GetTime() const { return time_; }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "client/gl.hpp"
+#include "gl.hpp"
 #include "client/utils.hpp"
 
 namespace gfx

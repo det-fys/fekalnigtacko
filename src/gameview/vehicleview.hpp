@@ -1,5 +1,8 @@
 #pragma once
 
+#include <chrono>
+#include <optional>
+
 #include "entityview.hpp"
 
 #include "assets/vehiclemdl.hpp"
@@ -7,8 +10,7 @@
 #include "game/deform_grid.hpp"
 #include "modelview.hpp"
 #include "spz_texture.hpp"
-
-#include <chrono>
+#include "gfx/deform_texture.hpp"
 
 namespace game::view
 {
@@ -28,9 +30,10 @@ struct VehicleWheelViewInfo
 struct VehicleDeformView
 {
     DeformGrid grid;
-    std::shared_ptr<gfx::DeformTexture> tex;
+    gfx::DeformTexture tex;
 
-    VehicleDeformView(const gfx::DeformGridInfo& info) : grid(info), tex(std::make_shared<gfx::DeformTexture>(info)) {}
+    VehicleDeformView(const gfx::DeformGridInfo& info) : grid(info), tex(gfx::DeformTextureDescriptor{info}) {};
+    void UpdateTexture() { tex.SetData(grid.GetData()); }
 };
 
 enum VehicleColorSlot
@@ -45,6 +48,8 @@ enum VehicleColorSlot
     VCS_REVERSE_LIGHT,
 
     VCS_OTHER,
+
+    VCS__COUNT,
 };
 
 class VehicleView : public EntityView
@@ -73,7 +78,6 @@ private:
     void InitLights();
 
     void UpdateSounds();
-    void UpdateWindows();
     void UpdateLights(float delta_t);
 
     void UpdateDestroyedColors();
@@ -85,9 +89,10 @@ private:
 private:
     std::shared_ptr<const assets::VehicleModel> model_;
     std::shared_ptr<const ModelView> model_view_;
-    std::vector<gfx::Surface> surfaces_;
-    glm::vec4 colors_[SD_MAX_COLORS];
-    glm::vec4 destroyed_colors_[SD_MAX_COLORS];
+    size_t window_surface_idx_ = -1;
+    size_t spz_surface_idx_ = -1;
+    glm::vec4 colors_[VCS__COUNT];
+    glm::vec4 destroyed_colors_[VCS__COUNT];
     glm::vec3 headlight_color_;
 
     game::VehicleSyncState sync_;
@@ -101,8 +106,8 @@ private:
     std::shared_ptr<const audio::Sound> snd_accel_;
     audio::SoundSource* snd_accel_src_ = nullptr;
 
-    bool windows_broken_ = false;
-    std::unique_ptr<VehicleDeformView> deform_;
+    std::optional<gfx::Material> broken_window_material_; // TODO: make this shared somehow?
+    std::optional<VehicleDeformView> deform_;
     std::vector<std::tuple<glm::vec3, glm::vec3>> debug_deforms_;
 
     // lights

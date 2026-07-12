@@ -104,12 +104,14 @@ void game::view::WorldView::Draw(const DrawArgs& args)
 
     map_->Draw(args);
 
+    const auto& frustum = args.ctx.frustum;
+
     for (const auto& [entnum, ent] : ents_)
     {
         if (!ent->IsVisible())
             continue;
 
-        if (!args.frustum.IsSphereVisible(ent->GetBoundingSphere()))
+        if (!frustum.IsSphereVisible(ent->GetBoundingSphere()))
             continue;    
         
         ent->Draw(args);
@@ -117,6 +119,26 @@ void game::view::WorldView::Draw(const DrawArgs& args)
 
     DrawBeams(args);
     emitter_.Draw(args);
+}
+
+gfx::Environment game::view::WorldView::GetEnv() const
+{
+    if (env_)
+    {
+        return env_->GetEnv();
+    }
+
+    gfx::Environment env{};
+    env.clear_color = glm::vec3(0.1f, 0.15f, 0.3f);
+    env.ambient_light = glm::vec3(0.4f, 0.4f, 0.4f);
+    env.sun_color = glm::vec3(0.5f, 0.8f, 1.0f) * 0.4f;
+    env.sun_direction = glm::normalize(glm::vec3(1.0f, 1.0f, -1.0f));
+    return env;
+}
+
+float game::view::WorldView::GetMapChunkSize() const
+{
+    return map_ ? map_->GetChunkSize() : 1.0f;
 }
 
 game::view::EntityView* game::view::WorldView::GetEntity(net::EntNum entnum)
@@ -146,17 +168,7 @@ void game::view::WorldView::DrawEnv(const DrawArgs& args) const
     if (env_)
     {
         env_->Draw(args);
-        return;
     }
-
-    // args.env.clear_color = glm::vec3(0.5f, 0.7f, 1.0f);
-    
-    args.env.clear_color = glm::vec3(0.1f, 0.15f, 0.3f);
-    args.env.ambient_light = glm::vec3(0.4f, 0.4f, 0.4f);
-    args.env.sun_color = glm::vec3(0.5f, 0.8f, 1.0f) * 0.4f;
-    args.env.sun_direction = glm::normalize(glm::vec3(1.0f, 1.0f, -1.0f));
-
-
 }
 
 bool game::view::WorldView::ProcessEnvMsg(net::InMessage& msg)
@@ -349,8 +361,10 @@ void game::view::WorldView::UpdateBeams()
 
 void game::view::WorldView::DrawBeams(const DrawArgs& args) const
 {
+    auto& dlist = args.ctx.dlist;
+
     for (const auto& beam : beams_)
     {
-        args.dlist.AddBeam(beam.start, beam.end, beam.color | 0xFF000000, beam.width);
+        dlist.AddBeam(beam.start, beam.end, beam.color | 0xFF000000, beam.width);
     }
 }

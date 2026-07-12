@@ -43,18 +43,23 @@ void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args) const
     if (!basemodel_view_)
         return;
 
-    args.dlist.SetMapChunkSize(map_->GetChunkSize());
+    const float chunk_radius = glm::length(glm::vec2(map_->GetChunkSize()));
 
-    const float max_dist = args.render_distance + 200.0f;
+    const float min_dist = glm::max(args.ctx.min_distance - chunk_radius, 0.0f);
+    const float min_dist2 = min_dist * min_dist;
+
+    const float max_dist = args.ctx.max_distance + chunk_radius;
     const float max_dist2 = max_dist * max_dist;
 
     for (const auto& chunks = map_->GetChunks(); const auto& chunk : chunks)
     {
         glm::vec3 center = (chunk.aabb.min + chunk.aabb.max) * 0.5f;
-        if (glm::distance2(args.eye, center) > max_dist2)
+        auto dist2 = glm::distance2(args.ctx.eye, center);
+
+        if (dist2 < min_dist2 || dist2 > max_dist2)
             continue;
 
-        if (!args.frustum.IsAABBVisible(chunk.aabb))
+        if (!args.ctx.frustum.IsAABBVisible(chunk.aabb))
             continue;
 
         DrawChunk(args, chunk);
@@ -117,16 +122,18 @@ void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, co
 {
     auto surfaces = basemodel_view_->GetSurfaces();
 
+    gfx::DrawSurfaceCmd cmd{};
+    cmd.mesh = basemodel_view_->GetMesh().GetID();
+    cmd.map_chunk_hash = chunk.light_hash;
+
+    auto& dlist = args.ctx.dlist;
     for (const auto& surface_range : chunk.surfaces)
     {
         auto& surface = surfaces[surface_range.idx];
-
-        gfx::DrawSurfaceCmd cmd{};
-        cmd.surface = &surface;
-        cmd.first = surface_range.first;
-        cmd.count = surface_range.count;
-        cmd.map_chunk_hash = chunk.light_hash;
-        args.dlist.AddSurface(cmd);
+        cmd.material = surface.material->GetID();
+        cmd.tri_offset = surface.tri_offset + surface_range.first;
+        cmd.tri_count = surface_range.count;
+        dlist.AddSurface(cmd);
     }
 
     const auto& objs = map_->GetStaticObjects();
@@ -143,19 +150,10 @@ void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, co
 
         const auto& obj = objs[abs_i];
 
-        if (!args.frustum.IsAABBVisible(obj.aabb))
+        if (!args.ctx.frustum.IsAABBVisible(obj.aabb))
             continue;
 
-        auto surfaces = obj_models_view_[obj.model_idx]->GetSurfaces();
-
-        for (const auto& surface : surfaces)
-        {
-            gfx::DrawSurfaceCmd cmd{};
-            cmd.surface = &surface;
-            cmd.matrices = &obj.node.matrix;
-            // cmd.color_mod = glm::vec4(obj.color, 1.0f);
-            args.dlist.AddSurface(cmd);
-        }
+        obj_models_view_[obj.model_idx]->Draw(args.ctx, obj.node.matrix, {});
     }
 }
 

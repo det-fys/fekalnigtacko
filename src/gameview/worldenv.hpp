@@ -28,6 +28,8 @@ public:
     void SetDayTime(float daytime) { daytime_ = glm::mod(daytime, 24.0f); }
     float GetDayTime() const { return daytime_; }
 
+    const gfx::Environment& GetEnv() const { return env_; }
+
 private:
     void DrawEnvModel(const DrawArgs& args, const ModelView& model, const glm::mat4& matrix, const glm::vec4& color, float dist);
 
@@ -49,6 +51,8 @@ private:
 
     glm::mat4 moon_halfsphere_matrix_;
     glm::vec4 moon_halfsphere_color_;
+
+    gfx::Environment env_{};
 };
 
 

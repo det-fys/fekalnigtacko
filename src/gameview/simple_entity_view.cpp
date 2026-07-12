@@ -60,14 +60,7 @@ void game::view::SimpleEntityView::Draw(const DrawArgs& args)
     if (!model_)
         return;
 
-    auto surfaces = model_->GetSurfaces();
-    for (const auto& surface : surfaces)
-    {
-        gfx::DrawSurfaceCmd cmd;
-        cmd.surface = &surface;
-        cmd.matrices = &root_.matrix;
-        args.dlist.AddSurface(cmd);
-    }
+    model_->Draw(args.ctx, root_.matrix, {});
 }
 
 bool game::view::SimpleEntityView::ReadState(net::InMessage* msg)

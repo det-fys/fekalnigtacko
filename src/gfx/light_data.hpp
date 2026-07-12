@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <cstddef>
 #include <glm/glm.hpp>
-#include "shader_defs.hpp"
 
 namespace gfx
 {
@@ -24,11 +23,5 @@ struct LightArray
     size_t num_lights = 0;
     LightData lights[Size];
 };
-
-//struct LightCache : public LightArray<SD_MAX_LIGHTS>
-//{
-//    glm::vec3 center = glm::vec3(0.0f);
-//    size_t frame = 0;
-//};
 
 }

@@ -165,7 +165,7 @@ void gui::PlayerHud::DrawCrosshair(Context& ctx) const
     auto p0 = glm::round(viewport_size * 0.5f - crosshair_size * 0.5f);
     auto p1 = p0 + crosshair_size;
 
-    ctx.DrawRect(p0, p1, glm::packUnorm4x8(GetCrosshairColor()), crosshair_texture_.get());
+    ctx.DrawRect(p0, p1, glm::packUnorm4x8(GetCrosshairColor()), crosshair_texture_->GetID());
 }
 
 void gui::PlayerHud::DrawScope(Context& ctx) const
@@ -198,7 +198,7 @@ void gui::PlayerHud::DrawScope(Context& ctx) const
     glm::vec2 p2 = p0 + size;
 
     auto color = GetCrosshairColor();
-    ctx.DrawRect(p0, p2, glm::packUnorm4x8(color), scope_texture_.get());
+    ctx.DrawRect(p0, p2, glm::packUnorm4x8(color), scope_texture_->GetID());
     
 }
 

@@ -4,14 +4,7 @@
 
 game::view::ModelView::ModelView(std::shared_ptr<const assets::Model> model) : model_(std::move(model))
 {
-    // init mesh flags
-    mflags_ = 0;
-    if (model_->GetSkeleton())
-    {
-        mflags_ = gfx::MF_SKELETAL;
-    }
-
-    CreateVA();
+    CreateMesh();
     CreateSurfaces();
 }
 
@@ -20,103 +13,80 @@ std::shared_ptr<game::view::ModelView> game::view::ModelView::Load(const std::st
     return std::make_shared<ModelView>(assets::AssetManager::GetInstance().Get<assets::Model>(name));
 }
 
-static int GetVertexAttrFlags(gfx::MeshFlags mflags)
+void game::view::ModelView::Draw(const gfx::DrawContext& ctx, const glm::mat4& matrix,
+                                 std::span<const glm::vec4> colors, gfx::SkeletonPoseID pose_id,
+                                 gfx::DeformTextureID deform_id, uint32_t surface_mask) const
 {
-    int attrs = gfx::VA_POSITION | gfx::VA_NORMAL | gfx::VA_UV;
+    auto d = ctx.eye - glm::vec3(matrix[3]);
 
-    if (mflags & gfx::MF_LIGHTMAP_UV)
+    gfx::DrawSurfaceCmd cmd{};
+    cmd.matrix = &matrix;
+    cmd.colors = colors;
+    cmd.pose = pose_id;
+    cmd.deform_tex = deform_id;
+    cmd.dist = glm::dot(d, d);
+
+    auto& dlist = ctx.dlist;
+
+    for (size_t i = 0; i < surfaces_.size(); ++i)
     {
-        attrs |= gfx::VA_LIGHTMAP_UV;
-    }
+        if ((surface_mask & (1 << i)) == 0)
+            continue;
+        
+        const auto& surface = surfaces_[i];
 
-    if (mflags & gfx::MF_SKELETAL)
-    {
-        attrs |= gfx::VA_BONE_INDICES | gfx::VA_BONE_WEIGHTS;
+        cmd.mesh = mesh_->GetID();
+        cmd.tri_offset = surface.tri_offset;
+        cmd.tri_count = surface.tri_count;
+        cmd.material = surface.material->GetID();
+        dlist.AddSurface(cmd);
     }
-
-    return attrs;
 }
 
-void game::view::ModelView::CreateVA()
+void game::view::ModelView::CreateMesh()
 {
-    auto verts = model_->GetVertices();
-    auto tris = model_->GetTriangles();
+    bool skeletal = model_->GetSkeleton().get() != nullptr;
 
-    // Generate VBO data
-    std::vector<char> buffer;
-    for (const auto& vert : verts)
-    {
-        BufferPut(buffer, vert.pos);
-        BufferPut(buffer, vert.normal);
-        BufferPut(buffer, vert.uv);
+    auto& verts = model_->GetVertices();
+    auto& tris = model_->GetTriangles();
 
-        if (mflags_ & gfx::MF_LIGHTMAP_UV)
-        {
-            BufferPut(buffer, vert.lightmap_uv);
-        }
+    gfx::MeshDescriptor desc{};
+    desc.attributes = gfx::MESH_VERTEX_ATTR_POSITION | gfx::MESH_VERTEX_ATTR_NORMAL | gfx::MESH_VERTEX_ATTR_UV0 |
+                      (skeletal ? gfx::MESH_VERTEX_ATTR_BONE_DATA : 0);
+    desc.use_index_buffer = true;
 
-        if (mflags_ & gfx::MF_SKELETAL)
-        {
-            for (int i = 0; i < 4; ++i)
-            {
-                BufferPut(buffer, static_cast<int32_t>(vert.bones[i].bone_index));
-            }
+    mesh_.emplace(desc);
 
-            for (int i = 0; i < 4; ++i)
-            {
-                BufferPut(buffer, vert.bones[i].weight);
-            }
-        }
-    }
+    gfx::MeshVertexData vertex_data{};
+    vertex_data.count = verts.positions.size();
+    vertex_data.position = verts.positions;
+    vertex_data.normal = verts.normals;
+    vertex_data.uv0 = verts.uvs;
+    vertex_data.bone = verts.bones;
+    mesh_->SetVertexData(vertex_data);
 
-    // populate VA
-    std::shared_ptr<gfx::VertexArray> va =
-        std::make_shared<gfx::VertexArray>(GetVertexAttrFlags(mflags_), gfx::VF_CREATE_EBO);
-    va->SetVBOData(buffer.data(), buffer.size());
-    va->SetIndices(reinterpret_cast<const GLuint*>(tris.data()), tris.size() * 3U);
-
-    va_ = std::move(va);
+    gfx::MeshTriangleData triangle_data{};
+    triangle_data.triangles = std::span<const gfx::MeshTriangle>{reinterpret_cast<const gfx::MeshTriangle*>(tris.data()), tris.size()};
+    mesh_->SetTriangleData(triangle_data);
 }
 
 void game::view::ModelView::CreateSurfaces()
 {
     for (auto surfaces = model_->GetSurfaces(); const auto& mdl_surface : surfaces)
     {
-        gfx::Surface surface{};
-        surface.va = va_;
-        surface.first = mdl_surface.first_tri;
-        surface.count = mdl_surface.num_tris;
-        surface.mflags = mflags_;
+        gfx::MaterialInfo material_info{};
+        material_info.properties = mdl_surface.properties;
 
         // texture
         if (!mdl_surface.texture_name.empty())
         {
-            surface.texture = assets::AssetManager::GetInstance().Get<gfx::Texture>(mdl_surface.texture_name);
+            material_info.texture = assets::AssetManager::GetInstance().Get<gfx::Texture>(mdl_surface.texture_name);
         }
 
-        if (mdl_surface.two_sided)
-            surface.sflags |= gfx::SF_2SIDED;
-
-        if (mdl_surface.object_color)
-            surface.sflags |= gfx::SF_OBJECT_COLOR;
-
-        if (mdl_surface.object_color_mult)
-            surface.sflags |= gfx::SF_OBJECT_COLOR_MULT;
-
-        if (mdl_surface.multicolor)
-            surface.sflags |= gfx::SF_MULTICOLOR;
-
-        if (mdl_surface.blend)
-            surface.sflags |= gfx::SF_BLEND;
-
-        if (mdl_surface.blend_additive)
-            surface.sflags |= gfx::SF_BLEND_ADDITIVE;
-
-        if (mdl_surface.unlit)
-            surface.sflags |= gfx::SF_UNLIT;
-
-        if (mdl_surface.translucent)
-            surface.sflags |= gfx::SF_TRANSLUCENT;
+        ModelViewSurface surface{};
+        surface.material = std::make_shared<gfx::Material>(material_info);
+        surface.tri_offset = mdl_surface.tri_offset;
+        surface.tri_count = mdl_surface.tri_count;
 
         surfaces_.emplace_back(std::move(surface));
     }

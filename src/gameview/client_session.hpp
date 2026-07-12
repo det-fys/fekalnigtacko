@@ -3,8 +3,7 @@
 #include <memory>
 
 #include "worldview.hpp"
-#include "gfx/draw_list.hpp"
-#include "gfx/renderer.hpp"
+#include "gfx/scene.hpp"
 #include "net/defs.hpp"
 #include "net/inmessage.hpp"
 #include "net/msg_producer.hpp"
@@ -33,7 +32,12 @@ public:
     void ChatInput(std::string_view line);
 
     void Update(const UpdateInfo& info);
-    void Draw(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui);
+    void Draw(const gfx::DrawContext& ctx, gui::Context& gui);
+
+    gfx::Environment GetEnv() const;
+    float GetMapChunkSize() const;
+
+    gfx::CameraParams GetCameraParams() const;
 
     const WorldView* GetWorld() const { return world_.get(); } 
     audio::Master& GetAudioMaster() const;
@@ -49,7 +53,7 @@ private:
     bool ProcessMenuMsg(net::InMessage& msg);
 
     void UpdateCamera(const UpdateInfo& info);
-    void DrawWorld(gfx::DrawList& dlist, gfx::DrawListParams& params, gui::Context& gui);
+    void DrawWorld(const gfx::DrawContext& ctx, gui::Context& gui);
     
     void SendInput(game::PlayerInputType type, bool enable);
     void SendViewAngles(float time);

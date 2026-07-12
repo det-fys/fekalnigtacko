@@ -1,5 +1,7 @@
 #include "loading_screen.hpp"
 
+#include <string>
+
 void gui::DrawLoadingScreen(Context& ctx, int percent)
 {
     float margin = 50.0f;

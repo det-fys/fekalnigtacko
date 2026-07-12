@@ -11,8 +11,7 @@ namespace game::view
 struct Particle
 {
     std::shared_ptr<const assets::Effect> fx; // to keep resources alive
-
-    gfx::Surface surface;
+    gfx::MaterialID material;
 
     // instance specific
     float time;

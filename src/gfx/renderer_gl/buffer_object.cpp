@@ -21,9 +21,13 @@ void gfx::BufferObject::SetData(const void* data, size_t size) {
     Bind();
 
     if (size > m_size)
+    {
         glBufferData(m_target, size, data, m_usage);
+    }
     else if (size > 0)
+    {
         glBufferSubData(m_target, 0, size, data);
+    }
 
     m_size = size;
 }

@@ -4,8 +4,8 @@
 #include <cassert>
 #include <memory>
 
-#include "client/gl.hpp"
-#include "client/utils.hpp"
+#include "gl.hpp"
+#include "utils/defs.hpp"
 #include "buffer_object.hpp"
 
 namespace gfx
@@ -30,7 +30,7 @@ namespace gfx
 	};
 
 	// VertexArray - trida pro praci s modely
-	class VertexArray : public NonCopyableNonMovable
+	class VertexArray
 	{
 		GLuint m_vao;// , m_vbo, m_ebo;
 		std::unique_ptr<BufferObject> m_vbo;
@@ -40,6 +40,8 @@ namespace gfx
 	
 	public:
 		VertexArray(int attrs, int flags);
+        DELETE_COPY_MOVE(VertexArray);
+
 		~VertexArray();
 
 		// Nastavi data do VBO

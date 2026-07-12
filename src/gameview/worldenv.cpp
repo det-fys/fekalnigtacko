@@ -148,66 +148,64 @@ void game::view::WorldEnv::Draw(const DrawArgs& args)
             kf2 = &env_kfs[(i + 1) % num_kfs];
         }
     }
-    
+
     float t2 = kf2->daytime;
     if (t2 < daytime_)
         t2 += 24.0f;
 
     float t = (daytime_ - kf1->daytime) / (t2 - kf1->daytime);
 
+    // env_.clear_color = glm::vec3(0.1f, 0.15f, 0.3f);
+    // env_.ambient_light = glm::vec3(0.4f, 0.4f, 0.4f);
+    // env_.sun_color = glm::vec3(0.5f, 0.8f, 1.0f) * 0.4f;
+    // env_.sun_direction = glm::normalize(glm::vec3(1.0f, 1.0f, -1.0f));
 
-    // args.env.clear_color = glm::vec3(0.1f, 0.15f, 0.3f);
-    // args.env.ambient_light = glm::vec3(0.4f, 0.4f, 0.4f);
-    // args.env.sun_color = glm::vec3(0.5f, 0.8f, 1.0f) * 0.4f;
-    // args.env.sun_direction = glm::normalize(glm::vec3(1.0f, 1.0f, -1.0f));
+    env_.clear_color = glm::mix(kf1->clear_color, kf2->clear_color, t);
+    env_.ambient_light = glm::mix(kf1->ambient_color, kf2->ambient_color, t);
+    env_.sun_color = glm::mix(kf1->sun_color, kf2->sun_color, t);
+    // env_.fog = glm::mix(kf1->fog, kf2->fog, t);
+    env_.fog = glm::vec4(env_.clear_color, glm::mix(kf1->fog.a, kf2->fog.a, t));
 
-    args.env.clear_color = glm::mix(kf1->clear_color, kf2->clear_color, t);
-    args.env.ambient_light = glm::mix(kf1->ambient_color, kf2->ambient_color, t);
-    args.env.sun_color = glm::mix(kf1->sun_color, kf2->sun_color, t);
-    // args.env.fog = glm::mix(kf1->fog, kf2->fog, t);
-    args.env.fog = glm::vec4(args.env.clear_color, glm::mix(kf1->fog.a, kf2->fog.a, t));
-
-    float dist = args.farplane * 0.5f;
+    float dist = 1500.0f;
 
     // std::cout<<daytime_<<std::endl;
-
 
     float sun_angle = (daytime_ - 12.0f) * glm::two_pi<float>() / 24.0f;
 
     sun_color_ = glm::mix(kf1->sun_disc_color, kf2->sun_disc_color, t);
     sun_matrix_ = glm::mat4(1.0f);
-    sun_matrix_ = glm::translate(sun_matrix_, args.eye);
+    sun_matrix_ = glm::translate(sun_matrix_, args.ctx.eye);
     sun_matrix_ = glm::scale(sun_matrix_, glm::vec3(dist));
     sun_matrix_ = glm::rotate(sun_matrix_, 0.3f, glm::vec3(1.0f, 0.0f, 0.0f));
     sun_matrix_ = glm::rotate(sun_matrix_, sun_angle, glm::vec3(0.0f, 1.0f, 0.0f));
     sun_matrix_ = glm::translate(sun_matrix_, glm::vec3(0.0f, 0.0f, 1.0f));
     sun_matrix_ = glm::scale(sun_matrix_, glm::vec3(0.7f));
-    
+
     sun_halfsphere_color_ = glm::mix(kf1->sun_halfsphere_color, kf2->sun_halfsphere_color, t);
     sun_halfsphere_matrix_ = glm::scale(sun_matrix_, glm::vec3(1.0f, 1.0f, 1.5f));
-    
+
     moon_color_ = glm::mix(kf1->moon_disc_color, kf2->moon_disc_color, t);
     moon_matrix_ = glm::mat4(1.0f);
-    moon_matrix_ = glm::translate(moon_matrix_, args.eye);
+    moon_matrix_ = glm::translate(moon_matrix_, args.ctx.eye);
     moon_matrix_ = glm::scale(moon_matrix_, glm::vec3(dist));
     moon_matrix_ = glm::rotate(moon_matrix_, sun_angle + glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f));
     moon_matrix_ = glm::translate(moon_matrix_, glm::vec3(0.0f, 0.0f, 1.0f));
     moon_matrix_ = glm::scale(moon_matrix_, glm::vec3(0.6f));
-    
+
     moon_halfsphere_color_ = glm::mix(kf1->moon_halfsphere_color, kf2->moon_halfsphere_color, t);
     moon_halfsphere_matrix_ = glm::scale(moon_matrix_, glm::vec3(1.1f, 1.1f, 1.5f));
-    
+
     float sun_dir = glm::mix(kf1->sun_dir, kf2->sun_dir, t);
 
     if (sun_dir >= 0.0f)
     {
-        args.env.sun_direction = -glm::normalize(glm::vec3(sun_matrix_[2]));
-        args.env.sun_color *= sun_dir;
+        env_.sun_direction = -glm::normalize(glm::vec3(sun_matrix_[2]));
+        env_.sun_color *= sun_dir;
     }
     else
     {
-        args.env.sun_direction = -glm::normalize(glm::vec3(moon_matrix_[2]));
-        args.env.sun_color *= -sun_dir;
+        env_.sun_direction = -glm::normalize(glm::vec3(moon_matrix_[2]));
+        env_.sun_color *= -sun_dir;
     }
 
     DrawEnvModel(args, *halfspheremodel_, moon_halfsphere_matrix_, moon_halfsphere_color_, dist);
@@ -219,15 +217,18 @@ void game::view::WorldEnv::Draw(const DrawArgs& args)
 void game::view::WorldEnv::DrawEnvModel(const DrawArgs& args, const ModelView& model, const glm::mat4& matrix,
                                         const glm::vec4& color, float dist)
 {
+    gfx::DrawSurfaceCmd cmd{};
+    cmd.mesh = model.GetMesh().GetID();
+    cmd.matrix = &matrix;
+    cmd.colors = {&color, 1};
+    cmd.dist = dist;
+
     auto surfaces = model.GetSurfaces();
     for (const auto& surface : surfaces)
     {
-        gfx::DrawSurfaceCmd cmd{};
-        cmd.surface = &surface;
-        cmd.matrices = &matrix;
-        cmd.color = &color;
-        cmd.dist = dist;
-
-        args.dlist.AddSurface(cmd);
+        cmd.tri_offset = surface.tri_offset;
+        cmd.tri_count = surface.tri_count;
+        cmd.material = surface.material->GetID();
+        args.ctx.dlist.AddSurface(cmd);
     }
 }

@@ -4,7 +4,7 @@
 #include "net/utils.hpp"
 #include "worldview.hpp"
 
-game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) : EntityView(world, msg), ubo_(sk_)
+game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) : EntityView(world, msg)
 {
     // read model name
     net::ModelName model_name;
@@ -13,8 +13,12 @@ game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) 
 
     basemodel_ = assets::AssetManager::GetInstance().Get<ModelView>(std::string(model_name));
     sk_ = SkeletonInstance(basemodel_->GetModel()->GetSkeleton(), &root_);
-    ubo_.Update();
-    ubo_valid_ = true;
+    
+    gfx::SkeletonPoseDescriptor pose_desc{};
+    pose_desc.num_bones = sk_.GetSkeleton()->GetNumBones();
+    skeleton_pose_.emplace(pose_desc);
+
+    pose_valid_ = true;
 
     // read clothes
     net::NumClothes num_clothes = 0;
@@ -31,8 +35,6 @@ game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) 
 
         AddClothes(name, color);
     }
-
-    UpdateSurfaceMask();
 
     // read item
     net::ModelName item_name;
@@ -107,7 +109,7 @@ void game::view::CharacterView::Update(const UpdateInfo& info)
 
     root_.UpdateMatrix();
     sk_.UpdateBoneMatrices();
-    ubo_valid_ = false;
+    pose_valid_ = false;
 
     if (item_)
     {
@@ -142,40 +144,28 @@ void game::view::CharacterView::Draw(const DrawArgs& args)
     // }
 
     // update skinning matrices
-    if (!ubo_valid_)
+    if (!pose_valid_)
     {
-        ubo_.Update();
-        ubo_valid_ = true;
+        static std::vector<glm::mat4> bone_matrices;
+        bone_matrices.resize(sk_.GetSkeleton()->GetNumBones());
+
+        sk_.ComputeBoneMatrices(bone_matrices);
+        skeleton_pose_->SetTransforms(bone_matrices);
+
+        pose_valid_ = true;
     }
+
+    uint32_t surfacemask = 0xFFFFFFFF;
 
     // draw clothes
     for (const auto& clothes : clothes_)
     {
-        auto surfaces = clothes.model->GetSurfaces();
-        for (const auto& surface : surfaces)
-        {
-            gfx::DrawSurfaceCmd cmd;
-            cmd.surface = &surface;
-            cmd.matrices = &root_.matrix;
-            cmd.skinning = &ubo_;
-            cmd.color = &clothes.color;
-            args.dlist.AddSurface(cmd);
-        }
+        clothes.model->Draw(args.ctx, root_.matrix, {&clothes.color, 1}, skeleton_pose_->GetID(), 0);
+        surfacemask &= ~clothes.surfacemask;
     }
 
-    // draw basemodel
-    auto surfaces = basemodel_->GetSurfaces();
-    for (size_t i = 0; i < surfaces.size(); ++i)
-    {
-        if (!(surfacemask_ & (1 << i))) // hidden by clothes?
-            continue;
-
-        gfx::DrawSurfaceCmd cmd;
-        cmd.surface = &surfaces[i];
-        cmd.matrices = &root_.matrix;
-        cmd.skinning = &ubo_;
-        args.dlist.AddSurface(cmd);
-    }
+    // draw base
+    basemodel_->Draw(args.ctx, root_.matrix, {}, skeleton_pose_->GetID(), 0, surfacemask);
 
     DrawItem(args);
 }
@@ -301,16 +291,6 @@ game::view::CharacterView::SurfaceMask game::view::CharacterView::GetSurfaceMask
     return 0;
 }
 
-void game::view::CharacterView::UpdateSurfaceMask()
-{
-    surfacemask_ = 0xFFFFFFFF;
-    for (const auto& clothes : clothes_)
-    {
-        surfacemask_ &= ~clothes.surfacemask;
-    }
-
-}
-
 void game::view::CharacterView::AddClothes(const std::string& name, const glm::vec3& color)
 {
     CharacterViewClothes c;
@@ -364,6 +344,7 @@ void game::view::CharacterView::SetItem(const std::string& item_name)
     if (item_name.empty())
     {
         item_.reset();
+        item_model_.reset();
         return;
     }
 
@@ -394,17 +375,10 @@ void game::view::CharacterView::SetItem(const std::string& item_name)
 
 void game::view::CharacterView::DrawItem(const DrawArgs& args)
 {
-    if (!item_ || !item_->model)
+    if (!item_model_)
         return;
 
-    auto surfaces = item_model_->GetSurfaces();
-    for (const auto& surface : surfaces)
-    {
-        gfx::DrawSurfaceCmd cmd;
-        cmd.surface = &surface;
-        cmd.matrices = &item_node_.matrix;
-        args.dlist.AddSurface(cmd);
-    }
+    item_model_->Draw(args.ctx, item_node_.matrix, {});
 }
 
 void game::view::CharacterView::FireItem()

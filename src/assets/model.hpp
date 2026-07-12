@@ -9,43 +9,27 @@
 #include "collision/trianglemesh.hpp"
 #include "asset_manager.hpp"
 
+#include "gfx/mesh_desc.hpp"
+#include "gfx/material_desc.hpp"
+
 namespace assets
 {
 
-struct ModelVertexBoneInfluence
+struct ModelVertexData
 {
-    int bone_index = -1;
-    float weight = 0.0f;
-};
-
-struct ModelVertex
-{
-    glm::vec3 pos;
-    glm::vec3 normal;
-    glm::vec2 uv;
-    glm::vec2 lightmap_uv;
-    ModelVertexBoneInfluence bones[4];
-};
-
-struct ModelTriangle
-{
-    uint32_t vert[3];
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec3> normals;
+    std::vector<glm::vec2> uvs;
+    std::vector<gfx::MeshVertexBoneData> bones;
 };
 
 struct ModelSurface
 {
     std::string name;
-    size_t first_tri = 0;
-    size_t num_tris = 0;
+    uint32_t tri_offset = 0;
+    uint32_t tri_count = 0;
     std::string texture_name;
-    bool two_sided = false;
-    bool object_color = false;
-    bool object_color_mult = false;
-    bool multicolor = false;
-    bool blend = false;
-    bool blend_additive = false;
-    bool unlit = false;
-    bool translucent = false;
+    gfx::MaterialProperties properties;
 };
 
 class Model : public Asset
@@ -55,8 +39,8 @@ public:
     static std::shared_ptr<Model> Load(const std::string& name);
     static std::shared_ptr<Model> LoadFromFile(const std::string& filename);
     
-    const std::span<const ModelVertex> GetVertices() const { return vertices_; }
-    const std::span<const ModelTriangle> GetTriangles() const { return tris_; }
+    const ModelVertexData& GetVertices() const { return vertices_; }
+    const std::vector<gfx::MeshTriangle>& GetTriangles() const { return tris_; }
     const std::span<const ModelSurface> GetSurfaces() const { return surfaces_; }
     bool GetSurfaceIndex(const std::string& name, size_t& idx) const;
 
@@ -74,8 +58,8 @@ public:
     const Transform* GetLocation(const std::string& key) const;
     
 private:
-    std::vector<ModelVertex> vertices_;
-    std::vector<ModelTriangle> tris_;
+    ModelVertexData vertices_;
+    std::vector<gfx::MeshTriangle> tris_;
     std::vector<ModelSurface> surfaces_;
     std::map<std::string, size_t> surface_indices_;
     
