@@ -2,6 +2,7 @@
 #include "shader_defs.hpp"
 
 #include <cassert>
+#include <array>
 
 gfx::SkeletonPoseGL::SkeletonPoseGL(size_t num_bones) : num_bones_(num_bones), ubo_(GL_UNIFORM_BUFFER, GL_DYNAMIC_DRAW)
 {
