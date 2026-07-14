@@ -26,6 +26,7 @@
 #include "key_map.hpp"
 #include "gfx/renderer.hpp"
 #include "utils/sdl_utils.hpp"
+#include "gfx/renderer_gl/gl.hpp"
 
 CVAR_CL(uint16_t, cl_maxfps, CV_SAVE, 0);
 
@@ -320,6 +321,11 @@ void SetName(const char* name)
 void SetUrl(const char* url)
 {
     s_url = url;
+}
+
+void SetRenderer(const char* renderer)
+{
+    CVarRegistry::GetClientInstance().Set("r_renderer", renderer);
 }
 
 }

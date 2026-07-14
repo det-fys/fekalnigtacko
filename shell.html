@@ -27,7 +27,7 @@
             color: #ff0
         }
 
-        input[type=text] {
+        input[type=text], select {
             background-color: #444;
             color: #fff;
             border-style: none;
@@ -55,7 +55,7 @@
             margin: 10pt;
         }
 
-        #name, #url
+        #name, #url, #renderer
         {
             font-size: 150%;
             margin: 10pt;
@@ -74,6 +74,14 @@
             <p id="vyplnitmeno" style="display:none">^ vyplnit</p>
             
             kam <input type="text" name="url" id="url" value="wss://test.deadfish.cz"><br>
+            
+            renderer
+            <select name="renderer" id="renderer">
+                <option value="wgpu">WebGPU</option>
+                <option value="gl">GL</option>
+            </select>
+            <br>
+
             <input id="okbut" type="button" value="probíhá získávání" onclick="ok()" disabled>
         </form>
     </div>
@@ -115,6 +123,7 @@
 
             const name = document.getElementById("name").value;
             const url = document.getElementById("url").value;
+            const renderer = document.getElementById("renderer").value;
         
             if (name == "") {
                 document.getElementById("vyplnitmeno").style = "";
@@ -126,6 +135,7 @@
 
             Module.ccall("SetName", null, ["string"], [name]);
             Module.ccall("SetUrl", null, ["string"], [url]);
+            Module.ccall("SetRenderer", null, ["string"], [renderer]);
 
             document.getElementById("loginform").style = "display:none";
             document.getElementById("canvas").style = "";

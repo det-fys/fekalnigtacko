@@ -10,6 +10,11 @@
 #include "renderer_wgpu/renderer_wgpu.hpp"
 #include "utils/cvars.hpp"
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/emscripten.h>
+#include <emscripten/html5.h>
+#endif
+
 CVAR_CL(std::string, r_renderer, CV_SAVE, "gl");
 
 static std::unique_ptr<gfx::Renderer> renderer;

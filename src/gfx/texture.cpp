@@ -1,5 +1,3 @@
-#pragma once
-
 #include "texture.hpp"
 #include "utils/files.hpp"
 #include "utils/image.hpp"

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.22)
 project(FekalniGtacko)
 
 # Enable C++20
@@ -221,6 +221,19 @@ set(SERVER_ONLY_SOURCES
     "src/utils/files_server.cpp"
 )
 
+if(CMAKE_SYSTEM_NAME STREQUAL Emscripten)
+    add_compile_definitions(EMSCRIPTEN=1)
+
+    add_compile_options(
+        "-pthread"
+    )
+
+    add_link_options(
+        "-pthread"
+    )
+
+endif()
+
 if(ANDROID)
     # Android-specific setup
     set(MAIN_NAME "main")
@@ -291,28 +304,23 @@ set(TINT_BUILD_REMOTE_COMPILE OFF)
 
 add_subdirectory("external/dawn" EXCLUDE_FROM_ALL)
 
-target_link_libraries(${MAIN_NAME} PRIVATE webgpu_dawn)
-
 # Platform-specific SDL2 handling
 if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
 
     # Emscripten provides SDL2 via its system libraries
     message(STATUS "Target platform: WebAssembly (Emscripten)")
-    set(CMAKE_EXECUTABLE_SUFFIX ".html")  # Optional: build HTML page
-
+    # set(CMAKE_EXECUTABLE_SUFFIX ".html")  # Optional: build HTML page
+    set_target_properties(${MAIN_NAME} PROPERTIES SUFFIX ".html")
+    
     target_compile_options(${MAIN_NAME} PRIVATE 
         "-sUSE_SDL=2"
         "-sNO_DISABLE_EXCEPTION_CATCHING=1"
-        "-pthread"
     )
-
-    target_compile_definitions(${MAIN_NAME} PRIVATE EMSCRIPTEN)
 
     target_link_options(${MAIN_NAME} PRIVATE 
         "-lwebsocket.js"
         "-lidbfs.js"
         "-lopenal"
-        "-pthread"
         "-sPTHREAD_POOL_SIZE=4"
         "-sUSE_SDL=2"
         "-sASYNCIFY"
@@ -320,12 +328,15 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
         "-sNO_DISABLE_EXCEPTION_CATCHING=1"
         "-sALLOW_MEMORY_GROWTH=1"
         "-sGROWABLE_ARRAYBUFFERS=0"
-        "-sEXPORTED_FUNCTIONS=_RunMain,_SetName,_SetUrl"
+        "-sEXPORTED_FUNCTIONS=_RunMain,_SetName,_SetUrl,_SetRenderer"
         "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
         "--shell-file" "${CMAKE_SOURCE_DIR}/shell.html"
         "--preload-file" "${CMAKE_SOURCE_DIR}/assets/@/"
         )
-        
+    
+    # add emdawnwebgpu
+    target_link_libraries(${MAIN_NAME} PRIVATE emdawnwebgpu_cpp)
+
 else()
     message(STATUS "Target platform: Native")
     # Native platform
@@ -376,6 +387,9 @@ endif()
             $<TARGET_FILE:OpenAL>
             $<TARGET_FILE_DIR:${MAIN_NAME}>
     )
+
+    # add dawn native
+    target_link_libraries(${MAIN_NAME} PRIVATE webgpu_dawn)
 
     # build server
     set(ASIO_INCLUDE_DIR "external/asio/include")

@@ -2,12 +2,16 @@
 
 #include <SDL2/SDL_syswm.h>
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/emscripten.h>
+#endif
+
 wgpu::Surface CreateWGPUSurfaceFromSDLWindow(wgpu::Instance instance, SDL_Window* window)
 {
 #if defined(__EMSCRIPTEN__)
     // webgpu_cpp / Emscripten C++ mapping
-    wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
-    canvasDesc.sType = wgpu::SType::SurfaceDescriptorFromCanvasHTMLSelector;
+    wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector canvasDesc{};
+    canvasDesc.sType = wgpu::SType::EmscriptenSurfaceSourceCanvasHTMLSelector;
     canvasDesc.selector = "#canvas"; // Emscripten's default mapping for SDL2 window
 
     wgpu::SurfaceDescriptor surfaceDesc{};

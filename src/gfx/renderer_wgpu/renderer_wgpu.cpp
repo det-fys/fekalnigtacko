@@ -211,7 +211,9 @@ void gfx::RendererWGPU::ReleaseDeformTexture(DeformTextureID deform_id)
 
 void gfx::RendererWGPU::Draw(Scene& scene, const CameraParams& camera)
 {
+#if !defined(__EMSCRIPTEN__)
     instance_.ProcessEvents();
+#endif
 
     RenderMainPass(scene, camera);
 }
@@ -832,8 +834,9 @@ void gfx::RendererWGPU::RenderMainPass(Scene& scene, const CameraParams& camera)
     auto command = encoder.Finish(&cmd_desc);
     queue_.Submit(1, &command);
 
+#if !defined(__EMSCRIPTEN__)
     surface_.Present();
-
+#endif
 }
 
 void gfx::RendererWGPU::DrawHudList(wgpu::RenderPassEncoder& pass, std::span<DrawHudCmd> queue, const DrawContext& ctx)
