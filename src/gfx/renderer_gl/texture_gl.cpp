@@ -26,7 +26,7 @@ static void GetGLFilterModes(bool linear, bool mipmaps, GLenum& filter_min, GLen
 	}
 }
 
-gfx::GLTexture::GLTexture(uint32_t width, uint32_t height, GLint internalformat, GLenum format, GLenum type,
+gfx::TextureGL::TextureGL(uint32_t width, uint32_t height, GLint internalformat, GLenum format, GLenum type,
                           bool linear, bool mipmaps)
     : width_(width), height_(height), internalformat_(internalformat), format_(format), type_(type), linear_(linear),
       mipmaps_(mipmaps)
@@ -53,7 +53,7 @@ gfx::GLTexture::GLTexture(uint32_t width, uint32_t height, GLint internalformat,
     }
 }
 
-void gfx::GLTexture::SetData(std::span<const uint8_t> data)
+void gfx::TextureGL::SetData(std::span<const uint8_t> data)
 {
     assert(data.size() >= width_ * height_ * 4);
 
@@ -67,7 +67,7 @@ void gfx::GLTexture::SetData(std::span<const uint8_t> data)
     }
 }
 
-gfx::GLTexture::~GLTexture()
+gfx::TextureGL::~TextureGL()
 {
     glDeleteTextures(1, &id_);
 }

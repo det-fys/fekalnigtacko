@@ -172,6 +172,7 @@ set(CLIENT_ONLY_SOURCES
     "src/gameview/worldview.hpp"
     "src/gameview/worldview.cpp"
 
+    "src/gfx/common/vertex_pack.cpp"
     "src/gfx/renderer_gl/buffer_object.cpp"
     "src/gfx/renderer_gl/deform_texture_gl.cpp"
     "src/gfx/renderer_gl/mesh_gl.cpp"
@@ -182,6 +183,8 @@ set(CLIENT_ONLY_SOURCES
     "src/gfx/renderer_gl/surface_shader.cpp"
     "src/gfx/renderer_gl/texture_gl.cpp"
     "src/gfx/renderer_gl/vertex_array.cpp"
+    "src/gfx/renderer_wgpu/renderer_wgpu.cpp"
+    "src/gfx/renderer_wgpu/surface_sdl.cpp"
     "src/gfx/deform_texture.cpp"
     "src/gfx/frustum.cpp"
     "src/gfx/material.cpp"
@@ -257,6 +260,38 @@ add_subdirectory(external/ogg)
 # add vorbis
 add_subdirectory(external/vorbis)
 target_link_libraries(${MAIN_NAME} PRIVATE vorbisfile vorbis)
+
+# add dawn
+set(DAWN_FETCH_DEPENDENCIES ON)
+
+set(DAWN_ENABLE_D3D11 OFF)
+set(DAWN_ENABLE_D3D12 ON)
+set(DAWN_ENABLE_METAL OFF)
+set(DAWN_ENABLE_NULL OFF)
+set(DAWN_ENABLE_DESKTOP_GL OFF)
+set(DAWN_ENABLE_OPENGLES OFF)
+set(DAWN_ENABLE_VULKAN OFF)
+set(TINT_BUILD_SPV_READER OFF)
+
+set(DAWN_BUILD_SAMPLES OFF)
+set(DAWN_USE_GLFW OFF)
+set(TINT_BUILD_TINT OFF)
+set(TINT_BUILD_CMD_TOOLS OFF)
+set(TINT_BUILD_SAMPLES OFF)
+set(TINT_BUILD_DOCS OFF)
+set(TINT_BUILD_TESTS OFF)
+set(TINT_BUILD_FUZZERS OFF)
+set(TINT_BUILD_SPIRV_TOOLS_FUZZER OFF)
+set(TINT_BUILD_AST_FUZZER OFF)
+set(TINT_BUILD_REGEX_FUZZER OFF)
+set(TINT_BUILD_BENCHMARKS OFF)
+set(TINT_BUILD_TESTS OFF)
+set(TINT_BUILD_AS_OTHER_OS OFF)
+set(TINT_BUILD_REMOTE_COMPILE OFF)
+
+add_subdirectory("external/dawn" EXCLUDE_FROM_ALL)
+
+target_link_libraries(${MAIN_NAME} PRIVATE webgpu_dawn)
 
 # Platform-specific SDL2 handling
 if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)

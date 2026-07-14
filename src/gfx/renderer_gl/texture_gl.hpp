@@ -8,15 +8,15 @@
 namespace gfx
 {
 
-class GLTexture
+class TextureGL
 {
 public:
-    GLTexture(uint32_t width, uint32_t height, GLint internalformat, GLenum format, GLenum type, bool linear, bool mipmaps);
-    DELETE_COPY_MOVE(GLTexture);
+    TextureGL(uint32_t width, uint32_t height, GLint internalformat, GLenum format, GLenum type, bool linear, bool mipmaps);
+    DELETE_COPY_MOVE(TextureGL);
 
     void SetData(std::span<const uint8_t> data);
 
-    ~GLTexture();
+    ~TextureGL();
 
     GLuint GetId() const { return id_; }
 

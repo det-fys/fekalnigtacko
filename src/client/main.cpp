@@ -326,8 +326,29 @@ void SetUrl(const char* url)
 
 #ifndef EMSCRIPTEN
 
+static void ProcessArgs(int argc, char* argv[])
+{
+    std::string var_name;
+
+    for (int i = 1; i < argc; ++i)
+    {
+        // var name
+        if (var_name.empty())
+        {
+            var_name = argv[i];
+            continue;
+        }
+
+        // value
+        std::string value = argv[i];
+        CVarRegistry::GetClientInstance().Set(var_name, value);
+        var_name.clear();
+    }
+}
+
 int main(int argc, char *argv[])
 {
+    ProcessArgs(argc, argv);
     SetName("random guvno");
     RunMain();
 	return 0;

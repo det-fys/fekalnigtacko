@@ -7,6 +7,7 @@
 #include <SDL.h>
 
 #include "renderer_gl/renderer_gl.hpp"
+#include "renderer_wgpu/renderer_wgpu.hpp"
 #include "utils/cvars.hpp"
 
 CVAR_CL(std::string, r_renderer, CV_SAVE, "gl");
@@ -23,7 +24,11 @@ void gfx::Renderer::Init(SDL_Window* window)
 {
     if (r_renderer.Get() == "gl")
     {
-        renderer = std::make_unique<GLRenderer>(window);
+        renderer = std::make_unique<RendererGL>(window);
+    }
+    else if (r_renderer.Get() == "wgpu")
+    {
+        renderer = std::make_unique<RendererWGPU>(window);
     }
     else
     {

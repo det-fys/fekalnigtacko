@@ -3,7 +3,7 @@
 #include <cassert>
 #include <stdexcept>
 
-gfx::GLDeformTexture::GLDeformTexture(const DeformGridInfo& info) : info_(info)
+gfx::DeformTextureGL::DeformTextureGL(const DeformGridInfo& info) : info_(info)
 {
     glGenTextures(1, &id_);
 
@@ -21,7 +21,7 @@ gfx::GLDeformTexture::GLDeformTexture(const DeformGridInfo& info) : info_(info)
     glBindTexture(GL_TEXTURE_3D, 0);
 }
 
-void gfx::GLDeformTexture::SetData(std::span<const glm::i8vec3> data)
+void gfx::DeformTextureGL::SetData(std::span<const glm::i8vec3> data)
 {
     assert(data.size() >= info_.res.x * info_.res.y * info_.res.z);
 
@@ -29,7 +29,7 @@ void gfx::GLDeformTexture::SetData(std::span<const glm::i8vec3> data)
     glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB8_SNORM, info_.res.x, info_.res.y, info_.res.z, 0, GL_RGB, GL_BYTE, data.data());
 }
 
-gfx::GLDeformTexture::~GLDeformTexture()
+gfx::DeformTextureGL::~DeformTextureGL()
 {
     glDeleteTextures(1, &id_);
 }

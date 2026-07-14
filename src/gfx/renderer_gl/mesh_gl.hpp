@@ -6,10 +6,10 @@
 namespace gfx
 {
 
-class GLMesh
+class MeshGL
 {
 public:
-    GLMesh(const MeshDescriptor& desc);
+    MeshGL(const MeshDescriptor& desc);
 
     void SetVertexData(const MeshVertexData& data);
     void SetTriangleData(const MeshTriangleData& data);

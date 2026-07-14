@@ -5,10 +5,10 @@
 namespace gfx
 {
 
-struct GLMaterial
+struct MaterialGL
 {
 public:
-    GLMaterial(const MaterialDescriptor& desc) : desc_(desc) {}
+    MaterialGL(const MaterialDescriptor& desc) : desc_(desc) {}
 
     const MaterialProperties& GetProperties() const { return desc_.properties; }
     TextureID GetTexture() const { return desc_.texture; }

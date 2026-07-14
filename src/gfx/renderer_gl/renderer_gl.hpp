@@ -40,10 +40,10 @@ constexpr static size_t LIGHT_GRID_CELL_LIGHTS = SD_MAX_LIGHTS;
 using LightGridCell = LightArray<LIGHT_GRID_CELL_LIGHTS>;
 using LightGrid = std::map<LightCellCoordHash, LightGridCell>;
 
-class GLRenderer : public Renderer
+class RendererGL : public Renderer
 {
 public:
-    GLRenderer(SDL_Window* window);
+    RendererGL(SDL_Window* window);
 
     virtual MeshID CreateMesh(const MeshDescriptor& desc) override;
     virtual void SetMeshVertexData(MeshID mesh_id, const MeshVertexData& data) override;
@@ -67,7 +67,7 @@ public:
 
     virtual void Draw(Scene& scene, const CameraParams& camera) override;
 
-    virtual ~GLRenderer() override;
+    virtual ~RendererGL() override;
 
 private:
     void Load();
@@ -94,11 +94,11 @@ private:
     SDL_GLContext gl_context_ = nullptr;
 
     // resources
-    ResourceArray<GLMesh> meshes_;
-    ResourceArray<GLTexture> textures_;
-    ResourceArray<GLMaterial> materials_;
-    ResourceArray<GLSkeletonPose> poses_;
-    ResourceArray<GLDeformTexture> deform_textures_;
+    ResourceArray<MeshGL> meshes_;
+    ResourceArray<TextureGL> textures_;
+    ResourceArray<MaterialGL> materials_;
+    ResourceArray<SkeletonPoseGL> poses_;
+    ResourceArray<DeformTextureGL> deform_textures_;
 
     bool loaded_ = false;
 
