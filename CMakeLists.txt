@@ -185,6 +185,7 @@ set(CLIENT_ONLY_SOURCES
     "src/gfx/renderer_gl/vertex_array.cpp"
     "src/gfx/renderer_wgpu/renderer_wgpu.cpp"
     "src/gfx/renderer_wgpu/surface_sdl.cpp"
+    "src/gfx/renderer_wgpu/surface_shader_wgpu.cpp"
     "src/gfx/deform_texture.cpp"
     "src/gfx/frustum.cpp"
     "src/gfx/material.cpp"
@@ -283,7 +284,7 @@ set(DAWN_ENABLE_METAL OFF)
 set(DAWN_ENABLE_NULL OFF)
 set(DAWN_ENABLE_DESKTOP_GL OFF)
 set(DAWN_ENABLE_OPENGLES OFF)
-set(DAWN_ENABLE_VULKAN OFF)
+set(DAWN_ENABLE_VULKAN ON)
 set(TINT_BUILD_SPV_READER OFF)
 
 set(DAWN_BUILD_SAMPLES OFF)

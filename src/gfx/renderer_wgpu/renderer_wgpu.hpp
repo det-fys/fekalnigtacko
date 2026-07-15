@@ -7,6 +7,7 @@
 #include "../texture.hpp"
 #include "../draw_list.hpp"
 #include "../scene.hpp"
+#include "surface_pipeline_wgpu.hpp"
 
 namespace gfx
 {
@@ -46,7 +47,6 @@ struct MaterialWGPU
     wgpu::Sampler sampler;
     wgpu::Texture color_texture;
     wgpu::TextureView color_texture_view;
-
     wgpu::BindGroup bind_group;
 };
 
@@ -54,6 +54,7 @@ struct SkeletonPoseWGPU
 {
     uint32_t num_bones;
     wgpu::Buffer bones_buffer;
+    wgpu::BindGroup bind_group;
 };
 
 struct DeformTextureWGPU
@@ -61,6 +62,7 @@ struct DeformTextureWGPU
     DeformTextureDescriptor desc{};
     wgpu::Texture texture;
     wgpu::TextureView view;
+    wgpu::BindGroup bind_group;
 };
 
 struct VertexBufferLayout
@@ -72,6 +74,12 @@ struct VertexBufferLayout
 struct GlobalUniformData
 {
     glm::mat4 view_proj;
+};
+
+struct InstanceUniformData
+{
+    glm::mat4 matrix;
+    std::array<uint32_t, 8> colors;
 };
 
 struct GlobalGUIUniformData
@@ -115,14 +123,18 @@ private:
     void ConfigureSurface();
     void SetupPipeline();
     SurfaceViewData GetNextSurfaceViewData();
+    bool ReserveBufferCapacity(DynamicBuffer& buffer, size_t capacity);
     void SetBufferData(DynamicBuffer& buffer, std::span<const uint8_t> data);
     TextureID GetWhiteTexture();
     wgpu::Sampler GetSampler(bool linear, bool mipmaps);
     wgpu::Sampler GetSamplerForTexture(const TextureWGPU& texture);
     void CreateTextureGuiBindGroup(TextureWGPU& texture);
     VertexBufferLayout GetVertexBufferLayout(MeshVertexAttributeFlags attrs);
+    const wgpu::RenderPipeline& GetSurfacePipeline(SurfacePipelineFlags flags);
+    void CreateInstanceBufferBindGroup();
 
     void RenderMainPass(Scene& scene, const CameraParams& camera);
+    void DrawSurfaceList(wgpu::RenderPassEncoder& pass, std::span<DrawSurfaceCmd> queue, const DrawContext& ctx);
     void DrawHudList(wgpu::RenderPassEncoder& pass, std::span<DrawHudCmd> queue, const DrawContext& ctx);
 
     void Unload();
@@ -137,6 +149,15 @@ private:
     // surface drawing resources
     wgpu::BindGroupLayout global_bind_group_layout_;
     wgpu::BindGroupLayout material_bind_group_layout_;
+    wgpu::BindGroupLayout instance_bind_group_layout_;
+    wgpu::BindGroupLayout skeletal_bind_group_layout_;
+    wgpu::BindGroupLayout deform_bind_group_layout_;
+    wgpu::Buffer global_buffer_;
+    wgpu::BindGroup global_bind_group_;
+    DynamicBuffer instance_buffer_;
+    wgpu::BindGroup instance_bind_group_;
+    std::map<SurfacePipelineFlags, wgpu::RenderPipeline> surface_pipelines_;
+    std::map<SurfacePipelineFlags, wgpu::ShaderModule> surface_shaders_;
 
     // GUI drawing resources
     wgpu::BindGroupLayout gui_global_bind_group_layout_;
@@ -149,6 +170,9 @@ private:
     glm::u32vec2 surface_size_{0};
     wgpu::TextureFormat surface_format_;
     wgpu::Surface surface_;
+    wgpu::TextureFormat depth_format_;
+    wgpu::Texture depth_texture_;
+    wgpu::TextureView depth_texture_view_;
 
     // resources
     ResourceArray<MeshWGPU> meshes_;
@@ -163,6 +187,7 @@ private:
     // caches
     std::map<uint8_t, wgpu::Sampler> samplers_;
     wgpu::RenderPipeline pipeline_;
+
 
     // drawing
     DrawList main_dlist_;
