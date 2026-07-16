@@ -13,16 +13,32 @@
 #include "../common/vertex_pack.hpp"
 #include "../common/hud_matrix.hpp"
 #include "surface_shader_wgpu.hpp"
+#include "utils/cvars.hpp"
+
+CVAR_CL(uint8_t, r_msaa, CV_SAVE, 0, 0, 1);
 
 static std::vector<uint8_t> temp_buffer;
+
+static inline glm::vec3 LinearizeColor(const glm::vec3 color_srgb)
+{
+    return color_srgb * color_srgb;
+}
+
+static inline uint32_t GetMultisampleCount()
+{
+    return r_msaa.Get() > 0 ? 4 : 1;
+}
 
 gfx::RendererWGPU::RendererWGPU(SDL_Window* window) : Renderer(window)
 {
     InitWGPU();
+
+    msaa_samples_ = GetMultisampleCount();
+ 
     ConfigureSurface();
     CreateGlobalResources();
+    CreateMipmapPipeline();
     CreateGuiPipeline();
-    SetupPipeline();
 }
 
 gfx::MeshID gfx::RendererWGPU::CreateMesh(const MeshDescriptor& desc)
@@ -59,12 +75,23 @@ gfx::TextureID gfx::RendererWGPU::CreateTexture(const TextureDescriptor& desc)
 {
     TextureWGPU texture{};
     texture.desc = desc;
+    if (desc.mipmaps)
+    {
+        texture.mip_levels = std::max(
+            1U, std::min(desc.max_mipmap_level, uint32_t(std::floor(std::log2(std::max(desc.width, desc.height))))));
+    }
 
     wgpu::TextureDescriptor tex_desc{};
     tex_desc.dimension = wgpu::TextureDimension::e2D;
     tex_desc.size = {desc.width, desc.height, 1};
-    tex_desc.format = wgpu::TextureFormat::RGBA8Unorm;
+    tex_desc.format = wgpu::TextureFormat::RGBA8UnormSrgb;
+    tex_desc.mipLevelCount = texture.mip_levels;
     tex_desc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
+    if (tex_desc.mipLevelCount > 1)
+    {
+        tex_desc.usage |= wgpu::TextureUsage::RenderAttachment; // need to render mipmaps
+    }
+
     tex_desc.label = "Game 2D texture";
     texture.texture = device_.CreateTexture(&tex_desc);
 
@@ -88,6 +115,61 @@ void gfx::RendererWGPU::SetTextureData(TextureID texture_id, std::span<const uin
     wgpu::Extent3D size{texture.desc.width, texture.desc.height, 1};
 
     queue_.WriteTexture(&dst, data.data(), data.size_bytes(), &layout, &size);
+
+    if (texture.mip_levels < 2)
+        return;
+
+    // generate mipmaps
+    auto encoder = device_.CreateCommandEncoder();
+    auto sampler = GetSampler(true, false);
+
+    wgpu::TextureViewDescriptor view_desc{};
+    view_desc.baseMipLevel = 0;
+    view_desc.mipLevelCount = 1;
+
+    auto srcView = texture.texture.CreateView(&view_desc);
+
+    for (uint32_t level = 1; level < texture.mip_levels; level++)
+    {
+        view_desc.baseMipLevel = level;
+        auto dstView = texture.texture.CreateView(&view_desc);
+
+        wgpu::BindGroupEntry bgEntries[2]{};
+
+        bgEntries[0].binding = 0;
+        bgEntries[0].sampler = sampler;
+
+        bgEntries[1].binding = 1;
+        bgEntries[1].textureView = srcView;
+
+        wgpu::BindGroupDescriptor bgDesc{};
+        bgDesc.layout = mipmap_bind_group_layout_;
+        bgDesc.entryCount = 2;
+        bgDesc.entries = bgEntries;
+
+        auto bindGroup = device_.CreateBindGroup(&bgDesc);
+
+        wgpu::RenderPassColorAttachment color{};
+        color.view = dstView;
+        color.loadOp = wgpu::LoadOp::Clear;
+        color.storeOp = wgpu::StoreOp::Store;
+
+        wgpu::RenderPassDescriptor passDesc{};
+        passDesc.colorAttachmentCount = 1;
+        passDesc.colorAttachments = &color;
+
+        auto pass = encoder.BeginRenderPass(&passDesc);
+
+        pass.SetPipeline(mipmap_pipeline_);
+        pass.SetBindGroup(0, bindGroup);
+        pass.Draw(3);
+        pass.End();
+
+        srcView = std::move(dstView);
+    }
+
+    auto command = encoder.Finish();
+    queue_.Submit(1, &command);
 }
 
 void gfx::RendererWGPU::ReleaseTexture(TextureID texture_id)
@@ -187,6 +269,7 @@ gfx::DeformTextureID gfx::RendererWGPU::CreateDeformTexture(const DeformTextureD
 
     glm::uvec3 tex_size(desc.grid.res);
 
+    // setup texture
     wgpu::TextureDescriptor tex_desc{};
     tex_desc.dimension = wgpu::TextureDimension::e3D;
     tex_desc.size = {tex_size.x, tex_size.y, tex_size.z};
@@ -197,17 +280,34 @@ gfx::DeformTextureID gfx::RendererWGPU::CreateDeformTexture(const DeformTextureD
 
     deform.view = deform.texture.CreateView();
 
+    // setup info buffer
+    wgpu::BufferDescriptor info_desc{};
+    info_desc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Uniform;
+    info_desc.size = sizeof(DeformInfoWGPU);
+    info_desc.label = "Deform texture info buffer";
+    deform.info_buffer = device_.CreateBuffer(&info_desc);
+
+    DeformInfoWGPU info{};
+    info.deform_min = desc.grid.min;
+    info.deform_max = desc.grid.max;
+    info.max_offset = desc.grid.max_offset;
+    queue_.WriteBuffer(deform.info_buffer, 0, &info, sizeof(info));
+
     // setup bind group
     {
-        std::array<wgpu::BindGroupEntry, 2> entries;
+        std::array<wgpu::BindGroupEntry, 3> entries;
 
         auto& sampler_entry = entries[0];
         sampler_entry.binding = 0;
         sampler_entry.sampler = GetSampler(true, false);
 
-        auto& color_texture_entry = entries[1];
-        color_texture_entry.binding = 1;
-        color_texture_entry.textureView = deform.view;
+        auto& texture_entry = entries[1];
+        texture_entry.binding = 1;
+        texture_entry.textureView = deform.view;
+
+        auto& info_entry = entries[2];
+        info_entry.binding = 2;
+        info_entry.buffer = deform.info_buffer;
 
         wgpu::BindGroupDescriptor group_desc{};
         group_desc.layout = deform_bind_group_layout_;
@@ -257,6 +357,8 @@ void gfx::RendererWGPU::Draw(Scene& scene, const CameraParams& camera)
 #if !defined(__EMSCRIPTEN__)
     instance_.ProcessEvents();
 #endif
+
+    UpdateSettings();
 
     RenderMainPass(scene, camera);
 }
@@ -333,6 +435,30 @@ void gfx::RendererWGPU::InitWGPU()
 
 void gfx::RendererWGPU::CreateGlobalResources()
 {
+    // MIPMAPS
+
+    // mipmap bind group layout
+    {
+        std::array<wgpu::BindGroupLayoutEntry, 2> entries;
+
+        auto& sampler_entry = entries[0];
+        sampler_entry.binding = 0;
+        sampler_entry.visibility = wgpu::ShaderStage::Fragment;
+        sampler_entry.sampler.type = wgpu::SamplerBindingType::Filtering;
+
+        auto& texture_entry = entries[1];
+        texture_entry.binding = 1;
+        texture_entry.visibility = wgpu::ShaderStage::Fragment;
+        texture_entry.texture.sampleType = wgpu::TextureSampleType::Float;
+        texture_entry.texture.viewDimension = wgpu::TextureViewDimension::e2D;
+
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        desc.label = "Mipmap bind group layout";
+        mipmap_bind_group_layout_ = device_.CreateBindGroupLayout(&desc);
+    }
+
     // SURFACE
 
     // global bind group layout
@@ -438,7 +564,7 @@ void gfx::RendererWGPU::CreateGlobalResources()
 
     // deform bind group layout
     {
-        std::array<wgpu::BindGroupLayoutEntry, 2> entries;
+        std::array<wgpu::BindGroupLayoutEntry, 3> entries;
 
         auto& sampler_entry = entries[0];
         sampler_entry.binding = 0;
@@ -450,6 +576,12 @@ void gfx::RendererWGPU::CreateGlobalResources()
         texture_entry.visibility = wgpu::ShaderStage::Vertex;
         texture_entry.texture.sampleType = wgpu::TextureSampleType::Float;
         texture_entry.texture.viewDimension = wgpu::TextureViewDimension::e3D;
+
+        auto& info_entry = entries[2];
+        info_entry.binding = 2;
+        info_entry.visibility = wgpu::ShaderStage::Vertex;
+        info_entry.buffer.type = wgpu::BufferBindingType::Uniform;
+        info_entry.buffer.minBindingSize = sizeof(DeformInfoWGPU);
 
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.entryCount = entries.size();
@@ -526,8 +658,108 @@ void gfx::RendererWGPU::CreateGlobalResources()
     }
 }
 
+void gfx::RendererWGPU::CreateMipmapPipeline()
+{
+    constexpr std::string_view SHADER_SRC = R"WGSL(
+        struct VSOut {
+            @builtin(position) pos: vec4f,
+            @location(0) uv: vec2f,
+        };
+
+        @vertex
+        fn vs_main(@builtin(vertex_index) index: u32) -> VSOut {
+            var positions = array<vec2f, 3>(
+                vec2f(-1.0, -1.0),
+                vec2f( 3.0, -1.0),
+                vec2f(-1.0,  3.0)
+            );
+
+            var uvs = array<vec2f, 3>(
+                vec2f(0.0, 1.0),
+                vec2f(2.0, 1.0),
+                vec2f(0.0, -1.0)
+            );
+
+            var out: VSOut;
+            out.pos = vec4f(positions[index], 0.0, 1.0);
+            out.uv = uvs[index];
+            return out;
+        }
+
+        @group(0) @binding(0)
+        var srcSampler: sampler;
+
+        @group(0) @binding(1)
+        var srcTexture: texture_2d<f32>;
+
+        @fragment
+        fn fs_main(in: VSOut) -> @location(0) vec4f {
+            return textureSampleLevel(
+                srcTexture,
+                srcSampler,
+                in.uv,
+                0.0
+            );
+        }
+    )WGSL";
+
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "Mipmap pipeline";
+
+    // shader
+    wgpu::ShaderModuleDescriptor shader_desc{};
+    shader_desc.label = "Mipmap shader";
+    wgpu::ShaderSourceWGSL shader_src{};
+    shader_src.code = SHADER_SRC;
+    shader_desc.nextInChain = &shader_src;
+    auto shader_module = device_.CreateShaderModule(&shader_desc);
+
+    // vertex
+    desc.vertex.module = shader_module;
+    desc.vertex.entryPoint = "vs_main";
+    desc.vertex.bufferCount = 0;
+    desc.vertex.buffers = nullptr;
+
+    // assembly
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.frontFace = wgpu::FrontFace::CCW;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+
+    // color
+    wgpu::ColorTargetState color{};
+    color.format = wgpu::TextureFormat::RGBA8UnormSrgb;
+    color.blend = nullptr;
+    color.writeMask = wgpu::ColorWriteMask::All;
+
+    // depth
+    desc.depthStencil = nullptr;
+
+    // fragment
+    wgpu::FragmentState fragment{};
+    fragment.module = shader_module;
+    fragment.entryPoint = "fs_main";
+    fragment.targetCount = 1;
+    fragment.targets = &color;
+    desc.fragment = &fragment;
+
+    // multisampling
+    desc.multisample.count = 1;
+    desc.multisample.mask = ~0u;
+
+    // layout
+    wgpu::PipelineLayoutDescriptor layout_desc{};
+    layout_desc.bindGroupLayoutCount = 1;
+    layout_desc.bindGroupLayouts = &mipmap_bind_group_layout_;
+    layout_desc.label = "Mipmap pipeline layout";
+    desc.layout = device_.CreatePipelineLayout(&layout_desc);
+
+    mipmap_pipeline_ = device_.CreateRenderPipeline(&desc);
+}
+
 void gfx::RendererWGPU::CreateGuiPipeline()
 {
+    gui_pipeline_ = nullptr;
+
     constexpr std::string_view SHADER_SRC = R"WGSL(
         struct VertexInput {
 	        @location(0) position: vec3f,
@@ -549,12 +781,16 @@ void gfx::RendererWGPU::CreateGuiPipeline()
         @group(1) @binding(0) var textureSampler: sampler;
         @group(1) @binding(1) var colorTexture: texture_2d<f32>;
 
+        fn srgbToLinear(c: vec3<f32>) -> vec3<f32> {
+            return c * c; // approx
+        }
+
         @vertex
         fn vs_main(in: VertexInput) -> VertexOutput {
             var out: VertexOutput;
             let pos2d = uGlobal.matrix * vec3f(in.position.xy, 1.0);
             out.position = vec4f(pos2d.xy, in.position.z, 1.0);
-            out.color = in.color;
+            out.color = vec4f(srgbToLinear(in.color.rgb), in.color.a);
             out.uv = in.uv;
             return out;
         }
@@ -621,8 +857,7 @@ void gfx::RendererWGPU::CreateGuiPipeline()
     desc.fragment = &fragment;
 
     // multisampling
-    desc.multisample.count = 1;
-    desc.multisample.mask = ~0u;
+    desc.multisample.count = msaa_samples_;
 
     // layout
     wgpu::PipelineLayoutDescriptor layout_desc{};
@@ -633,6 +868,17 @@ void gfx::RendererWGPU::CreateGuiPipeline()
     desc.layout = device_.CreatePipelineLayout(&layout_desc);
     
     gui_pipeline_ = device_.CreateRenderPipeline(&desc);
+}
+
+static wgpu::TextureFormat GetBestSurfaceFormat(std::span<const wgpu::TextureFormat> formats)
+{
+    for (auto& format : formats)
+    {
+        if (format == wgpu::TextureFormat::BGRA8UnormSrgb || format == wgpu::TextureFormat::RGBA8UnormSrgb)
+            return format;
+    }
+   
+    return formats[0];
 }
 
 void gfx::RendererWGPU::ConfigureSurface()
@@ -648,7 +894,7 @@ void gfx::RendererWGPU::ConfigureSurface()
 
     wgpu::SurfaceCapabilities caps{};
     surface_.GetCapabilities(adapter_, &caps);
-    surface_format_ = caps.formats[0];
+    surface_format_ = GetBestSurfaceFormat({caps.formats, caps.formatCount});
     config.format = surface_format_;
 
     surface_.Configure(&config);
@@ -663,7 +909,7 @@ void gfx::RendererWGPU::ConfigureSurface()
     depth_desc.dimension = wgpu::TextureDimension::e2D;
     depth_desc.format = depth_format_;
     depth_desc.mipLevelCount = 1;
-    depth_desc.sampleCount = 1;
+    depth_desc.sampleCount = msaa_samples_;
     depth_desc.size = {viewport_size.x, viewport_size.y};
     depth_desc.usage = wgpu::TextureUsage::RenderAttachment;
     depth_desc.viewFormatCount = 1;
@@ -679,6 +925,27 @@ void gfx::RendererWGPU::ConfigureSurface()
     depth_view_desc.dimension = wgpu::TextureViewDimension::e2D;
     depth_view_desc.format = depth_format_;
     depth_texture_view_ = depth_texture_.CreateView(&depth_view_desc);
+
+    if (msaa_samples_ > 1)
+    {
+        // create multisample color texture
+        wgpu::TextureDescriptor color_desc{};
+        color_desc.dimension = wgpu::TextureDimension::e2D;
+        color_desc.format = surface_format_;
+        color_desc.mipLevelCount = 1;
+        color_desc.sampleCount = msaa_samples_;
+        color_desc.size = {viewport_size.x, viewport_size.y};
+        color_desc.usage = wgpu::TextureUsage::RenderAttachment;
+        color_desc.viewFormatCount = 1;
+        color_desc.viewFormats = &surface_format_;
+        color_texture_ = device_.CreateTexture(&color_desc);
+        color_texture_view_ = color_texture_.CreateView();
+    }
+    else
+    {
+        color_texture_ = nullptr;
+        color_texture_view_ = nullptr;
+    }
 }
 
 constexpr std::string_view SHADER_SRC = R"WGSL(
@@ -700,61 +967,6 @@ fn fs_main() -> @location(0) vec4f {
     return vec4f(0.0, 0.4, 1.0, 1.0);
 }
 )WGSL";
-
-void gfx::RendererWGPU::SetupPipeline()
-{
-    wgpu::ShaderModuleDescriptor shader_desc{};
-    shader_desc.label = "my sard";
-
-    wgpu::ShaderSourceWGSL shader_src{};
-    shader_src.code = SHADER_SRC;
-
-    shader_desc.nextInChain = &shader_src;
-
-    auto shader_module = device_.CreateShaderModule(&shader_desc);
-
-    wgpu::RenderPipelineDescriptor desc{};
-    desc.vertex.bufferCount = 0;
-    desc.vertex.buffers = nullptr;
-    desc.vertex.module = shader_module;
-    desc.vertex.entryPoint = "vs_main";
-
-    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
-    desc.primitive.frontFace = wgpu::FrontFace::CCW;
-    desc.primitive.cullMode = wgpu::CullMode::None;
-
-    wgpu::BlendState blend{};
-    blend.color.srcFactor = wgpu::BlendFactor::SrcAlpha;
-    blend.color.dstFactor = wgpu::BlendFactor::OneMinusSrcAlpha;
-    blend.color.operation = wgpu::BlendOperation::Add;
-    //
-    blend.alpha.srcFactor = wgpu::BlendFactor::Zero;
-    blend.alpha.dstFactor = wgpu::BlendFactor::One;
-    blend.alpha.operation = wgpu::BlendOperation::Add;
-
-    wgpu::ColorTargetState color{};
-    color.format = surface_format_;
-    color.blend = &blend;
-    color.writeMask = wgpu::ColorWriteMask::All;
-
-    wgpu::FragmentState fragment{};
-    fragment.module = shader_module;
-    fragment.entryPoint = "fs_main";
-    fragment.targetCount = 1;
-    fragment.targets = &color;
-    desc.fragment = &fragment;
-
-    wgpu::DepthStencilState depth_stencil{};
-
-    desc.depthStencil = nullptr;
-
-    desc.multisample.count = 1;
-    desc.multisample.mask = ~0u;
-
-    desc.layout = nullptr;
-
-    pipeline_ = device_.CreateRenderPipeline(&desc);
-}
 
 gfx::SurfaceViewData gfx::RendererWGPU::GetNextSurfaceViewData()
 {
@@ -846,10 +1058,12 @@ wgpu::Sampler gfx::RendererWGPU::GetSampler(bool linear, bool mipmaps)
     desc.addressModeV = wgpu::AddressMode::Repeat;
     desc.addressModeW = wgpu::AddressMode::Repeat;
     desc.magFilter = linear ? wgpu::FilterMode::Linear : wgpu::FilterMode::Nearest;
-    desc.minFilter = wgpu::FilterMode::Linear;
+    desc.minFilter = mipmaps ? wgpu::FilterMode::Linear : wgpu::FilterMode::Nearest;
     desc.lodMinClamp = 0.0f;
-    desc.lodMaxClamp = 1.0f;
+    desc.lodMaxClamp = 32.0f;
     desc.label = "A cached sampler";
+    desc.mipmapFilter = mipmaps ? wgpu::MipmapFilterMode::Linear : wgpu::MipmapFilterMode::Undefined;
+
     auto sampler = device_.CreateSampler(&desc);
 
     samplers_[hash] = sampler;
@@ -859,7 +1073,7 @@ wgpu::Sampler gfx::RendererWGPU::GetSampler(bool linear, bool mipmaps)
 
 wgpu::Sampler gfx::RendererWGPU::GetSamplerForTexture(const TextureWGPU& texture)
 {
-    return GetSampler(texture.desc.filter == TEXTURE_FILTER_LINEAR, texture.desc.mipmaps == TEXTURE_MIPMAP_TYPE_LINEAR);
+    return GetSampler(texture.desc.filter == TEXTURE_FILTER_LINEAR, texture.mip_levels > 1);
 }
 
 void gfx::RendererWGPU::CreateTextureGuiBindGroup(TextureWGPU& texture)
@@ -1038,8 +1252,7 @@ const wgpu::RenderPipeline& gfx::RendererWGPU::GetSurfacePipeline(SurfacePipelin
     desc.fragment = &fragment;
 
     // multisampling
-    desc.multisample.count = 1;
-    desc.multisample.mask = ~0u;
+    desc.multisample.count = msaa_samples_;
 
     // layout
     wgpu::PipelineLayoutDescriptor layout_desc{};
@@ -1066,6 +1279,11 @@ const wgpu::RenderPipeline& gfx::RendererWGPU::GetSurfacePipeline(SurfacePipelin
     return pipeline;
 }
 
+void gfx::RendererWGPU::InvalidateSurfacePipelines()
+{
+    surface_pipelines_.clear();
+}
+
 void gfx::RendererWGPU::CreateInstanceBufferBindGroup()
 {
     std::array<wgpu::BindGroupEntry, 1> entries;
@@ -1081,6 +1299,19 @@ void gfx::RendererWGPU::CreateInstanceBufferBindGroup()
     desc.label = "Instance bind group";
     instance_bind_group_ = device_.CreateBindGroup(&desc);
 }
+
+void gfx::RendererWGPU::UpdateSettings()
+{
+    if (r_msaa.IsModified())
+    {
+        msaa_samples_ = GetMultisampleCount();
+        CreateGuiPipeline();
+        InvalidateSurfacePipelines();
+        ConfigureSurface();
+        r_msaa.ClearModified();
+    }
+}
+
 
 void gfx::RendererWGPU::RenderMainPass(Scene& scene, const CameraParams& camera)
 {
@@ -1107,17 +1338,32 @@ void gfx::RendererWGPU::RenderMainPass(Scene& scene, const CameraParams& camera)
         ConfigureSurface();
     }
 
+    auto env = scene.GetSceneEnvironment();
+
     auto surface_view = GetNextSurfaceViewData();
 
     static float color = 0.0f;
     color += 0.01f;
     color = glm::mod(color, 1.0f);
 
+    auto clear_color = env.clear_color;
+
     wgpu::RenderPassColorAttachment color_attachment{};
-    color_attachment.view = surface_view.view;
+    
+    if (msaa_samples_ <= 1)
+    {
+        color_attachment.view = surface_view.view;
+        color_attachment.storeOp = wgpu::StoreOp::Store;
+    }
+    else
+    {
+        color_attachment.view = color_texture_view_;
+        color_attachment.resolveTarget = surface_view.view;
+        color_attachment.storeOp = wgpu::StoreOp::Discard;
+    }
+
     color_attachment.loadOp = wgpu::LoadOp::Clear;
-    color_attachment.storeOp = wgpu::StoreOp::Store;
-    color_attachment.clearValue = {(glm::sin(color * glm::two_pi<float>() * 2.0f) + 1.0f) * 0.1f, 0.1, 0.2, 1.0};
+    color_attachment.clearValue = {clear_color.r, clear_color.g, clear_color.b, 1.0};
 
     wgpu::RenderPassDepthStencilAttachment depth_attachment{};
     depth_attachment.view = depth_texture_view_;
@@ -1134,7 +1380,7 @@ void gfx::RendererWGPU::RenderMainPass(Scene& scene, const CameraParams& camera)
     auto pass = encoder.BeginRenderPass(&pass_desc);
 
     //auto env = scene.GetSceneEnvironment();
-    DrawSurfaceList(pass, main_dlist_.surfaces, draw_ctx);
+    DrawSurfaceList(pass, main_dlist_.surfaces, draw_ctx, env);
     DrawHudList(pass, main_dlist_.huds, draw_ctx);
 
     pass.End();
@@ -1150,13 +1396,19 @@ void gfx::RendererWGPU::RenderMainPass(Scene& scene, const CameraParams& camera)
 }
 
 void gfx::RendererWGPU::DrawSurfaceList(wgpu::RenderPassEncoder& pass, std::span<DrawSurfaceCmd> queue,
-                                        const DrawContext& ctx)
+                                        const DrawContext& ctx, const Environment& env)
 {
     if (queue.empty())
         return;
 
     GlobalUniformData globals{};
+    globals.ambient_color = LinearizeColor(env.ambient_light);
+    globals.sun_color = LinearizeColor(env.sun_color);
+    globals.sun_direction = env.sun_direction;
+    globals.camera_pos = ctx.eye;
+    globals.fog = glm::vec4(LinearizeColor(env.fog), env.fog.a);
     globals.view_proj = ctx.view_proj;
+
     queue_.WriteBuffer(global_buffer_, 0, &globals, sizeof(globals));
 
     struct PreparedCmd
@@ -1193,16 +1445,19 @@ void gfx::RendererWGPU::DrawSurfaceList(wgpu::RenderPassEncoder& pass, std::span
         auto& mat_vals = material.desc.properties;
 
         // MESH
-        if ((mesh.desc.attributes & MESH_VERTEX_ATTR_BONE_DATA) > 0 && cmd.pose > 0)
+        if (cmd.pose > 0)
         {
             // skeletal
-            pcmd.pflags |= SPF_SKELETAL;
+            // require bone vert attrs for this
+            if ((mesh.desc.attributes & MESH_VERTEX_ATTR_BONE_DATA) > 0)
+            {
+                pcmd.pflags |= SPF_SKELETAL;
+            }
         }
         else if (cmd.deform_tex > 0)
         {
             // deform grid
-            // TODO: implement uniform data for this
-            //pcmd.pflags |= SPF_DEFORM;
+            pcmd.pflags |= SPF_DEFORM;
         }
 
         // MATERIAL
@@ -1247,6 +1502,11 @@ void gfx::RendererWGPU::DrawSurfaceList(wgpu::RenderPassEncoder& pass, std::span
                                                            mat_vals.color == MATERIAL_OBJECT_COLOR_TYPE_MULTIPLY))
         {
             pcmd.pflags |= SPF_CULL_ALPHA;
+        }
+
+        if (mat_vals.lighting != MATERIAL_LIGHTING_TYPE_UNLIT)
+        {
+            pcmd.pflags |= SPF_LIT;
         }
     }
 
@@ -1385,7 +1645,10 @@ void gfx::RendererWGPU::DrawSurfaceList(wgpu::RenderPassEncoder& pass, std::span
         {
             for (size_t i = 0; i < cmd.colors.size(); ++i)
             {
-                instance_data.colors[i] = glm::packUnorm4x8(cmd.colors[i]);
+                auto color = cmd.colors[i];
+                // linearize
+                color = glm::vec4(LinearizeColor(color), color.a);
+                instance_data.colors[i] = glm::packUnorm4x8(color);
             }
         }
 

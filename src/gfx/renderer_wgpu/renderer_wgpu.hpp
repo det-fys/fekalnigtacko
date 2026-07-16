@@ -37,6 +37,7 @@ struct TextureWGPU
 {
     TextureDescriptor desc{};
     wgpu::Texture texture;
+    uint32_t mip_levels = 1;
     wgpu::TextureView view;
     wgpu::BindGroup gui_bind_group; // generated if used in HUD cmd
 };
@@ -57,11 +58,20 @@ struct SkeletonPoseWGPU
     wgpu::BindGroup bind_group;
 };
 
+struct DeformInfoWGPU
+{
+    glm::vec3 deform_min;
+    float max_offset;
+    glm::vec3 deform_max;
+    float _pad0;
+};
+
 struct DeformTextureWGPU
 {
     DeformTextureDescriptor desc{};
     wgpu::Texture texture;
     wgpu::TextureView view;
+    wgpu::Buffer info_buffer;
     wgpu::BindGroup bind_group;
 };
 
@@ -74,6 +84,15 @@ struct VertexBufferLayout
 struct GlobalUniformData
 {
     glm::mat4 view_proj;
+    glm::vec3 ambient_color;
+    float _pad0;
+    glm::vec3 sun_color;
+    float _pad1;
+    glm::vec3 sun_direction;
+    float _pad2;
+    glm::vec3 camera_pos;
+    float _pad3;
+    glm::vec4 fog;
 };
 
 struct InstanceUniformData
@@ -119,9 +138,9 @@ public:
 private:
     void InitWGPU();
     void CreateGlobalResources();
+    void CreateMipmapPipeline();
     void CreateGuiPipeline();
     void ConfigureSurface();
-    void SetupPipeline();
     SurfaceViewData GetNextSurfaceViewData();
     bool ReserveBufferCapacity(DynamicBuffer& buffer, size_t capacity);
     void SetBufferData(DynamicBuffer& buffer, std::span<const uint8_t> data);
@@ -131,10 +150,12 @@ private:
     void CreateTextureGuiBindGroup(TextureWGPU& texture);
     VertexBufferLayout GetVertexBufferLayout(MeshVertexAttributeFlags attrs);
     const wgpu::RenderPipeline& GetSurfacePipeline(SurfacePipelineFlags flags);
+    void InvalidateSurfacePipelines();
     void CreateInstanceBufferBindGroup();
+    void UpdateSettings();
 
     void RenderMainPass(Scene& scene, const CameraParams& camera);
-    void DrawSurfaceList(wgpu::RenderPassEncoder& pass, std::span<DrawSurfaceCmd> queue, const DrawContext& ctx);
+    void DrawSurfaceList(wgpu::RenderPassEncoder& pass, std::span<DrawSurfaceCmd> queue, const DrawContext& ctx, const Environment& env);
     void DrawHudList(wgpu::RenderPassEncoder& pass, std::span<DrawHudCmd> queue, const DrawContext& ctx);
 
     void Unload();
@@ -145,6 +166,10 @@ private:
     wgpu::Adapter adapter_;
     wgpu::Device device_;
     wgpu::Queue queue_;
+
+    // mipmap rendering stuff
+    wgpu::BindGroupLayout mipmap_bind_group_layout_;
+    wgpu::RenderPipeline mipmap_pipeline_;
 
     // surface drawing resources
     wgpu::BindGroupLayout global_bind_group_layout_;
@@ -173,6 +198,8 @@ private:
     wgpu::TextureFormat depth_format_;
     wgpu::Texture depth_texture_;
     wgpu::TextureView depth_texture_view_;
+    wgpu::Texture color_texture_;
+    wgpu::TextureView color_texture_view_;
 
     // resources
     ResourceArray<MeshWGPU> meshes_;
@@ -186,11 +213,12 @@ private:
 
     // caches
     std::map<uint8_t, wgpu::Sampler> samplers_;
-    wgpu::RenderPipeline pipeline_;
-
 
     // drawing
     DrawList main_dlist_;
+
+    // settings
+    uint32_t msaa_samples_ = 1;
 };
 
 } // namespace gfx

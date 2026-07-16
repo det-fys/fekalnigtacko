@@ -11,7 +11,8 @@ namespace gfx
 class TextureGL
 {
 public:
-    TextureGL(uint32_t width, uint32_t height, GLint internalformat, GLenum format, GLenum type, bool linear, bool mipmaps);
+    TextureGL(uint32_t width, uint32_t height, GLint internalformat, GLenum format, GLenum type, bool linear,
+              bool mipmaps, uint32_t max_mipmap_level = -1);
     DELETE_COPY_MOVE(TextureGL);
 
     void SetData(std::span<const uint8_t> data);

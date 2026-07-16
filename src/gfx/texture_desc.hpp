@@ -25,6 +25,7 @@ struct TextureDescriptor
     uint32_t height = 0;
     TextureFilterType filter = TEXTURE_FILTER_NEAREST;
     TextureMipmapsType mipmaps = TEXTURE_MIPMAP_TYPE_NONE;
+    uint32_t max_mipmap_level = 0xFFFFFFFF;
 };
 
 }

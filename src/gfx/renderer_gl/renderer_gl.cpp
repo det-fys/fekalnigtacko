@@ -91,7 +91,8 @@ gfx::TextureID gfx::RendererGL::CreateTexture(const TextureDescriptor& desc)
     bool linear = desc.filter == TEXTURE_FILTER_LINEAR;
     bool mipmaps = desc.mipmaps == TEXTURE_MIPMAP_TYPE_LINEAR;
 
-    auto id = textures_.Alloc(desc.width, desc.height, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, linear, mipmaps);
+    auto id = textures_.Alloc(desc.width, desc.height, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, linear, mipmaps,
+                              desc.max_mipmap_level);
     return id;
 }
 

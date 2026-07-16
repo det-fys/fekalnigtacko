@@ -27,7 +27,7 @@ static void GetGLFilterModes(bool linear, bool mipmaps, GLenum& filter_min, GLen
 }
 
 gfx::TextureGL::TextureGL(uint32_t width, uint32_t height, GLint internalformat, GLenum format, GLenum type,
-                          bool linear, bool mipmaps)
+                          bool linear, bool mipmaps, uint32_t max_mipmap_level)
     : width_(width), height_(height), internalformat_(internalformat), format_(format), type_(type), linear_(linear),
       mipmaps_(mipmaps)
 {
@@ -46,7 +46,7 @@ gfx::TextureGL::TextureGL(uint32_t width, uint32_t height, GLint internalformat,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-    if (mipmaps_)
+    if (mipmaps_ && max_mipmap_level < 0xFFFFFFFF)
     {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 3);
