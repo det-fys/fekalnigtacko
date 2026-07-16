@@ -16,6 +16,8 @@ public:
 
     void SetData(std::span<const glm::i8vec3> data);
 
+    DeformTextureID GetID() const { return id_; }
+
     ~DeformTexture();
 
 private:

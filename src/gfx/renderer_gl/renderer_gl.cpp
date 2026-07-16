@@ -12,6 +12,7 @@
 #include "assets/asset_manager.hpp"
 #include "utils/sdl_utils.hpp"
 #include "utils/cvars.hpp"
+#include "../common/hud_matrix.hpp"
 
 CVAR_CL(uint8_t, r_vertex_lighting, CV_SAVE, 0, 0, 1);
 
@@ -29,7 +30,7 @@ static void APIENTRY GLDebugCallback(GLenum source, GLenum type, GLuint id, GLen
 
 #endif // PG_GLES
 
-gfx::GLRenderer::GLRenderer(SDL_Window* window) : Renderer(window)
+gfx::RendererGL::RendererGL(SDL_Window* window) : Renderer(window)
 {
     std::cout << "Initializing GL renderer" << std::endl;
 
@@ -62,95 +63,96 @@ gfx::GLRenderer::GLRenderer(SDL_Window* window) : Renderer(window)
 #endif // PG_GLES
 }
 
-gfx::MeshID gfx::GLRenderer::CreateMesh(const MeshDescriptor& desc)
+gfx::MeshID gfx::RendererGL::CreateMesh(const MeshDescriptor& desc)
 {
     auto id = meshes_.Alloc(desc);
     return id;
 }
 
-void gfx::GLRenderer::SetMeshVertexData(MeshID mesh_id, const MeshVertexData& data)
+void gfx::RendererGL::SetMeshVertexData(MeshID mesh_id, const MeshVertexData& data)
 {
     auto& mesh = meshes_.Get(mesh_id);
     mesh.SetVertexData(data);
 }
 
-void gfx::GLRenderer::SetMeshTriangleData(MeshID mesh_id, const MeshTriangleData& data)
+void gfx::RendererGL::SetMeshTriangleData(MeshID mesh_id, const MeshTriangleData& data)
 {
     auto& mesh = meshes_.Get(mesh_id);
     mesh.SetTriangleData(data);
 }
 
-void gfx::GLRenderer::ReleaseMesh(MeshID mesh_id)
+void gfx::RendererGL::ReleaseMesh(MeshID mesh_id)
 {
     meshes_.Free(mesh_id);
 }
 
-gfx::TextureID gfx::GLRenderer::CreateTexture(const TextureDescriptor& desc)
+gfx::TextureID gfx::RendererGL::CreateTexture(const TextureDescriptor& desc)
 {
     bool linear = desc.filter == TEXTURE_FILTER_LINEAR;
     bool mipmaps = desc.mipmaps == TEXTURE_MIPMAP_TYPE_LINEAR;
 
-    auto id = textures_.Alloc(desc.width, desc.height, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, linear, mipmaps);
+    auto id = textures_.Alloc(desc.width, desc.height, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, linear, mipmaps,
+                              desc.max_mipmap_level);
     return id;
 }
 
-void gfx::GLRenderer::SetTextureData(TextureID texture_id, std::span<const uint8_t> data)
+void gfx::RendererGL::SetTextureData(TextureID texture_id, std::span<const uint8_t> data)
 {
     auto& texture = textures_.Get(texture_id);
     texture.SetData(data);
 }
 
-void gfx::GLRenderer::ReleaseTexture(TextureID texture_id)
+void gfx::RendererGL::ReleaseTexture(TextureID texture_id)
 {
     textures_.Free(texture_id);
 }
 
-gfx::MaterialID gfx::GLRenderer::CreateMaterial(const MaterialDescriptor& desc)
+gfx::MaterialID gfx::RendererGL::CreateMaterial(const MaterialDescriptor& desc)
 {
     auto id = materials_.Alloc(desc);
     return id;
 }
 
-void gfx::GLRenderer::ReleaseMaterial(MaterialID material_id)
+void gfx::RendererGL::ReleaseMaterial(MaterialID material_id)
 {
     materials_.Free(material_id);
 }
 
-gfx::SkeletonPoseID gfx::GLRenderer::CreateSkeletonPose(const SkeletonPoseDescriptor& desc)
+gfx::SkeletonPoseID gfx::RendererGL::CreateSkeletonPose(const SkeletonPoseDescriptor& desc)
 {
     auto id = poses_.Alloc(desc.num_bones);
     return id;
 }
 
-void gfx::GLRenderer::SetSkeletonPoseTransforms(SkeletonPoseID pose_id, std::span<const glm::mat4> transforms)
+void gfx::RendererGL::SetSkeletonPoseTransforms(SkeletonPoseID pose_id, std::span<const glm::mat4> transforms)
 {
     auto& pose = poses_.Get(pose_id);
     pose.SetData(transforms);
 }
 
-void gfx::GLRenderer::ReleaseSkeletonPose(SkeletonPoseID pose_id)
+void gfx::RendererGL::ReleaseSkeletonPose(SkeletonPoseID pose_id)
 {
     poses_.Free(pose_id);
 }
 
-gfx::DeformTextureID gfx::GLRenderer::CreateDeformTexture(const DeformTextureDescriptor& desc)
+gfx::DeformTextureID gfx::RendererGL::CreateDeformTexture(const DeformTextureDescriptor& desc)
 {
     auto id = deform_textures_.Alloc(desc.grid);
     return id;
 }
 
-void gfx::GLRenderer::SetDeformTextureData(DeformTextureID deform_id, std::span<const glm::i8vec3> data)
+void gfx::RendererGL::SetDeformTextureData(DeformTextureID deform_id, std::span<const glm::i8vec3> data)
 {
     auto& deform_tex = deform_textures_.Get(deform_id);
     deform_tex.SetData(data);
 }
 
-void gfx::GLRenderer::ReleaseDeformTexture(DeformTextureID deform_id)
+void gfx::RendererGL::ReleaseDeformTexture(DeformTextureID deform_id)
 {
     deform_textures_.Free(deform_id);
 }
 
-void gfx::GLRenderer::Draw(Scene& scene, const CameraParams& camera)
+void gfx::RendererGL::Draw(Scene& scene, const CameraParams& camera)
 {
     Load();
 
@@ -192,7 +194,7 @@ void gfx::GLRenderer::Draw(Scene& scene, const CameraParams& camera)
     DrawHudList(list.huds, info);
 }
 
-gfx::GLRenderer::~GLRenderer()
+gfx::RendererGL::~RendererGL()
 {
     Unload();
 
@@ -200,7 +202,7 @@ gfx::GLRenderer::~GLRenderer()
 
 }
 
-void gfx::GLRenderer::Load()
+void gfx::RendererGL::Load()
 {
     if (loaded_)
         return;
@@ -212,7 +214,7 @@ void gfx::GLRenderer::Load()
     SetupCoronaVA();
 }
 
-void gfx::GLRenderer::SetupShaders()
+void gfx::RendererGL::SetupShaders()
 {
     ShaderSources::MakeShader(solid_shader_, SS_SOLID_VERT, SS_SOLID_FRAG);
     ShaderSources::MakeShader(hud_shader_, SS_HUD_VERT, SS_HUD_FRAG);
@@ -227,7 +229,7 @@ struct BeamSegment
     float radius;
 };
 
-void gfx::GLRenderer::SetupBeamVA()
+void gfx::RendererGL::SetupBeamVA()
 {
     beam_va_ = std::make_unique<VertexArray>(VA_POSITION, 0);
 
@@ -274,13 +276,13 @@ struct CoronaVertex
     glm::vec2 uv;
 };
 
-void gfx::GLRenderer::SetupCoronaVA()
+void gfx::RendererGL::SetupCoronaVA()
 {
     corona_va_ = std::make_unique<VertexArray>(VA_POSITION | VA_COLOR | VA_UV, VF_CREATE_EBO | VF_DYNAMIC);
     corona_tex_ = assets::AssetManager::GetInstance().Get<Texture>("corona");
 }
 
-void gfx::GLRenderer::Unload()
+void gfx::RendererGL::Unload()
 {
     hud_shader_.reset();
     corona_tex_.reset();
@@ -292,7 +294,7 @@ void gfx::GLRenderer::Unload()
     surface_shaders_.clear();
 }
 
-void gfx::GLRenderer::InvalidateShaders()
+void gfx::RendererGL::InvalidateShaders()
 {
     // invalidate surface shaders
     for (auto& [flags, sshader] : surface_shaders_)
@@ -301,7 +303,7 @@ void gfx::GLRenderer::InvalidateShaders()
     }
 }
 
-gfx::SurfaceShader& gfx::GLRenderer::GetSurfaceShader(SurfaceRenderFlags flags)
+gfx::SurfaceShader& gfx::RendererGL::GetSurfaceShader(SurfaceRenderFlags flags)
 {
     auto it = surface_shaders_.find(flags);
 
@@ -317,7 +319,7 @@ gfx::SurfaceShader& gfx::GLRenderer::GetSurfaceShader(SurfaceRenderFlags flags)
     return it->second;
 }
 
-void gfx::GLRenderer::SetupSurfaceShader(SurfaceShader& sshader, const DrawInfo& info)
+void gfx::RendererGL::SetupSurfaceShader(SurfaceShader& sshader, const DrawInfo& info)
 {
     const Shader& shader = *sshader.shader;
 
@@ -352,13 +354,13 @@ void gfx::GLRenderer::SetupSurfaceShader(SurfaceShader& sshader, const DrawInfo&
     sshader.global_setup = true;
 }
 
-void gfx::GLRenderer::InvalidateSurfaceShader(SurfaceShader& sshader)
+void gfx::RendererGL::InvalidateSurfaceShader(SurfaceShader& sshader)
 {
     sshader.global_setup = false;
     sshader.color = nullptr;
 }
 
-void gfx::GLRenderer::CreateLightGrid(std::span<DrawLightCmd> light_cmds, const DrawInfo& info)
+void gfx::RendererGL::CreateLightGrid(std::span<DrawLightCmd> light_cmds, const DrawInfo& info)
 {
     light_grid_.clear();
     light_grid_chunks_.clear();
@@ -380,7 +382,7 @@ void gfx::GLRenderer::CreateLightGrid(std::span<DrawLightCmd> light_cmds, const 
     }
 }
 
-void gfx::GLRenderer::AddLightToGrid(const LightData& light, LightGrid& grid, float cell_size)
+void gfx::RendererGL::AddLightToGrid(const LightData& light, LightGrid& grid, float cell_size)
 {
     float margin = light.radius + cell_size * 0.2f;
 
@@ -403,7 +405,7 @@ void gfx::GLRenderer::AddLightToGrid(const LightData& light, LightGrid& grid, fl
     }
 }
 
-void gfx::GLRenderer::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawInfo& info)
+void gfx::RendererGL::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawInfo& info)
 {
     // TODO: split this all-the-responsibilities function into multiple
 
@@ -775,7 +777,7 @@ static float GetRandomOffset(float max_offset)
     return (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) - 0.5f) * 2.0f * max_offset;
 }
 
-void gfx::GLRenderer::DrawBeamList(std::span<DrawBeamCmd> queue, const DrawInfo& info)
+void gfx::RendererGL::DrawBeamList(std::span<DrawBeamCmd> queue, const DrawInfo& info)
 {
     static std::vector<BeamSegment> segments;
     static std::vector<glm::vec3> points;
@@ -842,7 +844,7 @@ void gfx::GLRenderer::DrawBeamList(std::span<DrawBeamCmd> queue, const DrawInfo&
     glBindVertexArray(0);
 }
 
-void gfx::GLRenderer::DrawCoronaList(std::span<DrawCoronaCmd> queue, const DrawInfo& info)
+void gfx::RendererGL::DrawCoronaList(std::span<DrawCoronaCmd> queue, const DrawInfo& info)
 {
     if (queue.empty())
         return;
@@ -941,7 +943,7 @@ void gfx::GLRenderer::DrawCoronaList(std::span<DrawCoronaCmd> queue, const DrawI
 
 }
 
-void gfx::GLRenderer::DrawHudList(std::span<DrawHudCmd> queue, const DrawInfo& info)
+void gfx::RendererGL::DrawHudList(std::span<DrawHudCmd> queue, const DrawInfo& info)
 {
     if (queue.empty())
         return;
@@ -958,17 +960,7 @@ void gfx::GLRenderer::DrawHudList(std::span<DrawHudCmd> queue, const DrawInfo& i
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    float w = static_cast<float>(info.ctx.viewport_size.x);
-    float h = static_cast<float>(info.ctx.viewport_size.y);
-    glm::vec2 screen_size_px(w, h);
-    glm::vec2 ndc_scale(2.0f / screen_size_px.x, -2.0f / screen_size_px.y);
-    constexpr glm::vec2 ndc_offset(-1.0f, 1.0f);
-
-    glm::mat3 matrix(1.0f);
-    matrix[0][0] = ndc_scale.x;
-    matrix[1][1] = ndc_scale.y;
-    matrix[2][0] = ndc_offset.x;
-    matrix[2][1] = ndc_offset.y;
+    auto matrix = GetHudMatrix(info.ctx.viewport_size);
 
     glUniformMatrix3fv(shader->U(SU_MODEL), 1, GL_FALSE, &matrix[0][0]);
 

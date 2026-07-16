@@ -9,10 +9,10 @@
 namespace gfx
 {
 
-class GLSkeletonPose
+class SkeletonPoseGL
 {
 public:
-    GLSkeletonPose(size_t num_bones);
+    SkeletonPoseGL(size_t num_bones);
 
     void SetData(std::span<const glm::mat4> data);
 

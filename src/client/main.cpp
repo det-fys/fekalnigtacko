@@ -26,6 +26,7 @@
 #include "key_map.hpp"
 #include "gfx/renderer.hpp"
 #include "utils/sdl_utils.hpp"
+#include "gfx/renderer_gl/gl.hpp"
 
 CVAR_CL(uint16_t, cl_maxfps, CV_SAVE, 0);
 
@@ -322,12 +323,38 @@ void SetUrl(const char* url)
     s_url = url;
 }
 
+void SetRenderer(const char* renderer)
+{
+    CVarRegistry::GetClientInstance().Set("r_renderer", renderer);
+}
+
 }
 
 #ifndef EMSCRIPTEN
 
+static void ProcessArgs(int argc, char* argv[])
+{
+    std::string var_name;
+
+    for (int i = 1; i < argc; ++i)
+    {
+        // var name
+        if (var_name.empty())
+        {
+            var_name = argv[i];
+            continue;
+        }
+
+        // value
+        std::string value = argv[i];
+        CVarRegistry::GetClientInstance().Set(var_name, value);
+        var_name.clear();
+    }
+}
+
 int main(int argc, char *argv[])
 {
+    ProcessArgs(argc, argv);
     SetName("random guvno");
     RunMain();
 	return 0;

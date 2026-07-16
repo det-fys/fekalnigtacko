@@ -9,18 +9,18 @@
 namespace gfx
 {
 
-class GLDeformTexture
+class DeformTextureGL
 {
 public:
-    GLDeformTexture(const DeformGridInfo& info);
-    DELETE_COPY_MOVE(GLDeformTexture)
+    DeformTextureGL(const DeformGridInfo& info);
+    DELETE_COPY_MOVE(DeformTextureGL)
 
     void SetData(std::span<const glm::i8vec3> data);
 
     const DeformGridInfo& GetInfo() const { return info_; }
     GLuint GetId() const { return id_; }
 
-    ~GLDeformTexture();
+    ~DeformTextureGL();
 
 private:
     const DeformGridInfo info_;

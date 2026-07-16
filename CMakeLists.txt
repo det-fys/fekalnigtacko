@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.22)
 project(FekalniGtacko)
 
 # Enable C++20
@@ -172,6 +172,7 @@ set(CLIENT_ONLY_SOURCES
     "src/gameview/worldview.hpp"
     "src/gameview/worldview.cpp"
 
+    "src/gfx/common/vertex_pack.cpp"
     "src/gfx/renderer_gl/buffer_object.cpp"
     "src/gfx/renderer_gl/deform_texture_gl.cpp"
     "src/gfx/renderer_gl/mesh_gl.cpp"
@@ -182,6 +183,9 @@ set(CLIENT_ONLY_SOURCES
     "src/gfx/renderer_gl/surface_shader.cpp"
     "src/gfx/renderer_gl/texture_gl.cpp"
     "src/gfx/renderer_gl/vertex_array.cpp"
+    "src/gfx/renderer_wgpu/renderer_wgpu.cpp"
+    "src/gfx/renderer_wgpu/surface_sdl.cpp"
+    "src/gfx/renderer_wgpu/surface_shader_wgpu.cpp"
     "src/gfx/deform_texture.cpp"
     "src/gfx/frustum.cpp"
     "src/gfx/material.cpp"
@@ -217,6 +221,19 @@ set(SERVER_ONLY_SOURCES
     "src/server/main.cpp"
     "src/utils/files_server.cpp"
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL Emscripten)
+    add_compile_definitions(EMSCRIPTEN=1)
+
+    add_compile_options(
+        "-pthread"
+    )
+
+    add_link_options(
+        "-pthread"
+    )
+
+endif()
 
 if(ANDROID)
     # Android-specific setup
@@ -258,26 +275,53 @@ add_subdirectory(external/ogg)
 add_subdirectory(external/vorbis)
 target_link_libraries(${MAIN_NAME} PRIVATE vorbisfile vorbis)
 
+# add dawn
+set(DAWN_FETCH_DEPENDENCIES ON)
+
+set(DAWN_ENABLE_D3D11 OFF)
+set(DAWN_ENABLE_D3D12 ON)
+set(DAWN_ENABLE_METAL OFF)
+set(DAWN_ENABLE_NULL OFF)
+set(DAWN_ENABLE_DESKTOP_GL OFF)
+set(DAWN_ENABLE_OPENGLES OFF)
+set(DAWN_ENABLE_VULKAN ON)
+set(TINT_BUILD_SPV_READER OFF)
+
+set(DAWN_BUILD_SAMPLES OFF)
+set(DAWN_USE_GLFW OFF)
+set(TINT_BUILD_TINT OFF)
+set(TINT_BUILD_CMD_TOOLS OFF)
+set(TINT_BUILD_SAMPLES OFF)
+set(TINT_BUILD_DOCS OFF)
+set(TINT_BUILD_TESTS OFF)
+set(TINT_BUILD_FUZZERS OFF)
+set(TINT_BUILD_SPIRV_TOOLS_FUZZER OFF)
+set(TINT_BUILD_AST_FUZZER OFF)
+set(TINT_BUILD_REGEX_FUZZER OFF)
+set(TINT_BUILD_BENCHMARKS OFF)
+set(TINT_BUILD_TESTS OFF)
+set(TINT_BUILD_AS_OTHER_OS OFF)
+set(TINT_BUILD_REMOTE_COMPILE OFF)
+
+add_subdirectory("external/dawn" EXCLUDE_FROM_ALL)
+
 # Platform-specific SDL2 handling
 if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
 
     # Emscripten provides SDL2 via its system libraries
     message(STATUS "Target platform: WebAssembly (Emscripten)")
-    set(CMAKE_EXECUTABLE_SUFFIX ".html")  # Optional: build HTML page
-
+    # set(CMAKE_EXECUTABLE_SUFFIX ".html")  # Optional: build HTML page
+    set_target_properties(${MAIN_NAME} PROPERTIES SUFFIX ".html")
+    
     target_compile_options(${MAIN_NAME} PRIVATE 
         "-sUSE_SDL=2"
         "-sNO_DISABLE_EXCEPTION_CATCHING=1"
-        "-pthread"
     )
-
-    target_compile_definitions(${MAIN_NAME} PRIVATE EMSCRIPTEN)
 
     target_link_options(${MAIN_NAME} PRIVATE 
         "-lwebsocket.js"
         "-lidbfs.js"
         "-lopenal"
-        "-pthread"
         "-sPTHREAD_POOL_SIZE=4"
         "-sUSE_SDL=2"
         "-sASYNCIFY"
@@ -285,12 +329,15 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
         "-sNO_DISABLE_EXCEPTION_CATCHING=1"
         "-sALLOW_MEMORY_GROWTH=1"
         "-sGROWABLE_ARRAYBUFFERS=0"
-        "-sEXPORTED_FUNCTIONS=_RunMain,_SetName,_SetUrl"
+        "-sEXPORTED_FUNCTIONS=_RunMain,_SetName,_SetUrl,_SetRenderer"
         "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
         "--shell-file" "${CMAKE_SOURCE_DIR}/shell.html"
         "--preload-file" "${CMAKE_SOURCE_DIR}/assets/@/"
         )
-        
+    
+    # add emdawnwebgpu
+    target_link_libraries(${MAIN_NAME} PRIVATE emdawnwebgpu_cpp)
+
 else()
     message(STATUS "Target platform: Native")
     # Native platform
@@ -341,6 +388,9 @@ endif()
             $<TARGET_FILE:OpenAL>
             $<TARGET_FILE_DIR:${MAIN_NAME}>
     )
+
+    # add dawn native
+    target_link_libraries(${MAIN_NAME} PRIVATE webgpu_dawn)
 
     # build server
     set(ASIO_INCLUDE_DIR "external/asio/include")

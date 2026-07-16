@@ -1,5 +1,3 @@
-#pragma once
-
 #include "texture.hpp"
 #include "utils/files.hpp"
 #include "utils/image.hpp"
@@ -21,8 +19,11 @@ std::shared_ptr<gfx::Texture> gfx::Texture::LoadFromFile(const std::string& file
 
     auto image = LoadImage(filename);
 
-    bool mipmaps = true;
-    bool linear = false;
+    TextureDescriptor desc{};
+    desc.width = image.width;
+    desc.height = image.height;
+    desc.filter = TEXTURE_FILTER_NEAREST;
+    desc.mipmaps = TEXTURE_MIPMAP_TYPE_LINEAR;
 
     std::string config_path = filename + ".cfg";
     if (fs::FileExists(config_path))
@@ -30,20 +31,18 @@ std::shared_ptr<gfx::Texture> gfx::Texture::LoadFromFile(const std::string& file
         assets::LoadCMDFile(config_path, [&](const std::string& command, CmdLineStream& iss) {
             if (command == "nomipmaps")
             {
-                mipmaps = false;
+                desc.mipmaps = TEXTURE_MIPMAP_TYPE_NONE;
             }
             else if (command == "linear")
             {
-                linear = true;
+                desc.filter = TEXTURE_FILTER_LINEAR;
+            }
+            else if (command == "maxmipmaplevel")
+            {
+                iss >> desc.max_mipmap_level;
             }
         });
     }
-
-    TextureDescriptor desc{};
-    desc.width = image.width;
-    desc.height = image.height;
-    desc.filter = linear ? TEXTURE_FILTER_LINEAR : TEXTURE_FILTER_NEAREST;
-    desc.mipmaps = mipmaps ? TEXTURE_MIPMAP_TYPE_LINEAR : TEXTURE_MIPMAP_TYPE_NONE;
 
     auto texture = std::make_shared<Texture>(desc);
     texture->SetData(image.data);
