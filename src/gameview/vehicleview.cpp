@@ -484,6 +484,7 @@ void game::view::VehicleView::DrawBaseModel(const DrawArgs& args) const
     cmd.mesh = model_view_->GetMesh().GetID();
     cmd.matrix = &root_.matrix;
     cmd.colors = {colors, VCS__COUNT};
+    cmd.deform_tex = deform_->tex.GetID();
 
     auto& dlist = args.ctx.dlist;
     auto surfaces = model_view_->GetSurfaces();
