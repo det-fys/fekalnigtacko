@@ -255,7 +255,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
             camera_pos: vec3f,
             csm_cascade_count: u32,
             fog: vec4f,
-            csm_splits: array<f32, MAX_CASCADES>,
+            csm_splits: vec4f,
             csm_matrices: array<mat4x4f, MAX_CASCADES>,
         };
         @group(0) @binding(0) var<uniform> u_global: GlobalData;
