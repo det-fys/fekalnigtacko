@@ -8,11 +8,13 @@
 static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
 {
     std::string vertex_ins;
-    std::string special_bind_group;
+    std::string bindings;
     std::string functions;
     std::string vertex_main;
     std::string vertex_outs;
     std::string fragment_main;
+
+    bool fragment_output = (flags & gfx::SPF_DEPTH_ONLY) == 0;
 
     // DEFORM / SKELETAL
     if (flags & gfx::SPF_SKELETAL)
@@ -22,7 +24,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
         vertex_ins += "@location(5) bone_ids : vec4u,\n";
         vertex_ins += "@location(6) bone_weights : vec4f,\n";
 
-        special_bind_group += "@group(3) @binding(0) var<uniform> u_bones: array<mat4x4f, MAX_BONES>;\n";
+        bindings += "@group(3) @binding(0) var<uniform> u_bones: array<mat4x4f, MAX_BONES>;\n";
 
         vertex_main += R"WGSL(
             var bone_transform = mat4x4f(vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0));
@@ -47,9 +49,9 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
     }
     else if (flags & gfx::SPF_DEFORM)
     {
-        special_bind_group += "@group(3) @binding(0) var deform_texture_sampler: sampler;\n";
-        special_bind_group += "@group(3) @binding(1) var deform_texture: texture_3d<f32>;\n";
-        special_bind_group += R"WGSL(
+        bindings += "@group(3) @binding(0) var deform_texture_sampler: sampler;\n";
+        bindings += "@group(3) @binding(1) var deform_texture: texture_3d<f32>;\n";
+        bindings += R"WGSL(
             struct DeformInfo {
                 deform_min: vec3f,
                 max_offset: f32,
@@ -57,7 +59,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
                 _pad0: f32,
             };
         )WGSL";
-        special_bind_group += "@group(3) @binding(2) var<uniform> u_deform_info: DeformInfo;\n";
+        bindings += "@group(3) @binding(2) var<uniform> u_deform_info: DeformInfo;\n";
 
         vertex_main += R"WGSL(
             let deform_pos = (in.position - u_deform_info.deform_min) / (u_deform_info.deform_max - u_deform_info.deform_min);
@@ -129,14 +131,76 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
 
     if (flags & gfx::SPF_LIT)
     {
+        bindings += R"WGSL(
+            @group(0) @binding(1) var shadow_sampler: sampler_comparison;
+            @group(0) @binding(2) var csm_texture: texture_depth_2d_array;
+        )WGSL";
+
         functions += R"WGSL(
+            fn select_csm_cascade(depth: f32) -> u32 {
+                for (var i: u32 = 0u; i < MAX_CASCADES; i++) {
+                    if (i >= u_global.csm_cascade_count) {
+                        break;
+                    }            
+        
+                    if (depth < u_global.csm_splits[i]) {
+                        return i;
+                    }
+                }
+
+                return MAX_CASCADES;
+            }
+
+            fn sample_csm(world_pos: vec3f, depth: f32) -> f32 {
+                var cascade_idx = select_csm_cascade(depth);
+
+                var factor = 0.0;
+
+                if (cascade_idx == MAX_CASCADES) {
+                    cascade_idx = MAX_CASCADES - 1u;
+                    factor = 1.0;
+                }
+
+                var pos = u_global.csm_matrices[cascade_idx] * vec4f(world_pos, 1.0);
+                pos /= pos.w;
+
+                let uv = vec2f(
+                    pos.x * 0.5 + 0.5,
+                    1.0 - (pos.y * 0.5 + 0.5)
+                );
+
+                let texel_size = u_global.csm_texel_size;
+
+                let bias = 0.002;
+
+                var shadow = 0.0;
+
+                for (var x: i32 = -1; x <= 1; x++) {
+                    for (var y: i32 = -1; y <= 1; y++) {
+                        shadow += textureSampleCompare(
+                            csm_texture,
+                            shadow_sampler,
+                            uv + vec2f(f32(x), f32(y)) * texel_size,
+                            cascade_idx,
+                            pos.z - bias
+                        );
+                    }
+                }
+
+                shadow /= 9.0;
+
+                return max(shadow, factor);
+            }
+
             fn compute_sun_light(world_pos: vec3f, world_normal: vec3f) -> vec3f {
                 let N = normalize(world_normal);
                 let L = normalize(-u_global.sun_direction);
 
                 let NdotL = max(dot(N, L), 0.0);
 
-                return u_global.sun_color * NdotL;
+                let view_pos = u_global.view * vec4f(world_pos, 1.0);
+                let depth = -view_pos.z;
+                return u_global.sun_color * (NdotL * sample_csm(world_pos, depth));
             }
 
             fn compute_lights(world_pos: vec3f, world_normal: vec3f) -> vec3f {
@@ -144,9 +208,9 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
                 color += compute_sun_light(world_pos, world_normal);
                 return color;
             }
-
         )WGSL";
 
+        //fragment_main += "out *= get_cascade_color(in.world_position);\n";
         fragment_main += "out = vec4f(out.rgb * compute_lights(in.world_position, in.world_normal), out.a);\n";
     }
 
@@ -180,16 +244,19 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
     shader += R"WGSL(
         // global/pass
         struct GlobalData {
+            view: mat4x4f,
             view_proj: mat4x4f,
             ambient_color: vec3f,
             _pad0: f32,
             sun_color: vec3f,
             _pad1: f32,
             sun_direction: vec3f,
-            _pad2: f32,
+            csm_texel_size: f32,
             camera_pos: vec3f,
-            _pad3: f32,
+            csm_cascade_count: u32,
             fog: vec4f,
+            csm_splits: array<f32, MAX_CASCADES>,
+            csm_matrices: array<mat4x4f, MAX_CASCADES>,
         };
         @group(0) @binding(0) var<uniform> u_global: GlobalData;
 
@@ -206,7 +273,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
 
         // special
     )WGSL";
-    shader += special_bind_group;
+    shader += bindings;
     shader += functions;
 
     shader += "@vertex\n";
@@ -223,11 +290,15 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
     shader += "}\n\n";
 
     shader += "@fragment\n";
-    shader += "fn fs_main(in: VertexOutput) -> @location(0) vec4f {\n";
+    shader += "fn fs_main(in: VertexOutput) ";
+    if (fragment_output)
+        shader += "-> @location(0) vec4f";
+    shader += "{\n";
     shader += "    let instance = u_instance[in.instance_id];\n";
     shader += "    var out = vec4f(1.0);\n\n";
     shader += fragment_main;
-    shader += "    return out;\n\n";
+    if (fragment_output)
+        shader += "    return out;\n\n";
     shader += "}\n\n";
 
     return shader;

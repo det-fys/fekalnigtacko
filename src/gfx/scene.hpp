@@ -11,7 +11,7 @@ enum DrawPassType
 {
     DRAW_PASS_MAIN,
     DRAW_PASS_SHADOW_MAP,
-    DRAW_PASS_CSM,
+    //DRAW_PASS_CSM,
 };
 
 struct DrawContext

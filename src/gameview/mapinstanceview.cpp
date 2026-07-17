@@ -120,21 +120,26 @@ void game::view::MapInstanceView::InitObjsAndCollisions()
 
 void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, const assets::Chunk& chunk) const
 {
-    auto surfaces = basemodel_view_->GetSurfaces();
-
-    gfx::DrawSurfaceCmd cmd{};
-    cmd.mesh = basemodel_view_->GetMesh().GetID();
-    cmd.map_chunk_hash = chunk.light_hash;
-
-    auto& dlist = args.ctx.dlist;
-    for (const auto& surface_range : chunk.surfaces)
+    // make basemodel not cast shadows
+    if (args.ctx.pass != gfx::DRAW_PASS_SHADOW_MAP)
     {
-        auto& surface = surfaces[surface_range.idx];
-        cmd.material = surface.material->GetID();
-        cmd.tri_offset = surface.tri_offset + surface_range.first;
-        cmd.tri_count = surface_range.count;
-        dlist.AddSurface(cmd);
+        auto surfaces = basemodel_view_->GetSurfaces();
+
+        gfx::DrawSurfaceCmd cmd{};
+        cmd.mesh = basemodel_view_->GetMesh().GetID();
+        cmd.map_chunk_hash = chunk.light_hash;
+
+        auto& dlist = args.ctx.dlist;
+        for (const auto& surface_range : chunk.surfaces)
+        {
+            auto& surface = surfaces[surface_range.idx];
+            cmd.material = surface.material->GetID();
+            cmd.tri_offset = surface.tri_offset + surface_range.first;
+            cmd.tri_count = surface_range.count;
+            dlist.AddSurface(cmd);
+        }
     }
+
 
     const auto& objs = map_->GetStaticObjects();
 
