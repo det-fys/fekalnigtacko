@@ -872,13 +872,27 @@ void gfx::RendererWGPU::CreateGuiPipeline()
 
 static wgpu::TextureFormat GetBestSurfaceFormat(std::span<const wgpu::TextureFormat> formats)
 {
+    std::cout << "surface formats count:" << formats.size() << std::endl;
+
     for (auto& format : formats)
     {
+        std::cout << format << std::endl;
         if (format == wgpu::TextureFormat::BGRA8UnormSrgb || format == wgpu::TextureFormat::RGBA8UnormSrgb)
             return format;
     }
    
     return formats[0];
+}
+
+static wgpu::TextureFormat GetSurfaceSrgbViewFormat(wgpu::TextureFormat format)
+{
+    if (format == wgpu::TextureFormat::BGRA8Unorm)
+        return wgpu::TextureFormat::BGRA8UnormSrgb;
+
+    if (format == wgpu::TextureFormat::RGBA8Unorm)
+        return wgpu::TextureFormat::RGBA8UnormSrgb;
+
+    return format; // already srgb or weird format
 }
 
 void gfx::RendererWGPU::ConfigureSurface()
@@ -891,11 +905,15 @@ void gfx::RendererWGPU::ConfigureSurface()
     config.height = viewport_size.y;
     config.device = device_;
     config.usage = wgpu::TextureUsage::RenderAttachment;
-
+    
     wgpu::SurfaceCapabilities caps{};
     surface_.GetCapabilities(adapter_, &caps);
-    surface_format_ = GetBestSurfaceFormat({caps.formats, caps.formatCount});
-    config.format = surface_format_;
+    config.format = GetBestSurfaceFormat({caps.formats, caps.formatCount});
+    
+    // view format - srgb
+    surface_format_ = GetSurfaceSrgbViewFormat(config.format);
+    config.viewFormatCount = 1;
+    config.viewFormats = &surface_format_;
 
     surface_.Configure(&config);
     surface_size_ = viewport_size;
@@ -993,7 +1011,7 @@ gfx::SurfaceViewData gfx::RendererWGPU::GetNextSurfaceViewData()
     
     wgpu::TextureViewDescriptor view_desc{};
     view_desc.label = "Surface texture view";
-    view_desc.format = data.surface_texture.texture.GetFormat();
+    view_desc.format = surface_format_;
     view_desc.dimension = wgpu::TextureViewDimension::e2D;
     view_desc.baseMipLevel = 0;
     view_desc.mipLevelCount = 1;
