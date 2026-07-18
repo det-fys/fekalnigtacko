@@ -1035,153 +1035,202 @@ void gfx::RendererWGPU::CreateLightCullingBindGroup()
 void gfx::RendererWGPU::CreateLightCullingPipeline()
 {
     constexpr std::string_view SHADER_SRC = SHADER_DEFS_WGSL R"WGSL(
-const TILE_PIXELS = TILE_SIZE * TILE_SIZE;
+        const TILE_PIXELS = TILE_SIZE * TILE_SIZE;
 
-struct GlobalData {
-    screen_size: vec2u,
-    tile_count: vec2u,
-    view_proj: mat4x4f,
-    inv_view_proj: mat4x4f, // Added: Crucial for easy unprojection
-    view: mat4x4f,
-    light_count: u32,
-    _pad0: f32,
-    _pad1: f32,
-    _pad2: f32,
-};
+        struct GlobalData {
+            screen_size: vec2u,
+            tile_count: vec2u,
+            proj: mat4x4f,
+            inv_proj: mat4x4f,
+            light_count: u32,
+            _pad0: f32,
+            _pad1: f32,
+            _pad2: f32,
+        };
 
-struct LightBufferData {
-    pos: vec3f,
-    radius: f32,
-    color: vec3f,
-    cos_inner: f32,
-    dir: vec3f,
-    cos_outer: f32,
-};
+        struct LightBufferData {
+            view_pos: vec3f,
+            radius: f32,
+            color: vec3f,
+            cos_inner: f32,
+            view_dir: vec3f,
+            cos_outer: f32,
+            view_bounding_pos: vec3f,
+            bounding_radius: f32,
+        };
 
-@group(0) @binding(0) var<uniform> u_global: GlobalData;
-@group(0) @binding(1) var depth_texture: texture_depth_2d;
-@group(0) @binding(2) var<storage, read> u_lights: array<LightBufferData>;
-@group(0) @binding(3) var<storage, read_write> u_visible: array<u32>;
+        @group(0) @binding(0) var<uniform> u_global: GlobalData;
+        @group(0) @binding(1) var depth_texture: texture_depth_2d;
+        @group(0) @binding(2) var<storage, read> u_lights: array<LightBufferData>;
+        @group(0) @binding(3) var<storage, read_write> u_visible: array<u32>;
 
-var<workgroup> visible_count: atomic<u32>;
+        var<workgroup> visible_count: atomic<u32>;
+        var<workgroup> tile_min_depth_u32: atomic<u32>;
+        var<workgroup> tile_max_depth_u32: atomic<u32>;
+        var<workgroup> frustum_planes: array<vec4f, 6>;
+        var<workgroup> tile_aabb_min: vec3f;
+        var<workgroup> tile_aabb_max: vec3f;
 
-struct DepthRange {
-    min: f32,
-    max: f32,
-};
-
-var<workgroup> depths: array<DepthRange, TILE_PIXELS>;
-var<workgroup> frustum_planes: array<vec4f, 6>;
-
-fn sphere_in_frustum(pos: vec3f, radius: f32) -> bool {
-    for (var i = 0u; i < 6u; i++) {
-        let p = frustum_planes[i];
-        if (dot(p.xyz, pos) + p.w < -radius) {
-            return false;
+        fn sphere_in_frustum(pos: vec3f, radius: f32) -> bool {
+            for (var i = 0u; i < 4u; i = i + 1u) {
+                if (dot(frustum_planes[i].xyz, pos) < -radius) {
+                    return false;
+                }
+            }
+            for (var i = 4u; i < 6u; i = i + 1u) {
+                let p = frustum_planes[i];
+                if (dot(p.xyz, pos) + p.w < -radius) {
+                    return false;
+                }
+            }
+            return true;
         }
-    }
-    return true;
-}
 
-@compute @workgroup_size(16, 16) // Explicitly match TILE_SIZE
-fn cull_lights(
-    @builtin(local_invocation_id) lid: vec3u,
-    @builtin(workgroup_id) wgid: vec3u
-) {
-    let tile_index = wgid.y * u_global.tile_count.x + wgid.x;
-    let local_index = lid.y * TILE_SIZE + lid.x;
-
-    // 1. Initialize atomic counter
-    if (local_index == 0u) {
-        atomicStore(&visible_count, 0u);
-    }
+        // Unprojects an NDC point (x, y) at a specific depth (z) into View Space
+        fn ndc_to_view(ndc: vec2f, depth: f32, inv_proj: mat4x4f) -> vec3f {
+            // In WebGPU/ZO clip space, depth is directly [0.0, 1.0]
+            let clip_pos = vec4f(ndc.x, ndc.y, depth, 1.0);
+            let view_pos_homogenous = inv_proj * clip_pos;
     
-    // 2. Load depths (Standard ZO Layout)
-    let pixel = wgid.xy * TILE_SIZE + lid.xy;
-    var depth = 1.0; // Clear to 1.0 so out-of-bounds tiles don't artificially collapse min depth to 0
-    if (pixel.x < u_global.screen_size.x && pixel.y < u_global.screen_size.y) {
-        depth = textureLoad(depth_texture, vec2i(pixel), 0);
-    }
-
-    depths[local_index].min = depth;
-    depths[local_index].max = depth;
-    workgroupBarrier();
-
-    // 3. FIXED Parallel Reduction (No uniform control flow divergence)
-    for (var stride = TILE_PIXELS / 2u; stride > 0u; stride /= 2u) {
-        if (local_index < stride) {
-            depths[local_index].min = min(depths[local_index].min, depths[local_index + stride].min);
-            depths[local_index].max = max(depths[local_index].max, depths[local_index + stride].max);
+            // Divide by W to resolve the perspective projection
+            return view_pos_homogenous.xyz / view_pos_homogenous.w;
         }
-        workgroupBarrier(); // Safe: Executed by all threads outside the 'if' block
-    }
 
-    // 4. Compute Tile Frustum natively in World Space
-    if (local_index == 0u) {
-        let tile_min_depth = depths[0].min;
-        let tile_max_depth = depths[0].max;
-
-        let tile = wgid.xy;
-        let tile_scale = vec2f(u_global.tile_count);
-        
-        // Step fractions [0.0 to 1.0] across the screen grid
-        let step_min = vec2f(tile) / tile_scale;
-        let step_max = vec2f(tile + vec2u(1u)) / tile_scale;
-
-        // Map tile bounds cleanly into NDC space [-1.0, 1.0]
-        // X increases left-to-right (-1 to +1)
-        let ndc_x_min = -1.0 + 2.0 * step_min.x;
-        let ndc_x_max = -1.0 + 2.0 * step_max.x;
-        
-        // Y increases bottom-to-top in NDC (-1 to +1), while wgid.y goes top-to-bottom
-        let ndc_y_max = 1.0 - 2.0 * step_min.y;
-        let ndc_y_min = 1.0 - 2.0 * step_max.y;
-
-        // Clip space plane equations: A*x + B*y + C*z + D*w = 0
-        // Plane normals point inside the tile frustum
-        var p0 = vec4f( 1.0,  0.0,  0.0, -ndc_x_min); // Left:   x >= x_min
-        var p1 = vec4f(-1.0,  0.0,  0.0,  ndc_x_max); // Right:  x <= x_max
-        var p2 = vec4f( 0.0,  1.0,  0.0, -ndc_y_min); // Bottom: y >= y_min
-        var p3 = vec4f( 0.0, -1.0,  0.0,  ndc_y_max); // Top:    y <= y_max
-        
-        // Zero-to-One (ZO) depth bounds: z in [0.0, 1.0]
-        var p4 = vec4f( 0.0,  0.0,  1.0, -tile_min_depth); // Near: z >= min_depth
-        var p5 = vec4f( 0.0,  0.0, -1.0,  tile_max_depth); // Far:  z <= max_depth
-
-        // Use transpose(view_proj) ONLY if lights are in World Space.
-        // If lights are stored in View Space, use transpose(u_global.proj) instead!
-        let transform_mat = transpose(u_global.view_proj);
-
-        // Transform and normalize all six planes cleanly
-        let planes = array<vec4f, 6>(p0, p1, p2, p3, p4, p5);
-        for (var i = 0u; i < 6u; i = i + 1u) {
-            let p = transform_mat * planes[i];
-            let len = length(p.xyz);
-            frustum_planes[i] = p / len;
+        fn sphere_intersects_aabb(light_view_pos: vec3f, radius: f32) -> bool {
+            // Arvo's Algorithm Core: Clamp the sphere center inside the AABB grid bounds
+            // to find the absolute closest spatial coordinate on or inside the box surface.
+            let closest_point = clamp(light_view_pos, tile_aabb_min, tile_aabb_max);
+    
+            // Calculate the distance vector from the box to the sphere center
+            let delta = light_view_pos - closest_point;
+    
+            // Use dot product to check distance squared (saves a costly sqrt() call per light)
+            let distance_sq = dot(delta, delta);
+    
+            // If the squared distance is less than or equal to the squared radius, it intersects!
+            return distance_sq <= (radius * radius);
         }
-    }
-    workgroupBarrier();
 
-    // 6. Test Lights
-    for (var i = local_index; i < u_global.light_count; i += TILE_PIXELS) {
-        if (sphere_in_frustum(u_lights[i].pos, u_lights[i].radius)) {
-            let index = atomicAdd(&visible_count, 1u);
-            if (index < MAX_LIGHTS_PER_TILE) {
-                u_visible[tile_index * MAX_LIGHTS_PER_TILE + index] = i;
+        @compute @workgroup_size(TILE_SIZE, TILE_SIZE)
+        fn cull_lights(
+            @builtin(local_invocation_id) lid: vec3u,
+            @builtin(workgroup_id) wgid: vec3u
+        ) {
+            let tile_index = wgid.y * u_global.tile_count.x + wgid.x;
+            let local_index = lid.y * TILE_SIZE + lid.x;
+
+            // Initialize atomics in a single thread
+            if (local_index == 0u) {
+                atomicStore(&visible_count, 0u);
+                atomicStore(&tile_min_depth_u32, 0xFFFFFFFFu); // Max u32 represents 1.0f
+                atomicStore(&tile_max_depth_u32, 0u);          // 0 represents 0.0f
+            }
+            workgroupBarrier();
+
+            // Load depths with edge-clamping to prevent artificial far-plane stretching
+            let max_coord = u_global.screen_size - vec2u(1u);
+            let pixel = min(wgid.xy * TILE_SIZE + lid.xy, max_coord);
+            let depth = textureLoad(depth_texture, vec2i(pixel), 0);
+
+            // O(1) Atomic Float Reduction (Valid because depth is positive IEEE 754 float)
+            let depth_u32 = bitcast<u32>(depth);
+            atomicMin(&tile_min_depth_u32, depth_u32);
+            atomicMax(&tile_max_depth_u32, depth_u32);
+
+            workgroupBarrier();
+
+            // Compute Tile Frustum natively in View Space
+            if (local_index == 0u) {
+                let tile_min_depth = bitcast<f32>(atomicLoad(&tile_min_depth_u32));
+                let tile_max_depth = bitcast<f32>(atomicLoad(&tile_max_depth_u32));
+        
+                let tile = wgid.xy;
+                let tile_scale = vec2f(u_global.tile_count);
+
+                let step_min = vec2f(tile) / tile_scale;
+                let step_max = vec2f(tile + vec2u(1u)) / tile_scale;
+
+                let ndc_x_min = -1.0 + 2.0 * step_min.x;
+                let ndc_x_max = -1.0 + 2.0 * step_max.x;
+                let ndc_y_max =  1.0 - 2.0 * step_min.y;
+                let ndc_y_min =  1.0 - 2.0 * step_max.y;
+
+                // Clip space plane definitions
+                let p0 = vec4f( 1.0,  0.0,  0.0, -ndc_x_min); // Left
+                let p1 = vec4f(-1.0,  0.0,  0.0,  ndc_x_max); // Right
+                let p2 = vec4f( 0.0,  1.0,  0.0, -ndc_y_min); // Bottom
+                let p3 = vec4f( 0.0, -1.0,  0.0,  ndc_y_max); // Top
+                let p4 = vec4f( 0.0,  0.0,  1.0, -tile_min_depth); // Near (ZO layout)
+                let p5 = vec4f( 0.0,  0.0, -1.0,  tile_max_depth); // Far  (ZO layout)
+
+                // Transform Clip planes to View Space using transpose(Projection)
+                let transform_mat = transpose(u_global.proj);
+                let planes = array<vec4f, 6>(p0, p1, p2, p3, p4, p5);
+
+                for (var i = 0u; i < 6u; i = i + 1u) {
+                    var p = transform_mat * planes[i];
+                    let len = length(p.xyz);
+                    p = p / len;
+            
+                    // Explicitly zero out .w for side planes to prevent FP precision drift
+                    if (i < 4u) {
+                        p.w = 0.0;
+                    }
+                    frustum_planes[i] = p;
+                }
+
+                // Extract depth bounds directly out of your depth min/max reduction buffer
+                let depth_near = tile_min_depth; 
+                let depth_far  = tile_max_depth;
+
+                // Unproject the 4 corners at the Near Depth Plane
+                let frustum_0 = ndc_to_view(vec2f(ndc_x_min, ndc_y_min), depth_near, u_global.inv_proj);
+                let frustum_1 = ndc_to_view(vec2f(ndc_x_max, ndc_y_min), depth_near, u_global.inv_proj);
+                let frustum_2 = ndc_to_view(vec2f(ndc_x_min, ndc_y_max), depth_near, u_global.inv_proj);
+                let frustum_3 = ndc_to_view(vec2f(ndc_x_max, ndc_y_max), depth_near, u_global.inv_proj);
+
+                // Unproject the 4 corners at the Far Depth Plane
+                let frustum_4 = ndc_to_view(vec2f(ndc_x_min, ndc_y_min), depth_far, u_global.inv_proj);
+                let frustum_5 = ndc_to_view(vec2f(ndc_x_max, ndc_y_min), depth_far, u_global.inv_proj);
+                let frustum_6 = ndc_to_view(vec2f(ndc_x_min, ndc_y_max), depth_far, u_global.inv_proj);
+                let frustum_7 = ndc_to_view(vec2f(ndc_x_max, ndc_y_max), depth_far, u_global.inv_proj);
+
+                // Construct the absolute bounding extents containing all 8 corners
+                tile_aabb_min =
+                    min(min(min(frustum_0, frustum_1), min(frustum_2, frustum_3)), 
+                        min(min(frustum_4, frustum_5), min(frustum_6, frustum_7)));
+
+                tile_aabb_max =
+                    max(max(max(frustum_0, frustum_1), max(frustum_2, frustum_3)), 
+                        max(max(frustum_4, frustum_5), max(frustum_6, frustum_7)));
+
+                // Explicitly ensure Z bounding extents match your near/far slice precisely
+                tile_aabb_min.z = min(frustum_0.z, frustum_4.z);
+                tile_aabb_max.z = max(frustum_0.z, frustum_4.z);
+            }
+            workgroupBarrier();
+
+            // Test Lights in View Space
+            for (var i = local_index; i < u_global.light_count; i += TILE_PIXELS) {
+                if (sphere_in_frustum(u_lights[i].view_bounding_pos, u_lights[i].bounding_radius) && 
+                    sphere_intersects_aabb(u_lights[i].view_bounding_pos, u_lights[i].bounding_radius)) {
+                    let index = atomicAdd(&visible_count, 1u);
+                    if (index < MAX_LIGHTS_PER_TILE) {
+                        u_visible[tile_index * MAX_LIGHTS_PER_TILE + index] = i;
+                    }
+                }
+            }
+            workgroupBarrier();
+
+            // Write Sentinel
+            if (local_index == 0u) {
+                let count = min(atomicLoad(&visible_count), MAX_LIGHTS_PER_TILE);
+                let base = tile_index * MAX_LIGHTS_PER_TILE;
+                if (count < MAX_LIGHTS_PER_TILE) {
+                    u_visible[base + count] = INVALID_LIGHT_IDX;
+                }
             }
         }
-    }
-    workgroupBarrier();
-
-    // 7. Write Sentinel
-    if (local_index == 0u) {
-        let count = min(atomicLoad(&visible_count), MAX_LIGHTS_PER_TILE);
-        let base = tile_index * MAX_LIGHTS_PER_TILE;
-        if (count < MAX_LIGHTS_PER_TILE) {
-            u_visible[base + count] = INVALID_LIGHT_IDX;
-        }
-    }
-}
     )WGSL";
 
     // make shader
@@ -1946,7 +1995,8 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
         auto& cascade = csm_cascades_[i];
 
         GlobalUniformData globals{};
-        globals.view_proj = cascade.view_proj;
+        globals.view = cascade.view;
+        globals.proj = cascade.proj;
 
         // setup cascade depth attachment
         wgpu::RenderPassDepthStencilAttachment depth_attachment{};
@@ -1965,20 +2015,22 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
     // setup main globals
     GlobalUniformData globals{};
     globals.view = main_ctx.view;
-    globals.view_proj = main_ctx.view_proj;
+    globals.proj = main_ctx.proj;
     globals.ambient_color = LinearizeColor(env.ambient_light);
     globals.sun_color = LinearizeColor(env.sun_color) * 1.3f;
-    globals.sun_direction = env.sun_direction;
+    globals.sun_direction = glm::mat3(main_ctx.view) * env.sun_direction;
     globals.camera_pos = main_ctx.eye;
     globals.fog = glm::vec4(LinearizeColor(env.fog), env.fog.a);
     globals.tile_count_x = light_tiles_.x;
 
     globals.csm_texel_size = 1.0f / static_cast<float>(csm_resolution_);
     globals.csm_cascade_count = csm_num_cascades_;
+
+    auto inv_view = glm::inverse(main_ctx.view);
     for (uint32_t i = 0; i < csm_num_cascades_; ++i)
     {
         globals.csm_splits[i] = csm_splits_[i];
-        globals.csm_matrices[i] = csm_cascades_[i].view_proj;
+        globals.csm_matrices[i] = csm_cascades_[i].view_proj * inv_view;
     }
 
     // setup depth attachment
@@ -2239,6 +2291,12 @@ void gfx::RendererWGPU::PrepareSurfaceCmds(std::span<DrawSurfaceCmd> cmds, std::
         if (mat_vals.lighting != MATERIAL_LIGHTING_TYPE_UNLIT)
         {
             pcmd.pflags |= SPF_LIT;
+
+            // translucent
+            if (mat_vals.translucent)
+            {
+                pcmd.pflags |= SPF_TRANSLUCENT;
+            }
         }
     }
 
@@ -2422,8 +2480,44 @@ void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawCo
 
     for (size_t i = 0; i < num_lights; ++i)
     {
+        auto& light = cmds[i].light;
+
         auto& entry = lights_.emplace_back();
-        entry.light = cmds[i].light;
+        entry.view_pos = ctx.view * glm::vec4(light.position, 1.0f);
+        entry.radius = light.radius;
+        entry.color = light.color;
+        entry.cos_inner = light.cos_inner;
+        entry.cos_outer = light.cos_outer;
+
+        if (light.cos_inner > light.cos_outer)
+        {
+            // spotlight
+            entry.view_dir = glm::mat3(ctx.view) * light.dir;
+
+            if (light.cos_outer > 0.70710678f)
+            {
+                // narrow
+                entry.bounding_radius = light.radius / (2.0f * light.cos_outer);
+                entry.view_bounding_pos = entry.view_pos + entry.view_dir * entry.bounding_radius;
+            }
+            else
+            {
+                //wide
+                float sin_outer = glm::sqrt(1.0f - light.cos_outer * light.cos_outer);
+                entry.bounding_radius = light.radius * sin_outer;
+                entry.view_bounding_pos = entry.view_pos + entry.view_dir * (entry.radius * light.cos_outer);
+            }
+
+        }
+        else
+        {
+            // pointlight
+            entry.view_dir = glm::vec3(1.0f);
+            // identical
+            entry.bounding_radius = entry.radius;
+            entry.view_bounding_pos = entry.view_pos;
+        }
+
     }
 }
 
@@ -2439,9 +2533,8 @@ void gfx::RendererWGPU::EncodeLightCullingPass(wgpu::CommandEncoder& encoder, co
     LightCullingGlobalData globals{};
     globals.screen_size = ctx.viewport_size;
     globals.tile_count = light_tiles_;
-    globals.view_proj = ctx.view_proj;
-    globals.inv_view_proj = glm::inverse(ctx.view_proj);
-    globals.view = ctx.view;
+    globals.proj = ctx.proj;
+    globals.inv_proj = glm::inverse(ctx.proj);
     globals.light_count = lights_.size();
     queue_.WriteBuffer(light_culling_global_buffer_, 0, &globals, sizeof(globals));
 

@@ -97,7 +97,7 @@ struct VertexBufferLayout
 struct GlobalUniformData
 {
     glm::mat4 view;
-    glm::mat4 view_proj;
+    glm::mat4 proj;
     glm::vec3 ambient_color;
     float _pad0;
     glm::vec3 sun_color;
@@ -145,16 +145,22 @@ struct GlobalGUIUniformData
 
 struct LightBufferData
 {
-    LightData light;
+    glm::vec3 view_pos;
+    float radius;
+    glm::vec3 color;
+    float cos_inner;
+    glm::vec3 view_dir;
+    float cos_outer;
+    glm::vec3 view_bounding_pos;
+    float bounding_radius;
 };
 
 struct LightCullingGlobalData
 {
     glm::u32vec2 screen_size;
     glm::u32vec2 tile_count;
-    glm::mat4 view_proj;
-    glm::mat4 inv_view_proj;
-    glm::mat4 view;
+    glm::mat4 proj;
+    glm::mat4 inv_proj;
     uint32_t light_count;
     float _pad0[3];
 };

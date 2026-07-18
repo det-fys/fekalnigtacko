@@ -16,6 +16,8 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
 
     bool fragment_output = (flags & gfx::SPF_DEPTH_ONLY) == 0;
 
+    // TODO: use view_proj if view pos/normal not used in fragment 
+
     // DEFORM / SKELETAL
     if (flags & gfx::SPF_SKELETAL)
     {
@@ -136,17 +138,36 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
             @group(0) @binding(2) var csm_texture: texture_depth_2d_array;
 
             struct LightBufferData {
-                pos: vec3f,
+                view_pos: vec3f,
                 radius: f32,
                 color: vec3f,
                 cos_inner: f32,
-                dir: vec3f,
+                view_dir: vec3f,
                 cos_outer: f32,
+                view_bounding_pos: vec3f,
+                bounding_radius: f32,
             };
 
             @group(0) @binding(3) var<storage, read> u_lights: array<LightBufferData>;
             @group(0) @binding(4) var<storage, read> u_visible: array<u32>;
         )WGSL";
+
+        if (flags & gfx::SPF_TRANSLUCENT)
+        {
+            functions += R"WGSL(
+                fn get_normal_factor(normal: vec3f, dir: vec3f) -> f32 {
+                    return max(dot(normal, dir), 0.5);
+                }
+            )WGSL";
+        }
+        else
+        {
+            functions += R"WGSL(
+                fn get_normal_factor(normal: vec3f, dir: vec3f) -> f32 {
+                    return max(dot(normal, dir), 0.0);
+                }
+            )WGSL";
+        }
 
         functions += R"WGSL(
             fn select_csm_cascade(depth: f32) -> u32 {
@@ -163,7 +184,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
                 return MAX_CASCADES;
             }
 
-            fn sample_csm(world_pos: vec3f, depth: f32) -> f32 {
+            fn sample_csm(view_pos: vec3f, depth: f32) -> f32 {
                 var cascade_idx = select_csm_cascade(depth);
 
                 var factor = 0.0;
@@ -173,7 +194,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
                     factor = 1.0;
                 }
 
-                var pos = u_global.csm_matrices[cascade_idx] * vec4f(world_pos, 1.0);
+                var pos = u_global.csm_matrices[cascade_idx] * vec4f(view_pos, 1.0);
                 pos /= pos.w;
 
                 let uv = vec2f(
@@ -204,18 +225,46 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
                 return max(shadow, factor);
             }
 
-            fn compute_sun_light(world_pos: vec3f, world_normal: vec3f) -> vec3f {
-                let N = normalize(world_normal);
+            fn compute_sun_light(view_pos: vec3f, view_normal: vec3f) -> vec3f {
+                let N = normalize(view_normal);
                 let L = normalize(-u_global.sun_direction);
 
                 let NdotL = max(dot(N, L), 0.0);
 
-                let view_pos = u_global.view * vec4f(world_pos, 1.0);
                 let depth = -view_pos.z;
-                return u_global.sun_color * (NdotL * sample_csm(world_pos, depth));
+                return u_global.sun_color * (NdotL * sample_csm(view_pos, depth));
             }
 
-            fn compute_small_lights(world_pos: vec3f, world_normal: vec3f, frag_pos: vec2f) -> vec3f {
+            fn compute_light_contribution(light: ptr<storage, LightBufferData, read>, view_pos: vec3f, view_normal: vec3f) -> vec3f {
+                let to_light = light.view_pos - view_pos;
+                let dist2 = dot(to_light, to_light);
+
+                if (dist2 > light.radius * light.radius) {
+                    return vec3f(0.0);
+                }
+
+                let dist = sqrt(dist2);
+                let L = to_light / dist;
+
+                var attenuation = 1.0 - (dist / light.radius);
+                attenuation *= attenuation;
+
+                var ndotl = get_normal_factor(view_normal, L);
+                ndotl = sqrt(ndotl);
+
+                var spot = 1.0;
+
+                if (light.cos_inner > light.cos_outer) {
+                    let c = dot(-L, light.view_dir);
+                    let cone = smoothstep(light.cos_outer, light.cos_inner, c);
+    
+                    spot = cone * cone;
+                }
+
+                return light.color * (attenuation * ndotl * spot);
+            }
+
+            fn compute_small_lights(view_pos: vec3f, view_normal: vec3f, frag_pos: vec2f) -> vec3f {
                 let tile = vec2u(frag_pos) / TILE_SIZE;
                 let tile_index = tile.y * u_global.tile_count_x + tile.x;
 
@@ -229,37 +278,35 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
                     if (light_idx == INVALID_LIGHT_IDX) {
                         break;
                     }
-
-                    let light = u_lights[light_idx];
     
-                    accum.b += 0.2;
+                    accum += compute_light_contribution(&u_lights[light_idx], view_pos, view_normal);
+                    //accum.g += 0.2;
 
-                    if (distance(world_pos, light.pos) < light.radius)
-                    {
-                        accum.g += 0.2;
-                    }
+                    //if (distance(view_pos, light.view_bounding_pos) < light.bounding_radius)
+                    //{
+                    //    accum.b += 0.2;
+                    //}
                 }
 
                 return accum;
 
             }
 
-            fn compute_lights(world_pos: vec3f, world_normal: vec3f, frag_pos: vec2f) -> vec3f {
+            fn compute_lights(view_pos: vec3f, view_normal: vec3f, frag_pos: vec2f) -> vec3f {
                 var color = u_global.ambient_color;
-                color += compute_sun_light(world_pos, world_normal);
-                color += compute_small_lights(world_pos, world_normal, frag_pos);
+                color += compute_sun_light(view_pos, view_normal);
+                color += compute_small_lights(view_pos, view_normal, frag_pos);
                 return color;
             }
         )WGSL";
 
-        //fragment_main += "out *= get_cascade_color(in.world_position);\n";
-        fragment_main += "out = vec4f(out.rgb * compute_lights(in.world_position, in.world_normal, in.position.xy), out.a);\n";
+        fragment_main += "out = vec4f(out.rgb * compute_lights(in.view_pos, in.view_normal, in.position.xy), out.a);\n";
     }
 
     if (flags & gfx::SPF_FOG)
     {
         fragment_main += R"WGSL(
-            let dist = distance(in.world_position, u_global.camera_pos);
+            let dist = length(in.view_pos);
             let fog_factor = 1.0 / (1.0 + dist * dist * u_global.fog.a);
             out = vec4f(mix(u_global.fog.rgb, out.rgb, fog_factor), out.a);
         )WGSL";
@@ -278,8 +325,8 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
     shader += "struct VertexOutput {\n";
     shader += "    @builtin(position) position: vec4f,\n";
     shader += "    @location(0) @interpolate(flat) instance_id: u32,\n";
-    shader += "    @location(1) world_normal: vec3f,\n";
-    shader += "    @location(2) world_position: vec3f,\n";
+    shader += "    @location(1) view_pos: vec3f,\n";
+    shader += "    @location(2) view_normal: vec3f,\n";
     shader += "    @location(3) uv0: vec2f,\n";
     shader += vertex_outs;
     shader += "};\n";
@@ -287,7 +334,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
         // global/pass
         struct GlobalData {
             view: mat4x4f,
-            view_proj: mat4x4f,
+            proj: mat4x4f,
             ambient_color: vec3f,
             _pad0: f32,
             sun_color: vec3f,
@@ -323,10 +370,10 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
     shader += "    let instance = u_instance[in.instance_id];\n";
     shader += "    var out: VertexOutput;\n";
     shader += vertex_main;
-    shader += "    out.position = u_global.view_proj * vec4f(world_pos, 1.0);\n";
     shader += "    out.instance_id = in.instance_id;\n";
-    shader += "    out.world_position = world_pos;\n";
-    shader += "    out.world_normal = world_normal;\n";
+    shader += "    out.view_pos = (u_global.view * vec4f(world_pos, 1.0)).xyz;\n";
+    shader += "    out.view_normal = mat3x3f(u_global.view[0].xyz, u_global.view[1].xyz, u_global.view[2].xyz) * world_normal;\n";
+    shader += "    out.position = u_global.proj * vec4f(out.view_pos, 1.0);\n";
     shader += "    out.uv0 = in.uv0;\n";
     shader += "    return out;\n\n";
     shader += "}\n\n";
