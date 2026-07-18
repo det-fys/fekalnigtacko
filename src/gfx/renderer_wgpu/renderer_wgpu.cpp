@@ -14,6 +14,7 @@
 #include "../common/hud_matrix.hpp"
 #include "surface_shader_wgpu.hpp"
 #include "utils/cvars.hpp"
+#include "shader_defs_wgsl.hpp"
 
 CVAR_CL(uint8_t, r_msaa, CV_SAVE, 0, 0, 1);
 
@@ -32,6 +33,7 @@ static inline uint32_t GetMultisampleCount()
 gfx::RendererWGPU::RendererWGPU(SDL_Window* window) : Renderer(window)
 {
     InitWGPU();
+    SelectSurfaceFormat();
 
     msaa_samples_ = GetMultisampleCount();
  
@@ -42,10 +44,10 @@ gfx::RendererWGPU::RendererWGPU(SDL_Window* window) : Renderer(window)
     csm_splits_[2] = 100.0f;
     csm_splits_[3] = 200.0f;
 
-    ConfigureSurface();
     CreateGlobalResources();
     CreateMipmapPipeline();
     CreateGuiPipeline();
+    CreateLightCullingPipeline();
 }
 
 gfx::MeshID gfx::RendererWGPU::CreateMesh(const MeshDescriptor& desc)
@@ -457,6 +459,39 @@ void gfx::RendererWGPU::InitWGPU()
     }
 }
 
+static wgpu::TextureFormat GetBestSurfaceFormat(std::span<const wgpu::TextureFormat> formats)
+{
+    std::cout << "surface formats count:" << formats.size() << std::endl;
+
+    for (auto& format : formats)
+    {
+        std::cout << format << std::endl;
+        if (format == wgpu::TextureFormat::BGRA8UnormSrgb || format == wgpu::TextureFormat::RGBA8UnormSrgb)
+            return format;
+    }
+
+    return formats[0];
+}
+
+static wgpu::TextureFormat GetSurfaceSrgbViewFormat(wgpu::TextureFormat format)
+{
+    if (format == wgpu::TextureFormat::BGRA8Unorm)
+        return wgpu::TextureFormat::BGRA8UnormSrgb;
+
+    if (format == wgpu::TextureFormat::RGBA8Unorm)
+        return wgpu::TextureFormat::RGBA8UnormSrgb;
+
+    return format; // already srgb or weird format
+}
+
+void gfx::RendererWGPU::SelectSurfaceFormat()
+{
+    wgpu::SurfaceCapabilities caps{};
+    surface_.GetCapabilities(adapter_, &caps);
+    surface_real_format_ = GetBestSurfaceFormat({caps.formats, caps.formatCount});
+    surface_format_ = GetSurfaceSrgbViewFormat(surface_real_format_);
+}
+
 void gfx::RendererWGPU::CreateGlobalResources()
 {
     // MIPMAPS
@@ -475,6 +510,9 @@ void gfx::RendererWGPU::CreateGlobalResources()
 
     // depth rendering
     CreateDepthResources();
+
+    // light culling
+    CreateLightCullingResources();
 
 }
 
@@ -607,6 +645,8 @@ void gfx::RendererWGPU::CreateShadowResources()
     // reset first to avoid consuming too much memory
     csm_texture_ = nullptr;
     csm_texture_view_ = nullptr;
+    InvalidateSurfaceGlobalBindGroup();
+
     for (auto& cascade : csm_cascades_)
     {
         cascade.texture_view = nullptr;
@@ -666,7 +706,7 @@ void gfx::RendererWGPU::CreateSurfaceGlobalResources()
 
     // global bind group layout
     {
-        std::array<wgpu::BindGroupLayoutEntry, 3> entries;
+        std::array<wgpu::BindGroupLayoutEntry, 5> entries;
 
         auto& uniforms_entry = entries[0];
         uniforms_entry.binding = 0;
@@ -686,6 +726,16 @@ void gfx::RendererWGPU::CreateSurfaceGlobalResources()
         csm_texture_entry.texture.viewDimension = wgpu::TextureViewDimension::e2DArray;
         csm_texture_entry.texture.sampleType = wgpu::TextureSampleType::Depth;
 
+        auto& light_buffer_entry = entries[3];
+        light_buffer_entry.binding = 3;
+        light_buffer_entry.visibility = wgpu::ShaderStage::Fragment;
+        light_buffer_entry.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+
+        auto& visible_lights_entry = entries[4];
+        visible_lights_entry.binding = 4;
+        visible_lights_entry.visibility = wgpu::ShaderStage::Fragment;
+        visible_lights_entry.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.entryCount = entries.size();
         desc.entries = entries.data();
@@ -702,31 +752,46 @@ void gfx::RendererWGPU::CreateSurfaceGlobalResources()
         desc.label = "Global uniform buffer";
         global_buffer_ = device_.CreateBuffer(&desc);
     }
+}
 
-    // global bind group
-    {
-        std::array<wgpu::BindGroupEntry, 3> entries;
+void gfx::RendererWGPU::CreateSurfaceGlobalBindGroup()
+{
+    std::array<wgpu::BindGroupEntry, 5> entries;
 
-        auto& uniforms_entry = entries[0];
-        uniforms_entry.binding = 0;
-        uniforms_entry.buffer = global_buffer_;
-        uniforms_entry.size = sizeof(GlobalUniformData);
+    auto& uniforms_entry = entries[0];
+    uniforms_entry.binding = 0;
+    uniforms_entry.buffer = global_buffer_;
+    uniforms_entry.size = sizeof(GlobalUniformData);
 
-        auto& shadow_sampler_entry = entries[1];
-        shadow_sampler_entry.binding = 1;
-        shadow_sampler_entry.sampler = shadow_sampler_;
-        
-        auto& csm_texture_entry = entries[2];
-        csm_texture_entry.binding = 2;
-        csm_texture_entry.textureView = csm_texture_view_;
+    auto& shadow_sampler_entry = entries[1];
+    shadow_sampler_entry.binding = 1;
+    shadow_sampler_entry.sampler = shadow_sampler_;
 
-        wgpu::BindGroupDescriptor desc{};
-        desc.layout = global_bind_group_layout_;
-        desc.entryCount = entries.size();
-        desc.entries = entries.data();
-        desc.label = "Global bind group";
-        global_bind_group_ = device_.CreateBindGroup(&desc);
-    }
+    auto& csm_texture_entry = entries[2];
+    csm_texture_entry.binding = 2;
+    csm_texture_entry.textureView = csm_texture_view_;
+
+    auto& light_buffer_entry = entries[3];
+    light_buffer_entry.binding = 3;
+    light_buffer_entry.buffer = light_buffer_;
+    light_buffer_entry.size = MAX_LIGHTS * sizeof(LightBufferData);
+
+    auto& visible_lights_entry = entries[4];
+    visible_lights_entry.binding = 4;
+    visible_lights_entry.buffer = visible_lights_buffer_;
+    visible_lights_entry.size = visible_lights_buffer_size_;
+
+    wgpu::BindGroupDescriptor desc{};
+    desc.layout = global_bind_group_layout_;
+    desc.entryCount = entries.size();
+    desc.entries = entries.data();
+    desc.label = "Global bind group";
+    global_bind_group_ = device_.CreateBindGroup(&desc);
+}
+
+void gfx::RendererWGPU::InvalidateSurfaceGlobalBindGroup()
+{
+    global_bind_group_ = nullptr;
 }
 
 void gfx::RendererWGPU::CreateSurfaceMaterialResources()
@@ -859,6 +924,291 @@ void gfx::RendererWGPU::CreateDepthResources()
         global_depth_bind_group_ = device_.CreateBindGroup(&desc);
     }
 
+}
+
+void gfx::RendererWGPU::CreateLightCullingResources()
+{
+    // light culling bind group layout
+    {
+        std::array<wgpu::BindGroupLayoutEntry, 4> entries;
+
+        auto& uniforms_entry = entries[0];
+        uniforms_entry.binding = 0;
+        uniforms_entry.visibility = wgpu::ShaderStage::Compute;
+        uniforms_entry.buffer.type = wgpu::BufferBindingType::Uniform;
+        uniforms_entry.buffer.minBindingSize = sizeof(LightCullingGlobalData);
+
+        auto& depth_entry = entries[1];
+        depth_entry.binding = 1;
+        depth_entry.visibility = wgpu::ShaderStage::Compute;
+        depth_entry.texture.sampleType = wgpu::TextureSampleType::Depth;
+        depth_entry.texture.viewDimension = wgpu::TextureViewDimension::e2D;
+
+        auto& light_buffer_entry = entries[2];
+        light_buffer_entry.binding = 2;
+        light_buffer_entry.visibility = wgpu::ShaderStage::Compute;
+        light_buffer_entry.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        light_buffer_entry.buffer.minBindingSize = MAX_LIGHTS * sizeof(LightBufferData);
+
+        auto& visible_lights_entry = entries[3];
+        visible_lights_entry.binding = 3;
+        visible_lights_entry.visibility = wgpu::ShaderStage::Compute;
+        visible_lights_entry.buffer.type = wgpu::BufferBindingType::Storage;
+        visible_lights_entry.buffer.minBindingSize = sizeof(uint32_t);
+
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        desc.label = "Light culling bind group layout";
+        light_culling_bind_group_layout_ = device_.CreateBindGroupLayout(&desc);
+    }
+
+    // light culling global buffer
+    {
+        wgpu::BufferDescriptor desc{};
+        desc.size = sizeof(LightCullingGlobalData);
+        desc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Uniform;
+        desc.label = "Lights culling global buffer";
+        light_culling_global_buffer_ = device_.CreateBuffer(&desc);
+    }
+
+    // light buffer
+    {
+        wgpu::BufferDescriptor desc{};
+        desc.size = MAX_LIGHTS * sizeof(LightBufferData);
+        desc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage;
+        desc.label = "Lights buffer";
+        light_buffer_ = device_.CreateBuffer(&desc);
+    }
+}
+
+void gfx::RendererWGPU::CreateLightCullingVisibleLightsBuffer()
+{
+    InvalidateLightCullingBindGroup();
+    InvalidateSurfaceGlobalBindGroup();
+
+    visible_lights_buffer_ = nullptr;
+    
+    visible_lights_buffer_size_ = std::max(1U, light_tiles_.x * light_tiles_.y * MAX_LIGHTS_PER_TILE) * sizeof(uint32_t);
+
+    wgpu::BufferDescriptor desc{};
+    desc.size = visible_lights_buffer_size_;
+    desc.usage = wgpu::BufferUsage::Storage;
+    desc.label = "Visible lights buffer";
+    visible_lights_buffer_ = device_.CreateBuffer(&desc);
+}
+
+void gfx::RendererWGPU::CreateLightCullingBindGroup()
+{
+    light_culling_bind_group_ = nullptr;
+
+    std::array<wgpu::BindGroupEntry, 4> entries;
+
+    auto& uniforms_entry = entries[0];
+    uniforms_entry.binding = 0;
+    uniforms_entry.buffer = light_culling_global_buffer_;
+    uniforms_entry.size = sizeof(LightCullingGlobalData);
+    
+    auto& depth_entry = entries[1];
+    depth_entry.binding = 1;
+    depth_entry.textureView = depth_texture_view_;
+
+    auto& light_buffer_entry = entries[2];
+    light_buffer_entry.binding = 2;
+    light_buffer_entry.buffer = light_buffer_;
+    light_buffer_entry.size = MAX_LIGHTS * sizeof(LightBufferData);
+
+    auto& visible_lights_entry = entries[3];
+    visible_lights_entry.binding = 3;
+    visible_lights_entry.buffer = visible_lights_buffer_;
+    visible_lights_entry.size = visible_lights_buffer_size_;
+
+    wgpu::BindGroupDescriptor desc{};
+    desc.layout = light_culling_bind_group_layout_;
+    desc.entryCount = entries.size();
+    desc.entries = entries.data();
+    desc.label = "Light culling bind group";
+    light_culling_bind_group_ = device_.CreateBindGroup(&desc);
+
+}
+
+void gfx::RendererWGPU::CreateLightCullingPipeline()
+{
+    constexpr std::string_view SHADER_SRC = SHADER_DEFS_WGSL R"WGSL(
+const TILE_PIXELS = TILE_SIZE * TILE_SIZE;
+
+struct GlobalData {
+    screen_size: vec2u,
+    tile_count: vec2u,
+    view_proj: mat4x4f,
+    inv_view_proj: mat4x4f, // Added: Crucial for easy unprojection
+    view: mat4x4f,
+    light_count: u32,
+    _pad0: f32,
+    _pad1: f32,
+    _pad2: f32,
+};
+
+struct LightBufferData {
+    pos: vec3f,
+    radius: f32,
+    color: vec3f,
+    cos_inner: f32,
+    dir: vec3f,
+    cos_outer: f32,
+};
+
+@group(0) @binding(0) var<uniform> u_global: GlobalData;
+@group(0) @binding(1) var depth_texture: texture_depth_2d;
+@group(0) @binding(2) var<storage, read> u_lights: array<LightBufferData>;
+@group(0) @binding(3) var<storage, read_write> u_visible: array<u32>;
+
+var<workgroup> visible_count: atomic<u32>;
+
+struct DepthRange {
+    min: f32,
+    max: f32,
+};
+
+var<workgroup> depths: array<DepthRange, TILE_PIXELS>;
+var<workgroup> frustum_planes: array<vec4f, 6>;
+
+fn sphere_in_frustum(pos: vec3f, radius: f32) -> bool {
+    for (var i = 0u; i < 6u; i++) {
+        let p = frustum_planes[i];
+        if (dot(p.xyz, pos) + p.w < -radius) {
+            return false;
+        }
+    }
+    return true;
+}
+
+@compute @workgroup_size(16, 16) // Explicitly match TILE_SIZE
+fn cull_lights(
+    @builtin(local_invocation_id) lid: vec3u,
+    @builtin(workgroup_id) wgid: vec3u
+) {
+    let tile_index = wgid.y * u_global.tile_count.x + wgid.x;
+    let local_index = lid.y * TILE_SIZE + lid.x;
+
+    // 1. Initialize atomic counter
+    if (local_index == 0u) {
+        atomicStore(&visible_count, 0u);
+    }
+    
+    // 2. Load depths (Standard ZO Layout)
+    let pixel = wgid.xy * TILE_SIZE + lid.xy;
+    var depth = 1.0; // Clear to 1.0 so out-of-bounds tiles don't artificially collapse min depth to 0
+    if (pixel.x < u_global.screen_size.x && pixel.y < u_global.screen_size.y) {
+        depth = textureLoad(depth_texture, vec2i(pixel), 0);
+    }
+
+    depths[local_index].min = depth;
+    depths[local_index].max = depth;
+    workgroupBarrier();
+
+    // 3. FIXED Parallel Reduction (No uniform control flow divergence)
+    for (var stride = TILE_PIXELS / 2u; stride > 0u; stride /= 2u) {
+        if (local_index < stride) {
+            depths[local_index].min = min(depths[local_index].min, depths[local_index + stride].min);
+            depths[local_index].max = max(depths[local_index].max, depths[local_index + stride].max);
+        }
+        workgroupBarrier(); // Safe: Executed by all threads outside the 'if' block
+    }
+
+    // 4. Compute Tile Frustum natively in World Space
+    if (local_index == 0u) {
+        let tile_min_depth = depths[0].min;
+        let tile_max_depth = depths[0].max;
+
+        let tile = wgid.xy;
+        let tile_scale = vec2f(u_global.tile_count);
+        
+        // Step fractions [0.0 to 1.0] across the screen grid
+        let step_min = vec2f(tile) / tile_scale;
+        let step_max = vec2f(tile + vec2u(1u)) / tile_scale;
+
+        // Map tile bounds cleanly into NDC space [-1.0, 1.0]
+        // X increases left-to-right (-1 to +1)
+        let ndc_x_min = -1.0 + 2.0 * step_min.x;
+        let ndc_x_max = -1.0 + 2.0 * step_max.x;
+        
+        // Y increases bottom-to-top in NDC (-1 to +1), while wgid.y goes top-to-bottom
+        let ndc_y_max = 1.0 - 2.0 * step_min.y;
+        let ndc_y_min = 1.0 - 2.0 * step_max.y;
+
+        // Clip space plane equations: A*x + B*y + C*z + D*w = 0
+        // Plane normals point inside the tile frustum
+        var p0 = vec4f( 1.0,  0.0,  0.0, -ndc_x_min); // Left:   x >= x_min
+        var p1 = vec4f(-1.0,  0.0,  0.0,  ndc_x_max); // Right:  x <= x_max
+        var p2 = vec4f( 0.0,  1.0,  0.0, -ndc_y_min); // Bottom: y >= y_min
+        var p3 = vec4f( 0.0, -1.0,  0.0,  ndc_y_max); // Top:    y <= y_max
+        
+        // Zero-to-One (ZO) depth bounds: z in [0.0, 1.0]
+        var p4 = vec4f( 0.0,  0.0,  1.0, -tile_min_depth); // Near: z >= min_depth
+        var p5 = vec4f( 0.0,  0.0, -1.0,  tile_max_depth); // Far:  z <= max_depth
+
+        // Use transpose(view_proj) ONLY if lights are in World Space.
+        // If lights are stored in View Space, use transpose(u_global.proj) instead!
+        let transform_mat = transpose(u_global.view_proj);
+
+        // Transform and normalize all six planes cleanly
+        let planes = array<vec4f, 6>(p0, p1, p2, p3, p4, p5);
+        for (var i = 0u; i < 6u; i = i + 1u) {
+            let p = transform_mat * planes[i];
+            let len = length(p.xyz);
+            frustum_planes[i] = p / len;
+        }
+    }
+    workgroupBarrier();
+
+    // 6. Test Lights
+    for (var i = local_index; i < u_global.light_count; i += TILE_PIXELS) {
+        if (sphere_in_frustum(u_lights[i].pos, u_lights[i].radius)) {
+            let index = atomicAdd(&visible_count, 1u);
+            if (index < MAX_LIGHTS_PER_TILE) {
+                u_visible[tile_index * MAX_LIGHTS_PER_TILE + index] = i;
+            }
+        }
+    }
+    workgroupBarrier();
+
+    // 7. Write Sentinel
+    if (local_index == 0u) {
+        let count = min(atomicLoad(&visible_count), MAX_LIGHTS_PER_TILE);
+        let base = tile_index * MAX_LIGHTS_PER_TILE;
+        if (count < MAX_LIGHTS_PER_TILE) {
+            u_visible[base + count] = INVALID_LIGHT_IDX;
+        }
+    }
+}
+    )WGSL";
+
+    // make shader
+    wgpu::ShaderModuleDescriptor shader_desc{};
+    shader_desc.label = "Light culling shader";
+    wgpu::ShaderSourceWGSL shader_src{};
+    shader_src.code = SHADER_SRC;
+    shader_desc.nextInChain = &shader_src;
+    auto shader_module = device_.CreateShaderModule(&shader_desc);
+
+    wgpu::ComputePipelineDescriptor desc{};
+    desc.label = "Light culling pipeline";
+    
+    desc.compute.module = shader_module;
+    desc.compute.entryPoint = "cull_lights";
+   
+    wgpu::PipelineLayoutDescriptor layout_desc{};
+    layout_desc.bindGroupLayoutCount = 1;
+    layout_desc.bindGroupLayouts = &light_culling_bind_group_layout_;
+    desc.layout = device_.CreatePipelineLayout(&layout_desc);
+
+    light_culling_pipeline_ = device_.CreateComputePipeline(&desc);
+}
+
+void gfx::RendererWGPU::InvalidateLightCullingBindGroup()
+{
+    light_culling_bind_group_ = nullptr;
 }
 
 void gfx::RendererWGPU::CreateGuiResources()
@@ -1042,57 +1392,31 @@ void gfx::RendererWGPU::CreateGuiPipeline()
     gui_pipeline_ = device_.CreateRenderPipeline(&desc);
 }
 
-static wgpu::TextureFormat GetBestSurfaceFormat(std::span<const wgpu::TextureFormat> formats)
+void gfx::RendererWGPU::ConfigureSurface(const glm::u32vec2& viewport_size)
 {
-    std::cout << "surface formats count:" << formats.size() << std::endl;
-
-    for (auto& format : formats)
-    {
-        std::cout << format << std::endl;
-        if (format == wgpu::TextureFormat::BGRA8UnormSrgb || format == wgpu::TextureFormat::RGBA8UnormSrgb)
-            return format;
-    }
-   
-    return formats[0];
-}
-
-static wgpu::TextureFormat GetSurfaceSrgbViewFormat(wgpu::TextureFormat format)
-{
-    if (format == wgpu::TextureFormat::BGRA8Unorm)
-        return wgpu::TextureFormat::BGRA8UnormSrgb;
-
-    if (format == wgpu::TextureFormat::RGBA8Unorm)
-        return wgpu::TextureFormat::RGBA8UnormSrgb;
-
-    return format; // already srgb or weird format
-}
-
-void gfx::RendererWGPU::ConfigureSurface()
-{
-    auto viewport_size = GetViewportSize();
-
     wgpu::SurfaceConfiguration config{};
     config.presentMode = wgpu::PresentMode::Immediate;
     config.width = viewport_size.x;
     config.height = viewport_size.y;
     config.device = device_;
-    config.usage = wgpu::TextureUsage::RenderAttachment;
-    
-    wgpu::SurfaceCapabilities caps{};
-    surface_.GetCapabilities(adapter_, &caps);
-    config.format = GetBestSurfaceFormat({caps.formats, caps.formatCount});
-    
+    config.usage = wgpu::TextureUsage::RenderAttachment;    
+    config.format = surface_real_format_;
+
     // view format - srgb
-    surface_format_ = GetSurfaceSrgbViewFormat(config.format);
     config.viewFormatCount = 1;
     config.viewFormats = &surface_format_;
 
     surface_.Configure(&config);
-    surface_size_ = viewport_size;
+}
+
+void gfx::RendererWGPU::ProcessViewportSizeChange(const glm::u32vec2& viewport_size)
+{
+    ConfigureSurface(viewport_size);
 
     // create depth
     depth_texture_ = nullptr;
     depth_texture_view_ = nullptr;
+    InvalidateLightCullingBindGroup(); // depends on depth texture
 
     depth_format_ = wgpu::TextureFormat::Depth24Plus;
     wgpu::TextureDescriptor depth_desc{};
@@ -1101,9 +1425,10 @@ void gfx::RendererWGPU::ConfigureSurface()
     depth_desc.mipLevelCount = 1;
     depth_desc.sampleCount = msaa_samples_;
     depth_desc.size = {viewport_size.x, viewport_size.y};
-    depth_desc.usage = wgpu::TextureUsage::RenderAttachment;
+    depth_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
     depth_desc.viewFormatCount = 1;
     depth_desc.viewFormats = &depth_format_;
+    depth_desc.label = "Main depth texture";
     depth_texture_ = device_.CreateTexture(&depth_desc);
 
     wgpu::TextureViewDescriptor depth_view_desc{};
@@ -1114,8 +1439,12 @@ void gfx::RendererWGPU::ConfigureSurface()
     depth_view_desc.mipLevelCount = 1;
     depth_view_desc.dimension = wgpu::TextureViewDimension::e2D;
     depth_view_desc.format = depth_format_;
+    depth_view_desc.label = "Main depth texture view";
     depth_texture_view_ = depth_texture_.CreateView(&depth_view_desc);
 
+    // create MS color texture if MSAA
+    color_texture_ = nullptr;
+    color_texture_view_ = nullptr;
     if (msaa_samples_ > 1)
     {
         // create multisample color texture
@@ -1131,11 +1460,12 @@ void gfx::RendererWGPU::ConfigureSurface()
         color_texture_ = device_.CreateTexture(&color_desc);
         color_texture_view_ = color_texture_.CreateView();
     }
-    else
-    {
-        color_texture_ = nullptr;
-        color_texture_view_ = nullptr;
-    }
+
+    // create buffer for visible lights per tile
+    light_tiles_ = (viewport_size + (TILE_SIZE - 1)) / TILE_SIZE;
+    CreateLightCullingVisibleLightsBuffer();
+
+    setup_viewport_size_ = viewport_size;
 }
 
 constexpr std::string_view SHADER_SRC = R"WGSL(
@@ -1165,17 +1495,18 @@ gfx::SurfaceViewData gfx::RendererWGPU::GetNextSurfaceViewData()
     {
         surface_.GetCurrentTexture(&data.surface_texture);
 
-        if (data.surface_texture.status == wgpu::SurfaceGetCurrentTextureStatus::SuccessOptimal)
+        if (data.surface_texture.status == wgpu::SurfaceGetCurrentTextureStatus::SuccessOptimal ||
+            data.surface_texture.status == wgpu::SurfaceGetCurrentTextureStatus::SuccessSuboptimal)
         {
             break;
         }
 
-        if (data.surface_texture.status == wgpu::SurfaceGetCurrentTextureStatus::SuccessSuboptimal)
-        {
-            // try reconfigure
-            ConfigureSurface();
-            continue;
-        }
+        //if (data.surface_texture.status == wgpu::SurfaceGetCurrentTextureStatus::SuccessSuboptimal)
+        //{
+        //    // try reconfigure
+        //    ConfigureSurface();
+        //    continue;
+        //}
 
         // failure?
         return data;
@@ -1543,18 +1874,17 @@ void gfx::RendererWGPU::UpdateSettings()
         msaa_samples_ = GetMultisampleCount();
         CreateGuiPipeline();
         InvalidateSurfacePipelines();
-        ConfigureSurface();
+        setup_viewport_size_ = {0, 0};
         r_msaa.ClearModified();
     }
 }
 
-
 void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
 {
     auto viewport_size = GetViewportSize();
-    if (surface_size_ != viewport_size)
+    if (setup_viewport_size_ != viewport_size)
     {
-        ConfigureSurface();
+        ProcessViewportSizeChange(viewport_size);
     }
 
     auto encoder = device_.CreateCommandEncoder();
@@ -1641,6 +1971,7 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
     globals.sun_direction = env.sun_direction;
     globals.camera_pos = main_ctx.eye;
     globals.fog = glm::vec4(LinearizeColor(env.fog), env.fog.a);
+    globals.tile_count_x = light_tiles_.x;
 
     globals.csm_texel_size = 1.0f / static_cast<float>(csm_resolution_);
     globals.csm_cascade_count = csm_num_cascades_;
@@ -1664,6 +1995,16 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
         auto pass = encoder.BeginRenderPass(&pass_desc);
         EncodePreparedCmds(pass, pcmds_prepass_, globals, pass_index++, SPF_DEPTH_ONLY);
         pass.End();
+    }
+
+    // cull lights using depth buffer
+    PrepareLights(main_dlist_.lights, main_ctx);
+    EncodeLightCullingPass(encoder, main_ctx);
+
+    // setup global bind group
+    if (!global_bind_group_)
+    {
+        CreateSurfaceGlobalBindGroup();
     }
 
     // setup surface texture
@@ -2062,6 +2403,60 @@ void gfx::RendererWGPU::EncodePreparedCmds(wgpu::RenderPassEncoder& pass, std::s
     }
 
     flush_batch();
+}
+
+void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawContext& ctx)
+{
+    lights_.clear();
+
+    // calc distance
+    for (auto& cmd : cmds)
+    {
+        auto d = cmd.light.position - ctx.eye;
+        cmd.dist2 = glm::dot(d, d);
+    }
+
+    std::ranges::sort(cmds, [](const DrawLightCmd& a, const DrawLightCmd& b) { return a.dist2 < b.dist2; });
+
+    size_t num_lights = std::min(static_cast<size_t>(MAX_LIGHTS), cmds.size());
+
+    for (size_t i = 0; i < num_lights; ++i)
+    {
+        auto& entry = lights_.emplace_back();
+        entry.light = cmds[i].light;
+    }
+}
+
+void gfx::RendererWGPU::EncodeLightCullingPass(wgpu::CommandEncoder& encoder, const DrawContext& ctx)
+{
+    // ensure bind group
+    if (!light_culling_bind_group_)
+    {
+        CreateLightCullingBindGroup();
+    }
+
+    // setup globals
+    LightCullingGlobalData globals{};
+    globals.screen_size = ctx.viewport_size;
+    globals.tile_count = light_tiles_;
+    globals.view_proj = ctx.view_proj;
+    globals.inv_view_proj = glm::inverse(ctx.view_proj);
+    globals.view = ctx.view;
+    globals.light_count = lights_.size();
+    queue_.WriteBuffer(light_culling_global_buffer_, 0, &globals, sizeof(globals));
+
+    // upload light buffer
+    if (!lights_.empty())
+    {
+        queue_.WriteBuffer(light_buffer_, 0, lights_.data(), lights_.size() * sizeof(lights_[0]));
+    }
+
+    // dispatch
+    auto pass = encoder.BeginComputePass();
+    pass.SetPipeline(light_culling_pipeline_);
+    pass.SetBindGroup(0, light_culling_bind_group_);
+    pass.DispatchWorkgroups(light_tiles_.x, light_tiles_.y);
+    pass.End();
 }
 
 void gfx::RendererWGPU::EncodeHudCmds(wgpu::RenderPassEncoder& pass, std::span<DrawHudCmd> queue, const DrawContext& ctx)

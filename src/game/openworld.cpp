@@ -36,7 +36,7 @@ CVAR(float, ow_vehicle_distance_y, CV_NONE, 7.0f);
 CVAR(size_t, ow_vehicle_spawn_interval, CV_NONE, 160);
 
 // npcs
-CVAR(size_t, ow_npc_count, CV_NONE, 180, 0, 10000);
+CVAR(size_t, ow_npc_count, CV_NONE, 50, 0, 10000);
 CVAR(size_t, ow_npc_spawn_time_fast, CV_NONE, 80);
 CVAR(size_t, ow_npc_spawn_time_slow_min, CV_NONE, 2000);
 CVAR(size_t, ow_npc_spawn_time_slow_max, CV_NONE, 10000);

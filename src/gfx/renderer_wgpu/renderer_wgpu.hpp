@@ -9,14 +9,19 @@
 #include "../draw_list.hpp"
 #include "../scene.hpp"
 #include "surface_pipeline_wgpu.hpp"
+#include "shader_defs_wgsl.hpp"
 
 namespace gfx
 {
 
-constexpr uint32_t MAX_CSM_CASCADES = 4;
+constexpr uint32_t MAX_CSM_CASCADES = SD_MAX_CASCADES;
 constexpr uint32_t MAX_SPOTLIGHT_SHADOWMAPS = 8;
 constexpr uint32_t MAX_PASSES = 2 + MAX_CSM_CASCADES + MAX_SPOTLIGHT_SHADOWMAPS;
 constexpr uint32_t GLOBAL_BUFFER_STRIDE = 512;
+
+constexpr uint32_t MAX_LIGHTS = SD_MAX_LIGHTS;
+constexpr uint32_t MAX_LIGHTS_PER_TILE = SD_MAX_LIGHTS_PER_TILE;
+constexpr uint32_t TILE_SIZE = SD_TILE_SIZE;
 
 struct SurfaceViewData
 {
@@ -96,7 +101,7 @@ struct GlobalUniformData
     glm::vec3 ambient_color;
     float _pad0;
     glm::vec3 sun_color;
-    float _pad1;
+    uint32_t tile_count_x;
     glm::vec3 sun_direction;
     float csm_texel_size;
     glm::vec3 camera_pos;
@@ -138,6 +143,22 @@ struct GlobalGUIUniformData
     glm::mat3x4 matrix;
 };
 
+struct LightBufferData
+{
+    LightData light;
+};
+
+struct LightCullingGlobalData
+{
+    glm::u32vec2 screen_size;
+    glm::u32vec2 tile_count;
+    glm::mat4 view_proj;
+    glm::mat4 inv_view_proj;
+    glm::mat4 view;
+    uint32_t light_count;
+    float _pad0[3];
+};
+
 class RendererWGPU : public Renderer
 {
 public:
@@ -169,17 +190,26 @@ public:
 
 private:
     void InitWGPU();
+    void SelectSurfaceFormat();
     void CreateGlobalResources();
     void CreateMipmapResources();
     void CreateMipmapPipeline();
     void CreateShadowResources();
     void CreateSurfaceGlobalResources();
+    void CreateSurfaceGlobalBindGroup();
+    void InvalidateSurfaceGlobalBindGroup();
     void CreateSurfaceMaterialResources();
     void CreateSurfaceInstanceResources();
     void CreateDepthResources();
+    void CreateLightCullingResources();
+    void CreateLightCullingVisibleLightsBuffer();
+    void CreateLightCullingBindGroup();
+    void CreateLightCullingPipeline();
+    void InvalidateLightCullingBindGroup();
     void CreateGuiResources();
     void CreateGuiPipeline();
-    void ConfigureSurface();
+    void ConfigureSurface(const glm::u32vec2& viewport_size);
+    void ProcessViewportSizeChange(const glm::u32vec2& viewport_size);
     SurfaceViewData GetNextSurfaceViewData();
     bool ReserveBufferCapacity(DynamicBuffer& buffer, size_t capacity);
     void SetBufferData(DynamicBuffer& buffer, std::span<const uint8_t> data);
@@ -199,6 +229,8 @@ private:
     void PrepareSurfaceCmds(std::span<DrawSurfaceCmd> cmds, std::vector<PreparedCmd>& pcmds, SurfacePipelineFlags pflags);
     void EncodePreparedCmds(wgpu::RenderPassEncoder& pass, std::span<PreparedCmd> pcmds,
                             const GlobalUniformData& globals, uint32_t globals_index, SurfacePipelineFlags pflags);
+    void PrepareLights(std::span<DrawLightCmd> cmds, const DrawContext& ctx);
+    void EncodeLightCullingPass(wgpu::CommandEncoder& encoder, const DrawContext& ctx);
     void EncodeHudCmds(wgpu::RenderPassEncoder& pass, std::span<DrawHudCmd> queue, const DrawContext& ctx);
 
     void Unload();
@@ -240,7 +272,18 @@ private:
     std::array<float, MAX_CSM_CASCADES> csm_splits_;
     std::array<CSMCascadeData, MAX_CSM_CASCADES> csm_cascades_;
 
+    // light culling
+    wgpu::BindGroupLayout light_culling_bind_group_layout_;
+    wgpu::Buffer light_culling_global_buffer_;
+    wgpu::Buffer light_buffer_;
+    wgpu::Buffer visible_lights_buffer_;
+    uint32_t visible_lights_buffer_size_ = 0;
+    wgpu::BindGroup light_culling_bind_group_;
+    glm::u32vec2 light_tiles_;
+    wgpu::ComputePipeline light_culling_pipeline_;
+
     // temporary
+    std::vector<LightBufferData> lights_;
     std::vector<InstanceUniformData> instances_;
 
 
@@ -252,7 +295,8 @@ private:
     wgpu::RenderPipeline gui_pipeline_;
 
     // surface
-    glm::u32vec2 surface_size_{0};
+    glm::u32vec2 setup_viewport_size_{0};
+    wgpu::TextureFormat surface_real_format_;
     wgpu::TextureFormat surface_format_;
     wgpu::Surface surface_;
     wgpu::TextureFormat depth_format_;
