@@ -476,6 +476,7 @@ void game::view::VehicleView::UpdateDestroyedColors()
 void game::view::VehicleView::DrawBaseModel(const DrawArgs& args) const
 {
     bool exploded = (flags_ & VF_EXPLODED) > 0;
+    bool windows_broken = (flags_ & VF_BROKENWINDOWS) > 0;
 
     // base model
     const glm::vec4* colors = exploded ? &destroyed_colors_[0] : &colors_[0];
@@ -484,7 +485,13 @@ void game::view::VehicleView::DrawBaseModel(const DrawArgs& args) const
     cmd.mesh = model_view_->GetMesh().GetID();
     cmd.matrix = &root_.matrix;
     cmd.colors = {colors, VCS__COUNT};
-    cmd.deform_tex = deform_->tex.GetID();
+    
+    if (windows_broken)
+    {
+        // optimalization
+        // no need for deform if windows not broken
+        cmd.deform_tex = deform_->tex.GetID();
+    }
 
     auto& dlist = args.ctx.dlist;
     auto surfaces = model_view_->GetSurfaces();
@@ -499,7 +506,7 @@ void game::view::VehicleView::DrawBaseModel(const DrawArgs& args) const
 
         if (i == window_surface_idx_)
         {
-            if (flags_ & VF_BROKENWINDOWS)
+            if (windows_broken)
                 cmd.material = broken_window_material_->GetID();
         }
         else if (i == spz_surface_idx_)
