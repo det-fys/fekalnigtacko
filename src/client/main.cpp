@@ -355,7 +355,9 @@ static void ProcessArgs(int argc, char* argv[])
 int main(int argc, char *argv[])
 {
     ProcessArgs(argc, argv);
-    SetName("random guvno");
+    srand(time(NULL));
+    auto name = "random guvno " + std::to_string(rand());
+    SetName(name.c_str());
     RunMain();
 	return 0;
 }
