@@ -17,7 +17,7 @@ namespace gfx
 constexpr uint32_t MAX_CSM_CASCADES = SD_MAX_CASCADES;
 constexpr uint32_t MAX_SPOTLIGHT_SHADOWMAPS = 8;
 constexpr uint32_t MAX_PASSES = 2 + MAX_CSM_CASCADES + MAX_SPOTLIGHT_SHADOWMAPS;
-constexpr uint32_t GLOBAL_BUFFER_STRIDE = 512;
+constexpr uint32_t GLOBAL_BUFFER_STRIDE = 768;
 
 constexpr uint32_t MAX_LIGHTS = SD_MAX_LIGHTS;
 constexpr uint32_t MAX_LIGHTS_PER_TILE = SD_MAX_LIGHTS_PER_TILE;
@@ -98,6 +98,7 @@ struct GlobalUniformData
 {
     glm::mat4 view;
     glm::mat4 proj;
+    glm::mat4 view_proj;
     glm::vec3 ambient_color;
     float _pad0;
     glm::vec3 sun_color;

@@ -1997,6 +1997,7 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
         GlobalUniformData globals{};
         globals.view = cascade.view;
         globals.proj = cascade.proj;
+        globals.view_proj = cascade.view_proj;
 
         // setup cascade depth attachment
         wgpu::RenderPassDepthStencilAttachment depth_attachment{};
@@ -2016,6 +2017,7 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
     GlobalUniformData globals{};
     globals.view = main_ctx.view;
     globals.proj = main_ctx.proj;
+    globals.view_proj = main_ctx.view_proj;
     globals.ambient_color = LinearizeColor(env.ambient_light);
     globals.sun_color = LinearizeColor(env.sun_color) * 1.3f;
     globals.sun_direction = glm::mat3(main_ctx.view) * env.sun_direction;

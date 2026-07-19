@@ -16,7 +16,9 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
 
     bool fragment_output = (flags & gfx::SPF_DEPTH_ONLY) == 0;
 
-    // TODO: use view_proj if view pos/normal not used in fragment 
+    // in depth prepass the position calculation must exactly match the main pass
+    // due to EQUAL depth testing later
+    bool need_view_pos = (flags & gfx::SPF_SHADOW_MAP) == 0;
 
     // DEFORM / SKELETAL
     if (flags & gfx::SPF_SKELETAL)
@@ -133,6 +135,8 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
 
     if (flags & gfx::SPF_LIT)
     {
+        need_view_pos = true;
+
         bindings += R"WGSL(
             @group(0) @binding(1) var shadow_sampler: sampler_comparison;
             @group(0) @binding(2) var csm_texture: texture_depth_2d_array;
@@ -304,6 +308,8 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
 
     if (flags & gfx::SPF_FOG)
     {
+        need_view_pos = true;
+
         fragment_main += R"WGSL(
             let dist = length(in.view_pos);
             let fog_factor = 1.0 / (1.0 + dist * dist * u_global.fog.a);
@@ -334,6 +340,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
         struct GlobalData {
             view: mat4x4f,
             proj: mat4x4f,
+            view_proj: mat4x4f,
             ambient_color: vec3f,
             _pad0: f32,
             sun_color: vec3f,
@@ -370,9 +377,16 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
     shader += "    var out: VertexOutput;\n";
     shader += vertex_main;
     shader += "    out.instance_id = in.instance_id;\n";
-    shader += "    out.view_pos = (u_global.view * vec4f(world_pos, 1.0)).xyz;\n";
-    shader += "    out.view_normal = mat3x3f(u_global.view[0].xyz, u_global.view[1].xyz, u_global.view[2].xyz) * world_normal;\n";
-    shader += "    out.position = u_global.proj * vec4f(out.view_pos, 1.0);\n";
+    if (need_view_pos)
+    {
+        shader += "    out.view_pos = (u_global.view * vec4f(world_pos, 1.0)).xyz;\n";
+        shader += "    out.view_normal = mat3x3f(u_global.view[0].xyz, u_global.view[1].xyz, u_global.view[2].xyz) * world_normal;\n";
+        shader += "    out.position = u_global.proj * vec4f(out.view_pos, 1.0);\n";
+    }
+    else
+    {
+        shader += "    out.position = u_global.view_proj * vec4f(world_pos, 1.0);\n";
+    }
     shader += "    out.uv0 = in.uv0;\n";
     shader += "    return out;\n\n";
     shader += "}\n\n";
