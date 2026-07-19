@@ -5,7 +5,7 @@
 
 #include "shader_defs_wgsl.hpp"
 
-static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
+static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::ShaderConfig& cfg)
 {
     std::string vertex_ins;
     std::string bindings;
@@ -150,12 +150,19 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
                 cos_outer: f32,
                 view_bounding_pos: vec3f,
                 bounding_radius: f32,
+                shadow_idx: u32,
+                _pad0: f32,
+                _pad1: f32,
+                _pad2: f32,
             };
 
             @group(0) @binding(3) var<storage, read> u_lights: array<LightBufferData>;
             @group(0) @binding(4) var<storage, read> u_visible: array<u32>;
+
+            @group(0) @binding(5) var spotlight_shadow_texture: texture_depth_2d_array;
         )WGSL";
 
+        // translucent?
         if (flags & gfx::SPF_TRANSLUCENT)
         {
             functions += R"WGSL(
@@ -169,6 +176,151 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
             functions += R"WGSL(
                 fn get_normal_factor(normal: vec3f, dir: vec3f) -> f32 {
                     return max(dot(normal, dir), 0.0);
+                }
+            )WGSL";
+        }
+
+        // shadow sample function
+        if (cfg.shadow_sample_func == gfx::SHADOW_SAMPLE_PCF2X2)
+        {
+            functions += R"WGSL(
+                struct ShadowSampleData {
+                    dummy: u32,
+                };
+
+                fn setup_shadow_data(frag_coord: vec2f) -> ShadowSampleData {
+                    return ShadowSampleData(0u);
+                }
+
+                const POISSON_DISK_4 = array<vec2f, 4>(
+                    vec2f(-0.94201624, -0.39906216),
+                    vec2f(0.94558609, -0.76890725),
+                    vec2f(-0.094184101, -0.92938870),
+                    vec2f(0.34495938, 0.29387760)
+                );
+
+                // pcf2x2
+                fn sample_shadow(data: ShadowSampleData, t: texture_depth_2d_array, uv: vec2f, layer: u32, texel_size: f32, z: f32) -> f32 {
+                    let filter_radius = 1.5;
+
+                    var shadow = 0.0;
+                    for (var i = 0u; i < 4u; i = i + 1u) {
+                        let offset = POISSON_DISK_4[i] * texel_size * filter_radius;
+                        shadow += textureSampleCompareLevel(
+                            t,
+                            shadow_sampler,
+                            uv + offset,
+                            layer,
+                            z
+                        );
+                    }
+                    shadow *= 0.25; // Average the 4 hardware-filtered taps
+                    return shadow;
+
+                }
+            )WGSL";
+        }
+        else if (cfg.shadow_sample_func == gfx::SHADOW_SAMPLE_PCF3X3)
+        {
+            functions += R"WGSL(
+                struct ShadowSampleData {
+                    dummy: u32,
+                };
+
+                fn setup_shadow_data(frag_coord: vec2f) -> ShadowSampleData {
+                    return ShadowSampleData(0u);
+                }
+
+                fn sample_shadow(data: ShadowSampleData, t: texture_depth_2d_array, uv: vec2f, layer: u32, texel_size: f32, z: f32) -> f32 {
+                    var shadow = 0.0;
+
+                    for (var x: i32 = -1; x <= 1; x++) {
+                        for (var y: i32 = -1; y <= 1; y++) {
+                            shadow += textureSampleCompareLevel(
+                                t,
+                                shadow_sampler,
+                                uv + vec2f(f32(x), f32(y)) * texel_size,
+                                layer,
+                                z
+                            );
+                        }
+                    }
+
+                    shadow /= 9.0;
+
+                    return shadow;
+                }
+            )WGSL";
+        }
+        else if (cfg.shadow_sample_func == gfx::SHADOW_SAMPLE_IGN)
+        {
+            functions += R"WGSL(
+                struct ShadowSampleData {
+                    rot_matrix: mat2x2f,
+                };
+
+                // Generates a pseudo-random value between 0.0 and 1.0 that repeats cleanly every 3x3 pixels
+                fn interleaved_gradient_noise(frag_coord: vec2f) -> f32 {
+                    let magic = vec3f(0.06711056, 0.00583715, 52.9829189);
+                    return fract(magic.z * fract(dot(frag_coord, magic.xy)));
+                }
+
+                fn setup_shadow_data(frag_coord: vec2f) -> ShadowSampleData {
+                    let ign = interleaved_gradient_noise(frag_coord);
+                    let angle = ign * 6.28318530718;
+
+                    let s = sin(angle);
+                    let c = cos(angle);
+                    let rot_matrix = mat2x2f(c, -s, s, c);
+
+                    return ShadowSampleData(rot_matrix);
+                }
+
+                const POISSON_DISK_4 = array<vec2f, 4>(
+                    vec2f(-0.94201624, -0.39906216),
+                    vec2f(0.94558609, -0.76890725),
+                    vec2f(-0.094184101, -0.92938870),
+                    vec2f(0.34495938, 0.29387760)
+                );
+
+                // ign
+                fn sample_shadow(data: ShadowSampleData, t: texture_depth_2d_array, uv: vec2f, layer: u32, texel_size: f32, z: f32) -> f32 {
+                    let filter_radius = 2.5; 
+                
+                    let compare_z = z - 0.00001;
+
+                    var shadow = 0.0;
+                    for (var i = 0u; i < 4u; i = i + 1u) {
+                        let rotated_offset = data.rot_matrix * POISSON_DISK_4[i];
+                        let offset = rotated_offset * texel_size * filter_radius;
+    
+                        shadow += textureSampleCompareLevel(
+                            t,
+                            shadow_sampler,
+                            uv + offset,
+                            layer,
+                            compare_z
+                        );
+                    }
+                    shadow *= 0.25;
+
+                    return shadow;
+                }
+            )WGSL";
+        }
+        else // default
+        {
+            functions += R"WGSL(
+                struct ShadowSampleData {
+                    dummy: u32,
+                };
+
+                fn setup_shadow_data(frag_coord: vec2f) -> ShadowSampleData {
+                    return ShadowSampleData(0u);
+                }
+
+                fn sample_shadow(data: ShadowSampleData, t: texture_depth_2d_array, uv: vec2f, layer: u32, texel_size: f32, z: f32) -> f32 {
+                    return textureSampleCompareLevel(t, shadow_sampler, uv, layer, z);
                 }
             )WGSL";
         }
@@ -188,7 +340,19 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
                 return MAX_CASCADES;
             }
 
-            fn sample_csm(view_pos: vec3f, depth: f32) -> f32 {
+            fn view_pos_to_shadow_uv(view_pos: vec3f, matrix: mat4x4f) -> vec3f {
+                var pos = matrix * vec4f(view_pos, 1.0);
+                pos /= pos.w;
+
+                let uv = vec2f(
+                    pos.x * 0.5 + 0.5,
+                    1.0 - (pos.y * 0.5 + 0.5)
+                );
+
+                return vec3f(uv, pos.z);
+            }
+
+            fn sample_csm(view_pos: vec3f, depth: f32, shadow_data: ShadowSampleData) -> f32 {
                 var cascade_idx = select_csm_cascade(depth);
 
                 var factor = 0.0;
@@ -198,47 +362,24 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
                     factor = 1.0;
                 }
 
-                var pos = u_global.csm_matrices[cascade_idx] * vec4f(view_pos, 1.0);
-                pos /= pos.w;
-
-                let uv = vec2f(
-                    pos.x * 0.5 + 0.5,
-                    1.0 - (pos.y * 0.5 + 0.5)
-                );
-
+                let uv = view_pos_to_shadow_uv(view_pos, u_global.csm_matrices[cascade_idx]);
                 let texel_size = u_global.csm_texel_size;
-
-                let bias = 0.002;
-
-                var shadow = 0.0;
-
-                for (var x: i32 = -1; x <= 1; x++) {
-                    for (var y: i32 = -1; y <= 1; y++) {
-                        shadow += textureSampleCompare(
-                            csm_texture,
-                            shadow_sampler,
-                            uv + vec2f(f32(x), f32(y)) * texel_size,
-                            cascade_idx,
-                            pos.z - bias
-                        );
-                    }
-                }
-
-                shadow /= 9.0;
+                let bias = 0.001; //0.002;
+                let shadow = sample_shadow(shadow_data, csm_texture, uv.xy, cascade_idx, texel_size, uv.z - bias);
 
                 return max(shadow, factor);
             }
 
-            fn compute_sun_light(view_pos: vec3f, view_normal: vec3f) -> vec3f {
+            fn compute_sun_light(view_pos: vec3f, view_normal: vec3f, shadow_data: ShadowSampleData) -> vec3f {
                 let L = -u_global.sun_direction;
 
                 let NdotL = get_normal_factor(view_normal, L);
 
                 let depth = -view_pos.z;
-                return u_global.sun_color * (NdotL * sample_csm(view_pos, depth));
+                return u_global.sun_color * (NdotL * sample_csm(view_pos, depth, shadow_data));
             }
 
-            fn compute_light_contribution(light: ptr<storage, LightBufferData, read>, view_pos: vec3f, view_normal: vec3f) -> vec3f {
+            fn compute_light_contribution(light: ptr<storage, LightBufferData, read>, view_pos: vec3f, view_normal: vec3f, shadow_data: ShadowSampleData) -> vec3f {
                 let to_light = light.view_pos - view_pos;
                 let dist2 = dot(to_light, to_light);
 
@@ -249,25 +390,39 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
                 let dist = sqrt(dist2);
                 let L = to_light / dist;
 
+                // distance
                 var attenuation = 1.0 - (dist / light.radius);
                 attenuation *= attenuation;
 
-                var ndotl = get_normal_factor(view_normal, L);
-                ndotl = sqrt(ndotl);
-
-                var spot = 1.0;
+                // angle
+                let ndotl = get_normal_factor(view_normal, L);
+                attenuation *= sqrt(ndotl);
 
                 if (light.cos_inner > light.cos_outer) {
+                    // spotlight cone
                     let c = dot(-L, light.view_dir);
                     let cone = smoothstep(light.cos_outer, light.cos_inner, c);
-    
-                    spot = cone * cone;
+                    attenuation *= cone * cone;
+
+                    // shadow map
+                    if (attenuation < 0.001) {
+                        attenuation = 0.0;
+                    } else if (light.shadow_idx < 0xFFFFFFFF) {  
+                        let sample_pos = view_pos + view_normal * 0.03;
+
+                        let uv = view_pos_to_shadow_uv(sample_pos, u_global.spotlight_matrices[light.shadow_idx]);
+                        let texel_size = u_global.spotlight_texel_size;
+                        let compare_z = uv.z - 0.000001;
+                        let shadow = sample_shadow(shadow_data, spotlight_shadow_texture, uv.xy, light.shadow_idx, texel_size, compare_z);
+
+                        attenuation *= shadow;
+                    }
                 }
 
-                return light.color * (attenuation * ndotl * spot);
+                return light.color * attenuation;
             }
 
-            fn compute_small_lights(view_pos: vec3f, view_normal: vec3f, frag_pos: vec2f) -> vec3f {
+            fn compute_small_lights(view_pos: vec3f, view_normal: vec3f, frag_pos: vec2f, shadow_data: ShadowSampleData) -> vec3f {
                 let tile = vec2u(frag_pos) / TILE_SIZE;
                 let tile_index = tile.y * u_global.tile_count_x + tile.x;
 
@@ -282,7 +437,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
                         break;
                     }
     
-                    accum += compute_light_contribution(&u_lights[light_idx], view_pos, view_normal);
+                    accum += compute_light_contribution(&u_lights[light_idx], view_pos, view_normal, shadow_data);
                     //accum.g += 0.2;
 
                     //if (distance(view_pos, light.view_bounding_pos) < light.bounding_radius)
@@ -297,8 +452,9 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
 
             fn compute_lights(view_pos: vec3f, view_normal: vec3f, frag_pos: vec2f) -> vec3f {
                 var color = u_global.ambient_color;
-                color += compute_sun_light(view_pos, view_normal);
-                color += compute_small_lights(view_pos, view_normal, frag_pos);
+                let shadow_data = setup_shadow_data(frag_pos);
+                color += compute_sun_light(view_pos, view_normal, shadow_data);
+                color += compute_small_lights(view_pos, view_normal, frag_pos, shadow_data);
                 return color;
             }
         )WGSL";
@@ -342,7 +498,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
             proj: mat4x4f,
             view_proj: mat4x4f,
             ambient_color: vec3f,
-            _pad0: f32,
+            spotlight_texel_size: f32,
             sun_color: vec3f,
             tile_count_x: u32,
             sun_direction: vec3f,
@@ -352,6 +508,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
             fog: vec4f,
             csm_splits: vec4f,
             csm_matrices: array<mat4x4f, MAX_CASCADES>,
+            spotlight_matrices: array<mat4x4f, MAX_SPOTLIGHT_SHADOWMAPS>,
         };
         @group(0) @binding(0) var<uniform> u_global: GlobalData;
 
@@ -406,9 +563,10 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
     return shader;
 }
 
-wgpu::ShaderModule gfx::CreateSurfaceShaderWGPU(const wgpu::Device& device, SurfacePipelineFlags flags)
+wgpu::ShaderModule gfx::CreateSurfaceShaderWGPU(const wgpu::Device& device, SurfacePipelineFlags flags,
+                                                const ShaderConfig& cfg)
 {
-    auto src = GetShaderSource(flags);
+    auto src = GetShaderSource(flags, cfg);
 
     wgpu::ShaderModuleDescriptor shader_desc{};
     shader_desc.label = "A surface shader";

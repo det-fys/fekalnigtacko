@@ -10,14 +10,15 @@
 #include "../scene.hpp"
 #include "surface_pipeline_wgpu.hpp"
 #include "shader_defs_wgsl.hpp"
+#include "surface_shader_wgpu.hpp"
 
 namespace gfx
 {
 
 constexpr uint32_t MAX_CSM_CASCADES = SD_MAX_CASCADES;
-constexpr uint32_t MAX_SPOTLIGHT_SHADOWMAPS = 8;
+constexpr uint32_t MAX_SPOTLIGHT_SHADOWMAPS = SD_MAX_SPOTLIGHT_SHADOWMAPS;
 constexpr uint32_t MAX_PASSES = 2 + MAX_CSM_CASCADES + MAX_SPOTLIGHT_SHADOWMAPS;
-constexpr uint32_t GLOBAL_BUFFER_STRIDE = 768;
+constexpr uint32_t GLOBAL_BUFFER_STRIDE = 1280;
 
 constexpr uint32_t MAX_LIGHTS = SD_MAX_LIGHTS;
 constexpr uint32_t MAX_LIGHTS_PER_TILE = SD_MAX_LIGHTS_PER_TILE;
@@ -100,7 +101,7 @@ struct GlobalUniformData
     glm::mat4 proj;
     glm::mat4 view_proj;
     glm::vec3 ambient_color;
-    float _pad0;
+    float spotlight_texel_size;
     glm::vec3 sun_color;
     uint32_t tile_count_x;
     glm::vec3 sun_direction;
@@ -110,6 +111,7 @@ struct GlobalUniformData
     glm::vec4 fog;
     std::array<float, MAX_CSM_CASCADES> csm_splits;
     std::array<glm::mat4, MAX_CSM_CASCADES> csm_matrices;
+    std::array<glm::mat4, MAX_SPOTLIGHT_SHADOWMAPS> spotlight_matrices;
 };
 
 struct InstanceUniformData
@@ -129,7 +131,7 @@ struct PreparedCmd
     SurfacePipelineFlags pflags = 0;
 };
 
-struct CSMCascadeData
+struct ShadowMapData
 {
     wgpu::TextureView texture_view;
     glm::mat4 proj;
@@ -154,6 +156,8 @@ struct LightBufferData
     float cos_outer;
     glm::vec3 view_bounding_pos;
     float bounding_radius;
+    uint32_t shadow_idx;
+    float _pad0[3];
 };
 
 struct LightCullingGlobalData
@@ -202,6 +206,7 @@ private:
     void CreateMipmapResources();
     void CreateMipmapPipeline();
     void CreateShadowResources();
+    void InvalidateShadowResources();
     void CreateSurfaceGlobalResources();
     void CreateSurfaceGlobalBindGroup();
     void InvalidateSurfaceGlobalBindGroup();
@@ -216,6 +221,7 @@ private:
     void CreateGuiResources();
     void CreateGuiPipeline();
     void ConfigureSurface(const glm::u32vec2& viewport_size);
+    void InvalidateSurface();
     void ProcessViewportSizeChange(const glm::u32vec2& viewport_size);
     SurfaceViewData GetNextSurfaceViewData();
     bool ReserveBufferCapacity(DynamicBuffer& buffer, size_t capacity);
@@ -263,6 +269,7 @@ private:
     wgpu::BindGroup global_bind_group_;
     DynamicBuffer instance_buffer_;
     wgpu::BindGroup instance_bind_group_;
+    ShaderConfig surface_shader_cfg_{};
     std::map<SurfacePipelineFlags, wgpu::RenderPipeline> surface_pipelines_;
     std::map<SurfacePipelineFlags, wgpu::ShaderModule> surface_shaders_;
 
@@ -270,6 +277,7 @@ private:
     wgpu::BindGroupLayout global_depth_bind_group_layout_; // does not contain shadowmap info
     wgpu::BindGroup global_depth_bind_group_;
     wgpu::Sampler shadow_sampler_;
+    bool shadow_resources_setup_ = false;
 
     // CSM
     uint32_t csm_resolution_ = 1024;
@@ -277,7 +285,15 @@ private:
     wgpu::Texture csm_texture_;
     wgpu::TextureView csm_texture_view_;
     std::array<float, MAX_CSM_CASCADES> csm_splits_;
-    std::array<CSMCascadeData, MAX_CSM_CASCADES> csm_cascades_;
+    std::array<ShadowMapData, MAX_CSM_CASCADES> csm_cascades_;
+
+    // spotlight shadows
+    uint32_t spotlight_shadow_resolution_ = 1024;
+    uint32_t spotlight_shadow_count_ = 8;
+    wgpu::Texture spotlight_shadow_texture_;
+    wgpu::TextureView spotlight_shadow_texture_view_;
+    std::array<ShadowMapData, MAX_SPOTLIGHT_SHADOWMAPS> spotlight_shadows_;
+    uint32_t spotlight_shadow_current_count_ = 0;
 
     // light culling
     wgpu::BindGroupLayout light_culling_bind_group_layout_;

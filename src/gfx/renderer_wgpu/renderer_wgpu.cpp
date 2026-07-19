@@ -16,7 +16,28 @@
 #include "utils/cvars.hpp"
 #include "shader_defs_wgsl.hpp"
 
-CVAR_CL(uint8_t, r_msaa, CV_SAVE, 0, 0, 1);
+//CVAR_CL(uint8_t, r_msaa, CV_SAVE, 0, 0, 1);
+
+// 0: 256
+// 1: 512
+// 2: 1024
+// 3: 2048
+// 4: 4096
+CVAR_CL(uint32_t, r_csm_resolution, CV_SAVE, 3, 0, 4);
+CVAR_CL(uint32_t, r_shadow_resolution, CV_SAVE, 2, 0, 4);
+
+CVAR_CL(uint32_t, r_csm_cascades, CV_SAVE, 4, 0, 4);
+CVAR_CL(uint32_t, r_shadow_count, CV_SAVE, 4, 0, 8);
+
+// 0: linear
+// 1: PCF 2x2
+// 2: PCF 3x3
+// 3: IGN
+CVAR_CL(uint32_t, r_shadow_quality, CV_SAVE, 3, 0, 3);
+
+// 0: immediate
+// 1: vsync
+CVAR_CL(uint32_t, r_vsync, CV_SAVE, 0, 0, 2);
 
 static std::vector<uint8_t> temp_buffer;
 
@@ -27,7 +48,8 @@ static inline glm::vec3 LinearizeColor(const glm::vec3 color_srgb)
 
 static inline uint32_t GetMultisampleCount()
 {
-    return r_msaa.Get() > 0 ? 4 : 1;
+    return 1;
+    //return r_msaa.Get() > 0 ? 4 : 1;
 }
 
 gfx::RendererWGPU::RendererWGPU(SDL_Window* window) : Renderer(window)
@@ -36,13 +58,6 @@ gfx::RendererWGPU::RendererWGPU(SDL_Window* window) : Renderer(window)
     SelectSurfaceFormat();
 
     msaa_samples_ = GetMultisampleCount();
- 
-    csm_resolution_ = 2048;
-    csm_num_cascades_ = 4;
-    csm_splits_[0] = 15.0f;
-    csm_splits_[1] = 45.0f;
-    csm_splits_[2] = 100.0f;
-    csm_splits_[3] = 200.0f;
 
     CreateGlobalResources();
     CreateMipmapPipeline();
@@ -640,23 +655,90 @@ void gfx::RendererWGPU::CreateMipmapPipeline()
     mipmap_pipeline_ = device_.CreateRenderPipeline(&desc);
 }
 
+static uint32_t GetShadowMapResolution(uint32_t level)
+{
+    if (level == 0)
+        return 256;
+    else if (level == 1)
+        return 512;
+    else if (level == 2)
+        return 1024;
+    else if (level == 3)
+        return 2048;
+    else
+        return 4096;
+}
+
+static gfx::ShadowSampleFunction GetShadowSampleFunction(uint32_t level)
+{
+    if (level == 0)
+        return gfx::SHADOW_SAMPLE_DEFAULT;
+    else if (level == 1)
+        return gfx::SHADOW_SAMPLE_PCF2X2;
+    else if (level == 2)
+        return gfx::SHADOW_SAMPLE_PCF3X3;
+    else
+        return gfx::SHADOW_SAMPLE_IGN;
+
+}
+
 void gfx::RendererWGPU::CreateShadowResources()
 {
-    // reset first to avoid consuming too much memory
-    csm_texture_ = nullptr;
-    csm_texture_view_ = nullptr;
-    InvalidateSurfaceGlobalBindGroup();
+    // load settings
+    // resolutions
+    csm_resolution_ = GetShadowMapResolution(r_csm_resolution.Get());
+    spotlight_shadow_resolution_ = GetShadowMapResolution(r_shadow_resolution.Get());
 
-    for (auto& cascade : csm_cascades_)
+    // csm cascade count & splits
+    csm_num_cascades_ = std::min(r_csm_cascades.Get(), 4U);
+    uint32_t csm_layers = csm_num_cascades_;
+
+    if (csm_num_cascades_ == 4)
     {
-        cascade.texture_view = nullptr;
+        csm_splits_[0] = 15.0f;
+        csm_splits_[1] = 45.0f;
+        csm_splits_[2] = 100.0f;
+        csm_splits_[3] = 200.0f;
+    }
+    else if (csm_num_cascades_ == 3)
+    {
+        csm_splits_[0] = 20.0f;
+        csm_splits_[1] = 60.0f;
+        csm_splits_[2] = 150.0f;
+    }
+    else if (csm_num_cascades_ == 2)
+    {
+        csm_splits_[0] = 30.0f;
+        csm_splits_[1] = 90.0f;
+    }
+    else if (csm_num_cascades_ == 1)
+    {
+        csm_splits_[0] = 40.0f;
+    }
+    else // 0
+    {
+        csm_layers = 1;
+        csm_resolution_ = 1; // dummy single-layer texture
     }
 
-    // create depth texture array
+    // spotlight shadow count
+    spotlight_shadow_count_ = std::min(r_shadow_count.Get(), MAX_SPOTLIGHT_SHADOWMAPS);
+    uint32_t spotlight_layers = spotlight_shadow_count_;
+
+    if (spotlight_layers == 0)
+    {
+        spotlight_layers = 1;
+        spotlight_shadow_resolution_ = 1; // dummy
+    }
+
+    // shadow quality
+    surface_shader_cfg_.shadow_sample_func = GetShadowSampleFunction(r_shadow_quality.Get());
+
+    // create CSM texture array
     {
         wgpu::TextureDescriptor tex_desc{};
         tex_desc.dimension = wgpu::TextureDimension::e2D;
-        tex_desc.size = {csm_resolution_, csm_resolution_, csm_num_cascades_};
+        tex_desc.size = {csm_resolution_, csm_resolution_, csm_layers};
         tex_desc.format = wgpu::TextureFormat::Depth32Float;
         tex_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
         tex_desc.label = "CSM texture array";
@@ -664,13 +746,13 @@ void gfx::RendererWGPU::CreateShadowResources()
 
         wgpu::TextureViewDescriptor view_desc{};
         view_desc.dimension = wgpu::TextureViewDimension::e2DArray;
-        view_desc.arrayLayerCount = csm_num_cascades_;
+        view_desc.arrayLayerCount = csm_layers;
         view_desc.label = "CSM texture array view";
         csm_texture_view_ = csm_texture_.CreateView(&view_desc);
     }
 
-    // create individual views
-    for (uint32_t i = 0; i < csm_num_cascades_; ++i)
+    // create individual CSM views
+    for (uint32_t i = 0; i < csm_layers; ++i)
     {
         wgpu::TextureViewDescriptor view_desc{};
         view_desc.dimension = wgpu::TextureViewDimension::e2D;
@@ -678,6 +760,34 @@ void gfx::RendererWGPU::CreateShadowResources()
         view_desc.arrayLayerCount = 1;
         view_desc.label = "CSM texture array layer view";
         csm_cascades_[i].texture_view = csm_texture_.CreateView(&view_desc);
+    }
+
+    // create spotlight shadow texture array
+    {
+        wgpu::TextureDescriptor tex_desc{};
+        tex_desc.dimension = wgpu::TextureDimension::e2D;
+        tex_desc.size = {spotlight_shadow_resolution_, spotlight_shadow_resolution_, spotlight_layers};
+        tex_desc.format = wgpu::TextureFormat::Depth32Float;
+        tex_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+        tex_desc.label = "Spotlight shadow texture array";
+        spotlight_shadow_texture_ = device_.CreateTexture(&tex_desc);
+
+        wgpu::TextureViewDescriptor view_desc{};
+        view_desc.dimension = wgpu::TextureViewDimension::e2DArray;
+        view_desc.arrayLayerCount = spotlight_layers;
+        view_desc.label = "Spotlight shadow texture array view";
+        spotlight_shadow_texture_view_ = spotlight_shadow_texture_.CreateView(&view_desc);
+    }
+
+    // create individual spotlight shadow views
+    for (uint32_t i = 0; i < spotlight_layers; ++i)
+    {
+        wgpu::TextureViewDescriptor view_desc{};
+        view_desc.dimension = wgpu::TextureViewDimension::e2D;
+        view_desc.baseArrayLayer = i;
+        view_desc.arrayLayerCount = 1;
+        view_desc.label = "Spotlight shadow texture array layer view";
+        spotlight_shadows_[i].texture_view = spotlight_shadow_texture_.CreateView(&view_desc);
     }
 
     // create shadow sampler
@@ -696,6 +806,31 @@ void gfx::RendererWGPU::CreateShadowResources()
         sampler_desc.mipmapFilter = wgpu::MipmapFilterMode::Undefined;
         shadow_sampler_ = device_.CreateSampler(&sampler_desc);
     }
+
+    shadow_resources_setup_ = true;
+}
+
+void gfx::RendererWGPU::InvalidateShadowResources()
+{
+    InvalidateSurfaceGlobalBindGroup();
+    InvalidateSurfacePipelines();
+    csm_texture_ = nullptr;
+    csm_texture_view_ = nullptr;
+    spotlight_shadow_texture_ = nullptr;
+    spotlight_shadow_texture_view_ = nullptr;
+
+    for (auto& cascade : csm_cascades_)
+    {
+        cascade.texture_view = nullptr;
+    }
+
+    for (auto& shadowmap : spotlight_shadows_)
+    {
+        shadowmap.texture_view = nullptr;
+    }
+
+    shadow_resources_setup_ = false;
+
 }
 
 void gfx::RendererWGPU::CreateSurfaceGlobalResources()
@@ -706,7 +841,7 @@ void gfx::RendererWGPU::CreateSurfaceGlobalResources()
 
     // global bind group layout
     {
-        std::array<wgpu::BindGroupLayoutEntry, 5> entries;
+        std::array<wgpu::BindGroupLayoutEntry, 6> entries;
 
         auto& uniforms_entry = entries[0];
         uniforms_entry.binding = 0;
@@ -736,6 +871,12 @@ void gfx::RendererWGPU::CreateSurfaceGlobalResources()
         visible_lights_entry.visibility = wgpu::ShaderStage::Fragment;
         visible_lights_entry.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
 
+        auto& shadow_texture_entry = entries[5];
+        shadow_texture_entry.binding = 5;
+        shadow_texture_entry.visibility = wgpu::ShaderStage::Fragment;
+        shadow_texture_entry.texture.viewDimension = wgpu::TextureViewDimension::e2DArray;
+        shadow_texture_entry.texture.sampleType = wgpu::TextureSampleType::Depth;
+
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.entryCount = entries.size();
         desc.entries = entries.data();
@@ -756,7 +897,7 @@ void gfx::RendererWGPU::CreateSurfaceGlobalResources()
 
 void gfx::RendererWGPU::CreateSurfaceGlobalBindGroup()
 {
-    std::array<wgpu::BindGroupEntry, 5> entries;
+    std::array<wgpu::BindGroupEntry, 6> entries;
 
     auto& uniforms_entry = entries[0];
     uniforms_entry.binding = 0;
@@ -780,6 +921,10 @@ void gfx::RendererWGPU::CreateSurfaceGlobalBindGroup()
     visible_lights_entry.binding = 4;
     visible_lights_entry.buffer = visible_lights_buffer_;
     visible_lights_entry.size = visible_lights_buffer_size_;
+
+    auto& shadow_texture_entry = entries[5];
+    shadow_texture_entry.binding = 5;
+    shadow_texture_entry.textureView = spotlight_shadow_texture_view_;
 
     wgpu::BindGroupDescriptor desc{};
     desc.layout = global_bind_group_layout_;
@@ -1057,6 +1202,10 @@ void gfx::RendererWGPU::CreateLightCullingPipeline()
             cos_outer: f32,
             view_bounding_pos: vec3f,
             bounding_radius: f32,
+            shadow_idx: u32,
+            _pad0: f32,
+            _pad1: f32,
+            _pad2: f32,
         };
 
         @group(0) @binding(0) var<uniform> u_global: GlobalData;
@@ -1441,10 +1590,20 @@ void gfx::RendererWGPU::CreateGuiPipeline()
     gui_pipeline_ = device_.CreateRenderPipeline(&desc);
 }
 
+static wgpu::PresentMode GetDesiredPresentMode()
+{
+    if (r_vsync.Get() == 0)
+        return wgpu::PresentMode::Immediate;
+    else if (r_vsync.Get() == 1)
+        return wgpu::PresentMode::Fifo;
+    else
+        return wgpu::PresentMode::Mailbox;
+}
+
 void gfx::RendererWGPU::ConfigureSurface(const glm::u32vec2& viewport_size)
 {
     wgpu::SurfaceConfiguration config{};
-    config.presentMode = wgpu::PresentMode::Immediate;
+    config.presentMode = GetDesiredPresentMode();
     config.width = viewport_size.x;
     config.height = viewport_size.y;
     config.device = device_;
@@ -1456,6 +1615,11 @@ void gfx::RendererWGPU::ConfigureSurface(const glm::u32vec2& viewport_size)
     config.viewFormats = &surface_format_;
 
     surface_.Configure(&config);
+}
+
+void gfx::RendererWGPU::InvalidateSurface()
+{
+    setup_viewport_size_ = {0, 0};
 }
 
 void gfx::RendererWGPU::ProcessViewportSizeChange(const glm::u32vec2& viewport_size)
@@ -1769,7 +1933,7 @@ const wgpu::RenderPipeline& gfx::RendererWGPU::GetSurfacePipeline(SurfacePipelin
     auto& shader_module = surface_shaders_[flags];
     if (!shader_module)
     {
-        shader_module = CreateSurfaceShaderWGPU(device_, flags);
+        shader_module = CreateSurfaceShaderWGPU(device_, flags, surface_shader_cfg_);
     }
 
     // PIPELINE
@@ -1812,6 +1976,13 @@ const wgpu::RenderPipeline& gfx::RendererWGPU::GetSurfacePipeline(SurfacePipelin
     {
         depth_state.depthCompare = (flags & SPF_BLEND) ? wgpu::CompareFunction::Less : wgpu::CompareFunction::Equal;
         depth_state.depthWriteEnabled = false;
+    }
+
+    if (flags & SPF_SHADOW_MAP)
+    {
+        depth_state.depthBias = 8;
+        depth_state.depthBiasSlopeScale = 1.5f;
+        depth_state.depthBiasClamp = 0.05f;
     }
 
     desc.depthStencil = &depth_state;
@@ -1898,6 +2069,7 @@ const wgpu::RenderPipeline& gfx::RendererWGPU::GetSurfacePipeline(SurfacePipelin
 void gfx::RendererWGPU::InvalidateSurfacePipelines()
 {
     surface_pipelines_.clear();
+    surface_shaders_.clear();
 }
 
 void gfx::RendererWGPU::CreateInstanceBufferBindGroup()
@@ -1918,18 +2090,41 @@ void gfx::RendererWGPU::CreateInstanceBufferBindGroup()
 
 void gfx::RendererWGPU::UpdateSettings()
 {
-    if (r_msaa.IsModified())
+    //if (r_msaa.IsModified())
+    //{
+    //    msaa_samples_ = GetMultisampleCount();
+    //    CreateGuiPipeline();
+    //    InvalidateSurfacePipelines();
+    //    InvalidateSurface();
+    //    r_msaa.ClearModified();
+    //}
+
+    if (r_csm_resolution.IsModified() || r_shadow_resolution.IsModified() || r_csm_cascades.IsModified() ||
+        r_shadow_count.IsModified() || r_shadow_quality.IsModified())
     {
-        msaa_samples_ = GetMultisampleCount();
-        CreateGuiPipeline();
-        InvalidateSurfacePipelines();
-        setup_viewport_size_ = {0, 0};
-        r_msaa.ClearModified();
+        InvalidateShadowResources();
+
+        r_csm_resolution.ClearModified();
+        r_shadow_resolution.ClearModified();
+        r_csm_cascades.ClearModified();
+        r_shadow_count.ClearModified();
+        r_shadow_quality.ClearModified();
+    }
+
+    if (r_vsync.IsModified())
+    {
+        InvalidateSurface();
+        r_vsync.ClearModified();
     }
 }
 
 void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
 {
+    if (!shadow_resources_setup_)
+    {
+        CreateShadowResources();
+    }
+
     auto viewport_size = GetViewportSize();
     if (setup_viewport_size_ != viewport_size)
     {
@@ -1978,6 +2173,23 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
         total_instances += cascade.pcmds.size();
     }
 
+    // prepare spotlight shadow cmds
+    PrepareLights(main_dlist_.lights, main_ctx);
+
+    for (uint32_t i = 0; i < spotlight_shadow_current_count_; ++i)
+    {
+        auto& shadowmap = spotlight_shadows_[i];
+        shadowmap.dlist.Clear();
+
+        DrawContext shadowmap_ctx(shadowmap.dlist, DRAW_PASS_SHADOW_MAP, camera.eye, shadowmap.view, shadowmap.proj,
+                                  0.0f, 150.0f, glm::u32vec2(spotlight_shadow_resolution_));
+
+        scene.Draw(shadowmap_ctx);
+
+        PrepareSurfaceCmds(shadowmap.dlist.surfaces, shadowmap.pcmds, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
+        total_instances += shadowmap.pcmds.size();
+    }
+
     // setup instance buffer
     instances_.clear();
     instances_.reserve(total_instances);
@@ -2013,6 +2225,30 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
         pass.End();
     }
 
+    // render spotlight shadowmaps
+    for (uint32_t i = 0; i < spotlight_shadow_current_count_; ++i)
+    {
+        auto& shadowmap = spotlight_shadows_[i];
+
+        GlobalUniformData globals{};
+        globals.view = shadowmap.view;
+        globals.proj = shadowmap.proj;
+        globals.view_proj = shadowmap.view_proj;
+
+        // setup cascade depth attachment
+        wgpu::RenderPassDepthStencilAttachment depth_attachment{};
+        depth_attachment.view = shadowmap.texture_view;
+        depth_attachment.depthLoadOp = wgpu::LoadOp::Clear;
+        depth_attachment.depthStoreOp = wgpu::StoreOp::Store;
+        depth_attachment.depthClearValue = 1.0f;
+
+        wgpu::RenderPassDescriptor pass_desc{};
+        pass_desc.depthStencilAttachment = &depth_attachment;
+        auto pass = encoder.BeginRenderPass(&pass_desc);
+        EncodePreparedCmds(pass, shadowmap.pcmds, globals, pass_index++, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
+        pass.End();
+    }
+
     // setup main globals
     GlobalUniformData globals{};
     globals.view = main_ctx.view;
@@ -2035,6 +2271,13 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
         globals.csm_matrices[i] = csm_cascades_[i].view_proj * inv_view;
     }
 
+    globals.spotlight_texel_size = 1.0f / static_cast<float>(spotlight_shadow_resolution_);
+
+    for (uint32_t i = 0; i < spotlight_shadow_current_count_; ++i)
+    {
+        globals.spotlight_matrices[i] = spotlight_shadows_[i].view_proj * inv_view;
+    }
+
     // setup depth attachment
     wgpu::RenderPassDepthStencilAttachment depth_attachment{};
     depth_attachment.view = depth_texture_view_;
@@ -2052,7 +2295,6 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
     }
 
     // cull lights using depth buffer
-    PrepareLights(main_dlist_.lights, main_ctx);
     EncodeLightCullingPass(encoder, main_ctx);
 
     // setup global bind group
@@ -2468,6 +2710,7 @@ void gfx::RendererWGPU::EncodePreparedCmds(wgpu::RenderPassEncoder& pass, std::s
 void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawContext& ctx)
 {
     lights_.clear();
+    spotlight_shadow_current_count_ = 0;
 
     // calc distance
     for (auto& cmd : cmds)
@@ -2490,6 +2733,7 @@ void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawCo
         entry.color = light.color;
         entry.cos_inner = light.cos_inner;
         entry.cos_outer = light.cos_outer;
+        entry.shadow_idx = 0xFFFFFFFF;
 
         if (light.cos_inner > light.cos_outer)
         {
@@ -2508,6 +2752,22 @@ void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawCo
                 float sin_outer = glm::sqrt(1.0f - light.cos_outer * light.cos_outer);
                 entry.bounding_radius = light.radius * sin_outer;
                 entry.view_bounding_pos = entry.view_pos + entry.view_dir * (entry.radius * light.cos_outer);
+            }
+
+            // shadow map candidate
+            if (spotlight_shadow_current_count_ < spotlight_shadow_count_)
+            {
+                uint32_t i = spotlight_shadow_current_count_++;
+
+                // setup matrices
+                auto& shadowmap = spotlight_shadows_[i];
+                shadowmap.proj = glm::perspectiveRH_ZO(2.0f * glm::acos(light.cos_outer), 1.0f, 0.1f, light.radius + 0.1f);
+                glm::vec3 up =
+                    (std::abs(light.dir.z) < 0.99f) ? glm::vec3(0.0f, 0.0f, 1.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
+                shadowmap.view = glm::lookAt(light.position, light.position + light.dir, glm::vec3(0.0f, 0.0f, 1.0f));
+                shadowmap.view_proj = shadowmap.proj * shadowmap.view;
+
+                entry.shadow_idx = i;
             }
 
         }
