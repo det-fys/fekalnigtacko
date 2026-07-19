@@ -226,10 +226,9 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
             }
 
             fn compute_sun_light(view_pos: vec3f, view_normal: vec3f) -> vec3f {
-                let N = normalize(view_normal);
-                let L = normalize(-u_global.sun_direction);
+                let L = -u_global.sun_direction;
 
-                let NdotL = max(dot(N, L), 0.0);
+                let NdotL = get_normal_factor(view_normal, L);
 
                 let depth = -view_pos.z;
                 return u_global.sun_color * (NdotL * sample_csm(view_pos, depth));
@@ -300,7 +299,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags)
             }
         )WGSL";
 
-        fragment_main += "out = vec4f(out.rgb * compute_lights(in.view_pos, in.view_normal, in.position.xy), out.a);\n";
+        fragment_main += "out = vec4f(out.rgb * compute_lights(in.view_pos, normalize(in.view_normal), in.position.xy), out.a);\n";
     }
 
     if (flags & gfx::SPF_FOG)
