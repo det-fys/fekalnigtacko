@@ -379,7 +379,9 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
                 return u_global.sun_color * (NdotL * sample_csm(view_pos, depth, shadow_data));
             }
 
-            fn compute_light_contribution(light: ptr<storage, LightBufferData, read>, view_pos: vec3f, view_normal: vec3f, shadow_data: ShadowSampleData) -> vec3f {
+            fn compute_light_contribution(light_idx: u32, view_pos: vec3f, view_normal: vec3f, shadow_data: ShadowSampleData) -> vec3f {
+                let light = u_lights[light_idx];
+            
                 let to_light = light.view_pos - view_pos;
                 let dist2 = dot(to_light, to_light);
 
@@ -437,7 +439,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
                         break;
                     }
     
-                    accum += compute_light_contribution(&u_lights[light_idx], view_pos, view_normal, shadow_data);
+                    accum += compute_light_contribution(light_idx, view_pos, view_normal, shadow_data);
                     //accum.g += 0.2;
 
                     //if (distance(view_pos, light.view_bounding_pos) < light.bounding_radius)
