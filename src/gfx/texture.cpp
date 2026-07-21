@@ -41,6 +41,10 @@ std::shared_ptr<gfx::Texture> gfx::Texture::LoadFromFile(const std::string& file
             {
                 iss >> desc.max_mipmap_level;
             }
+            else if (command == "linearrgb")
+            {
+                desc.linear_rgb = true;
+            }
         });
     }
 

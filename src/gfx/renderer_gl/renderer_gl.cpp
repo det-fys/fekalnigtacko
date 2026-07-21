@@ -377,6 +377,11 @@ void gfx::RendererGL::CreateLightGrid(std::span<DrawLightCmd> light_cmds, const 
 
     for (const auto& cmd : light_cmds)
     {
+        if (cmd.flags & LF_DETAIL)
+        {
+            continue; // not drawn by this renderer due to limited light count
+        }
+
         AddLightToGrid(cmd.light, light_grid_, light_grid_size_);
         AddLightToGrid(cmd.light, light_grid_chunks_, light_grid_chunks_size_);
     }

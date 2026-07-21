@@ -21,6 +21,7 @@ enum ShadowSampleFunction
 struct ShaderConfig
 {
     ShadowSampleFunction shadow_sample_func = SHADOW_SAMPLE_DEFAULT;
+    bool debug_tiles = false;
 };
 
 wgpu::ShaderModule CreateSurfaceShaderWGPU(const wgpu::Device& device, SurfacePipelineFlags flags,

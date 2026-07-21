@@ -134,6 +134,11 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
 
 void game::view::WorldEnv::Draw(const DrawArgs& args)
 {
+    if (args.ctx.pass != gfx::DRAW_PASS_MAIN)
+    {
+        return; // only draw this in main pass
+    }
+
     const WorldEnvKeyframe *kf1, *kf2;
 
     if (daytime_ < 0.0f)
@@ -166,7 +171,7 @@ void game::view::WorldEnv::Draw(const DrawArgs& args)
     // env_.fog = glm::mix(kf1->fog, kf2->fog, t);
     env_.fog = glm::vec4(env_.clear_color, glm::mix(kf1->fog.a, kf2->fog.a, t));
 
-    float dist = 1500.0f;
+    float dist = args.ctx.max_distance * 1.5f + 500.0f;
 
     // std::cout<<daytime_<<std::endl;
 

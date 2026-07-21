@@ -18,6 +18,9 @@
 
 //CVAR_CL(uint8_t, r_msaa, CV_SAVE, 0, 0, 1);
 
+// max render distance
+CVAR_CL(uint32_t, r_distance, CV_SAVE, 3000, 1, 3000);
+
 // 0: 256
 // 1: 512
 // 2: 1024
@@ -36,8 +39,11 @@ CVAR_CL(uint32_t, r_shadow_count, CV_SAVE, 4, 0, 8);
 CVAR_CL(uint32_t, r_shadow_quality, CV_SAVE, 3, 0, 3);
 
 // 0: immediate
-// 1: vsync
+// 1: FIFO
+// 2: mailbox
 CVAR_CL(uint32_t, r_vsync, CV_SAVE, 0, 0, 2);
+
+CVAR_CL(uint8_t, r_tile_debug, CV_NONE, 0, 0, 1);
 
 static std::vector<uint8_t> temp_buffer;
 
@@ -63,6 +69,7 @@ gfx::RendererWGPU::RendererWGPU(SDL_Window* window) : Renderer(window)
     CreateMipmapPipeline();
     CreateGuiPipeline();
     CreateLightCullingPipeline();
+    CreateCoronaPipeline();
 }
 
 gfx::MeshID gfx::RendererWGPU::CreateMesh(const MeshDescriptor& desc)
@@ -99,7 +106,7 @@ gfx::TextureID gfx::RendererWGPU::CreateTexture(const TextureDescriptor& desc)
 {
     TextureWGPU texture{};
     texture.desc = desc;
-    if (desc.mipmaps)
+    if (desc.mipmaps && !desc.linear_rgb) // TODO: enable linear mipmap generation
     {
         texture.mip_levels = std::max(
             1U, std::min(desc.max_mipmap_level, uint32_t(std::floor(std::log2(std::max(desc.width, desc.height))))));
@@ -108,7 +115,7 @@ gfx::TextureID gfx::RendererWGPU::CreateTexture(const TextureDescriptor& desc)
     wgpu::TextureDescriptor tex_desc{};
     tex_desc.dimension = wgpu::TextureDimension::e2D;
     tex_desc.size = {desc.width, desc.height, 1};
-    tex_desc.format = wgpu::TextureFormat::RGBA8UnormSrgb;
+    tex_desc.format = desc.linear_rgb ? wgpu::TextureFormat::RGBA8Unorm : wgpu::TextureFormat::RGBA8UnormSrgb;
     tex_desc.mipLevelCount = texture.mip_levels;
     tex_desc.usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding;
     if (tex_desc.mipLevelCount > 1)
@@ -529,6 +536,8 @@ void gfx::RendererWGPU::CreateGlobalResources()
     // light culling
     CreateLightCullingResources();
 
+    // corona
+    CreateCoronaResources();
 }
 
 void gfx::RendererWGPU::CreateMipmapResources()
@@ -1180,206 +1189,244 @@ void gfx::RendererWGPU::CreateLightCullingBindGroup()
 void gfx::RendererWGPU::CreateLightCullingPipeline()
 {
     constexpr std::string_view SHADER_SRC = SHADER_DEFS_WGSL R"WGSL(
-        const TILE_PIXELS = TILE_SIZE * TILE_SIZE;
+const TILE_PIXELS = TILE_SIZE * TILE_SIZE;
 
-        struct GlobalData {
-            screen_size: vec2u,
-            tile_count: vec2u,
-            proj: mat4x4f,
-            inv_proj: mat4x4f,
-            light_count: u32,
-            _pad0: f32,
-            _pad1: f32,
-            _pad2: f32,
-        };
+struct GlobalData {
+    screen_size: vec2u,
+    tile_count: vec2u,
+    proj: mat4x4f,
+    inv_proj: mat4x4f,
+    light_count: u32,
+    _pad0: f32,
+    _pad1: f32,
+    _pad2: f32,
+};
 
-        struct LightBufferData {
-            view_pos: vec3f,
-            radius: f32,
-            color: vec3f,
-            cos_inner: f32,
-            view_dir: vec3f,
-            cos_outer: f32,
-            view_bounding_pos: vec3f,
-            bounding_radius: f32,
-            shadow_idx: u32,
-            _pad0: f32,
-            _pad1: f32,
-            _pad2: f32,
-        };
+struct LightBufferData {
+    view_pos: vec3f,
+    radius: f32,
+    color: vec3f,
+    cos_inner: f32,
+    view_dir: vec3f,
+    cos_outer: f32,
+    view_bounding_pos: vec3f,
+    bounding_radius: f32,
+    shadow_idx: u32,
+    _pad0: f32,
+    _pad1: f32,
+    _pad2: f32,
+};
 
-        @group(0) @binding(0) var<uniform> u_global: GlobalData;
-        @group(0) @binding(1) var depth_texture: texture_depth_2d;
-        @group(0) @binding(2) var<storage, read> u_lights: array<LightBufferData>;
-        @group(0) @binding(3) var<storage, read_write> u_visible: array<u32>;
+@group(0) @binding(0) var<uniform> u_global: GlobalData;
+@group(0) @binding(1) var depth_texture: texture_depth_2d;
+@group(0) @binding(2) var<storage, read> u_lights: array<LightBufferData>;
+@group(0) @binding(3) var<storage, read_write> u_visible: array<u32>;
 
-        var<workgroup> visible_count: atomic<u32>;
-        var<workgroup> tile_min_depth_u32: atomic<u32>;
-        var<workgroup> tile_max_depth_u32: atomic<u32>;
-        var<workgroup> frustum_planes: array<vec4f, 6>;
-        var<workgroup> tile_aabb_min: vec3f;
-        var<workgroup> tile_aabb_max: vec3f;
+// Dual atomic counters for the two list halves
+var<workgroup> opaque_count: atomic<u32>;
+var<workgroup> transparent_count: atomic<u32>;
 
-        fn sphere_in_frustum(pos: vec3f, radius: f32) -> bool {
-            for (var i = 0u; i < 4u; i = i + 1u) {
-                if (dot(frustum_planes[i].xyz, pos) < -radius) {
-                    return false;
-                }
-            }
-            for (var i = 4u; i < 6u; i = i + 1u) {
-                let p = frustum_planes[i];
-                if (dot(p.xyz, pos) + p.w < -radius) {
-                    return false;
-                }
-            }
-            return true;
+var<workgroup> tile_min_depth_u32: atomic<u32>;
+var<workgroup> tile_max_depth_u32: atomic<u32>;
+
+// Shared frustum side planes (0..3) and far plane (4)
+var<workgroup> side_and_far_planes: array<vec4f, 5>;
+var<workgroup> opaque_near_plane: vec4f;
+var<workgroup> transparent_near_plane: vec4f;
+
+// Separate AABBs for Opaque (min_depth -> max_depth) and Transparent (0.0 -> max_depth)
+var<workgroup> opaque_aabb_min: vec3f;
+var<workgroup> opaque_aabb_max: vec3f;
+var<workgroup> transparent_aabb_min: vec3f;
+var<workgroup> transparent_aabb_max: vec3f;
+
+fn sphere_in_sides_and_far(pos: vec3f, radius: f32) -> bool {
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        if (dot(side_and_far_planes[i].xyz, pos) < -radius) {
+            return false;
+        }
+    }
+    let p_far = side_and_far_planes[4];
+    if (dot(p_far.xyz, pos) + p_far.w < -radius) {
+        return false;
+    }
+    return true;
+}
+
+fn sphere_pass_plane(pos: vec3f, radius: f32, plane: vec4f) -> bool {
+    return (dot(plane.xyz, pos) + plane.w) >= -radius;
+}
+
+// Unprojects an NDC point (x, y) at a specific depth (z) into View Space
+fn ndc_to_view(ndc: vec2f, depth: f32, inv_proj: mat4x4f) -> vec3f {
+    let clip_pos = vec4f(ndc.x, ndc.y, depth, 1.0);
+    let view_pos_homogenous = inv_proj * clip_pos;
+    return view_pos_homogenous.xyz / view_pos_homogenous.w;
+}
+
+fn sphere_intersects_aabb(light_view_pos: vec3f, radius: f32, aabb_min: vec3f, aabb_max: vec3f) -> bool {
+    let closest_point = clamp(light_view_pos, aabb_min, aabb_max);
+    let delta = light_view_pos - closest_point;
+    return dot(delta, delta) <= (radius * radius);
+}
+
+@compute @workgroup_size(TILE_SIZE, TILE_SIZE)
+fn cull_lights(
+    @builtin(local_invocation_id) lid: vec3u,
+    @builtin(workgroup_id) wgid: vec3u
+) {
+    let tile_index = wgid.y * u_global.tile_count.x + wgid.x;
+    let local_index = lid.y * TILE_SIZE + lid.x;
+    let half_max_lights = MAX_LIGHTS_PER_TILE / 2u;
+
+    // Initialize atomics in a single thread
+    if (local_index == 0u) {
+        atomicStore(&opaque_count, 0u);
+        atomicStore(&transparent_count, 0u);
+        atomicStore(&tile_min_depth_u32, 0xFFFFFFFFu); // Max u32 represents 1.0f
+        atomicStore(&tile_max_depth_u32, 0u);          // 0 represents 0.0f
+    }
+    workgroupBarrier();
+
+    // Load depths with edge-clamping to prevent artificial far-plane stretching
+    let max_coord = u_global.screen_size - vec2u(1u);
+    let pixel = min(wgid.xy * TILE_SIZE + lid.xy, max_coord);
+    let depth = textureLoad(depth_texture, vec2i(pixel), 0);
+
+    let depth_u32 = bitcast<u32>(depth);
+    atomicMin(&tile_min_depth_u32, depth_u32);
+    atomicMax(&tile_max_depth_u32, depth_u32);
+    workgroupBarrier();
+
+    // Compute Tile Frustums and AABBs natively in View Space
+    if (local_index == 0u) {
+        let tile_min_depth = bitcast<f32>(atomicLoad(&tile_min_depth_u32));
+        let tile_max_depth = bitcast<f32>(atomicLoad(&tile_max_depth_u32));
+
+        let tile = wgid.xy;
+        let tile_scale = vec2f(u_global.tile_count);
+        let step_min = vec2f(tile) / tile_scale;
+        let step_max = vec2f(tile + vec2u(1u)) / tile_scale;
+        let ndc_x_min = -1.0 + 2.0 * step_min.x;
+        let ndc_x_max = -1.0 + 2.0 * step_max.x;
+        let ndc_y_max =  1.0 - 2.0 * step_min.y;
+        let ndc_y_min =  1.0 - 2.0 * step_max.y;
+
+        // Clip space plane definitions
+        let p0 = vec4f( 1.0,  0.0,  0.0, -ndc_x_min); // Left
+        let p1 = vec4f(-1.0,  0.0,  0.0,  ndc_x_max); // Right
+        let p2 = vec4f( 0.0,  1.0,  0.0, -ndc_y_min); // Bottom
+        let p3 = vec4f( 0.0, -1.0,  0.0,  ndc_y_max); // Top
+        let p_far         = vec4f( 0.0,  0.0, -1.0,  tile_max_depth); // Far (ZO layout)
+        let p_near_opaque = vec4f( 0.0,  0.0,  1.0, -tile_min_depth); // Near Opaque
+        let p_near_trans  = vec4f( 0.0,  0.0,  1.0,  0.0);            // Near Transparent (Depth = 0.0)
+
+        let transform_mat = transpose(u_global.proj);
+        let raw_sides = array<vec4f, 4>(p0, p1, p2, p3);
+
+        for (var i = 0u; i < 4u; i = i + 1u) {
+            var p = transform_mat * raw_sides[i];
+            p = p / length(p.xyz);
+            p.w = 0.0; // Prevent FP precision drift on side planes
+            side_and_far_planes[i] = p;
         }
 
-        // Unprojects an NDC point (x, y) at a specific depth (z) into View Space
-        fn ndc_to_view(ndc: vec2f, depth: f32, inv_proj: mat4x4f) -> vec3f {
-            // In WebGPU/ZO clip space, depth is directly [0.0, 1.0]
-            let clip_pos = vec4f(ndc.x, ndc.y, depth, 1.0);
-            let view_pos_homogenous = inv_proj * clip_pos;
-    
-            // Divide by W to resolve the perspective projection
-            return view_pos_homogenous.xyz / view_pos_homogenous.w;
-        }
+        var far_p = transform_mat * p_far;
+        side_and_far_planes[4] = far_p / length(far_p.xyz);
 
-        fn sphere_intersects_aabb(light_view_pos: vec3f, radius: f32) -> bool {
-            // Arvo's Algorithm Core: Clamp the sphere center inside the AABB grid bounds
-            // to find the absolute closest spatial coordinate on or inside the box surface.
-            let closest_point = clamp(light_view_pos, tile_aabb_min, tile_aabb_max);
-    
-            // Calculate the distance vector from the box to the sphere center
-            let delta = light_view_pos - closest_point;
-    
-            // Use dot product to check distance squared (saves a costly sqrt() call per light)
-            let distance_sq = dot(delta, delta);
-    
-            // If the squared distance is less than or equal to the squared radius, it intersects!
-            return distance_sq <= (radius * radius);
-        }
+        var n_op = transform_mat * p_near_opaque;
+        opaque_near_plane = n_op / length(n_op.xyz);
 
-        @compute @workgroup_size(TILE_SIZE, TILE_SIZE)
-        fn cull_lights(
-            @builtin(local_invocation_id) lid: vec3u,
-            @builtin(workgroup_id) wgid: vec3u
-        ) {
-            let tile_index = wgid.y * u_global.tile_count.x + wgid.x;
-            let local_index = lid.y * TILE_SIZE + lid.x;
+        var n_tr = transform_mat * p_near_trans;
+        transparent_near_plane = n_tr / length(n_tr.xyz);
 
-            // Initialize atomics in a single thread
-            if (local_index == 0u) {
-                atomicStore(&visible_count, 0u);
-                atomicStore(&tile_min_depth_u32, 0xFFFFFFFFu); // Max u32 represents 1.0f
-                atomicStore(&tile_max_depth_u32, 0u);          // 0 represents 0.0f
-            }
-            workgroupBarrier();
+        // Unproject 4 corners at Z = 0.0 (Transparent Near Plane)
+        let f_tr_0 = ndc_to_view(vec2f(ndc_x_min, ndc_y_min), 0.0, u_global.inv_proj);
+        let f_tr_1 = ndc_to_view(vec2f(ndc_x_max, ndc_y_min), 0.0, u_global.inv_proj);
+        let f_tr_2 = ndc_to_view(vec2f(ndc_x_min, ndc_y_max), 0.0, u_global.inv_proj);
+        let f_tr_3 = ndc_to_view(vec2f(ndc_x_max, ndc_y_max), 0.0, u_global.inv_proj);
 
-            // Load depths with edge-clamping to prevent artificial far-plane stretching
-            let max_coord = u_global.screen_size - vec2u(1u);
-            let pixel = min(wgid.xy * TILE_SIZE + lid.xy, max_coord);
-            let depth = textureLoad(depth_texture, vec2i(pixel), 0);
+        // Unproject 4 corners at Opaque Near Depth Plane
+        let f_op_0 = ndc_to_view(vec2f(ndc_x_min, ndc_y_min), tile_min_depth, u_global.inv_proj);
+        let f_op_1 = ndc_to_view(vec2f(ndc_x_max, ndc_y_min), tile_min_depth, u_global.inv_proj);
+        let f_op_2 = ndc_to_view(vec2f(ndc_x_min, ndc_y_max), tile_min_depth, u_global.inv_proj);
+        let f_op_3 = ndc_to_view(vec2f(ndc_x_max, ndc_y_max), tile_min_depth, u_global.inv_proj);
 
-            // O(1) Atomic Float Reduction (Valid because depth is positive IEEE 754 float)
-            let depth_u32 = bitcast<u32>(depth);
-            atomicMin(&tile_min_depth_u32, depth_u32);
-            atomicMax(&tile_max_depth_u32, depth_u32);
+        // Unproject 4 corners at Far Depth Plane
+        let f_far_0 = ndc_to_view(vec2f(ndc_x_min, ndc_y_min), tile_max_depth, u_global.inv_proj);
+        let f_far_1 = ndc_to_view(vec2f(ndc_x_max, ndc_y_min), tile_max_depth, u_global.inv_proj);
+        let f_far_2 = ndc_to_view(vec2f(ndc_x_min, ndc_y_max), tile_max_depth, u_global.inv_proj);
+        let f_far_3 = ndc_to_view(vec2f(ndc_x_max, ndc_y_max), tile_max_depth, u_global.inv_proj);
 
-            workgroupBarrier();
+        let far_min = min(min(f_far_0, f_far_1), min(f_far_2, f_far_3));
+        let far_max = max(max(f_far_0, f_far_1), max(f_far_2, f_far_3));
 
-            // Compute Tile Frustum natively in View Space
-            if (local_index == 0u) {
-                let tile_min_depth = bitcast<f32>(atomicLoad(&tile_min_depth_u32));
-                let tile_max_depth = bitcast<f32>(atomicLoad(&tile_max_depth_u32));
-        
-                let tile = wgid.xy;
-                let tile_scale = vec2f(u_global.tile_count);
+        // Construct Opaque AABB
+        let op_near_min = min(min(f_op_0, f_op_1), min(f_op_2, f_op_3));
+        let op_near_max = max(max(f_op_0, f_op_1), max(f_op_2, f_op_3));
+        opaque_aabb_min = min(op_near_min, far_min);
+        opaque_aabb_max = max(op_near_max, far_max);
+        opaque_aabb_min.z = min(f_op_0.z, f_far_0.z);
+        opaque_aabb_max.z = max(f_op_0.z, f_far_0.z);
 
-                let step_min = vec2f(tile) / tile_scale;
-                let step_max = vec2f(tile + vec2u(1u)) / tile_scale;
+        // Construct Transparent AABB
+        let tr_near_min = min(min(f_tr_0, f_tr_1), min(f_tr_2, f_tr_3));
+        let tr_near_max = max(max(f_tr_0, f_tr_1), max(f_tr_2, f_tr_3));
+        transparent_aabb_min = min(tr_near_min, far_min);
+        transparent_aabb_max = max(tr_near_max, far_max);
+        transparent_aabb_min.z = min(f_tr_0.z, f_far_0.z);
+        transparent_aabb_max.z = max(f_tr_0.z, f_far_0.z);
+    }
+    workgroupBarrier();
 
-                let ndc_x_min = -1.0 + 2.0 * step_min.x;
-                let ndc_x_max = -1.0 + 2.0 * step_max.x;
-                let ndc_y_max =  1.0 - 2.0 * step_min.y;
-                let ndc_y_min =  1.0 - 2.0 * step_max.y;
+    // Test Lights in View Space
+    for (var i = local_index; i < u_global.light_count; i += TILE_PIXELS) {
+        let light = u_lights[i];
+        let pos = light.view_bounding_pos;
+        let rad = light.bounding_radius;
 
-                // Clip space plane definitions
-                let p0 = vec4f( 1.0,  0.0,  0.0, -ndc_x_min); // Left
-                let p1 = vec4f(-1.0,  0.0,  0.0,  ndc_x_max); // Right
-                let p2 = vec4f( 0.0,  1.0,  0.0, -ndc_y_min); // Bottom
-                let p3 = vec4f( 0.0, -1.0,  0.0,  ndc_y_max); // Top
-                let p4 = vec4f( 0.0,  0.0,  1.0, -tile_min_depth); // Near (ZO layout)
-                let p5 = vec4f( 0.0,  0.0, -1.0,  tile_max_depth); // Far  (ZO layout)
-
-                // Transform Clip planes to View Space using transpose(Projection)
-                let transform_mat = transpose(u_global.proj);
-                let planes = array<vec4f, 6>(p0, p1, p2, p3, p4, p5);
-
-                for (var i = 0u; i < 6u; i = i + 1u) {
-                    var p = transform_mat * planes[i];
-                    let len = length(p.xyz);
-                    p = p / len;
-            
-                    // Explicitly zero out .w for side planes to prevent FP precision drift
-                    if (i < 4u) {
-                        p.w = 0.0;
-                    }
-                    frustum_planes[i] = p;
+        // Step 1: Broad check against Extended Frustum/AABB (ignoring min depth Z)
+        if (sphere_in_sides_and_far(pos, rad) &&
+            sphere_pass_plane(pos, rad, transparent_near_plane) &&
+            sphere_intersects_aabb(pos, rad, transparent_aabb_min, transparent_aabb_max)) 
+        {
+            // Step 2: Decide list routing based on min depth Z
+            if (sphere_pass_plane(pos, rad, opaque_near_plane) &&
+                sphere_intersects_aabb(pos, rad, opaque_aabb_min, opaque_aabb_max)) 
+            {
+                // Route to First Half (Opaque List)
+                let index = atomicAdd(&opaque_count, 1u);
+                if (index < half_max_lights) {
+                    u_visible[tile_index * MAX_LIGHTS_PER_TILE + index] = i;
                 }
-
-                // Extract depth bounds directly out of your depth min/max reduction buffer
-                let depth_near = tile_min_depth; 
-                let depth_far  = tile_max_depth;
-
-                // Unproject the 4 corners at the Near Depth Plane
-                let frustum_0 = ndc_to_view(vec2f(ndc_x_min, ndc_y_min), depth_near, u_global.inv_proj);
-                let frustum_1 = ndc_to_view(vec2f(ndc_x_max, ndc_y_min), depth_near, u_global.inv_proj);
-                let frustum_2 = ndc_to_view(vec2f(ndc_x_min, ndc_y_max), depth_near, u_global.inv_proj);
-                let frustum_3 = ndc_to_view(vec2f(ndc_x_max, ndc_y_max), depth_near, u_global.inv_proj);
-
-                // Unproject the 4 corners at the Far Depth Plane
-                let frustum_4 = ndc_to_view(vec2f(ndc_x_min, ndc_y_min), depth_far, u_global.inv_proj);
-                let frustum_5 = ndc_to_view(vec2f(ndc_x_max, ndc_y_min), depth_far, u_global.inv_proj);
-                let frustum_6 = ndc_to_view(vec2f(ndc_x_min, ndc_y_max), depth_far, u_global.inv_proj);
-                let frustum_7 = ndc_to_view(vec2f(ndc_x_max, ndc_y_max), depth_far, u_global.inv_proj);
-
-                // Construct the absolute bounding extents containing all 8 corners
-                tile_aabb_min =
-                    min(min(min(frustum_0, frustum_1), min(frustum_2, frustum_3)), 
-                        min(min(frustum_4, frustum_5), min(frustum_6, frustum_7)));
-
-                tile_aabb_max =
-                    max(max(max(frustum_0, frustum_1), max(frustum_2, frustum_3)), 
-                        max(max(frustum_4, frustum_5), max(frustum_6, frustum_7)));
-
-                // Explicitly ensure Z bounding extents match your near/far slice precisely
-                tile_aabb_min.z = min(frustum_0.z, frustum_4.z);
-                tile_aabb_max.z = max(frustum_0.z, frustum_4.z);
-            }
-            workgroupBarrier();
-
-            // Test Lights in View Space
-            for (var i = local_index; i < u_global.light_count; i += TILE_PIXELS) {
-                if (sphere_in_frustum(u_lights[i].view_bounding_pos, u_lights[i].bounding_radius) && 
-                    sphere_intersects_aabb(u_lights[i].view_bounding_pos, u_lights[i].bounding_radius)) {
-                    let index = atomicAdd(&visible_count, 1u);
-                    if (index < MAX_LIGHTS_PER_TILE) {
-                        u_visible[tile_index * MAX_LIGHTS_PER_TILE + index] = i;
-                    }
-                }
-            }
-            workgroupBarrier();
-
-            // Write Sentinel
-            if (local_index == 0u) {
-                let count = min(atomicLoad(&visible_count), MAX_LIGHTS_PER_TILE);
-                let base = tile_index * MAX_LIGHTS_PER_TILE;
-                if (count < MAX_LIGHTS_PER_TILE) {
-                    u_visible[base + count] = INVALID_LIGHT_IDX;
+            } else {
+                // Route to Second Half (Transparent Supplementary List)
+                let index = atomicAdd(&transparent_count, 1u);
+                if (index < half_max_lights) {
+                    u_visible[tile_index * MAX_LIGHTS_PER_TILE + half_max_lights + index] = i;
                 }
             }
         }
+    }
+    workgroupBarrier();
+
+    // Write Dual Sentinels
+    if (local_index == 0u) {
+        let base = tile_index * MAX_LIGHTS_PER_TILE;
+
+        // Terminate Opaque List (First Half)
+        let op_count = min(atomicLoad(&opaque_count), half_max_lights);
+        if (op_count < half_max_lights) {
+            u_visible[base + op_count] = INVALID_LIGHT_IDX;
+        }
+
+        // Terminate Transparent List (Second Half)
+        let tr_count = min(atomicLoad(&transparent_count), half_max_lights);
+        if (tr_count < half_max_lights) {
+            u_visible[base + half_max_lights + tr_count] = INVALID_LIGHT_IDX;
+        }
+    }
+}
     )WGSL";
 
     // make shader
@@ -1407,6 +1454,218 @@ void gfx::RendererWGPU::CreateLightCullingPipeline()
 void gfx::RendererWGPU::InvalidateLightCullingBindGroup()
 {
     light_culling_bind_group_ = nullptr;
+}
+
+void gfx::RendererWGPU::CreateCoronaResources()
+{
+    // corona bind group layout
+    {
+        std::array<wgpu::BindGroupLayoutEntry, 2> entries;
+
+        auto& uniforms_entry = entries[0];
+        uniforms_entry.binding = 0;
+        uniforms_entry.visibility = wgpu::ShaderStage::Vertex;
+        uniforms_entry.buffer.type = wgpu::BufferBindingType::Uniform;
+        uniforms_entry.buffer.minBindingSize = sizeof(CoronaGlobalData);
+
+        auto& buffer_entry = entries[1];
+        buffer_entry.binding = 1;
+        buffer_entry.visibility = wgpu::ShaderStage::Vertex;
+        buffer_entry.buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
+        buffer_entry.buffer.minBindingSize = sizeof(CoronaBufferData);
+
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        desc.label = "Corona bind group layout";
+        corona_bind_group_layout_ = device_.CreateBindGroupLayout(&desc);
+    }
+
+    // corona global buffer
+    {
+        wgpu::BufferDescriptor desc{};
+        desc.size = sizeof(CoronaGlobalData);
+        desc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Uniform;
+        desc.label = "Corona global buffer";
+        corona_global_buffer_ = device_.CreateBuffer(&desc);
+    }
+
+    // corona buffer
+    corona_buffer_.usage |= wgpu::BufferUsage::Storage;
+
+}
+
+void gfx::RendererWGPU::CreateCoronaBindGroup()
+{
+    corona_bind_group_ = nullptr;
+
+    std::array<wgpu::BindGroupEntry, 2> entries;
+
+    auto& uniforms_entry = entries[0];
+    uniforms_entry.binding = 0;
+    uniforms_entry.buffer = corona_global_buffer_;
+    uniforms_entry.size = sizeof(CoronaGlobalData);
+
+    auto& buffer_entry = entries[1];
+    buffer_entry.binding = 1;
+    buffer_entry.buffer = corona_buffer_.buffer;
+    buffer_entry.size = corona_buffer_.buffer.GetSize();
+
+    wgpu::BindGroupDescriptor desc{};
+    desc.layout = corona_bind_group_layout_;
+    desc.entryCount = entries.size();
+    desc.entries = entries.data();
+    desc.label = "Corona bind group";
+    corona_bind_group_ = device_.CreateBindGroup(&desc);
+}
+
+void gfx::RendererWGPU::CreateCoronaPipeline()
+{
+    constexpr std::string_view SHADER_SRC = R"WGSL(
+        struct VertexInput {
+            @builtin(vertex_index) vertex_id: u32,
+            @builtin(instance_index) instance_id: u32,
+        };
+
+        struct VertexOutput {
+	        @builtin(position) position: vec4f,
+	        @location(0) color: vec3f,
+	        @location(1) quad_pos: vec2f,
+        };
+
+        struct GlobalData {
+            proj: mat4x4f,
+            scale_xy: vec2f,
+            _pad0: f32,
+            _pad1: f32,
+        };
+
+        struct CoronaBufferData {
+            view_pos: vec3f,
+            size: f32,
+            view_dir: vec3f,
+            _pad0: f32,
+            color: vec4f,
+        };
+
+        @group(0) @binding(0) var<uniform> u_global: GlobalData;
+        @group(0) @binding(1) var<storage> u_coronas: array<CoronaBufferData>;
+
+        const VERTICES = array<vec2f, 4>(
+            vec2f(-1.0f, -1.0f),
+            vec2f( 1.0f, -1.0f),
+            vec2f(-1.0f,  1.0f),
+            vec2f( 1.0f,  1.0f),
+        );
+
+        @vertex
+        fn vs_main(in: VertexInput) -> VertexOutput {
+            let corona = u_coronas[in.instance_id];
+
+            let dist = length(corona.view_pos);
+            let offset_pos = corona.view_pos * (1.0 - (0.2 / dist));
+            
+            let clip_pos = u_global.proj * vec4f(offset_pos, 1.0);
+
+            let angle_factor = sqrt(max(corona.view_dir.z, 0.0));
+            let angle_mult = mix(0.0, 0.7, angle_factor);
+            let angle_scale = mix(0.3, 1.0, angle_factor);
+
+            let scale_dist = max(0.1, dist);
+            const a = 1.0;
+            const b = 0.15;
+            let scale = 0.2 * angle_scale * (1.0 / (a + b * scale_dist)) * corona.size;
+            
+            let quad_pos = VERTICES[in.vertex_id];
+            
+            var out: VertexOutput;
+            out.position = vec4f(clip_pos.xy + quad_pos * u_global.scale_xy * (scale * clip_pos.w), clip_pos.zw);
+            out.quad_pos = quad_pos;
+            out.color = corona.color.rgb * angle_mult;
+            return out;
+        }
+
+        @fragment
+        fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+            let two_quad_pos = in.quad_pos * 2.0;
+            let r2 = dot(two_quad_pos, two_quad_pos);
+
+            if (r2 > 4.0) {
+                return vec4f(0.0);
+            }
+
+            let core = exp(-18.0 * r2);
+            let halo = exp(-3.5 * r2);
+
+            let alpha = core + 0.35 * halo;
+            return vec4f(in.color * alpha, 1.0);
+        }
+    )WGSL";
+
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "Corona pipeline";
+
+    // shader
+    wgpu::ShaderModuleDescriptor shader_desc{};
+    shader_desc.label = "Corona shader";
+    wgpu::ShaderSourceWGSL shader_src{};
+    shader_src.code = SHADER_SRC;
+    shader_desc.nextInChain = &shader_src;
+    auto shader_module = device_.CreateShaderModule(&shader_desc);
+
+    // vertex
+    desc.vertex.bufferCount = 0;
+    desc.vertex.buffers = nullptr;
+    desc.vertex.module = shader_module;
+    desc.vertex.entryPoint = "vs_main";
+
+    // assembly
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleStrip;
+    desc.primitive.frontFace = wgpu::FrontFace::CCW;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+
+    // blending
+    wgpu::BlendState blend{};
+    blend.color.srcFactor = wgpu::BlendFactor::SrcAlpha;
+    blend.color.dstFactor = wgpu::BlendFactor::One;
+    blend.color.operation = wgpu::BlendOperation::Add;
+    //
+    blend.alpha.srcFactor = wgpu::BlendFactor::Zero;
+    blend.alpha.dstFactor = wgpu::BlendFactor::One;
+    blend.alpha.operation = wgpu::BlendOperation::Add;
+
+    // color
+    wgpu::ColorTargetState color{};
+    color.format = surface_format_;
+    color.blend = &blend;
+    color.writeMask = wgpu::ColorWriteMask::All;
+
+    // depth
+    wgpu::DepthStencilState depth_state{};
+    depth_state.depthCompare = wgpu::CompareFunction::LessEqual;
+    depth_state.depthWriteEnabled = wgpu::OptionalBool::False;
+    depth_state.format = wgpu::TextureFormat::Depth24Plus;
+    desc.depthStencil = &depth_state;
+
+    // fragment
+    wgpu::FragmentState fragment{};
+    fragment.module = shader_module;
+    fragment.entryPoint = "fs_main";
+    fragment.targetCount = 1;
+    fragment.targets = &color;
+    desc.fragment = &fragment;
+
+    // multisampling
+    desc.multisample.count = msaa_samples_;
+
+    // layout
+    wgpu::PipelineLayoutDescriptor layout_desc{};
+    layout_desc.bindGroupLayoutCount = 1;
+    layout_desc.bindGroupLayouts = &corona_bind_group_layout_;
+    layout_desc.label = "Corona pipeline layout";
+    desc.layout = device_.CreatePipelineLayout(&layout_desc);
+
+    corona_pipeline_ = device_.CreateRenderPipeline(&desc);
 }
 
 void gfx::RendererWGPU::CreateGuiResources()
@@ -2116,6 +2375,13 @@ void gfx::RendererWGPU::UpdateSettings()
         InvalidateSurface();
         r_vsync.ClearModified();
     }
+
+    if (r_tile_debug.IsModified())
+    {
+        surface_shader_cfg_.debug_tiles = r_tile_debug.Get() > 0;
+        InvalidateSurfacePipelines();
+        r_tile_debug.ClearModified();
+    }
 }
 
 void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
@@ -2136,13 +2402,13 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
     // compute matrices
     float aspect = static_cast<float>(viewport_size.x) / static_cast<float>(viewport_size.y);
 
-    const float farplane = 3000.0f;
+    float min_distance = 0.0f;
+    float max_distance = static_cast<float>(r_distance.Get());
+    const float farplane = max_distance * 2.0f + 500.0f;
 
     auto proj = glm::perspectiveRH_ZO(glm::radians(camera.fov * 0.5f), aspect, 0.1f, farplane);
     auto view = glm::lookAt(camera.eye, camera.eye + camera.dir, glm::vec3(0.0f, 0.0f, 1.0f));
 
-    float min_distance = 0.0f;
-    float max_distance = 500.0f;
 
     // main capture
     main_dlist_.Clear();
@@ -2255,7 +2521,7 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
     globals.proj = main_ctx.proj;
     globals.view_proj = main_ctx.view_proj;
     globals.ambient_color = LinearizeColor(env.ambient_light);
-    globals.sun_color = LinearizeColor(env.sun_color) * 1.3f;
+    globals.sun_color = LinearizeColor(env.sun_color) * 1.5f;
     globals.sun_direction = glm::mat3(main_ctx.view) * env.sun_direction;
     globals.camera_pos = main_ctx.eye;
     globals.fog = glm::vec4(LinearizeColor(env.fog), env.fog.a);
@@ -2340,7 +2606,10 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
         // draw surfaces
         EncodePreparedCmds(pass, pcmds_main_, globals, pass_index++, 0);
 
-        // also draw hud in this pass
+        // also draw coronas in this pass
+        EncodeCoronaCmds(pass, main_dlist_.coronas, main_ctx);
+
+        // and also draw hud
         EncodeHudCmds(pass, main_dlist_.huds, main_ctx);
         
         pass.End();
@@ -2725,7 +2994,8 @@ void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawCo
 
     for (size_t i = 0; i < num_lights; ++i)
     {
-        auto& light = cmds[i].light;
+        auto& cmd = cmds[i];
+        auto& light = cmd.light;
 
         auto& entry = lights_.emplace_back();
         entry.view_pos = ctx.view * glm::vec4(light.position, 1.0f);
@@ -2755,7 +3025,9 @@ void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawCo
             }
 
             // shadow map candidate
-            if (spotlight_shadow_current_count_ < spotlight_shadow_count_)
+            constexpr float MAX_SHADOWMAP_LIGHT_DISTANCE = 150.0f;
+            if (spotlight_shadow_current_count_ < spotlight_shadow_count_ && (cmd.flags & LF_SHADOWS) &&
+                cmd.dist2 < (MAX_SHADOWMAP_LIGHT_DISTANCE * MAX_SHADOWMAP_LIGHT_DISTANCE))
             {
                 uint32_t i = spotlight_shadow_current_count_++;
 
@@ -2812,6 +3084,71 @@ void gfx::RendererWGPU::EncodeLightCullingPass(wgpu::CommandEncoder& encoder, co
     pass.SetBindGroup(0, light_culling_bind_group_);
     pass.DispatchWorkgroups(light_tiles_.x, light_tiles_.y);
     pass.End();
+}
+
+void gfx::RendererWGPU::EncodeCoronaCmds(wgpu::RenderPassEncoder& pass, std::span<DrawCoronaCmd> cmds,
+                                         const DrawContext& ctx)
+{
+    if (cmds.empty())
+    {
+        return; // no coronas
+    }
+
+    // setup globals
+    auto aspect = static_cast<float>(ctx.viewport_size.x) / static_cast<float>(ctx.viewport_size.y);
+    
+    CoronaGlobalData globals{};
+    globals.proj = ctx.proj;
+    globals.scale_xy = glm::vec2(1.0f, aspect);
+    queue_.WriteBuffer(corona_global_buffer_, 0, &globals, sizeof(globals));
+
+    // prepare coronas
+    coronas_.clear();
+    for (const auto& cmd : cmds)
+    {
+        auto& corona = coronas_.emplace_back();
+        corona.view_dir = glm::mat3(ctx.view) * cmd.dir;
+
+        if (corona.view_dir.z < 0.0f)
+        {
+            continue; // not facing camera
+        }
+
+        corona.view_dir = glm::normalize(corona.view_dir);
+
+        corona.view_pos = ctx.view * glm::vec4(cmd.pos, 1.0f);
+
+        if (corona.view_pos.z > 0.0f)
+        {
+            continue; // behind camera
+        }
+
+        //corona.size = cmd.size;
+        corona.size = 1.0f;
+        corona.color = glm::vec4(cmd.color, 1.0f);
+    }
+
+    if (coronas_.empty())
+    {
+        return;
+    }
+
+    // setup buffer
+    std::span<const uint8_t> corona_buffer_data(reinterpret_cast<const uint8_t*>(coronas_.data()),
+                                                coronas_.size() * sizeof(coronas_[0]));
+    
+    if (ReserveBufferCapacity(corona_buffer_, corona_buffer_data.size_bytes()))
+    {
+        // need to recreate bind group if buffer relocated
+        CreateCoronaBindGroup();
+    }
+
+    SetBufferData(corona_buffer_, corona_buffer_data);
+    
+    // draw
+    pass.SetPipeline(corona_pipeline_);
+    pass.SetBindGroup(0, corona_bind_group_);
+    pass.Draw(4, coronas_.size());
 }
 
 void gfx::RendererWGPU::EncodeHudCmds(wgpu::RenderPassEncoder& pass, std::span<DrawHudCmd> queue, const DrawContext& ctx)

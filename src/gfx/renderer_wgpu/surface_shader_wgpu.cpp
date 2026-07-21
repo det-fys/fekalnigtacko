@@ -123,8 +123,6 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
             let color_slot = clamp(u32(out.a * 9.0), 0, MAX_COLORS);
             out.a = 1.0;
 
-            var emis = 0.0;
-
             if (color_slot < MAX_COLORS) {
                 let color = unpack4x8unorm(instance.colors[color_slot]);
                 out = vec4f(out.rgb * color.rgb, out.a);
@@ -432,7 +430,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
 
                 var accum = vec3f(0.0);
 
-                for (var i = 0u; i < MAX_LIGHTS_PER_TILE; i++) {
+                for (var i = 0u; i < (MAX_LIGHTS_PER_TILE/2); i++) {
                     let light_idx = u_visible[base + i];
 
                     if (light_idx == INVALID_LIGHT_IDX) {
@@ -440,16 +438,29 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
                     }
     
                     accum += compute_light_contribution(light_idx, view_pos, view_normal, shadow_data);
-                    //accum.g += 0.2;
-
-                    //if (distance(view_pos, light.view_bounding_pos) < light.bounding_radius)
-                    //{
-                    //    accum.b += 0.2;
-                    //}
                 }
 
-                return accum;
+        )WGSL";
 
+        if (flags & gfx::SPF_BLEND)
+        {
+            functions += R"WGSL(
+                for (var i = (MAX_LIGHTS_PER_TILE/2); i < MAX_LIGHTS_PER_TILE; i++) {
+                    let light_idx = u_visible[base + i];
+
+                    if (light_idx == INVALID_LIGHT_IDX) {
+                        break;
+                    }
+    
+                    accum += compute_light_contribution(light_idx, view_pos, view_normal, shadow_data);
+                }
+
+            )WGSL";
+        }
+
+        functions += R"WGSL(
+
+                return accum;
             }
 
             fn compute_lights(view_pos: vec3f, view_normal: vec3f, frag_pos: vec2f) -> vec3f {
@@ -461,7 +472,44 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
             }
         )WGSL";
 
-        fragment_main += "out = vec4f(out.rgb * compute_lights(in.view_pos, normalize(in.view_normal), in.position.xy), out.a);\n";
+        fragment_main += "out = vec4f(mix(out.rgb * compute_lights(in.view_pos, normalize(in.view_normal), in.position.xy), out.rgb * 1.5, emis), out.a);\n";
+
+        if (cfg.debug_tiles)
+        {
+            functions += R"WGSL(
+                fn get_tile_debug_color(view_pos: vec3f, frag_pos: vec2f) -> vec4f {
+                    let tile = vec2u(frag_pos) / TILE_SIZE;
+                    let tile_index = tile.y * u_global.tile_count_x + tile.x;
+
+                    let base = tile_index * MAX_LIGHTS_PER_TILE;
+
+                    var accum = vec4f(0.0, 0.0, 0.0, 0.0);
+
+                    for (var i = 0u; i < (MAX_LIGHTS_PER_TILE/2); i++) {
+                        let light_idx = u_visible[base + i];
+
+                        if (light_idx == INVALID_LIGHT_IDX) {
+                            break;
+                        }
+
+                        accum.r += 0.05;
+                        
+                        let light = u_lights[light_idx];
+                        if (distance(view_pos, light.view_bounding_pos) < light.bounding_radius) {
+                            accum.g += 0.05;
+                        }
+                    }
+
+                    return accum;
+                }
+            )WGSL";
+
+            fragment_main += R"WGSL(
+                let tile_debug_color = get_tile_debug_color(in.view_pos, in.position.xy);
+                //out = vec4f(mix(out.rgb, tile_debug_color.rgb, tile_debug_color.a), out.a);
+                out = vec4f(out.rgb + tile_debug_color.rgb, out.a);
+            )WGSL";
+        }
     }
 
     if (flags & gfx::SPF_FOG)
@@ -556,6 +604,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
         shader += "-> @location(0) vec4f";
     shader += "{\n";
     shader += "    let instance = u_instance[in.instance_id];\n";
+    shader += "    var emis = 0.0;\n\n";
     shader += "    var out = vec4f(1.0);\n\n";
     shader += fragment_main;
     if (fragment_output)

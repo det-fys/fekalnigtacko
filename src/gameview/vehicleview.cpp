@@ -561,7 +561,7 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
 
             // spotlight
             dlist.AddSpotLight(spotlight_pos, spotlight_color, 30.0f, forward, glm::radians(12.0f),
-                               glm::radians(30.0f));
+                               glm::radians(30.0f), gfx::LF_SHADOWS);
         }
     }
 
@@ -570,9 +570,11 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
         // REAR LIGHTS
         for (size_t i = 0; i < num_rearlights_; ++i)
         {
-            dlist.AddCorona(root_.matrix * glm::vec4(rearlight_pos_[i], 1.0f), -forward,
-                            glm::vec3(1.0f, 0.2f, 0.2f) * (headlights_factor_ * 0.5f + braking_lights_factor_ * 0.7f),
-                            0.3f + braking_lights_factor_ * 0.7f);
+            glm::vec3 pos = root_.matrix * glm::vec4(rearlight_pos_[i], 1.0f);
+            glm::vec3 color = glm::vec3(1.0f, 0.1f, 0.1f) * (headlights_factor_ * 0.5f + braking_lights_factor_ * 0.7f);
+
+            dlist.AddCorona(pos, -forward, color, 0.3f + braking_lights_factor_ * 0.7f);
+            dlist.AddSpotLight(pos, color * 0.4f, 3.0f, -forward, glm::radians(20.0f), glm::radians(80.0f), gfx::LF_DETAIL);
         }
     }
 
@@ -582,7 +584,7 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
         for (size_t i = 0; i < num_brakinglights_; ++i)
         {
             dlist.AddCorona(root_.matrix * glm::vec4(brakinglights_pos_[i], 1.0f), -forward,
-                            glm::vec3(1.0f, 0.2f, 0.2f) * braking_lights_factor_, 1.0f);
+                            glm::vec3(1.0f, 0.1f, 0.1f) * braking_lights_factor_, 1.0f);
         }
     }
 
@@ -591,8 +593,12 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
         // REVERSE LIGHT
         for (size_t i = 0; i < num_reverselights_; ++i)
         {
-            dlist.AddCorona(root_.matrix * glm::vec4(reverselights_pos_[i], 1.0f), -forward,
-                            glm::vec3(reverse_light_factor_), 1.0f);
+            glm::vec3 pos = root_.matrix * glm::vec4(reverselights_pos_[i], 1.0f);
+            glm::vec3 color(reverse_light_factor_);
+
+            dlist.AddCorona(pos, -forward, color, 1.0f);
+            dlist.AddSpotLight(pos, color * 0.4f, 5.0f, -forward, glm::radians(12.0f), glm::radians(40.0f), gfx::LF_DETAIL);
+
         }
     }
 }

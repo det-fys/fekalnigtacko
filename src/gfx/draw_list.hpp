@@ -32,12 +32,20 @@ struct DrawSurfaceCmd
     LightCellCoordHash map_chunk_hash = 0;
 };
 
+using LightFlags = uint8_t;
+enum LightFlag : LightFlags
+{
+    LF_DETAIL = 1,
+    LF_SHADOWS = 2,
+};
+
 struct DrawLightCmd
 {
     LightData light;
     float dist2 = 0.0f;
+    LightFlags flags = 0;
 
-    DrawLightCmd(const glm::vec3& position, const glm::vec3& color, float radius)
+    DrawLightCmd(const glm::vec3& position, const glm::vec3& color, float radius, LightFlags flags = 0) : flags(flags)
     {
         light.position = position;
         light.color = color;
@@ -48,7 +56,9 @@ struct DrawLightCmd
         light.cos_outer = 0.0f;
     }
 
-    DrawLightCmd(const glm::vec3& position, const glm::vec3& color, float radius, const glm::vec3& dir, float angle_inner, float angle_outer)
+    DrawLightCmd(const glm::vec3& position, const glm::vec3& color, float radius, const glm::vec3& dir,
+                 float angle_inner, float angle_outer, LightFlags flags = 0)
+        : flags(flags)
     {
         light.position = position;
         light.color = color;
@@ -114,15 +124,15 @@ struct DrawList
     void AddSurface(const DrawSurfaceCmd& cmd) { surfaces.emplace_back(cmd); }
 
     void AddLight(const DrawLightCmd& cmd) { lights.emplace_back(cmd); }
-    void AddLight(const glm::vec3& position, const glm::vec3& color, float radius)
+    void AddLight(const glm::vec3& position, const glm::vec3& color, float radius, LightFlags flags = 0)
     {
-        lights.emplace_back(position, color, radius);
+        lights.emplace_back(position, color, radius, flags);
     }
 
     void AddSpotLight(const glm::vec3& position, const glm::vec3& color, float radius, const glm::vec3& dir,
-                      float angle_inner, float angle_outer)
+                      float angle_inner, float angle_outer, LightFlags flags = 0)
     {
-        lights.emplace_back(position, color, radius, dir, angle_inner, angle_outer);
+        lights.emplace_back(position, color, radius, dir, angle_inner, angle_outer, flags);
     }
 
     void AddCorona(const glm::vec3& pos, const glm::vec3& dir, const glm::vec3& color, float size)

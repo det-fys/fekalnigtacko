@@ -141,6 +141,22 @@ struct ShadowMapData
     std::vector<PreparedCmd> pcmds;
 };
 
+struct CoronaGlobalData
+{
+    glm::mat4 proj;
+    glm::vec2 scale_xy;
+    float _pad0[2];
+};
+
+struct CoronaBufferData
+{
+    glm::vec3 view_pos;
+    float size;
+    glm::vec3 view_dir;
+    float _pad0;
+    glm::vec4 color;
+};
+
 struct GlobalGUIUniformData
 {
     glm::mat3x4 matrix;
@@ -202,39 +218,59 @@ public:
 private:
     void InitWGPU();
     void SelectSurfaceFormat();
+    
     void CreateGlobalResources();
+    
     void CreateMipmapResources();
     void CreateMipmapPipeline();
+    
     void CreateShadowResources();
     void InvalidateShadowResources();
+    
     void CreateSurfaceGlobalResources();
     void CreateSurfaceGlobalBindGroup();
     void InvalidateSurfaceGlobalBindGroup();
     void CreateSurfaceMaterialResources();
     void CreateSurfaceInstanceResources();
+    
     void CreateDepthResources();
+    
     void CreateLightCullingResources();
     void CreateLightCullingVisibleLightsBuffer();
     void CreateLightCullingBindGroup();
     void CreateLightCullingPipeline();
     void InvalidateLightCullingBindGroup();
+
+    void CreateCoronaResources();
+    void CreateCoronaBindGroup();
+    void CreateCoronaPipeline();
+
     void CreateGuiResources();
     void CreateGuiPipeline();
+    
     void ConfigureSurface(const glm::u32vec2& viewport_size);
     void InvalidateSurface();
     void ProcessViewportSizeChange(const glm::u32vec2& viewport_size);
     SurfaceViewData GetNextSurfaceViewData();
+    
     bool ReserveBufferCapacity(DynamicBuffer& buffer, size_t capacity);
     void SetBufferData(DynamicBuffer& buffer, std::span<const uint8_t> data);
+    
     TextureID GetWhiteTexture();
     MaterialID GetDummyMaterial();
+    
     wgpu::Sampler GetSampler(bool linear, bool mipmaps);
     wgpu::Sampler GetSamplerForTexture(const TextureWGPU& texture);
+    
     void CreateTextureGuiBindGroup(TextureWGPU& texture);
+    
     VertexBufferLayout GetVertexBufferLayout(MeshVertexAttributeFlags attrs);
+    
     const wgpu::RenderPipeline& GetSurfacePipeline(SurfacePipelineFlags flags);
     void InvalidateSurfacePipelines();
+    
     void CreateInstanceBufferBindGroup();
+    
     void UpdateSettings();
 
     void Render(Scene& scene, const CameraParams& camera);
@@ -244,6 +280,7 @@ private:
                             const GlobalUniformData& globals, uint32_t globals_index, SurfacePipelineFlags pflags);
     void PrepareLights(std::span<DrawLightCmd> cmds, const DrawContext& ctx);
     void EncodeLightCullingPass(wgpu::CommandEncoder& encoder, const DrawContext& ctx);
+    void EncodeCoronaCmds(wgpu::RenderPassEncoder& pass, std::span<DrawCoronaCmd> cmds, const DrawContext& ctx);
     void EncodeHudCmds(wgpu::RenderPassEncoder& pass, std::span<DrawHudCmd> queue, const DrawContext& ctx);
 
     void Unload();
@@ -305,10 +342,17 @@ private:
     glm::u32vec2 light_tiles_;
     wgpu::ComputePipeline light_culling_pipeline_;
 
+    // light coronas
+    wgpu::BindGroupLayout corona_bind_group_layout_;
+    wgpu::Buffer corona_global_buffer_;
+    DynamicBuffer corona_buffer_;
+    wgpu::BindGroup corona_bind_group_;
+    wgpu::RenderPipeline corona_pipeline_;
+
     // temporary
     std::vector<LightBufferData> lights_;
     std::vector<InstanceUniformData> instances_;
-
+    std::vector<CoronaBufferData> coronas_;
 
     // GUI drawing resources
     wgpu::BindGroupLayout gui_global_bind_group_layout_;
