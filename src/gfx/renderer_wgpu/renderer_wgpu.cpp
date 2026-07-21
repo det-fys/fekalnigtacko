@@ -2588,7 +2588,8 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
     }
 
     color_attachment.loadOp = wgpu::LoadOp::Clear;
-    auto clear_color = env.clear_color;
+    //auto clear_color = env.clear_color;
+    auto clear_color = LinearizeColor(env.clear_color);
     color_attachment.clearValue = {clear_color.r, clear_color.g, clear_color.b, 1.0};
 
     // setup depth for main pass
