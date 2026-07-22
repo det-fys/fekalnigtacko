@@ -266,6 +266,11 @@ private:
     void CreateAOPipeline();
     void InvalidateAOPipeline();
 
+    void CreateFXAAResources();
+    void CreateFXAABindGroup();
+    void InvalidateFXAABindGroup();
+    void CreateFXAAPipeline();
+
     void CreateGuiResources();
     void CreateGuiPipeline();
     
@@ -302,6 +307,7 @@ private:
     void PrepareLights(std::span<DrawLightCmd> cmds, const DrawContext& ctx);
     void EncodeLightCullingPass(wgpu::CommandEncoder& encoder, const DrawContext& ctx);
     void EncodeAO(wgpu::CommandEncoder& encoder, const DrawContext& ctx);
+    void EncodeFXAA(wgpu::RenderPassEncoder& pass, const DrawContext& ctx);
     void EncodeCoronaCmds(wgpu::RenderPassEncoder& pass, std::span<DrawCoronaCmd> cmds, const DrawContext& ctx);
     void EncodeHudCmds(wgpu::RenderPassEncoder& pass, std::span<DrawHudCmd> queue, const DrawContext& ctx);
 
@@ -381,6 +387,12 @@ private:
     wgpu::Buffer ao_global_buffer_;
     wgpu::BindGroup ao_bind_group_;
     wgpu::ComputePipeline ao_pipeline_;
+
+    // FXAA
+    bool use_fxaa_ = false;
+    wgpu::BindGroupLayout fxaa_bind_group_layout_;
+    wgpu::BindGroup fxaa_bind_group_;
+    wgpu::RenderPipeline fxaa_pipeline_;
 
     // GUI drawing resources
     wgpu::BindGroupLayout gui_global_bind_group_layout_;

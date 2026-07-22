@@ -49,6 +49,10 @@ CVAR_CL(uint8_t, r_tile_debug, CV_NONE, 0, 0, 1);
 // 1: SSAO
 CVAR_CL(uint8_t, r_ao, CV_SAVE, 0, 0, 1);
 
+// 0: disabled
+// 1: enabled
+CVAR_CL(uint8_t, r_fxaa, CV_SAVE, 0, 0, 1);
+
 static std::vector<uint8_t> temp_buffer;
 
 static inline glm::vec3 LinearizeColor(const glm::vec3 color_srgb)
@@ -74,6 +78,7 @@ gfx::RendererWGPU::RendererWGPU(SDL_Window* window) : Renderer(window)
     CreateGuiPipeline();
     CreateLightCullingPipeline();
     CreateCoronaPipeline();
+    CreateFXAAPipeline();
 }
 
 gfx::MeshID gfx::RendererWGPU::CreateMesh(const MeshDescriptor& desc)
@@ -545,6 +550,9 @@ void gfx::RendererWGPU::CreateGlobalResources()
 
     // ao
     CreateAOResources();
+
+    // AA
+    CreateFXAAResources();
 }
 
 void gfx::RendererWGPU::CreateMipmapResources()
@@ -1949,6 +1957,289 @@ void gfx::RendererWGPU::InvalidateAOPipeline()
     ao_pipeline_ = nullptr;
 }
 
+void gfx::RendererWGPU::CreateFXAAResources()
+{
+    // FXAA bind group layout
+    {
+        std::array<wgpu::BindGroupLayoutEntry, 2> entries;
+
+        auto& sampler_entry = entries[0];
+        sampler_entry.binding = 0;
+        sampler_entry.visibility = wgpu::ShaderStage::Fragment;
+        sampler_entry.sampler.type = wgpu::SamplerBindingType::Filtering;
+
+        auto& texture_entry = entries[1];
+        texture_entry.binding = 1;
+        texture_entry.visibility = wgpu::ShaderStage::Fragment;
+        texture_entry.texture.sampleType = wgpu::TextureSampleType::Float;
+        texture_entry.texture.viewDimension = wgpu::TextureViewDimension::e2D;
+
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        desc.label = "FXAA bind group layout";
+        fxaa_bind_group_layout_ = device_.CreateBindGroupLayout(&desc);
+    }
+}
+
+void gfx::RendererWGPU::CreateFXAABindGroup()
+{
+    fxaa_bind_group_ = nullptr;
+
+    std::array<wgpu::BindGroupEntry, 2> entries;
+
+    auto& sampler_entry = entries[0];
+    sampler_entry.binding = 0;
+    sampler_entry.sampler = GetSampler(true, false);
+
+    auto& texture_entry = entries[1];
+    texture_entry.binding = 1;
+    texture_entry.textureView = color_texture_view_;
+
+    wgpu::BindGroupDescriptor desc{};
+    desc.layout = fxaa_bind_group_layout_;
+    desc.entryCount = entries.size();
+    desc.entries = entries.data();
+    desc.label = "FXAA bind group";
+    fxaa_bind_group_ = device_.CreateBindGroup(&desc);
+}
+
+void gfx::RendererWGPU::InvalidateFXAABindGroup()
+{
+    fxaa_bind_group_ = nullptr;
+}
+
+void gfx::RendererWGPU::CreateFXAAPipeline()
+{
+    constexpr std::string_view SHADER_SRC = R"WGSL(
+        struct VertexInput {
+            @builtin(vertex_index) vertex_id: u32,
+        };
+
+        struct VertexOutput {
+	        @builtin(position) position: vec4f,
+        };
+
+        @group(0) @binding(0) var linear_sampler: sampler;
+        @group(0) @binding(1) var color_texture: texture_2d<f32>;
+
+        const VERTICES = array<vec2f, 4>(
+            vec2f(-1.0f, -1.0f),
+            vec2f( 1.0f, -1.0f),
+            vec2f(-1.0f,  1.0f),
+            vec2f( 1.0f,  1.0f),
+        );
+
+        @vertex
+        fn vs_main(in: VertexInput) -> VertexOutput {
+            var out: VertexOutput;
+            out.position = vec4f(VERTICES[in.vertex_id], 0.0, 1.0);
+            return out;
+        }
+
+// FXAA Quality Settings
+const FXAA_EDGE_THRESHOLD: f32 = 0.125;      // Minimum local contrast required to apply AA
+const FXAA_EDGE_THRESHOLD_MIN: f32 = 0.0312; // Trims algorithm from processing dark areas
+const FXAA_SEARCH_STEPS: i32 = 12;           // Maximum number of search steps along the edge
+const FXAA_SUBPIXEL_QUALITY: f32 = 0.75;     // Controls removal of sub-pixel aliasing (0.0 to 1.0)
+
+fn rgb_to_luma(rgb: vec3f) -> f32 {
+    // Standard Rec. 709 luminance weights (green weighted heavily for human vision sensitivity)
+    return dot(rgb, vec3f(0.299, 0.587, 0.114));
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4f {
+    // 1. Calculate screen coordinates and inverse texture dimensions
+    let tex_size = vec2f(textureDimensions(color_texture));
+    let inv_tex_size = 1.0 / tex_size;
+    let uv = in.position.xy * inv_tex_size;
+
+    // 2. Sample center and 4 cardinal neighbors (using explicit mip level 0.0)
+    let color_center = textureSampleLevel(color_texture, linear_sampler, uv, 0.0).rgb;
+    let luma_center  = rgb_to_luma(color_center);
+
+    let luma_n = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv + vec2f( 0.0, -inv_tex_size.y), 0.0).rgb);
+    let luma_s = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv + vec2f( 0.0,  inv_tex_size.y), 0.0).rgb);
+    let luma_e = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv + vec2f( inv_tex_size.x,  0.0), 0.0).rgb);
+    let luma_w = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv + vec2f(-inv_tex_size.x,  0.0), 0.0).rgb);
+
+    // Find min and max luminance around the pixel
+    let luma_min = min(luma_center, min(min(luma_n, luma_s), min(luma_e, luma_w)));
+    let luma_max = max(luma_center, max(max(luma_n, luma_s), max(luma_e, luma_w)));
+    let luma_range = luma_max - luma_min;
+
+    // Early exit if local contrast is below threshold (pixel is not on an edge)
+    if (luma_range < max(FXAA_EDGE_THRESHOLD_MIN, luma_max * FXAA_EDGE_THRESHOLD)) {
+        return vec4f(color_center, 1.0);
+    }
+
+    // 3. Sample 4 diagonal neighbors to determine edge orientation
+    let luma_nw = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv + vec2f(-inv_tex_size.x, -inv_tex_size.y), 0.0).rgb);
+    let luma_ne = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv + vec2f( inv_tex_size.x, -inv_tex_size.y), 0.0).rgb);
+    let luma_sw = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv + vec2f(-inv_tex_size.x,  inv_tex_size.y), 0.0).rgb);
+    let luma_se = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv + vec2f( inv_tex_size.x,  inv_tex_size.y), 0.0).rgb);
+
+    let luma_down_up    = luma_n + luma_s;
+    let luma_left_right = luma_w + luma_e;
+
+    // Sobel-like edge detection filter for horizontal vs vertical
+    let edge_horizontal = abs(-2.0 * luma_w + luma_nw + luma_sw) +
+                          abs(-2.0 * luma_center + luma_down_up) * 2.0 +
+                          abs(-2.0 * luma_e + luma_ne + luma_se);
+
+    let edge_vertical   = abs(-2.0 * luma_n + luma_nw + luma_ne) +
+                          abs(-2.0 * luma_center + luma_left_right) * 2.0 +
+                          abs(-2.0 * luma_s + luma_sw + luma_se);
+
+    let is_horizontal = (edge_horizontal >= edge_vertical);
+
+    // 4. Determine step direction and initial edge offset
+    var step_length = select(inv_tex_size.x, inv_tex_size.y, is_horizontal);
+    let luma_1 = select(luma_w, luma_n, is_horizontal);
+    let luma_2 = select(luma_e, luma_s, is_horizontal);
+
+    let gradient_1 = abs(luma_1 - luma_center);
+    let gradient_2 = abs(luma_2 - luma_center);
+    let is_1_steeper = gradient_1 >= gradient_2;
+
+    let gradient_scaled = 0.25 * max(gradient_1, gradient_2);
+
+    // Step size along the edge (orthogonal to gradient direction)
+    let step_offset = select(
+        vec2f(0.0, inv_tex_size.y),
+        vec2f(inv_tex_size.x, 0.0),
+        is_horizontal
+    );
+
+    var luma_local_average = 0.0;
+    if (is_1_steeper) {
+        step_length = -step_length;
+        luma_local_average = 0.5 * (luma_1 + luma_center);
+    } else {
+        luma_local_average = 0.5 * (luma_2 + luma_center);
+    }
+
+    // Shift UV coordinate half a pixel towards the edge
+    var current_uv = uv;
+    if (is_horizontal) {
+        current_uv.y += step_length * 0.5;
+    } else {
+        current_uv.x += step_length * 0.5;
+    }
+
+    // 5. Explore along the edge in both directions to find endpoints
+    var uv1 = current_uv - step_offset;
+    var uv2 = current_uv + step_offset;
+
+    var luma_end_1 = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv1, 0.0).rgb) - luma_local_average;
+    var luma_end_2 = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv2, 0.0).rgb) - luma_local_average;
+
+    var reached_1 = abs(luma_end_1) >= gradient_scaled;
+    var reached_2 = abs(luma_end_2) >= gradient_scaled;
+    var reached_both = reached_1 && reached_2;
+
+    if (!reached_1) { uv1 -= step_offset; }
+    if (!reached_2) { uv2 += step_offset; }
+
+    if (!reached_both) {
+        for (var i = 2; i < FXAA_SEARCH_STEPS; i++) {
+            if (!reached_1) {
+                luma_end_1 = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv1, 0.0).rgb) - luma_local_average;
+                reached_1 = abs(luma_end_1) >= gradient_scaled;
+            }
+            if (!reached_2) {
+                luma_end_2 = rgb_to_luma(textureSampleLevel(color_texture, linear_sampler, uv2, 0.0).rgb) - luma_local_average;
+                reached_2 = abs(luma_end_2) >= gradient_scaled;
+            }
+            if (reached_1 && reached_2) {
+                break;
+            }
+            if (!reached_1) { uv1 -= step_offset; }
+            if (!reached_2) { uv2 += step_offset; }
+        }
+    }
+
+    // 6. Estimate blend factor based on distance to edge endpoints
+    let distance_1 = select(abs(uv.y - uv1.y), abs(uv.x - uv1.x), is_horizontal);
+    let distance_2 = select(abs(uv2.y - uv.y), abs(uv2.x - uv.x), is_horizontal);
+
+    let is_direction_1 = distance_1 < distance_2;
+    let distance_final = min(distance_1, distance_2);
+    let edge_thickness = distance_1 + distance_2;
+    let pixel_offset = -distance_final / edge_thickness + 0.5;
+
+    // Verify that luma variation at closer endpoint matches center pixel variation
+    let is_luma_center_smaller = luma_center < luma_local_average;
+    let luma_end_selected = select(luma_end_2, luma_end_1, is_direction_1);
+    let correct_variation = (luma_end_selected < 0.0) != is_luma_center_smaller;
+    var final_offset = select(0.0, pixel_offset, correct_variation);
+
+    // 7. Sub-pixel aliasing test (for standalone dots/thin lines)
+    let luma_average = (1.0 / 12.0) * (2.0 * (luma_down_up + luma_left_right) + luma_nw + luma_ne + luma_sw + luma_se);
+    let subpixel_offset_1 = clamp(abs(luma_average - luma_center) / luma_range, 0.0, 1.0);
+    let subpixel_offset_2 = (-2.0 * subpixel_offset_1 + 3.0) * subpixel_offset_1 * subpixel_offset_1;
+    let subpixel_offset_final = subpixel_offset_2 * subpixel_offset_2 * FXAA_SUBPIXEL_QUALITY;
+
+    final_offset = max(final_offset, subpixel_offset_final);
+
+    // 8. Sample final color with offset along the gradient direction
+    var final_uv = uv;
+    if (is_horizontal) {
+        final_uv.y += step_length * final_offset;
+    } else {
+        final_uv.x += step_length * final_offset;
+    }
+
+    return textureSampleLevel(color_texture, linear_sampler, final_uv, 0.0);
+}
+    )WGSL";
+
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "FXAA pipeline";
+
+    // shader
+    wgpu::ShaderModuleDescriptor shader_desc{};
+    shader_desc.label = "FXAA shader";
+    wgpu::ShaderSourceWGSL shader_src{};
+    shader_src.code = SHADER_SRC;
+    shader_desc.nextInChain = &shader_src;
+    auto shader_module = device_.CreateShaderModule(&shader_desc);
+
+    // vertex
+    desc.vertex.bufferCount = 0;
+    desc.vertex.buffers = nullptr;
+    desc.vertex.module = shader_module;
+    desc.vertex.entryPoint = "vs_main";
+
+    // assembly
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleStrip;
+    desc.primitive.frontFace = wgpu::FrontFace::CCW;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+
+    // color
+    wgpu::ColorTargetState color{};
+    color.format = surface_format_;
+    color.writeMask = wgpu::ColorWriteMask::All;
+
+    // fragment
+    wgpu::FragmentState fragment{};
+    fragment.module = shader_module;
+    fragment.entryPoint = "fs_main";
+    fragment.targetCount = 1;
+    fragment.targets = &color;
+    desc.fragment = &fragment;
+
+    // layout
+    wgpu::PipelineLayoutDescriptor layout_desc{};
+    layout_desc.bindGroupLayoutCount = 1;
+    layout_desc.bindGroupLayouts = &fxaa_bind_group_layout_;
+    layout_desc.label = "FXAA pipeline layout";
+    desc.layout = device_.CreatePipelineLayout(&layout_desc);
+
+    fxaa_pipeline_ = device_.CreateRenderPipeline(&desc);
+}
+
 void gfx::RendererWGPU::CreateGuiResources()
 {
     // GUI global bind group layout
@@ -2102,11 +2393,11 @@ void gfx::RendererWGPU::CreateGuiPipeline()
     color.writeMask = wgpu::ColorWriteMask::All;
         
     // depth
-    wgpu::DepthStencilState depth_state{};
-    depth_state.depthCompare = wgpu::CompareFunction::Always;
-    depth_state.depthWriteEnabled = wgpu::OptionalBool::False;
-    depth_state.format = wgpu::TextureFormat::Depth24Plus;
-    desc.depthStencil = &depth_state;
+    //wgpu::DepthStencilState depth_state{};
+    //depth_state.depthCompare = wgpu::CompareFunction::Always;
+    //depth_state.depthWriteEnabled = wgpu::OptionalBool::False;
+    //depth_state.format = wgpu::TextureFormat::Depth24Plus;
+    //desc.depthStencil = &depth_state;
 
     // fragment
     wgpu::FragmentState fragment{};
@@ -2166,11 +2457,13 @@ void gfx::RendererWGPU::ProcessViewportSizeChange(const glm::u32vec2& viewport_s
 {
     ConfigureSurface(viewport_size);
 
+    InvalidateLightCullingBindGroup(); // depends on depth texture
+    InvalidateAOBindGroup();
+    InvalidateFXAABindGroup();
+
     // create depth
     depth_texture_ = nullptr;
     depth_texture_view_ = nullptr;
-    InvalidateLightCullingBindGroup(); // depends on depth texture
-    InvalidateAOBindGroup();
 
     depth_format_ = wgpu::TextureFormat::Depth24Plus;
     wgpu::TextureDescriptor depth_desc{};
@@ -2196,21 +2489,17 @@ void gfx::RendererWGPU::ProcessViewportSizeChange(const glm::u32vec2& viewport_s
     depth_view_desc.label = "Main depth texture view";
     depth_texture_view_ = depth_texture_.CreateView(&depth_view_desc);
 
-    // create MS color texture if MSAA
+    // create back color texture if FXAA
     color_texture_ = nullptr;
     color_texture_view_ = nullptr;
-    if (msaa_samples_ > 1)
+    if (use_fxaa_)
     {
         // create multisample color texture
         wgpu::TextureDescriptor color_desc{};
         color_desc.dimension = wgpu::TextureDimension::e2D;
         color_desc.format = surface_format_;
-        color_desc.mipLevelCount = 1;
-        color_desc.sampleCount = msaa_samples_;
         color_desc.size = {viewport_size.x, viewport_size.y};
-        color_desc.usage = wgpu::TextureUsage::RenderAttachment;
-        color_desc.viewFormatCount = 1;
-        color_desc.viewFormats = &surface_format_;
+        color_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
         color_texture_ = device_.CreateTexture(&color_desc);
         color_texture_view_ = color_texture_.CreateView();
     }
@@ -2707,6 +2996,13 @@ void gfx::RendererWGPU::UpdateSettings()
         InvalidateAOPipeline();
         r_ao.ClearModified();
     }
+
+    if (r_fxaa.IsModified())
+    {
+        use_fxaa_ = r_fxaa.Get() > 0;
+        InvalidateSurface();
+        r_fxaa.ClearModified();
+    }
 }
 
 void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
@@ -2920,19 +3216,8 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
 
     // setup color attachment
     wgpu::RenderPassColorAttachment color_attachment{};
-
-    if (msaa_samples_ <= 1)
-    {
-        color_attachment.view = surface_view.view;
-        color_attachment.storeOp = wgpu::StoreOp::Store;
-    }
-    else
-    {
-        color_attachment.view = color_texture_view_;
-        color_attachment.resolveTarget = surface_view.view;
-        color_attachment.storeOp = wgpu::StoreOp::Discard;
-    }
-
+    color_attachment.view = use_fxaa_ ? color_texture_view_ : surface_view.view;
+    color_attachment.storeOp = wgpu::StoreOp::Store;
     color_attachment.loadOp = wgpu::LoadOp::Clear;
     //auto clear_color = env.clear_color;
     auto clear_color = LinearizeColor(env.clear_color);
@@ -2949,18 +3234,40 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
         pass_desc.colorAttachments = &color_attachment;
         pass_desc.depthStencilAttachment = &depth_attachment;
         auto pass = encoder.BeginRenderPass(&pass_desc);
-        
+
         // draw surfaces
         EncodePreparedCmds(pass, pcmds_main_, globals, pass_index++, 0);
 
         // also draw coronas in this pass
         EncodeCoronaCmds(pass, main_dlist_.coronas, main_ctx);
 
-        // and also draw hud
-        EncodeHudCmds(pass, main_dlist_.huds, main_ctx);
-        
         pass.End();
     }
+
+    // setup FXAA/HUD pass
+    color_attachment.view = surface_view.view;
+    color_attachment.loadOp = use_fxaa_ ? wgpu::LoadOp::Clear : wgpu::LoadOp::Load; // load directly if FXAA disabled
+    color_attachment.clearValue = {0.0, 0.0, 0.0, 1.0};
+
+    // encode FXAA/HUD pass
+    {
+        wgpu::RenderPassDescriptor pass_desc{};
+        pass_desc.colorAttachmentCount = 1;
+        pass_desc.colorAttachments = &color_attachment;
+        auto pass = encoder.BeginRenderPass(&pass_desc);
+
+        if (use_fxaa_)
+        {
+            EncodeFXAA(pass, main_ctx);
+        }
+
+        // hud
+        EncodeHudCmds(pass, main_dlist_.huds, main_ctx);
+
+        pass.End();
+
+    }
+
 
     // upload instance data from all passes
     std::span<const uint8_t> instance_data_view = {reinterpret_cast<const uint8_t*>(instances_.data()),
@@ -3466,6 +3773,18 @@ void gfx::RendererWGPU::EncodeAO(wgpu::CommandEncoder& encoder, const DrawContex
     pass.SetBindGroup(0, ao_bind_group_);
     pass.DispatchWorkgroups(count_x, count_y);
     pass.End();
+}
+
+void gfx::RendererWGPU::EncodeFXAA(wgpu::RenderPassEncoder& pass, const DrawContext& ctx)
+{
+    if (!fxaa_bind_group_)
+    {
+        CreateFXAABindGroup();
+    }
+
+    pass.SetPipeline(fxaa_pipeline_);
+    pass.SetBindGroup(0, fxaa_bind_group_);
+    pass.Draw(4);
 }
 
 void gfx::RendererWGPU::EncodeCoronaCmds(wgpu::RenderPassEncoder& pass, std::span<DrawCoronaCmd> cmds,
