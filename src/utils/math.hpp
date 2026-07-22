@@ -3,6 +3,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include <cstddef>
+#include <type_traits>
+
 inline void MoveToward(float& val, float target, float max_delta)
 {
     if (val == target)
@@ -52,3 +55,10 @@ inline glm::quat RotationTowards(const glm::vec3& dir)
     return glm::quat(BasisFromDir(dir));
 }
 
+template <typename T>
+inline constexpr T AlignUp(T value, T alignment)
+{
+    static_assert(std::is_integral_v<T>, "T must be an integer type");
+
+    return (value + alignment - 1) / alignment * alignment;
+}

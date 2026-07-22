@@ -45,6 +45,10 @@ CVAR_CL(uint32_t, r_vsync, CV_SAVE, 0, 0, 2);
 
 CVAR_CL(uint8_t, r_tile_debug, CV_NONE, 0, 0, 1);
 
+// 0: none
+// 1: SSAO
+CVAR_CL(uint8_t, r_ao, CV_SAVE, 0, 0, 1);
+
 static std::vector<uint8_t> temp_buffer;
 
 static inline glm::vec3 LinearizeColor(const glm::vec3 color_srgb)
@@ -538,6 +542,9 @@ void gfx::RendererWGPU::CreateGlobalResources()
 
     // corona
     CreateCoronaResources();
+
+    // ao
+    CreateAOResources();
 }
 
 void gfx::RendererWGPU::CreateMipmapResources()
@@ -850,7 +857,7 @@ void gfx::RendererWGPU::CreateSurfaceGlobalResources()
 
     // global bind group layout
     {
-        std::array<wgpu::BindGroupLayoutEntry, 6> entries;
+        std::array<wgpu::BindGroupLayoutEntry, 7> entries;
 
         auto& uniforms_entry = entries[0];
         uniforms_entry.binding = 0;
@@ -886,6 +893,12 @@ void gfx::RendererWGPU::CreateSurfaceGlobalResources()
         shadow_texture_entry.texture.viewDimension = wgpu::TextureViewDimension::e2DArray;
         shadow_texture_entry.texture.sampleType = wgpu::TextureSampleType::Depth;
 
+        auto& ao_texture_entry = entries[6];
+        ao_texture_entry.binding = 6;
+        ao_texture_entry.visibility = wgpu::ShaderStage::Fragment;
+        ao_texture_entry.texture.viewDimension = wgpu::TextureViewDimension::e2D;
+        ao_texture_entry.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.entryCount = entries.size();
         desc.entries = entries.data();
@@ -906,7 +919,7 @@ void gfx::RendererWGPU::CreateSurfaceGlobalResources()
 
 void gfx::RendererWGPU::CreateSurfaceGlobalBindGroup()
 {
-    std::array<wgpu::BindGroupEntry, 6> entries;
+    std::array<wgpu::BindGroupEntry, 7> entries;
 
     auto& uniforms_entry = entries[0];
     uniforms_entry.binding = 0;
@@ -934,6 +947,10 @@ void gfx::RendererWGPU::CreateSurfaceGlobalBindGroup()
     auto& shadow_texture_entry = entries[5];
     shadow_texture_entry.binding = 5;
     shadow_texture_entry.textureView = spotlight_shadow_texture_view_;
+
+    auto& ao_texture_entry = entries[6];
+    ao_texture_entry.binding = 6;
+    ao_texture_entry.textureView = ao_output_texture_view_ ? ao_output_texture_view_ : textures_.Get(GetWhiteTexture()).view;
 
     wgpu::BindGroupDescriptor desc{};
     desc.layout = global_bind_group_layout_;
@@ -1668,6 +1685,270 @@ void gfx::RendererWGPU::CreateCoronaPipeline()
     corona_pipeline_ = device_.CreateRenderPipeline(&desc);
 }
 
+void gfx::RendererWGPU::CreateAOResources()
+{
+    // AO bind group layout
+    {
+        std::array<wgpu::BindGroupLayoutEntry, 4> entries;
+
+        auto& uniforms_entry = entries[0];
+        uniforms_entry.binding = 0;
+        uniforms_entry.visibility = wgpu::ShaderStage::Compute;
+        uniforms_entry.buffer.type = wgpu::BufferBindingType::Uniform;
+        uniforms_entry.buffer.minBindingSize = sizeof(AOGlobalData);
+
+        auto& depth_texture_entry = entries[1];
+        depth_texture_entry.binding = 1;
+        depth_texture_entry.visibility = wgpu::ShaderStage::Compute;
+        depth_texture_entry.texture.sampleType = wgpu::TextureSampleType::Depth;
+        depth_texture_entry.texture.viewDimension = wgpu::TextureViewDimension::e2D;
+
+        auto& normal_texture_entry = entries[2];
+        normal_texture_entry.binding = 2;
+        normal_texture_entry.visibility = wgpu::ShaderStage::Compute;
+        normal_texture_entry.texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+        normal_texture_entry.texture.viewDimension = wgpu::TextureViewDimension::e2D;
+
+        auto& output_texture_entry = entries[3];
+        output_texture_entry.binding = 3;
+        output_texture_entry.visibility = wgpu::ShaderStage::Compute;
+        output_texture_entry.storageTexture.access = wgpu::StorageTextureAccess::WriteOnly;
+        output_texture_entry.storageTexture.format = wgpu::TextureFormat::RGBA8Unorm;
+        output_texture_entry.storageTexture.viewDimension = wgpu::TextureViewDimension::e2D;
+
+        wgpu::BindGroupLayoutDescriptor desc{};
+        desc.entryCount = entries.size();
+        desc.entries = entries.data();
+        desc.label = "AO bind group layout";
+        ao_bind_group_layout_ = device_.CreateBindGroupLayout(&desc);
+    }
+
+    // AO global buffer
+    {
+        wgpu::BufferDescriptor desc{};
+        desc.size = sizeof(AOGlobalData);
+        desc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Uniform;
+        desc.label = "AO global buffer";
+        ao_global_buffer_ = device_.CreateBuffer(&desc);
+    }
+}
+
+void gfx::RendererWGPU::CreateAOBindGroup()
+{
+    ao_bind_group_ = nullptr;
+
+    std::array<wgpu::BindGroupEntry, 4> entries;
+
+    auto& uniforms_entry = entries[0];
+    uniforms_entry.binding = 0;
+    uniforms_entry.buffer = ao_global_buffer_;
+    uniforms_entry.size = sizeof(AOGlobalData);
+
+    auto& depth_texture_entry = entries[1];
+    depth_texture_entry.binding = 1;
+    depth_texture_entry.textureView = depth_texture_view_;
+
+    auto& normal_texture_entry = entries[2];
+    normal_texture_entry.binding = 2;
+    normal_texture_entry.textureView = normal_texture_view_;
+
+    auto& output_texture_entry = entries[3];
+    output_texture_entry.binding = 3;
+    output_texture_entry.textureView = ao_output_texture_view_;
+
+    wgpu::BindGroupDescriptor desc{};
+    desc.layout = ao_bind_group_layout_;
+    desc.entryCount = entries.size();
+    desc.entries = entries.data();
+    desc.label = "AO bind group";
+    ao_bind_group_ = device_.CreateBindGroup(&desc);
+}
+
+void gfx::RendererWGPU::InvalidateAOBindGroup()
+{
+    ao_bind_group_ = nullptr;
+}
+
+void gfx::RendererWGPU::CreateAOPipeline()
+{
+    ao_pipeline_ = nullptr;
+
+    if (!surface_shader_cfg_.ao)
+    {
+        return;
+    }
+
+    constexpr std::string_view SHADER_SRC = SHADER_DEFS_WGSL R"WGSL(
+const WORKGROUP_SIZE = 16u;
+const PI = 3.14159265359;
+
+struct AOGlobalData {
+    inv_proj: mat4x4<f32>,
+    proj: mat4x4<f32>,
+    viewport_size: vec2<f32>,
+    radius: f32,          // World-space AO radius (Recommended: 0.5 - 1.5)
+    sample_count: u32,    // Replaces slice_count (Recommended: 12u - 16u)
+    steps_per_slice: u32, // Unused in SSAO (kept for layout compatibility)
+    frame_index: u32,     // Spatio-temporal noise frame counter
+    bias: f32,            // Replaces _pad0: self-shadowing acne bias (Recommended: 0.025)
+    intensity: f32,       // Replaces _pad1: occlusion darkening strength (Recommended: 1.5 - 2.0)
+};
+
+@group(0) @binding(0) var<uniform> params: AOGlobalData;
+@group(0) @binding(1) var depth_texture: texture_depth_2d;
+@group(0) @binding(2) var normal_texture: texture_2d<f32>;
+@group(0) @binding(3) var output_texture: texture_storage_2d<rgba8unorm, write>;
+
+// Interleaved Gradient Noise for spatial jittering
+fn interleaved_gradient_noise(pixel_pos: vec2<f32>, frame: u32) -> f32 {
+    let frame_offset = f32(frame % 16u) * 0.0625;
+    let pos = pixel_pos + vec2<f32>(frame_offset * 5.588238, frame_offset * 3.588238);
+    let magic = vec3<f32>(0.06711056, 0.00583715, 52.9829189);
+    return fract(magic.z * fract(dot(pos, magic.xy)));
+}
+
+// Reconstruct View Space Position from perspectiveRH_ZO clip space depth
+fn get_view_pos(uv: vec2<f32>, depth: f32) -> vec3<f32> {
+    let clip_xy = vec2<f32>(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
+    let clip = vec4<f32>(clip_xy, depth, 1.0);
+    let view_h = params.inv_proj * clip;
+    return view_h.xyz / view_h.w;
+}
+
+// Procedural Fibonacci Hemisphere: Generates optimal uniform kernel samples on the fly
+fn get_hemisphere_sample(index: u32, num_samples: u32) -> vec3<f32> {
+    let f_idx = f32(index);
+    let f_num = f32(num_samples);
+
+    // Golden ratio spiral angle
+    let phi = f_idx * 2.399963229728653;
+
+    // Uniform distribution over hemisphere along Z [0, 1]
+    let cos_theta = 1.0 - (f_idx + 0.5) / f_num;
+    let sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+    let unscaled_pos = vec3<f32>(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
+
+    // Quadratic scale distribution: clusters samples closer to the surface origin
+    let frac = (f_idx + 1.0) / f_num;
+    let scale = mix(0.1, 1.0, frac * frac);
+
+    return unscaled_pos * scale;
+}
+
+@compute @workgroup_size(WORKGROUP_SIZE, WORKGROUP_SIZE)
+fn ao(@builtin(global_invocation_id) gid: vec3u) {
+    let pixel = vec2<i32>(gid.xy);
+    let dims = vec2<i32>(params.viewport_size);
+    if (pixel.x >= dims.x || pixel.y >= dims.y) {
+        return;
+    }
+
+    // Fetch depth & skip background/sky pixels
+    let depth = textureLoad(depth_texture, pixel, 0);
+    if (depth >= 0.99999) {
+        textureStore(output_texture, pixel, vec4<f32>(1.0, 0.0, 0.0, 1.0));
+        return;
+    }
+
+    let uv = (vec2<f32>(pixel) + 0.5) / params.viewport_size;
+    let V_pos = get_view_pos(uv, depth);
+
+    // Unpack normal and ensure valid fallback
+    let raw_normal = textureLoad(normal_texture, pixel, 0).rgb;
+    var N = normalize(raw_normal * 2.0 - 1.0);
+    if (length(raw_normal) < 0.001) {
+        N = normalize(-V_pos);
+    }
+
+    // Safe fallback values in case CPU uniforms are unassigned (0.0)
+    let num_samples = select(params.sample_count, 16u, params.sample_count < 4u);
+    let bias = select(params.bias, 0.025, params.bias <= 0.0001);
+    let intensity = select(params.intensity, 1.5, params.intensity <= 0.0001);
+
+    // Build orthonormal TBN basis oriented along normal N
+    var up = vec3<f32>(0.0, 0.0, 1.0);
+    if (abs(N.z) > 0.999) {
+        up = vec3<f32>(1.0, 0.0, 0.0);
+    }
+    let tangent_base = normalize(cross(up, N));
+    let bitangent_base = cross(N, tangent_base);
+
+    // Rotate basis using Interleaved Gradient Noise to trade banding for high-frequency noise
+    let noise_angle = interleaved_gradient_noise(vec2<f32>(pixel), params.frame_index) * 2.0 * PI;
+    let cos_a = cos(noise_angle);
+    let sin_a = sin(noise_angle);
+    let tangent = tangent_base * cos_a + bitangent_base * sin_a;
+    let bitangent = bitangent_base * cos_a - tangent_base * sin_a;
+    let TBN = mat3x3<f32>(tangent, bitangent, N);
+
+    var occlusion = 0.0;
+
+    for (var s = 0u; s < num_samples; s = s + 1u) {
+        // Orient sample along surface normal and scale by world radius
+        let sample_vec = TBN * get_hemisphere_sample(s, num_samples);
+        let sample_pos = V_pos + sample_vec * params.radius;
+
+        // Project 3D sample point to 2D screen UV coordinates
+        let clip_pos = params.proj * vec4<f32>(sample_pos, 1.0);
+        let ndc = clip_pos.xy / clip_pos.w;
+        let sample_uv = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+
+        // Skip samples that project outside the viewport
+        if (sample_uv.x < 0.0 || sample_uv.x > 1.0 || sample_uv.y < 0.0 || sample_uv.y > 1.0) {
+            continue;
+        }
+
+        // Fetch occluder depth and reconstruct its view-space Z
+        let sample_pixel = vec2<i32>(sample_uv * params.viewport_size);
+        let occluder_depth = textureLoad(depth_texture, sample_pixel, 0);
+        let occluder_pos = get_view_pos(sample_uv, occluder_depth);
+
+        // Range check: prevent foreground objects from casting halos on background walls
+        let range_diff = abs(V_pos.z - occluder_pos.z);
+        let range_check = smoothstep(0.0, 1.0, params.radius / max(0.0001, range_diff));
+
+        // Depth check (RH coordinate system: closer to camera = less negative Z)
+        if (occluder_pos.z >= sample_pos.z + bias) {
+            occlusion += range_check;
+        }
+    }
+
+    // Convert accumulated occlusion into visibility [0.0 = dark, 1.0 = white]
+    let ao_visibility = 1.0 - (occlusion / f32(num_samples)) * intensity;
+    let final_ao = clamp(ao_visibility, 0.0, 1.0);
+
+    textureStore(output_texture, pixel, vec4<f32>(final_ao, 0.0, 0.0, 1.0));
+}
+    )WGSL";
+
+    // make shader
+    wgpu::ShaderModuleDescriptor shader_desc{};
+    shader_desc.label = "AO shader";
+    wgpu::ShaderSourceWGSL shader_src{};
+    shader_src.code = SHADER_SRC;
+    shader_desc.nextInChain = &shader_src;
+    auto shader_module = device_.CreateShaderModule(&shader_desc);
+
+    wgpu::ComputePipelineDescriptor desc{};
+    desc.label = "AO pipeline";
+
+    desc.compute.module = shader_module;
+    desc.compute.entryPoint = "ao";
+
+    wgpu::PipelineLayoutDescriptor layout_desc{};
+    layout_desc.bindGroupLayoutCount = 1;
+    layout_desc.bindGroupLayouts = &ao_bind_group_layout_;
+    desc.layout = device_.CreatePipelineLayout(&layout_desc);
+
+    ao_pipeline_ = device_.CreateComputePipeline(&desc);
+}
+
+void gfx::RendererWGPU::InvalidateAOPipeline()
+{
+    ao_pipeline_ = nullptr;
+}
+
 void gfx::RendererWGPU::CreateGuiResources()
 {
     // GUI global bind group layout
@@ -1889,6 +2170,7 @@ void gfx::RendererWGPU::ProcessViewportSizeChange(const glm::u32vec2& viewport_s
     depth_texture_ = nullptr;
     depth_texture_view_ = nullptr;
     InvalidateLightCullingBindGroup(); // depends on depth texture
+    InvalidateAOBindGroup();
 
     depth_format_ = wgpu::TextureFormat::Depth24Plus;
     wgpu::TextureDescriptor depth_desc{};
@@ -1931,6 +2213,30 @@ void gfx::RendererWGPU::ProcessViewportSizeChange(const glm::u32vec2& viewport_s
         color_desc.viewFormats = &surface_format_;
         color_texture_ = device_.CreateTexture(&color_desc);
         color_texture_view_ = color_texture_.CreateView();
+    }
+
+    // create normal texture for AO if enabled
+    normal_texture_ = nullptr;
+    normal_texture_view_ = nullptr;
+    ao_output_texture_ = nullptr;
+    ao_output_texture_view_ = nullptr;
+    if (surface_shader_cfg_.ao)
+    {
+        wgpu::TextureDescriptor normal_texture_desc{};
+        normal_texture_desc.dimension = wgpu::TextureDimension::e2D;
+        normal_texture_desc.format = wgpu::TextureFormat::RGBA8Unorm;
+        normal_texture_desc.size = {viewport_size.x, viewport_size.y};
+        normal_texture_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+        normal_texture_ = device_.CreateTexture(&normal_texture_desc);
+        normal_texture_view_ = normal_texture_.CreateView();
+
+        wgpu::TextureDescriptor output_texture_desc{};
+        output_texture_desc.dimension = wgpu::TextureDimension::e2D;
+        output_texture_desc.format = wgpu::TextureFormat::RGBA8Unorm;
+        output_texture_desc.size = {viewport_size.x, viewport_size.y};
+        output_texture_desc.usage = wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding;
+        ao_output_texture_ = device_.CreateTexture(&output_texture_desc);
+        ao_output_texture_view_ = ao_output_texture_.CreateView();
     }
 
     // create buffer for visible lights per tile
@@ -2285,6 +2591,15 @@ const wgpu::RenderPipeline& gfx::RendererWGPU::GetSurfacePipeline(SurfacePipelin
         fragment.targetCount = 1;
         fragment.targets = &color;
     }
+    else if ((flags & SPF_DEPTH_ONLY) > 0 && (flags & SPF_SHADOW_MAP) == 0 &&
+             surface_shader_cfg_.ao) // depth prepass, write normal for AO
+    {
+        color.format = normal_texture_.GetFormat();
+        color.writeMask = wgpu::ColorWriteMask::All;
+
+        fragment.targetCount = 1;
+        fragment.targets = &color;
+    }
 
     // only use fragment shader if color attachment or alpha culling in depth pass
     if (fragment.targets || flags & SPF_CULL_ALPHA)
@@ -2382,10 +2697,22 @@ void gfx::RendererWGPU::UpdateSettings()
         InvalidateSurfacePipelines();
         r_tile_debug.ClearModified();
     }
+
+    if (r_ao.IsModified())
+    {
+        surface_shader_cfg_.ao = r_ao.Get() > 0;
+        InvalidateSurface();
+        InvalidateSurfacePipelines();
+        InvalidateSurfaceGlobalBindGroup();
+        InvalidateAOPipeline();
+        r_ao.ClearModified();
+    }
 }
 
 void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
 {
+    ++frame_index_;
+
     if (!shadow_resources_setup_)
     {
         CreateShadowResources();
@@ -2555,6 +2882,19 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
     {        
         wgpu::RenderPassDescriptor pass_desc{};
         pass_desc.depthStencilAttachment = &depth_attachment;
+        
+        // normal texture for AO
+        wgpu::RenderPassColorAttachment color_attachment{};
+        if (surface_shader_cfg_.ao)
+        {
+            color_attachment.view = normal_texture_view_;
+            color_attachment.loadOp = wgpu::LoadOp::Clear;
+            color_attachment.storeOp = wgpu::StoreOp::Store;
+            color_attachment.clearValue = {0.0, 0.0, 0.0, 1.0};
+            pass_desc.colorAttachmentCount = 1;
+            pass_desc.colorAttachments = &color_attachment;
+        }
+
         auto pass = encoder.BeginRenderPass(&pass_desc);
         EncodePreparedCmds(pass, pcmds_prepass_, globals, pass_index++, SPF_DEPTH_ONLY);
         pass.End();
@@ -2562,6 +2902,12 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
 
     // cull lights using depth buffer
     EncodeLightCullingPass(encoder, main_ctx);
+
+    // compute AO
+    if (surface_shader_cfg_.ao)
+    {
+        EncodeAO(encoder, main_ctx);
+    }
 
     // setup global bind group
     if (!global_bind_group_)
@@ -3084,6 +3430,41 @@ void gfx::RendererWGPU::EncodeLightCullingPass(wgpu::CommandEncoder& encoder, co
     pass.SetPipeline(light_culling_pipeline_);
     pass.SetBindGroup(0, light_culling_bind_group_);
     pass.DispatchWorkgroups(light_tiles_.x, light_tiles_.y);
+    pass.End();
+}
+
+void gfx::RendererWGPU::EncodeAO(wgpu::CommandEncoder& encoder, const DrawContext& ctx)
+{
+    if (!ao_bind_group_)
+    {
+        CreateAOBindGroup();
+    }
+
+    if (!ao_pipeline_)
+    {
+        CreateAOPipeline();
+    }
+
+    // setup globals
+    AOGlobalData globals{};
+    globals.inv_proj = glm::inverse(ctx.proj);
+    globals.proj = ctx.proj;
+    globals.viewport_size = ctx.viewport_size;
+    globals.radius = 0.25f;
+    globals.sample_count = 12;
+    globals.steps_per_slice = 4;
+    globals.frame_index = static_cast<uint32_t>(frame_index_);
+    globals.bias = 0.025f;
+    globals.intensity = 1.0f;
+    queue_.WriteBuffer(ao_global_buffer_, 0, &globals, sizeof(globals));
+
+    auto count_x = AlignUp(ctx.viewport_size.x, uint32_t(16));
+    auto count_y = AlignUp(ctx.viewport_size.y, uint32_t(16));
+
+    auto pass = encoder.BeginComputePass();
+    pass.SetPipeline(ao_pipeline_);
+    pass.SetBindGroup(0, ao_bind_group_);
+    pass.DispatchWorkgroups(count_x, count_y);
     pass.End();
 }
 

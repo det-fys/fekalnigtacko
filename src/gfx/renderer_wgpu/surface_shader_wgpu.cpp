@@ -14,11 +14,17 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
     std::string vertex_outs;
     std::string fragment_main;
 
-    bool fragment_output = (flags & gfx::SPF_DEPTH_ONLY) == 0;
+    bool is_main_pass = (flags & gfx::SPF_DEPTH_ONLY) == 0;
+    bool is_depth_prepass = (flags & gfx::SPF_DEPTH_ONLY) > 0 && (flags & gfx::SPF_SHADOW_MAP) == 0;
 
     // in depth prepass the position calculation must exactly match the main pass
     // due to EQUAL depth testing later
-    bool need_view_pos = (flags & gfx::SPF_SHADOW_MAP) == 0;
+    // ... and is also used for AO normal texture
+    bool need_view_pos = is_main_pass || is_depth_prepass;
+
+    // in main pass output is used for color, in depth prepass for normal
+    bool output_normal = is_depth_prepass && cfg.ao;
+    bool fragment_output = is_main_pass || output_normal;
 
     // DEFORM / SKELETAL
     if (flags & gfx::SPF_SKELETAL)
@@ -118,7 +124,6 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
     }
     else if (flags & gfx::SPF_MULTICOLOR)
     {
-        // TODO: use emis
         fragment_main += R"WGSL(
             let color_slot = clamp(u32(out.a * 9.0), 0, MAX_COLORS);
             out.a = 1.0;
@@ -158,6 +163,8 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
             @group(0) @binding(4) var<storage, read> u_visible: array<u32>;
 
             @group(0) @binding(5) var spotlight_shadow_texture: texture_depth_2d_array;
+
+            @group(0) @binding(6) var ao_texture: texture_2d<f32>;
         )WGSL";
 
         // translucent?
@@ -323,6 +330,24 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
             )WGSL";
         }
 
+        // ao sampling
+        if (cfg.ao && (flags & gfx::SPF_BLEND) == 0)
+        {
+            functions += R"WGSL(
+                fn sample_ao(frag_pos: vec2f) -> f32 {
+                    return textureLoad(ao_texture, vec2u(frag_pos), 0).r;
+                }
+            )WGSL";
+        }
+        else
+        {
+            functions += R"WGSL(
+                fn sample_ao(frag_pos: vec2f) -> f32 {
+                    return 1.0;
+                }
+            )WGSL";
+        }
+
         functions += R"WGSL(
             fn select_csm_cascade(depth: f32) -> u32 {
                 for (var i: u32 = 0u; i < MAX_CASCADES; i++) {
@@ -464,7 +489,7 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
             }
 
             fn compute_lights(view_pos: vec3f, view_normal: vec3f, frag_pos: vec2f) -> vec3f {
-                var color = u_global.ambient_color;
+                var color = u_global.ambient_color * sample_ao(frag_pos);
                 let shadow_data = setup_shadow_data(frag_pos);
                 color += compute_sun_light(view_pos, view_normal, shadow_data);
                 color += compute_small_lights(view_pos, view_normal, frag_pos, shadow_data);
@@ -521,6 +546,11 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
             let fog_factor = 1.0 / (1.0 + dist * dist * u_global.fog.a);
             out = vec4f(mix(u_global.fog.rgb, out.rgb, fog_factor), out.a);
         )WGSL";
+    }
+
+    if (output_normal)
+    {
+        fragment_main += "out = vec4f(normalize(in.view_normal) * 0.5 + 0.5, 1.0);\n";
     }
 
     std::string shader;

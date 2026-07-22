@@ -11,6 +11,7 @@
 #include "surface_pipeline_wgpu.hpp"
 #include "shader_defs_wgsl.hpp"
 #include "surface_shader_wgpu.hpp"
+#include "utils/math.hpp"
 
 namespace gfx
 {
@@ -18,7 +19,6 @@ namespace gfx
 constexpr uint32_t MAX_CSM_CASCADES = SD_MAX_CASCADES;
 constexpr uint32_t MAX_SPOTLIGHT_SHADOWMAPS = SD_MAX_SPOTLIGHT_SHADOWMAPS;
 constexpr uint32_t MAX_PASSES = 2 + MAX_CSM_CASCADES + MAX_SPOTLIGHT_SHADOWMAPS;
-constexpr uint32_t GLOBAL_BUFFER_STRIDE = 1280;
 
 constexpr uint32_t MAX_LIGHTS = SD_MAX_LIGHTS;
 constexpr uint32_t MAX_LIGHTS_PER_TILE = SD_MAX_LIGHTS_PER_TILE;
@@ -114,6 +114,8 @@ struct GlobalUniformData
     std::array<glm::mat4, MAX_SPOTLIGHT_SHADOWMAPS> spotlight_matrices;
 };
 
+constexpr uint32_t GLOBAL_BUFFER_STRIDE = AlignUp(static_cast<uint32_t>(sizeof(GlobalUniformData)), uint32_t(256));
+
 struct InstanceUniformData
 {
     glm::mat4 matrix;
@@ -186,6 +188,19 @@ struct LightCullingGlobalData
     float _pad0[3];
 };
 
+struct AOGlobalData
+{
+    glm::mat4 inv_proj;
+    glm::mat4 proj;
+    glm::vec2 viewport_size;
+    float radius;
+    uint32_t sample_count;
+    uint32_t steps_per_slice;
+    uint32_t frame_index;
+    float bias;
+    float intensity;
+};
+
 class RendererWGPU : public Renderer
 {
 public:
@@ -245,6 +260,12 @@ private:
     void CreateCoronaBindGroup();
     void CreateCoronaPipeline();
 
+    void CreateAOResources();
+    void CreateAOBindGroup();
+    void InvalidateAOBindGroup();
+    void CreateAOPipeline();
+    void InvalidateAOPipeline();
+
     void CreateGuiResources();
     void CreateGuiPipeline();
     
@@ -280,6 +301,7 @@ private:
                             const GlobalUniformData& globals, uint32_t globals_index, SurfacePipelineFlags pflags);
     void PrepareLights(std::span<DrawLightCmd> cmds, const DrawContext& ctx);
     void EncodeLightCullingPass(wgpu::CommandEncoder& encoder, const DrawContext& ctx);
+    void EncodeAO(wgpu::CommandEncoder& encoder, const DrawContext& ctx);
     void EncodeCoronaCmds(wgpu::RenderPassEncoder& pass, std::span<DrawCoronaCmd> cmds, const DrawContext& ctx);
     void EncodeHudCmds(wgpu::RenderPassEncoder& pass, std::span<DrawHudCmd> queue, const DrawContext& ctx);
 
@@ -354,6 +376,12 @@ private:
     std::vector<InstanceUniformData> instances_;
     std::vector<CoronaBufferData> coronas_;
 
+    // AO
+    wgpu::BindGroupLayout ao_bind_group_layout_;
+    wgpu::Buffer ao_global_buffer_;
+    wgpu::BindGroup ao_bind_group_;
+    wgpu::ComputePipeline ao_pipeline_;
+
     // GUI drawing resources
     wgpu::BindGroupLayout gui_global_bind_group_layout_;
     wgpu::BindGroupLayout gui_texture_bind_group_layout_;
@@ -371,6 +399,10 @@ private:
     wgpu::TextureView depth_texture_view_;
     wgpu::Texture color_texture_;
     wgpu::TextureView color_texture_view_;
+    wgpu::Texture normal_texture_; // for AO
+    wgpu::TextureView normal_texture_view_;
+    wgpu::Texture ao_output_texture_;
+    wgpu::TextureView ao_output_texture_view_;
 
     // resources
     ResourceArray<MeshWGPU> meshes_;
@@ -387,6 +419,7 @@ private:
     std::map<uint8_t, wgpu::Sampler> samplers_;
 
     // drawing
+    size_t frame_index_ = 0;
     DrawList main_dlist_;
     std::vector<PreparedCmd> pcmds_prepass_;
     std::vector<PreparedCmd> pcmds_main_;
