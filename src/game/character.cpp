@@ -253,15 +253,21 @@ void game::Character::PlayActionAnim(assets::AnimIdx anim_idx, float speed)
     action_anim_done_ = anim_idx == assets::NO_ANIM;
 }
 
-void game::Character::PlayActionAnim(const std::string& anim_name, float speed)
+bool game::Character::PlayActionAnim(const std::string& anim_name, float speed)
 {
     if (anim_name.empty())
     {
         ClearActionAnim();
-        return;
+        return false;
     }
 
     PlayActionAnim(GetAnim(anim_name), speed);
+    return true;
+}
+
+void game::Character::SetActionAnimTime(float time)
+{
+    animstate_.action_time = time;
 }
 
 void game::Character::ClearActionAnim()
@@ -760,7 +766,7 @@ void game::Character::DeleteHitBones()
 
 void game::Character::UpdateActionAnim()
 {
-    if (action_anim_done_)
+    if (action_anim_done_ || action_anim_playback_speed_ == 0.0f)
         return;
 
     animstate_.action_time += action_anim_playback_speed_ * (1.0f / 25.0f);

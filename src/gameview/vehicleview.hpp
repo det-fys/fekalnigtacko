@@ -27,6 +27,13 @@ struct VehicleWheelViewInfo
     float rotation = 0.0f;
 };
 
+struct VehicleViewState
+{
+    Transform trans;
+
+    float steering = 0.0f;
+};
+
 struct VehicleDeformView
 {
     DeformGrid grid;
@@ -76,15 +83,18 @@ private:
     bool ProcessDeformSyncMsg(net::InMessage& msg);
 
     void InitLights();
+    void InitSteeringWheel();
 
     void UpdateSounds();
     void UpdateLights(float delta_t);
+    void UpdateSteeringWheel();
 
     void UpdateDestroyedColors();
 
     void DrawBaseModel(const DrawArgs& args) const;
     void DrawWheels(const DrawArgs& args) const;
     void DrawLights(const DrawArgs& args) const;
+    void DrawSteeringWheel(const DrawArgs& args) const;
 
 private:
     std::shared_ptr<const assets::VehicleModel> model_;
@@ -95,11 +105,10 @@ private:
     glm::vec4 destroyed_colors_[VCS__COUNT];
     glm::vec3 headlight_color_;
 
-    game::VehicleSyncState sync_;
+    VehicleSyncState sync_;
+    VehicleViewState state_[2];
     std::vector<VehicleWheelViewInfo> wheels_;
-
     float update_time_ = 0.0f;
-    Transform root_trans_[2];
 
     VehicleFlags flags_ = 0;
 
@@ -133,6 +142,13 @@ private:
 
     // spz
     SpzTexture spz_;
+
+    // steering wheel
+    float steering_ = 0.0f;
+    bool has_steerw_ = false;
+    std::shared_ptr<const ModelView> steerw_model_;
+    Transform steerw_transform_;
+    TransformNode steerw_node_;
 };
 
 }

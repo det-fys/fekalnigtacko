@@ -333,15 +333,15 @@ void game::HumanCharacter::ClearItem()
     SwitchItem();
 }
 
-void game::HumanCharacter::PlayItemActionAnim(const std::string assets::Item::*anim, float speed)
+bool game::HumanCharacter::PlayItemActionAnim(const std::string assets::Item::*anim, float speed)
 {
     if (!item_)
     {
         ClearActionAnim();
-        return;
+        return false;
     }
 
-    PlayActionAnim(item_->def.get()->*anim, speed);
+    return PlayActionAnim(item_->def.get()->*anim, speed);
 }
 
 void game::HumanCharacter::PlayDeathAnim()
@@ -361,6 +361,19 @@ void game::HumanCharacter::PlayDeathAnim()
             PlayActionAnim("vehicle_passenger_die_animal", 1.0f);
         }
     }
+}
+
+void game::HumanCharacter::UpdateSteeringAnim()
+{
+    float time = 1.0f;
+
+    auto vehicle = GetVehicle();
+    if (vehicle)
+    {
+        time = glm::clamp(1.0f - vehicle->GetSteering() * 2.0f, 0.0f, 2.0f);
+    }
+
+    SetActionAnimTime(time);
 }
 
 void game::HumanCharacter::TrySpawnLoot()
@@ -545,7 +558,13 @@ void game::HumanCharacter::EnterActionState(ActionState state)
     case ACTION_IDLE:
         SetAiming(false);
         SetCanSprint(true);
-        PlayItemActionAnim(&assets::Item::idle_anim);
+        
+        steering_ = !PlayItemActionAnim(&assets::Item::idle_anim) && IsDriver();
+        if (steering_)
+        {
+            PlayActionAnim("vehicle_steer", 0.0f);
+        }
+
         break;
 
     case ACTION_RAISE:
@@ -634,6 +653,9 @@ game::ActionState game::HumanCharacter::CheckActionStateTransition()
 
         if (aimheld_ && CanAim()) // want aim
             return ACTION_AIM;
+
+        if (steering_)
+            UpdateSteeringAnim();
 
         return ACTION_IDLE;
 

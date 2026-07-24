@@ -106,8 +106,9 @@ protected:
     void SwitchItem();
     void UpdateItemStuff();
     void ClearItem();
-    void PlayItemActionAnim(const std::string assets::Item::*anim, float speed = 1.0f);
+    bool PlayItemActionAnim(const std::string assets::Item::*anim, float speed = 1.0f);
     void PlayDeathAnim();
+    void UpdateSteeringAnim();
     void TrySpawnLoot();
 
     void UpdateState();
@@ -145,6 +146,7 @@ private:
     DrivableVehicle* vehicle_ = nullptr;
     size_t seat_idx_ = 0;
     bool is_driver_ = false;
+    bool steering_ = false;
 
     HumanCharacterState state_ = HS_INIT;
     HumanCharacterStateSignals signals_ = 0;

@@ -91,6 +91,7 @@ public:
     float GetSpeed() const;
 
     void SetSteering(bool analog, float value = 0.0f);
+    float GetSteering() const;
 
     void SetLightsOn(bool lights_on) { lights_on_ = lights_on; }
     bool GetLightsOn() const { return lights_on_; }

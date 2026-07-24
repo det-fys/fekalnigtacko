@@ -149,6 +149,11 @@ void game::Vehicle::SetSteering(bool analog, float value)
     target_steering_ = value;
 }
 
+float game::Vehicle::GetSteering() const
+{
+    return steering_;
+}
+
 void game::Vehicle::SetTuning(const VehicleTuning& tuning)
 {
     ApplyTuning(tuning);

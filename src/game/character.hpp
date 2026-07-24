@@ -119,9 +119,10 @@ protected:
     void SetWalkAnim(const std::string& anim_name);
     void SetRunAnim(const std::string& anim_name);
     void PlayActionAnim(assets::AnimIdx anim_idx, float speed);
-    void PlayActionAnim(const std::string& anim_name, float speed = 1.0f);
+    bool PlayActionAnim(const std::string& anim_name, float speed = 1.0f);
+    void SetActionAnimTime(float time);
     void ClearActionAnim();
-    bool IsActionAnimDone() { return action_anim_done_; }
+    bool IsActionAnimDone() const { return action_anim_done_; }
     void SetAiming(bool aiming) { aiming_ = aiming; }
     bool GetAiming() const { return aiming_; }
     void SetAimTarget(const glm::vec3& target);

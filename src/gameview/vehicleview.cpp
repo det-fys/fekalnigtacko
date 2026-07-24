@@ -20,6 +20,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
     model_view_ = assets::AssetManager::GetInstance().Get<ModelView>(model_->GetModel()->GetAssetName());
     InitMesh();
     InitLights();
+    InitSteeringWheel();
     
     auto& modelwheels = model_->GetWheels();
     wheels_.resize(modelwheels.size());
@@ -33,8 +34,8 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
         throw EntityInitError();
     
     // init the other transform to identical
-    root_trans_[0] = root_trans_[1];
-    root_.local = root_trans_[0];
+    state_[0] = state_[1];
+    root_.local = state_[0].trans;
 
     snd_accel_ = assets::AssetManager::GetInstance().Get<audio::Sound>("auto");
 
@@ -70,9 +71,10 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
     float tps = 25.0f;
     float t = (info.time - update_time_) * tps * 0.8f; // assume some jitter, interpolate for longer
     t = glm::clamp(t, 0.0f, 2.0f);
-    root_.local = Transform::Lerp(root_trans_[0], root_trans_[1], t);
-
+    auto t_clamped = glm::clamp(t, 0.0f, 1.0f);
+    root_.local = Transform::Lerp(state_[0].trans, state_[1].trans, t);
     root_.UpdateMatrix();
+    steering_ = glm::mix(state_[0].steering, state_[1].steering, t_clamped);
 
     const auto& wheels = model_->GetWheels();
     for (size_t i = 0; i < wheels.size(); ++i)
@@ -99,6 +101,7 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
 
     UpdateSounds();
     UpdateLights(info.delta_time);
+    UpdateSteeringWheel();
 }
 
 void game::view::VehicleView::Draw(const DrawArgs& args)
@@ -108,6 +111,7 @@ void game::view::VehicleView::Draw(const DrawArgs& args)
         Super::Draw(args);
         DrawBaseModel(args);
         DrawWheels(args);
+        DrawSteeringWheel(args);
 
         //// temp deforms
         // for (const auto& [pos, deform] : debug_deforms_)
@@ -215,8 +219,13 @@ bool game::view::VehicleView::ReadTuning(net::InMessage& msg)
 
 bool game::view::VehicleView::ReadState(net::InMessage* msg)
 {
-    root_trans_[0] = root_.local;
-    auto& root_trans = root_trans_[1];
+    auto& old_state = state_[0];
+    auto& new_state = state_[1];
+
+    old_state.trans = root_.local;
+    old_state.steering = steering_;
+
+    auto& root_trans = state_[1].trans;
     update_time_ = world_.GetTime();
 
     if (msg)
@@ -261,9 +270,8 @@ bool game::view::VehicleView::ReadState(net::InMessage* msg)
             if (!net::ReadDelta(*msg, sync_.steering))
                 return false;
 
+            new_state.steering = sync_.steering.Decode();
         }
-
-        float steering = sync_.steering.Decode();
 
         // wheels
         if (fields & VSF_WHEELS)
@@ -283,7 +291,7 @@ bool game::view::VehicleView::ReadState(net::InMessage* msg)
             wheel.z_offset = sync_.wheels[i].z_offset.Decode();
             wheel.speed = sync_.wheels[i].speed.Decode();
 
-            wheel.steering = i < 2 ? steering : 0.0f;
+            wheel.steering = i < 2 ? new_state.steering : 0.0f;
         }
     }
     return true;
@@ -412,6 +420,18 @@ void game::view::VehicleView::InitLights()
     }
 }
 
+void game::view::VehicleView::InitSteeringWheel()
+{
+    auto loc = model_->GetLocation("steerw");
+    if (!loc)
+        return;
+
+    steerw_transform_ = *loc;
+    steerw_model_ = assets::AssetManager::GetInstance().Get<ModelView>("steerw");
+    steerw_node_.parent = &GetRoot();
+    has_steerw_ = true;
+}
+
 void game::view::VehicleView::UpdateSounds()
 {
     if (!world_.IsLoaded())
@@ -456,6 +476,18 @@ void game::view::VehicleView::UpdateLights(float delta_t)
     {
         light_cone_node_[i].UpdateMatrix();
     }
+}
+
+void game::view::VehicleView::UpdateSteeringWheel()
+{
+    if (!has_steerw_)
+        return;
+
+    float angle = steering_ * 2.0f * glm::two_pi<float>();
+
+    steerw_node_.local.position = steerw_transform_.position;
+    steerw_node_.local.rotation = glm::rotate(steerw_transform_.rotation, angle, glm::vec3(0, 0, 1));
+    steerw_node_.UpdateMatrix();
 }
 
 void game::view::VehicleView::UpdateDestroyedColors()
@@ -601,4 +633,12 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
 
         }
     }
+}
+
+void game::view::VehicleView::DrawSteeringWheel(const DrawArgs& args) const
+{
+    if (!has_steerw_)
+        return;
+
+    steerw_model_->Draw(args.ctx, steerw_node_.matrix, {});
 }
