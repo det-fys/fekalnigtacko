@@ -182,7 +182,7 @@ void game::Game::RegisterCommands()
             {
                 cvar.SetString(value);
             }
-            catch (const std::runtime_error& e)
+            catch (const std::exception& e)
             {
                 cmd.SendError(e.what());
                 return;
