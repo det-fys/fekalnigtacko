@@ -21,7 +21,7 @@ void game::view::MapInstanceView::LoadNext()
     map_ = loader_->GetMap();
     loader_.reset();
     
-    InitModelViews();
+    InitModels();
     InitObjsAndCollisions();
 }
 
@@ -33,7 +33,7 @@ int game::view::MapInstanceView::GetLoadingPercent() const
     return loader_->GetPercent();
 }
 
-void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args) const
+void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args)
 {
     if (!map_)
         return;
@@ -67,6 +67,11 @@ void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args) const
 
 }
 
+void game::view::MapInstanceView::Update()
+{
+    ++update_frame_;
+}
+
 void game::view::MapInstanceView::EnableObj(net::ObjNum num, bool enable)
 {
     size_t i = static_cast<size_t>(num);
@@ -83,15 +88,58 @@ void game::view::MapInstanceView::EnableObj(net::ObjNum num, bool enable)
     }
 }
 
-void game::view::MapInstanceView::InitModelViews()
+void game::view::MapInstanceView::InitModels()
 {
     basemodel_view_ = assets::AssetManager::GetInstance().Get<ModelView>(map_->GetBaseModel()->GetAssetName());
 
     const auto& obj_models = map_->GetObjModels();
-    obj_models_view_.reserve(obj_models.size());
+    obj_models_.reserve(obj_models.size());
     for (const auto& obj_model : obj_models)
     {
-        obj_models_view_.emplace_back(assets::AssetManager::GetInstance().Get<ModelView>(obj_model->GetAssetName()));
+        auto& mapmodel = obj_models_.emplace_back();
+        mapmodel.model = assets::AssetManager::GetInstance().Get<ModelView>(obj_model->GetAssetName());
+        InitModel(mapmodel);
+    }
+}
+
+void game::view::MapInstanceView::InitModel(MapModel& mapmodel)
+{
+    const auto& model = *mapmodel.model->GetModel();
+    auto special = model.GetParam("special");
+    if (!special)
+        return;
+
+    if (*special == "nightlight")
+    {
+        mapmodel.special = MMS_NIGHTLIGHT;
+
+        auto light0 = model.GetLocation("light0");
+        if (!light0)
+        {
+            throw std::runtime_error("Map model: nightlight without light0 location");
+        }
+
+        mapmodel.light.position = light0->position;
+        mapmodel.light.dir = light0->rotation * glm::vec3(0.0f, 0.0f, 1.0f);
+        
+        mapmodel.light.radius = 15.0f;
+        float inner_deg = 25.0f;
+        float outer_deg = 70.0f;
+        mapmodel.light.color = glm::vec3(1.0f);
+        float color_mult = 1.0f;
+
+        model.GetParamFloat("light0_radius", mapmodel.light.radius);
+        model.GetParamFloat("light0_angle_inner", inner_deg);
+        model.GetParamFloat("light0_angle_outer", outer_deg);
+        model.GetParamFloat("light0_color_r", mapmodel.light.color.r);
+        model.GetParamFloat("light0_color_g", mapmodel.light.color.g);
+        model.GetParamFloat("light0_color_b", mapmodel.light.color.b);
+        model.GetParamFloat("light0_color_mult", color_mult);
+
+        mapmodel.light.color *= color_mult;
+
+        mapmodel.light.cos_inner = glm::radians(inner_deg);
+        mapmodel.light.cos_outer = glm::radians(outer_deg);
     }
 }
 
@@ -118,7 +166,7 @@ void game::view::MapInstanceView::InitObjsAndCollisions()
     }
 }
 
-void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, const assets::Chunk& chunk) const
+void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, const assets::Chunk& chunk)
 {
     // make basemodel not cast shadows
     if (args.ctx.pass != gfx::DRAW_PASS_SHADOW_MAP)
@@ -158,7 +206,61 @@ void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, co
         if (!args.ctx.frustum.IsAABBVisible(obj.aabb))
             continue;
 
-        obj_models_view_[obj.model_idx]->Draw(args.ctx, obj.node.matrix, {});
+        DrawObj(args, obj_models_[obj.model_idx], obj.node.matrix);
+    }
+}
+
+void game::view::MapInstanceView::DrawObj(const DrawArgs& args, MapModel& mapmodel, const glm::mat4& matrix)
+{
+    if (mapmodel.special == MMS_NONE)
+    {
+        // no special effect, just draw
+        mapmodel.model->Draw(args.ctx, matrix, {});
+        return;
+    }
+
+    UpdateModelSpecial(mapmodel);
+
+    if (mapmodel.special == MMS_NIGHTLIGHT)
+    {
+        mapmodel.model->Draw(args.ctx, matrix, { mapmodel.colors.data(), 1 });
+
+        if (mapmodel.light_on)
+        {
+            glm::vec3 light_pos = matrix * glm::vec4(mapmodel.light.position, 1.0f);
+            glm::vec3 light_dir = glm::mat3(matrix) * mapmodel.light.dir;
+
+            args.ctx.dlist.AddSpotLight(light_pos, mapmodel.light.color, mapmodel.light.radius, light_dir,
+                                        mapmodel.light.cos_inner, mapmodel.light.cos_outer, gfx::LF_SHADOWS);
+
+            args.ctx.dlist.AddCorona(light_pos, light_dir, mapmodel.light.color, 1.0f);
+        }
+    }
+}
+
+void game::view::MapInstanceView::UpdateModelSpecial(MapModel& mapmodel)
+{
+    if (mapmodel.update_frame == update_frame_)
+    {
+        return; // already updated
+    }
+
+    mapmodel.update_frame = update_frame_;
+
+    if (mapmodel.special == MMS_NIGHTLIGHT)
+    {
+        if (daytime_ < 6.0f || daytime_ > 18.0f)
+        {
+            // night
+            mapmodel.colors[0] = glm::vec4(glm::normalize(mapmodel.light.color) * 1.5f, 1.0f);
+            mapmodel.light_on = true;
+        }
+        else
+        {
+            // day
+            mapmodel.colors[0] = glm::vec4(0.9f, 0.9f, 0.9f, 0.0f);
+            mapmodel.light_on = false;
+        }
     }
 }
 

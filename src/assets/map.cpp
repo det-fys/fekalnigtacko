@@ -5,8 +5,17 @@
 #include "cmdfile.hpp"
 #include "utils/files.hpp"
 
-static AABB3 TransformAABB(const AABB3& aabb, const glm::mat4& mat)
+static AABB3 TransformAABB(const assets::Model& model, const glm::mat4& mat)
 {
+    auto aabb = model.GetAABB();
+
+    auto custom_aabb_loc = model.GetLocation("customaabb");
+    if (custom_aabb_loc)
+    {
+        aabb.AddPoint(custom_aabb_loc->position - custom_aabb_loc->scale);
+        aabb.AddPoint(custom_aabb_loc->position + custom_aabb_loc->scale);
+    }
+
     const glm::vec3 corners[] = {
         glm::vec3(aabb.min.x, aabb.min.y, aabb.min.z), glm::vec3(aabb.max.x, aabb.min.y, aabb.min.z),
         glm::vec3(aabb.min.x, aabb.max.y, aabb.min.z), glm::vec3(aabb.max.x, aabb.max.y, aabb.min.z),
@@ -207,7 +216,7 @@ void assets::MapLoader::LoadStructs()
 
             obj.node.UpdateMatrix();
 
-            obj.aabb = TransformAABB(map_->obj_models_[model_idx]->GetAABB(), obj.node.matrix);
+            obj.aabb = TransformAABB(*map_->obj_models_[model_idx], obj.node.matrix);
             chunk->aabb.AddAABB(obj.aabb);
 
             std::string flag;

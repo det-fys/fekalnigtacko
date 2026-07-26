@@ -75,6 +75,7 @@ private:
     
     float daytime0_ = 0.0f;
     float daytime1_ = 0.0f;
+    float daytime_ = 0.0f;
     float env_msg_time_ = 0.0f;
 
     audio::Master& audiomaster_;

@@ -78,8 +78,17 @@ void game::view::WorldView::Update(const UpdateInfo& info)
 {
     time_ = info.time;
 
+    daytime_ = glm::mix(daytime0_, daytime1_, glm::clamp(GetTime() - env_msg_time_, 0.0f, 1.0f));
+
     if (!map_->IsLoaded())
+    {
         map_->LoadNext();
+    }
+    else
+    {
+        map_->SetDayTime(daytime_);
+        map_->Update();
+    }
 
     for (const auto& [entnum, ent] : ents_)
     {
@@ -160,7 +169,7 @@ void game::view::WorldView::UpdateEnv()
     if (!env_)
         return;
 
-    env_->SetDayTime(glm::mix(daytime0_, daytime1_, glm::clamp(GetTime() - env_msg_time_, 0.0f, 1.0f)));
+    env_->SetDayTime(daytime_);
 }
 
 void game::view::WorldView::DrawEnv(const DrawArgs& args) const
