@@ -569,7 +569,7 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
     if ((flags_ & VF_EXPLODED) > 0)
         return;
     
-    auto forward = glm::normalize(root_.matrix[1]);
+    auto forward = glm::normalize(glm::vec3(root_.matrix[1]));
     
     if (headlights_factor_ > 0.01f)
     {
@@ -592,7 +592,7 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
             spotlight_pos /= static_cast<float>(num_headlights_);
 
             // spotlight
-            dlist.AddSpotLight(spotlight_pos, spotlight_color, 30.0f, forward, glm::radians(12.0f),
+            dlist.AddSpotLight(spotlight_pos + forward * 0.1f, spotlight_color, 30.0f, forward, glm::radians(12.0f),
                                glm::radians(30.0f), gfx::LF_SHADOWS);
         }
     }

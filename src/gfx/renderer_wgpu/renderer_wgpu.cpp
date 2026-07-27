@@ -3687,7 +3687,7 @@ void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawCo
 
                 // setup matrices
                 auto& shadowmap = spotlight_shadows_[i];
-                shadowmap.proj = glm::perspectiveRH_ZO(2.0f * glm::acos(light.cos_outer), 1.0f, 0.1f, light.radius + 0.1f);
+                shadowmap.proj = glm::perspectiveRH_ZO(2.0f * glm::acos(light.cos_outer), 1.0f, 0.2f, light.radius + 0.1f);
                 glm::vec3 up =
                     (std::abs(light.dir.z) < 0.99f) ? glm::vec3(0.0f, 0.0f, 1.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
                 shadowmap.view = glm::lookAt(light.position, light.position + light.dir, glm::vec3(0.0f, 0.0f, 1.0f));
