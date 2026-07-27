@@ -559,7 +559,7 @@ void game::HumanCharacter::EnterActionState(ActionState state)
         SetAiming(false);
         SetCanSprint(true);
         
-        steering_ = !PlayItemActionAnim(&assets::Item::idle_anim) && IsDriver();
+        steering_ = !PlayItemActionAnim(&assets::Item::idle_anim) && GetVehicle() && IsDriver();
         if (steering_)
         {
             PlayActionAnim("vehicle_steer", 0.0f);
