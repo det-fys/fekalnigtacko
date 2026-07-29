@@ -4,7 +4,7 @@
 
 inline float RandomFloat(float min, float max)
 {
-    return min + (max - min) * static_cast<float>(rand() % 100) * 0.01f;
+    return min + (max - min) * static_cast<float>(rand() % 10000) * 0.0001f;
 }
 
 inline int RandomInt(int min, int max)
