@@ -1,6 +1,7 @@
 #include "openworld.hpp"
 
 #include <iostream>
+#include <cassert>
 
 #include "assets/asset_manager.hpp"
 #include "player.hpp"
@@ -49,15 +50,44 @@ CVAR(float, ow_npc_driver_armed_chance, CV_NONE, 0.4f, 0.0f, 1.0f);
 CVAR(float, ow_npc_passenger_chance, CV_NONE, 0.3f, 0.0f, 1.0f);
 CVAR(float, ow_npc_passenger_armed_chance, CV_NONE, 0.8f, 0.0f, 1.0f);
 
-namespace game
-{
-
-} // namespace game
-
 static const char* GetRandomCarModel()
 {
-    const char* vehicles[] = {"pickup_hd", "passat", "twingo", "polskifiat", "avia"};
-    return vehicles[rand() % (sizeof(vehicles) / sizeof(vehicles[0]))];
+    struct CarModelEntry
+    {
+        float weight;
+        const char* model;
+    };
+
+    static const std::vector<CarModelEntry> entries = {
+        {1.0f, "pickup_hd"},  
+        {1.0f, "passat"}, 
+        {1.0f, "twingo"},
+        {1.0f, "polskifiat"}, 
+        {1.0f, "fusion"}, 
+        {0.5f, "m235i"}, 
+        {0.3f, "trm4000"},
+        {0.5f, "avia"},   
+    };
+
+    float total_weight = 0.0f;
+    for (const auto& entry : entries)
+    {
+        total_weight += entry.weight;
+    }
+
+    float random_w = RandomFloat(0.0f, total_weight);
+
+    for (const auto& entry : entries)
+    {
+        if (random_w <= entry.weight)
+        {
+            return entry.model;
+        }
+
+        random_w -= entry.weight;
+    }
+
+    return entries.back().model;
 }
 
 static glm::vec3 GetRandomColor()
@@ -343,6 +373,7 @@ void game::OpenWorld::SpawnNpcVehicleWithPassengers()
     }
 
     auto [pos, yaw] = GetRandomNodeAndRotation(*roads);
+    pos.z += 1.0f;
     auto& vehicle = SpawnRandomVehicle(pos, yaw, true);
 
     auto& driver = SpawnRandomNpc();
