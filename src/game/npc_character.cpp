@@ -7,6 +7,7 @@
 
 #include <array>
 #include <iostream>
+#include <chrono>
 
 CVAR(float, npc_ignore_damage_chance, CV_NONE, 0.05f, 0.0f, 1.0f);
 CVAR(float, npc_follow_enemy_chance, CV_NONE, 0.8f, 0.0f, 1.0f);
@@ -291,11 +292,35 @@ bool game::NpcCharacter::IsVehicleDriver() const
 void game::NpcCharacter::ResetVehiclePath()
 {
     path_.clear();
-    last_waypoint_idx_= 0;
+    last_waypoint_idx_ = INVALID_WAYPOINT_IDX;
+    last_pathfind_time_ = 0;
+}
+
+void game::NpcCharacter::SetPathMode(bool to_target)
+{
+    ResetVehiclePath();
+    path_to_target_ = to_target;
 }
 
 void game::NpcCharacter::FindVehiclePath(const glm::vec3& position)
 {
+    if (path_to_target_)
+    {
+        FindVehiclePathToTarget(position);
+    }
+    else
+    {
+        FindVehiclePathRoads(position);
+    }
+}
+
+void game::NpcCharacter::FindVehiclePathRoads(const glm::vec3& position)
+{
+    if (last_waypoint_idx_ == INVALID_WAYPOINT_IDX)
+    {
+        path_.clear();
+    }
+
     if (path_.empty())
     {
         // path_.clear(); // make sure there is not 1 left
@@ -332,6 +357,50 @@ void game::NpcCharacter::FindVehiclePath(const glm::vec3& position)
         path_.push_back(roads_->nodes[nb_idx].position);
         last_waypoint_idx_ = nb_idx;
     }
+}
+
+void game::NpcCharacter::FindVehiclePathToTarget(const glm::vec3& position)
+{
+    last_waypoint_idx_ = INVALID_WAYPOINT_IDX;
+
+    auto target_pos = enemy_ ? enemy_->GetRoot().GetGlobalPosition() : position;
+
+    auto time = GetWorld().GetTime();
+
+    if (!path_.empty())
+    {
+        int64_t time_since_last_pathfind = time - last_pathfind_time_;
+        if ((glm::distance(glm::vec2(path_.back()), glm::vec2(target_pos)) < 5.0f || time_since_last_pathfind < 120) && time_since_last_pathfind < 3000)
+        {
+            return; // already close and recent enough
+        }
+    }
+
+    path_.clear();
+
+    //auto time_start = std::chrono::high_resolution_clock::now();
+    bool found = GetWorld().GetNavMeshSet().GetVehicleNavMesh().FindPath(position, target_pos,
+                                                                         [this](const glm::vec3& waypoint) {
+                                                                             path_.emplace_back(waypoint);
+                                                                         });
+    //auto time_end = std::chrono::high_resolution_clock::now();
+
+    //std::cout << "pathfind: found: " << (found ? "yes" : "no") << ", waypoints: " << path_.size()
+    //          << ", time: " << std::chrono::duration_cast<std::chrono::nanoseconds>(time_end - time_start).count()
+    //          << " ns\n";
+
+    if (!found || path_.size() < 2)
+    {
+        // DRIVE STRAIGHT TO TARGET
+        path_.clear();
+        path_.emplace_back(position);
+        path_.emplace_back(target_pos);
+    }
+
+    //std::cout << "path found: " << path_.size() << " waypoints\n";
+
+    last_pathfind_time_ = time;
+
 }
 
 static float FindClosestPointOnSegment(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& pos)
@@ -479,33 +548,78 @@ void game::NpcCharacter::UpdateVehicleInput(std::span<glm::vec3> actual_path)
         target_speed *= npc_driver_speed_mult_hurry.Get();
     }
 
+    float speed = vehicle->GetSpeed();
+
     // set steering
     vehicle_steer_ = GetTurnAngle(vehicle_pos, vehicle_rot, target_pos);
 
+    auto time = GetWorld().GetTime();
+    if (time - last_direction_change_time_ > 1000)
+    {
+        bool would_be_better_to_reverse = false;
+        float abs_steer = glm::abs(vehicle_steer_);
+        if (!reverse_)
+        {
+            if (speed < 5.0f)
+            {
+                would_be_better_to_reverse = abs_steer > glm::radians(60.0f);
+            }
+            else if (speed < 20.0f)
+            {
+                would_be_better_to_reverse = abs_steer > glm::radians(100.0f);
+            }
+        }
+        else
+        {
+            would_be_better_to_reverse = abs_steer > glm::radians(35.0f);
+        }
+
+        if (reverse_ && (time - last_direction_change_time_) > 5000)
+        {
+            would_be_better_to_reverse = false; // dont reverse for too long
+        }
+
+        if (would_be_better_to_reverse != reverse_)
+        {
+            reverse_ = would_be_better_to_reverse;
+            last_direction_change_time_ = time;
+        }
+    }
+
     // set input
-    float speed = vehicle->GetSpeed();
-
-    if (speed < target_speed * 0.9f && ((vehicle_in_ & (1<<VIN_FORWARD)) == 0))
+    if (reverse_)
     {
-        // gas
-        vehicle_in_ |= (1<<VIN_FORWARD);
-    }
-    else if (speed > target_speed * 1.1f && ((vehicle_in_ & (1<<VIN_FORWARD)) > 0))
-    {
-        // no gas
-        vehicle_in_ &= ~(1<<VIN_FORWARD);
-    }
-
-    if (speed > target_speed * 1.4f)
-    {
-        // brake
-        vehicle_in_ |= (1<<VIN_BACKWARD);
+        vehicle_steer_ = -vehicle_steer_;
+        vehicle_in_ &= ~(1 << VIN_FORWARD);
+        vehicle_in_ |= (1 << VIN_BACKWARD);
     }
     else
     {
-        // dont brake
-        vehicle_in_ &= ~(1<<VIN_BACKWARD);
+
+        if (speed < target_speed * 0.9f && ((vehicle_in_ & (1 << VIN_FORWARD)) == 0))
+        {
+            // gas
+            vehicle_in_ |= (1 << VIN_FORWARD);
+        }
+        else if (speed > target_speed * 1.1f && ((vehicle_in_ & (1 << VIN_FORWARD)) > 0))
+        {
+            // no gas
+            vehicle_in_ &= ~(1 << VIN_FORWARD);
+        }
+
+        if (speed > target_speed * 1.4f)
+        {
+            // brake
+            vehicle_in_ |= (1 << VIN_BACKWARD);
+        }
+        else
+        {
+            // dont brake
+            vehicle_in_ &= ~(1 << VIN_BACKWARD);
+        }
     }
+
+
 
     if (npc_path_beams.Get() > 0)
     {
@@ -548,21 +662,24 @@ void game::NpcCharacter::UpdateVehicleInputToFollowPath()
     // check if we reached next waypoint
     while (true)
     {
+        bool need_break = path_.size() <= 2;
+
         auto seg_dir = path_[1] - path_[0];
         auto seg_len2 = glm::dot(seg_dir, seg_dir);
         auto seg_len = glm::sqrt(seg_len2);
-        if (seg_len > 0.1f)
+        if (seg_len > 0.1f || need_break)
         {
             seg_t = glm::dot(vehicle_pos - path_[0], seg_dir) / seg_len2;
-            if (seg_t < (1.0f - 3.0f / seg_len))
+            if (seg_t < (1.0f - 3.0f / seg_len) || need_break)
             {
                 break;
             }
         }
 
         path_.pop_front();
-        FindVehiclePath(vehicle_pos);
-        
+
+        //// try to find continuation immediately
+        //FindVehiclePath(vehicle_pos);
     }
 
     seg_t = glm::clamp(seg_t, 0.0f, 1.0f);
@@ -574,12 +691,14 @@ void game::NpcCharacter::UpdateVehicleInputToFollowPath()
     std::array<glm::vec3, PATH_NEXT_WAYPOINTS + 1> actual_path; // pos,on_segment,path[1],path[2]...
     actual_path[0] = vehicle_pos;
     actual_path[1] = on_segment;
-    for (size_t i = 1; i < PATH_NEXT_WAYPOINTS; ++i)
+
+    size_t num_next_waypoints = glm::min<size_t>(PATH_NEXT_WAYPOINTS, path_.size());
+    for (size_t i = 1; i < num_next_waypoints; ++i)
     {
         actual_path[i + 2 - 1] = path_[i];
     }
 
-    UpdateVehicleInput(actual_path);
+    UpdateVehicleInput({ actual_path.data(), num_next_waypoints + 1 });
 }
 
 void game::NpcCharacter::UpdateVehicleInputToFollowEnemy()
@@ -817,7 +936,7 @@ void game::NpcCharacter::EnterDriverThinkState(DriverThinkState state)
     case DRIVERSTATE_PATH_BEGIN:
         vehicle_in_ = 0;
         vehicle_steer_ = 0.0f;
-        ResetVehiclePath();
+        SetPathMode(false);
         break;
 
     case DRIVERSTATE_PATH:
@@ -829,6 +948,7 @@ void game::NpcCharacter::EnterDriverThinkState(DriverThinkState state)
         break;
 
     case DRIVERSTATE_FOLLOW_ENEMY:
+        SetPathMode(true);
         break;
 
     default:
@@ -879,7 +999,7 @@ game::DriverThinkState game::NpcCharacter::CheckDriverThinkStateTransition()
         if (CheckStuck())
             return DRIVERSTATE_REVERSE;
 
-        UpdateVehicleInputToFollowEnemy();
+        UpdateVehicleInputToFollowPath();
 
         return DRIVERSTATE_FOLLOW_ENEMY;
 

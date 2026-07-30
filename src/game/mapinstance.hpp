@@ -1,6 +1,7 @@
 #pragma once
 
 #include "assets/map.hpp"
+#include "assets/map_navmesh.hpp"
 #include "collision/dynamicsworld.hpp"
 #include "net/defs.hpp"
 #include "collision/object_info.hpp"
@@ -56,6 +57,8 @@ public:
     MapInstance(collision::DynamicsWorld& world, std::string mapname);
 
     const assets::Map& GetMap() const { return *map_; }
+    const assets::MapNavMeshSet& GetNavMeshSet() const { return *navmesh_set_; }
+
     const std::string& GetName() const { return mapname_; }
 
     void SpawnObj(net::ObjNum objnum);
@@ -67,6 +70,7 @@ private:
     collision::DynamicsWorld& world_;
     std::string mapname_;
     std::shared_ptr<const assets::Map> map_;
+    std::shared_ptr<const assets::MapNavMeshSet> navmesh_set_;
 
     std::unique_ptr<MapObjectCollision> basemodel_col_;
     std::vector<std::unique_ptr<MapObjectCollision>> obj_cols_;

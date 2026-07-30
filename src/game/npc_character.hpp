@@ -7,6 +7,8 @@
 namespace game
 {
 
+constexpr size_t INVALID_WAYPOINT_IDX = std::numeric_limits<size_t>::max();
+
 class OpenWorld;
 
 enum ThinkState
@@ -62,10 +64,12 @@ private:
     void ClearEnemy();
     bool WantsToFollowEnemy();
 
-
     bool IsVehicleDriver() const;
     void ResetVehiclePath();
+    void SetPathMode(bool to_target);
     void FindVehiclePath(const glm::vec3& position);
+    void FindVehiclePathRoads(const glm::vec3& position);
+    void FindVehiclePathToTarget(const glm::vec3& position);
     void UpdateVehicleInput(std::span<glm::vec3> path);
     void UpdateVehicleInputToFollowPath();
     void UpdateVehicleInputToFollowEnemy();
@@ -100,14 +104,20 @@ private:
     DriverThinkState prev_driver_state_ = DRIVERSTATE_NONE;
     
     std::deque<glm::vec3> path_;
-    size_t last_waypoint_idx_ = 0;
+    size_t last_waypoint_idx_ = INVALID_WAYPOINT_IDX;
     glm::vec3 last_pos_ = glm::vec3(0.0f);
     size_t stuck_counter_ = 0;
     
     VehicleInputFlags vehicle_in_ = 0;
     float vehicle_steer_ = 0.0f;
 
+    bool path_to_target_ = false;
+    int64_t last_pathfind_time_ = 0;
+
     bool in_hurry_ = false;
+
+    bool reverse_ = false;
+    int64_t last_direction_change_time_ = 0;
 
     // mad
     std::shared_ptr<ItemInstance> weapon_;

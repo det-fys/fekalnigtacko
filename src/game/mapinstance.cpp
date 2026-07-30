@@ -8,6 +8,7 @@ game::MapInstance::MapInstance(collision::DynamicsWorld& world, std::string mapn
     : world_(world), mapname_(std::move(mapname))
 {
     map_ = assets::AssetManager::GetInstance().Get<assets::Map>(mapname_);
+    navmesh_set_ = assets::AssetManager::GetInstance().Get<assets::MapNavMeshSet>(mapname_);
 
     // add basemodel col
     const auto& basemodel = map_->GetBaseModel();

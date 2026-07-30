@@ -46,6 +46,15 @@ std::shared_ptr<assets::Map> assets::Map::LoadFromFile(const std::string& filena
     return loader.GetMap();
 }
 
+int assets::Map::GetChunkIdx(int x, int y) const
+{
+    ChunkCoord coord(x, y);
+    auto it = chunk_map_.find(coord);
+    if (it != chunk_map_.end())
+        return it->second;
+    return -1;
+}
+
 const assets::MapGraph* assets::Map::GetGraph(const std::string& name) const
 {
     auto it = graphs_.find(name);
@@ -61,6 +70,31 @@ std::span<const assets::MapLocation> assets::Map::GetLocations(const std::string
         return std::span<const MapLocation>();
 
     return it->second;
+}
+
+void assets::Map::GetOverlappingChunks(const AABB3& aabb, std::vector<uint32_t>& chunk_idxs) const
+{
+    chunk_idxs.clear();
+
+    int min_x = static_cast<int>(std::floor((aabb.min.x - aabb_.min.x) / chunk_size_));
+    int min_y = static_cast<int>(std::floor((aabb.min.y - aabb_.min.y) / chunk_size_));
+    int max_x = static_cast<int>(std::ceil((aabb.max.x - aabb_.min.x) / chunk_size_));
+    int max_y = static_cast<int>(std::ceil((aabb.max.y - aabb_.min.y) / chunk_size_));
+
+    for (int y = min_y; y <= max_y; ++y)
+    {
+        for (int x = min_x; x <= max_x; ++x)
+        {
+            int chunk_idx = GetChunkIdx(x, y);
+            if (chunk_idx < 0)
+                continue;
+
+            if (!chunks_[chunk_idx].aabb.CollidesWith(aabb))
+                continue;
+
+            chunk_idxs.push_back(static_cast<uint32_t>(chunk_idx));
+        }
+    }
 }
 
 // MapLoader
@@ -218,6 +252,7 @@ void assets::MapLoader::LoadStructs()
 
             obj.aabb = TransformAABB(*map_->obj_models_[model_idx], obj.node.matrix);
             chunk->aabb.AddAABB(obj.aabb);
+            map_->aabb_.AddAABB(obj.aabb);
 
             std::string flag;
             while (!iss.Eol())
@@ -235,11 +270,15 @@ void assets::MapLoader::LoadStructs()
         }
         else if (command == "chunk")
         {
-            glm::ivec2 coord;
             chunk = &map_->chunks_.emplace_back();
-            iss >> coord.x >> coord.y;
+            iss >> chunk->coord.x >> chunk->coord.y;
             iss >> chunk->aabb.min.x >> chunk->aabb.min.y >> chunk->aabb.min.z;
             iss >> chunk->aabb.max.x >> chunk->aabb.max.y >> chunk->aabb.max.z;
+
+            // add to map
+            map_->chunk_map_[chunk->coord] = map_->chunks_.size() - 1;
+
+            map_->aabb_.AddAABB(chunk->aabb);
 
             chunk->first_obj = map_->objs_.size();
 

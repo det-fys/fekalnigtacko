@@ -16,6 +16,7 @@ set(COMMON_SOURCES
     "src/assets/item.cpp"
     "src/assets/map.hpp"
     "src/assets/map.cpp"
+    "src/assets/map_navmesh.cpp"
     "src/assets/model.hpp"
     "src/assets/model.cpp"
     "src/assets/skeleton.hpp"
@@ -268,6 +269,13 @@ add_subdirectory(external/bullet3)
 target_link_libraries(${MAIN_NAME} PRIVATE BulletDynamics BulletCollision LinearMath Bullet3Common)
 target_include_directories(${MAIN_NAME} PRIVATE "external/bullet3/src")
 
+# add recast
+set(RECASTNAVIGATION_DEMO OFF)
+set(RECASTNAVIGATION_TESTS OFF)
+set(RECASTNAVIGATION_EXAMPLES OFF)
+add_subdirectory(external/recastnavigation)
+target_link_libraries(${MAIN_NAME} PRIVATE RecastNavigation::Recast RecastNavigation::Detour)
+
 # add ogg
 add_subdirectory(external/ogg)
 
@@ -400,7 +408,7 @@ endif()
 
     set(SERVER_NAME server)
     add_executable(${SERVER_NAME} ${COMMON_SOURCES} ${SERVER_ONLY_SOURCES})
-    target_link_libraries(${SERVER_NAME} PRIVATE Crow glm BulletDynamics BulletCollision LinearMath Bullet3Common)
+    target_link_libraries(${SERVER_NAME} PRIVATE Crow glm BulletDynamics BulletCollision LinearMath Bullet3Common RecastNavigation::Recast RecastNavigation::Detour)
     target_include_directories(${SERVER_NAME} PRIVATE "src" "external/bullet3/src")
     target_compile_definitions(${SERVER_NAME} PRIVATE SERVER)
 

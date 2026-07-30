@@ -19,27 +19,21 @@ gfx::Frustum::Frustum(const glm::mat4& vp)
         planes_[i] /= len;
     }
 
-    //glm::mat4 inv_vp = glm::inverse(m_vp);
+    // compute AABB
+    auto inv_vp = glm::inverse(vp);
 
-    //m_min = glm::vec3(FLT_MAX);
-    //m_max = glm::vec3(-FLT_MAX);
+    static const glm::vec3 corners[8] = {glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(1.0f, -1.0f, -1.0f),
+                                         glm::vec3(-1.0f, 1.0f, -1.0f),  glm::vec3(1.0f, 1.0f, -1.0f),
+                                         glm::vec3(-1.0f, -1.0f, 1.0f),  glm::vec3(1.0f, -1.0f, 1.0f),
+                                         glm::vec3(-1.0f, 1.0f, 1.0f),   glm::vec3(1.0f, 1.0f, 1.0f)};
 
-    //for (int x = 0; x < 2; ++x)
-    //{
-    //    for (int y = 0; y < 2; ++y)
-    //    {
-    //        for (int z = 0; z < 2; ++z)
-    //        {
-    //            glm::vec4 pt = inv_vp * glm::vec4(2.0f * x - 1.0f, 2.0f * y - 1.0f, 2.0f * z - 1.0f, 1.0f);
+    for (int i = 0; i < 8; ++i)
+    {
+        glm::vec4 corner_ws = inv_vp * glm::vec4(corners[i], 1.0f);
+        corner_ws /= corner_ws.w;
 
-    //            pt /= pt.w;
-
-    //            m_min = glm::min(m_min, glm::vec3(pt));
-    //            m_max = glm::max(m_max, glm::vec3(pt));
-    //        }
-    //    }
-    //}
-
+        aabb_.AddPoint(glm::vec3(corner_ws));
+    }
 }
 
 bool gfx::Frustum::IsAABBVisible(const AABB3& aabb) const

@@ -90,6 +90,7 @@ public:
 
     const assets::Map& GetMap() const { return map_.GetMap(); }
     const std::string& GetMapName() const { return map_.GetName(); }
+    const assets::MapNavMeshSet& GetNavMeshSet() const { return map_.GetNavMeshSet(); }
     const std::map<net::EntNum, std::unique_ptr<Entity>>& GetEntities() const { return ents_; }
     const int64_t& GetTime() const { return time_ms_; }
     float GetDayTime() const { return daytime_; }

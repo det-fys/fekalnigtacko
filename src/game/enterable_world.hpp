@@ -15,6 +15,8 @@ class EnterableWorld : public World
 public:
     EnterableWorld(const collision::DynamicsWorldInfo& info, std::string mapname);
 
+    virtual void Update(int64_t delta_time) override;
+
     // events
     virtual PlayerCharacter& InsertPlayer(Player& player, const HumanCharacterTuning& tuning, const glm::vec3& pos,
                                           float yaw);
@@ -34,6 +36,8 @@ public:
 private:
     PlayerCharacter& CreatePlayerCharacter(Player& player, const HumanCharacterTuning& tuning, const glm::vec3& position, float yaw);
     void RemovePlayerCharacter(Player& player);
+
+    void DrawNavMeshBeams();
 
 private:
     std::map<Player*, PlayerCharacter*> player_characters_;

@@ -51,20 +51,28 @@ void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args)
     const float max_dist = args.ctx.max_distance + chunk_radius;
     const float max_dist2 = max_dist * max_dist;
 
-    for (const auto& chunks = map_->GetChunks(); const auto& chunk : chunks)
+    const auto& frustum_aabb = args.ctx.frustum.GetAABB();
+
+    static std::vector<uint32_t> visible_chunks;
+    map_->GetOverlappingChunks(frustum_aabb, visible_chunks);
+
+    const auto& chunks = map_->GetChunks();
+
+    for (auto chunk_idx : visible_chunks)
     {
+        const auto& chunk = chunks[chunk_idx];
+        
         glm::vec3 center = (chunk.aabb.min + chunk.aabb.max) * 0.5f;
         auto dist2 = glm::distance2(args.ctx.eye, center);
 
         if (dist2 < min_dist2 || dist2 > max_dist2)
             continue;
-
+        
         if (!args.ctx.frustum.IsAABBVisible(chunk.aabb))
             continue;
 
         DrawChunk(args, chunk);
     }
-
 }
 
 void game::view::MapInstanceView::Update()

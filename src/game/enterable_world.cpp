@@ -3,9 +3,23 @@
 #include "player_character.hpp"
 #include "drivable_vehicle.hpp"
 
+#include "utils/cvars.hpp"
+
+CVAR(std::string, ew_navmesh_beams, CV_NONE, "", 0, 16);
+
 game::EnterableWorld::EnterableWorld(const collision::DynamicsWorldInfo& info, std::string mapname)
     : World(info, std::move(mapname))
 {
+}
+
+void game::EnterableWorld::Update(int64_t delta_time)
+{
+    World::Update(delta_time);
+
+    if (!ew_navmesh_beams.Get().empty())
+    {
+        DrawNavMeshBeams();
+    }
 }
 
 game::PlayerCharacter& game::EnterableWorld::InsertPlayer(Player& player, const HumanCharacterTuning& tuning,
@@ -106,4 +120,25 @@ void game::EnterableWorld::RemovePlayerCharacter(Player& player)
     }
 
     player_characters_.erase(it);
+}
+
+void game::EnterableWorld::DrawNavMeshBeams()
+{
+    const auto& navmesh_id = ew_navmesh_beams.Get();
+
+    auto& navmesh_set = GetNavMeshSet();
+    auto& navmesh = (navmesh_id == "vehicle") ? navmesh_set.GetVehicleNavMesh() : navmesh_set.GetPawnNavMesh();
+
+    for (auto& [player, character] : player_characters_)
+    {
+        if (!character)
+            continue;
+        static std::vector<assets::NavMeshDebugLine> lines;
+        lines.clear();
+        navmesh.DrawDebug(character->GetRoot().GetGlobalPosition(), lines);
+        for (const auto& line : lines)
+        {
+            Beam(line.start, line.end, 0x00ff00ff, 0.1f);
+        }
+    }
 }

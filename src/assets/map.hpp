@@ -31,8 +31,30 @@ struct ChunkSurfaceRange
     ChunkSurfaceRange(size_t idx, size_t first, size_t count) : idx(idx), first(first), count(count) {}
 };
 
+struct ChunkCoord
+{
+    int x = 0;
+    int y = 0;
+
+    ChunkCoord() = default;
+    ChunkCoord(int x, int y) : x(x), y(y) {}
+
+    bool operator==(const ChunkCoord& other) const
+    {
+        return x == other.x && y == other.y;
+    }
+
+    bool operator<(const ChunkCoord& other) const
+    {
+        if (x != other.x)
+            return x < other.x;
+        return y < other.y;
+    }
+};
+
 struct Chunk
 {
+    ChunkCoord coord;
     AABB3 aabb;
     std::vector<ChunkSurfaceRange> surfaces;
     size_t first_obj = 0;
@@ -69,15 +91,20 @@ public:
     const std::shared_ptr<const Model>& GetBaseModel() const { return basemodel_; }
     const std::vector<std::shared_ptr<const Model>>& GetObjModels() const { return obj_models_; }
     const std::vector<Chunk>& GetChunks() const { return chunks_; }
+    int GetChunkIdx(int x, int y) const;
     float GetChunkSize() const { return chunk_size_; }
     const std::vector<MapStaticObject>& GetStaticObjects() const { return objs_; }
     const MapGraph* GetGraph(const std::string& name) const;
     std::span<const MapLocation> GetLocations(const std::string& name) const;
+    void GetOverlappingChunks(const AABB3& aabb, std::vector<uint32_t>& chunk_idxs) const;
+    const AABB3& GetAABB() const { return aabb_; }
 
 private:
     std::shared_ptr<const Model> basemodel_;
     std::vector<std::shared_ptr<const Model>> obj_models_;
     std::vector<Chunk> chunks_;
+    AABB3 aabb_;
+    std::map<ChunkCoord, int> chunk_map_;
     float chunk_size_ = 1.0f;
     std::vector<MapStaticObject> objs_;
     std::map<std::string, MapGraph> graphs_;
