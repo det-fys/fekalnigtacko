@@ -1,0 +1,36 @@
+name: Build Server
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-server:
+    name: Build Dedicated Server (Ubuntu 22.04)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential cmake python3 git ca-certificates
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON
+
+      - name: Build Server Binary
+        # Using -j $(nproc) speeds up the build by running jobs in parallel
+        run: cmake --build build --config Release --target server -j $(nproc)
+
+      - name: Upload Server Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fekalnigtacko-server-ubuntu22.04-x86_64
+          path: build/server
+          if-no-files-found: error
