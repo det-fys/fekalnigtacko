@@ -70,6 +70,24 @@ void game::Game::RegisterCommands()
         }
     );
 
+    // /online
+    cmds_.RegisterCommand(
+        "online", 
+        CMDF_NONE, 
+        "zobrazí seznam hráčů", 
+        [this](const CommandData& cmd) {
+            cmd.player.SendChat("hráči online: ");
+            for (auto& [player, info] : players_)
+            {
+                std::string msg = " - ";
+                msg.append(player->GetName());
+                if (player->IsAdmin())
+                    msg.append(" [" CMD_PREFIX_ADMIN "admin^r]");
+                cmd.player.SendChat(msg);
+            }
+        }
+    );
+
     // /password
     cmds_.RegisterCommand(
         "password",
