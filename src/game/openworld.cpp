@@ -388,7 +388,7 @@ void game::OpenWorld::SpawnNpcVehicleWithPassengers()
         if (Chance(ow_npc_passenger_armed_chance.Get()))
         {
             passenger.SetWeapon(std::make_shared<ItemInstance>(
-                Chance(0.6f) ? "panzerschreck" : (Chance(0.4f) ? "ak47" : (Chance(0.5f) ? "uzi" : "airsniper"))));
+                Chance(0.1f) ? "panzerschreck" : (Chance(0.4f) ? "ak47" : (Chance(0.5f) ? "uzi" : "airsniper"))));
         
             has_armed_passenger = true;
         }
