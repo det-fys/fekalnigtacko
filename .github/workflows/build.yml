@@ -2,12 +2,18 @@ name: Build Server
 
 on:
   push:
+    branches: [ master ]
+    tags:
+      - 'v*'
   pull_request:
 
 jobs:
   build-server:
     name: Build Dedicated Server (Ubuntu 22.04)
     runs-on: ubuntu-22.04
+
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -34,3 +40,10 @@ jobs:
           name: fekalnigtacko-server-ubuntu22.04-x86_64
           path: build/server
           if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: build/server
+          generate_release_notes: true # Automatically summarizes PRs/commits in the release notes
