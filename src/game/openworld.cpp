@@ -65,7 +65,7 @@ static const char* GetRandomCarModel()
         {1.0f, "polskifiat"}, 
         {1.0f, "fusion"}, 
         {0.5f, "m235i"}, 
-        {0.3f, "trm4000"},
+        {0.15f, "trm4000"},
         {0.5f, "avia"},   
     };
 
