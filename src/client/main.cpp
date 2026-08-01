@@ -27,6 +27,7 @@
 #include "gfx/renderer.hpp"
 #include "utils/sdl_utils.hpp"
 #include "gfx/renderer_gl/gl.hpp"
+#include "version.hpp"
 
 CVAR_CL(uint16_t, cl_maxfps, CV_SAVE, 0);
 
@@ -76,7 +77,7 @@ static void InitSDL()
     }
 
 	std::cout << "Creating SDL window..." << std::endl;
-    s_window = SDL_CreateWindow("Fekalni gtacko", 100, 100, 640, 480, window_flags);
+    s_window = SDL_CreateWindow("Fekalni gtacko [" FEKAL_VERSION "]", 100, 100, 640, 480, window_flags);
     if (!s_window)
     {
         ThrowSDLError("SDL_CreateWindow");

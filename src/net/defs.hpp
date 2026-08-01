@@ -167,7 +167,8 @@ using ObjCount = ObjNum;
 using NumTexels = uint16_t;
 
 // version
-using Version = uint32_t;
+//using Version = uint32_t; // not used any more
+using VersionStr = FixedStr<32>;
 
 // tuning
 using TuningPartIdx = uint8_t;

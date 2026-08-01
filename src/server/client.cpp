@@ -2,7 +2,7 @@
 
 #include "server.hpp"
 #include "utils/validate.hpp"
-#include "utils/version.hpp"
+#include "version.hpp"
 #include "utils/chatcolors.hpp"
 #include "utils/cvars.hpp"
 
@@ -90,13 +90,19 @@ void sv::Client::Send(std::string msg)
 
 bool sv::Client::ProcessLoginMsg(net::InMessage& msg)
 {
-    net::Version ver = 0;
-    msg.Read(ver);
-    
-    // check ver
-    if (ver != FEKAL_VERSION)
+    net::VersionStr version;
+    if (!msg.Read(version))
     {
-        SendChat("^f55máš nahovno verzi " + std::to_string(ver) + ", server je na " + std::to_string(FEKAL_VERSION));
+        SendChat("^f55chyba: nepodařilo se přečíst verzi");
+        return false;
+    }
+
+    std::string version_str = version;
+
+    // check ver
+    if (version_str != FEKAL_VERSION)
+    {
+        SendChat("^f55máš nahovno verzi " + version_str + ", server je na " + std::string(FEKAL_VERSION));
         return false;
     }
 

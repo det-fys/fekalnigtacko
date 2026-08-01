@@ -4,7 +4,7 @@
 #include <iostream>
 // #include <glm/gtx/common.hpp>
 
-#include "utils/version.hpp"
+#include "version.hpp"
 #include "utils.hpp"
 #include "vehicleview.hpp"
 #include "assets/asset_manager.hpp"
@@ -15,7 +15,7 @@ game::view::ClientSession::ClientSession(App& app) : app_(app), hud_(app.GetTime
 {
     // send login
     auto msg = BeginMsg(net::MSG_ID);
-    msg.Write<net::Version>(FEKAL_VERSION);
+    msg.Write(net::VersionStr(std::string_view(FEKAL_VERSION)));
     msg.Write(net::PlayerName(app.GetUserName()));
 }
 

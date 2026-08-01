@@ -8,6 +8,27 @@ option(BUILD_CLIENT "Build the client application" ON)
 option(BUILD_SERVER "Build the server application" ON)
 
 # ------------------------------------------------------------------------------
+# Version
+# ------------------------------------------------------------------------------
+execute_process(
+    COMMAND git describe --tags --always --dirty
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE PROJECT_VERSION_GIT
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# fallback
+if(NOT PROJECT_VERSION_GIT)
+    set(PROJECT_VERSION_GIT "unknown")
+endif()
+
+configure_file(
+    "${CMAKE_SOURCE_DIR}/src/utils/version.hpp.in"
+    "${CMAKE_BINARY_DIR}/generated/version.hpp"
+    @ONLY
+)
+
+# ------------------------------------------------------------------------------
 # Global Compiler Settings (Set early for submodules to inherit)
 # ------------------------------------------------------------------------------
 # Enable C++20
@@ -167,7 +188,7 @@ if(BUILD_CLIENT)
     set(MAIN_NAME "FekalniGtacko")
     add_executable(${MAIN_NAME} ${COMMON_SOURCES} ${CLIENT_ONLY_SOURCES})
     
-    target_include_directories(${MAIN_NAME} PRIVATE "src" "external/stb" "external/bullet3/src")
+    target_include_directories(${MAIN_NAME} PRIVATE "src" "external/stb" "external/bullet3/src" "${CMAKE_BINARY_DIR}/generated")
     target_compile_definitions(${MAIN_NAME} PRIVATE CLIENT)
     target_link_libraries(${MAIN_NAME} PRIVATE 
         glm 
@@ -287,6 +308,7 @@ if(BUILD_SERVER)
             "src" 
             "external/bullet3/src"
             ${ASIO_INCLUDE_DIR}
+            "${CMAKE_BINARY_DIR}/generated"
         )
         target_compile_definitions(${SERVER_NAME} PRIVATE SERVER)
         
