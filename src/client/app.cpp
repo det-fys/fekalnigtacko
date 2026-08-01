@@ -17,6 +17,7 @@
 #include "server/server.hpp"
 #include "server/server_cfg.hpp"
 #include "db/db_memory.hpp"
+#include "version.hpp"
 
 #include "net/client_ws.hpp"
 
@@ -65,6 +66,8 @@ App::App(const std::string& settings_path)
       precache_("data/precache"), chat_(gui_, time_)
 {
 	std::cout << "Initializing App..." << std::endl;
+    AddChatMessage("fekální gtačko " FEKAL_VERSION);
+
 
 	chat_.SetOnInput([this](std::string msg) {
 		ProcessChatInput(std::move(msg));

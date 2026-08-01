@@ -6,11 +6,14 @@
 #include "utils/cvars.hpp"
 #include "net/server_ws_crow.hpp"
 #include "db/db_memory.hpp"
+#include "version.hpp"
 
 CVAR(uint16_t, sv_port, CV_CONST, 11200);
 
 int main()
 {
+    std::cout << "Starting server " FEKAL_VERSION << std::endl;
+
     srand(time(NULL));
     
     try
