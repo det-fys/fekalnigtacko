@@ -265,6 +265,7 @@ if(BUILD_CLIENT)
             "-sUSE_SDL=2"
             "-sASYNCIFY"
             "-sUSE_WEBGL2=1"
+            "-sFETCH"
             "-sNO_DISABLE_EXCEPTION_CATCHING=1"
             "-sALLOW_MEMORY_GROWTH=1"
             "-sGROWABLE_ARRAYBUFFERS=0"
