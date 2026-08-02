@@ -20,6 +20,7 @@
 #include "utils/keys.hpp"
 #include "utils/cmdlinestream.hpp"
 #include "gfx/scene.hpp"
+#include "fs/archive_fetch.hpp"
 
 struct ChatMessage
 {
@@ -31,6 +32,7 @@ struct ChatMessage
 enum AppState
 {
     APP_STATE_INIT,
+    APP_STATE_FETCHING_ASSETS,
     APP_STATE_LOADING,
     APP_STATE_IDLE,
     APP_STATE_CONNECT,
@@ -41,6 +43,7 @@ enum AppState
     APP_STATE_CONNECTED_LOCAL,
     APP_STATE_DISCONNECT_LOCAL,
     APP_STATE_DISCONNECTED_LOCAL,
+    APP_STATE_ERROR,
 };
 
 class App : public net::ClientInterfaceCallback, public gfx::Scene
@@ -111,6 +114,7 @@ private:
     void ProcessConnectOrDisconnectCmd(CmdLineStream& line, bool connect);
 
 private:
+
     Settings settings_;
 
     float time_ = 0.0f;
@@ -121,6 +125,8 @@ private:
 
     gui::Context gui_;
     audio::Master audiomaster_;
+
+    std::optional<fs::ArchiveFetch> assets_fetch_;
 
     std::jthread server_thread_;
     bool run_local_server_ = false;
@@ -133,7 +139,7 @@ private:
     bool connected_ = false;
     bool local_error_ = false;
 
-    assets::Precache precache_;
+    std::optional<assets::Precache> precache_;
 
     gui::Chat chat_;
 

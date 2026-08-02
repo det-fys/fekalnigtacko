@@ -1,0 +1,42 @@
+#pragma once
+
+#include <string>
+#include <cstddef>
+
+namespace fs
+{
+
+enum class ArchiveFetchState
+{
+    NotStarted,
+    InProgress,
+    Completed,
+    Failed
+};
+
+class ArchiveFetch
+{
+public:
+    ArchiveFetch(const std::string& name);
+
+    const std::string& GetName() const { return name_; }
+    ArchiveFetchState GetState() const { return state_; }
+
+    size_t GetTotalSize() const { return total_size_; }
+    size_t GetDownloadedSize() const { return downloaded_size_; }
+    const std::string& GetError() const { return error_; }
+
+private:
+    std::string name_;
+    ArchiveFetchState state_ = ArchiveFetchState::NotStarted;
+
+    size_t total_size_ = 0;
+    size_t downloaded_size_ = 0;
+
+    //std::string content_;
+    std::string error_;
+
+};
+
+
+}

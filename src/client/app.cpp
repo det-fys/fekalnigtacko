@@ -63,7 +63,7 @@ static const std::map<KeyCode, game::PlayerInputType> s_inputmap = {
 
 App::App(const std::string& settings_path)
     : settings_(settings_path), gui_(assets::AssetManager::GetInstance().Get<gui::Font>("comic32")),
-      precache_("data/precache"), chat_(gui_, time_)
+      chat_(gui_, time_)
 {
 	std::cout << "Initializing App..." << std::endl;
     AddChatMessage("fekální gtačko " FEKAL_VERSION);
@@ -136,9 +136,31 @@ void App::Draw(const gfx::DrawContext& ctx)
         return;
 
     // loading screen
-    if (!precache_.IsDone())
+	if (assets_fetch_ && assets_fetch_->GetState() == fs::ArchiveFetchState::InProgress)
+	{
+		auto total_size = assets_fetch_->GetTotalSize();
+		auto downloaded_size = assets_fetch_->GetDownloadedSize();
+
+        std::string message = "získávání " + assets_fetch_->GetName() + ": " + std::to_string(downloaded_size) + " / " +
+                              std::to_string(total_size) + " bajtů";
+
+        int percent = 0;
+		if (total_size > 0)
+		{
+            percent = static_cast<int>(downloaded_size * 100 / total_size);
+		}
+
+        gui::DrawLoadingScreen(gui_, percent, message);
+	}
+    else if (precache_ && !precache_->IsDone())
     {
-        gui::DrawLoadingScreen(gui_, precache_.GetNumLoaded() * 100 / precache_.GetNumItems());
+		int percent = 0;
+		if (precache_->GetNumItems() > 0)
+		{
+			percent = precache_->GetNumLoaded() * 100 / precache_->GetNumItems();
+		}
+
+        gui::DrawLoadingScreen(gui_, percent, "načítání...");
     }
 
     DrawStats();
@@ -510,7 +532,12 @@ void App::EnterState(AppState state)
 	case APP_STATE_INIT:
 		break;
 
+	case APP_STATE_FETCHING_ASSETS:
+        assets_fetch_.emplace("game.tsrp");
+		break;
+
 	case APP_STATE_LOADING:
+        precache_.emplace("data/precache");
 		break;
 
 	case APP_STATE_IDLE:
@@ -563,6 +590,9 @@ void App::EnterState(AppState state)
 		run_local_server_ = false;
 		break;
 
+	case APP_STATE_ERROR:
+		break;
+
 	default:
 		break;
 	}
@@ -573,13 +603,35 @@ AppState App::CheckStateTransition()
 	switch (state_)
 	{
 	case APP_STATE_INIT:
-		return APP_STATE_LOADING;
+        return APP_STATE_FETCHING_ASSETS;
 	
-	case APP_STATE_LOADING:
-		if (precache_.IsDone())
-			return APP_STATE_IDLE;
+	case APP_STATE_FETCHING_ASSETS:
+		// failure
+		if (assets_fetch_->GetState() == fs::ArchiveFetchState::Failed)
+		{
+			std::cerr << "Failed to fetch assets: " << assets_fetch_->GetError() << std::endl;
+            AddChatMessage(COL_ERROR "chyba při získávání assetů: " + assets_fetch_->GetError());
+			assets_fetch_.reset();
+			return APP_STATE_ERROR;
+		}
 
-		precache_.LoadNext();
+		// completed
+		if (assets_fetch_->GetState() == fs::ArchiveFetchState::Completed)
+		{
+			std::cout << "Assets fetched successfully, loading..." << std::endl;
+			assets_fetch_.reset();
+			return APP_STATE_LOADING;
+		}
+
+		return APP_STATE_FETCHING_ASSETS;
+
+	case APP_STATE_LOADING:
+		if (precache_->IsDone())
+		{
+			return APP_STATE_IDLE;
+		}
+
+		precache_->LoadNext();
 
 		return APP_STATE_LOADING;
 
@@ -654,6 +706,9 @@ AppState App::CheckStateTransition()
 			return APP_STATE_IDLE;
 
 		return APP_STATE_DISCONNECTED_LOCAL;
+
+	case APP_STATE_ERROR:
+		return APP_STATE_ERROR;
 
 	default:
 		return state_;

@@ -67,6 +67,7 @@ set(COMMON_SOURCES
     "src/utils/cvars.cpp"
     "src/db/db.cpp"
     "src/db/db_memory.cpp"
+    "src/fs/archive_fetch.cpp"
     "src/fs/fs.cpp"
     "src/fs/zip_archive_kubazip.cpp"
     "src/game/animal.cpp"

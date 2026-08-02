@@ -31,17 +31,21 @@ public:
     std::string ReadFileAsString(const std::string& path);
     std::istringstream ReadFileAsStream(const std::string& path);
     void WriteFile(const std::string& virtual_path, std::string_view content);
+    
+    void AddArchiveFromMemory(const std::string& content);
+
+    static std::string ReadPhysicalFile(const std::string& path);
 
 private:
     FileSystem() = default;
 
     void ScanFiles();
+    void ScanFiles(std::filesystem::path base_path);
     void AddArchiveFile(const std::string& path);
     void AddArchiveMemory(const std::string& content);
     void ScanArchive(std::shared_ptr<ZipArchive> archive);
 
     const FileInfo* GetFileInfo(const std::string& path) const;
-    std::string ReadPhysicalFile(const std::string& path) const;
 
 private:
     std::mutex mtx_;
