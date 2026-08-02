@@ -3,7 +3,6 @@ build-wasm/
 out/
 .vs/
 .vscode/
-/assets/
 .cache/
 .idea/
 *.log
@@ -13,3 +12,7 @@ out/
 *.lnk
 CMakeSettings.json
 todo.txt
+/assets/.*
+/assets/game
+/assets/*.tsrp
+/assets/settings.dat
