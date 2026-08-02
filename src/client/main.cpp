@@ -28,6 +28,7 @@
 #include "utils/sdl_utils.hpp"
 #include "gfx/renderer_gl/gl.hpp"
 #include "version.hpp"
+#include "fs/fs.hpp"
 
 CVAR_CL(uint16_t, cl_maxfps, CV_SAVE, 0);
 
@@ -248,6 +249,8 @@ static void Main() {
 
     InitSDL();
 
+    fs::FileSystem::GetInstance().Init();
+
     try
     {
         gfx::Renderer::Init(s_window);
@@ -312,6 +315,8 @@ void RunMain()
         std::cerr << "[ERROR] " << e.what() << std::endl;
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", e.what(), nullptr);
     }
+
+    s_app.reset();
 }
 
 void SetName(const char* name)

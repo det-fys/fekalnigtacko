@@ -2,6 +2,7 @@
 
 #include "utils/defs.hpp"
 #include <vector>
+#include <string>
 #include <vorbis/vorbisfile.h>
 
 // class OggVorbis_File;
@@ -13,7 +14,7 @@ namespace audio
 class OggFile
 {
 public:
-    OggFile(const char* filename);
+    OggFile(const std::string& path);
     DELETE_COPY_MOVE(OggFile)
 
     size_t GetNumChannels() const;
@@ -29,6 +30,9 @@ private:
     void LoadInfo();
 
 private:
+    std::string content_;
+    size_t content_pos_ = 0;
+
     OggVorbis_File ogg_file_;
     vorbis_info* vorbis_info_ = nullptr;
 };

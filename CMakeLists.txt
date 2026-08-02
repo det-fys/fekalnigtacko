@@ -67,6 +67,8 @@ set(COMMON_SOURCES
     "src/utils/cvars.cpp"
     "src/db/db.cpp"
     "src/db/db_memory.cpp"
+    "src/fs/fs.cpp"
+    "src/fs/zip_archive_kubazip.cpp"
     "src/game/animal.cpp"
     "src/game/character.cpp"
     "src/game/commands.cpp"
@@ -116,6 +118,12 @@ set(RECASTNAVIGATION_DEMO OFF CACHE BOOL "" FORCE)
 set(RECASTNAVIGATION_TESTS OFF CACHE BOOL "" FORCE)
 set(RECASTNAVIGATION_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/recastnavigation)
+
+# Zip
+set(ZIP_ENABLE_INFLATE ON)
+set(ZIP_ENABLE_DEFLATE OFF)
+set(ZIP_HAVE_SYMLINK OFF)
+add_subdirectory(external/zip)
 
 
 # ------------------------------------------------------------------------------
@@ -181,19 +189,26 @@ if(BUILD_CLIENT)
         "src/net/client.cpp"
         "src/net/local_channel.cpp"
         "src/net/server_local.cpp"
-        "src/utils/files.cpp"
         "src/utils/image.cpp"
     )
 
     set(MAIN_NAME "FekalniGtacko")
     add_executable(${MAIN_NAME} ${COMMON_SOURCES} ${CLIENT_ONLY_SOURCES})
     
-    target_include_directories(${MAIN_NAME} PRIVATE "src" "external/stb" "external/bullet3/src" "${CMAKE_BINARY_DIR}/generated")
+    target_include_directories(${MAIN_NAME} PRIVATE 
+        "src"
+        "external/stb"
+        "external/bullet3/src"
+        "${CMAKE_BINARY_DIR}/generated"
+        "external/zip/src"
+    )
+
     target_compile_definitions(${MAIN_NAME} PRIVATE CLIENT)
     target_link_libraries(${MAIN_NAME} PRIVATE 
         glm 
         BulletDynamics BulletCollision LinearMath Bullet3Common 
         RecastNavigation::Recast RecastNavigation::Detour
+        zip
     )
 
     # Client-only external libraries
@@ -296,7 +311,6 @@ if(BUILD_SERVER)
         set(SERVER_ONLY_SOURCES
             "src/net/server_ws_crow.cpp"
             "src/server/main.cpp"
-            "src/utils/files_server.cpp"
         )
 
         set(SERVER_NAME "server")
@@ -309,6 +323,7 @@ if(BUILD_SERVER)
             "external/bullet3/src"
             ${ASIO_INCLUDE_DIR}
             "${CMAKE_BINARY_DIR}/generated"
+            "external/zip/src"
         )
         target_compile_definitions(${SERVER_NAME} PRIVATE SERVER)
         
@@ -320,6 +335,7 @@ if(BUILD_SERVER)
             glm 
             BulletDynamics BulletCollision LinearMath Bullet3Common 
             RecastNavigation::Recast RecastNavigation::Detour
+            zip
         )
     endif()
 endif()

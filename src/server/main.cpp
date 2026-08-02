@@ -7,6 +7,7 @@
 #include "net/server_ws_crow.hpp"
 #include "db/db_memory.hpp"
 #include "version.hpp"
+#include "utils/files.hpp"
 
 CVAR(uint16_t, sv_port, CV_CONST, 11200);
 
@@ -14,8 +15,9 @@ int main()
 {
     std::cout << "Starting server " FEKAL_VERSION << std::endl;
 
+    fs::FileSystem::GetInstance().Init();
     srand(time(NULL));
-    
+
     try
     {
         sv::LoadCfg("server.cfg");
