@@ -220,12 +220,10 @@ if(BUILD_CLIENT)
     # Dawn setup
     set(DAWN_FETCH_DEPENDENCIES ON)
     set(DAWN_ENABLE_D3D11 OFF)
-    set(DAWN_ENABLE_D3D12 ON)
     set(DAWN_ENABLE_METAL OFF)
     set(DAWN_ENABLE_NULL OFF)
     set(DAWN_ENABLE_DESKTOP_GL OFF)
     set(DAWN_ENABLE_OPENGLES OFF)
-    set(DAWN_ENABLE_VULKAN ON)
     set(TINT_BUILD_SPV_READER OFF)
     set(DAWN_BUILD_SAMPLES OFF)
     set(DAWN_USE_GLFW OFF)
@@ -241,6 +239,15 @@ if(BUILD_CLIENT)
     set(TINT_BUILD_BENCHMARKS OFF)
     set(TINT_BUILD_AS_OTHER_OS OFF)
     set(TINT_BUILD_REMOTE_COMPILE OFF)
+    
+    if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+        set(DAWN_ENABLE_D3D12 OFF)
+        set(DAWN_ENABLE_VULKAN OFF)
+    else()
+        set(DAWN_ENABLE_D3D12 ON)
+        set(DAWN_ENABLE_VULKAN ON)
+    endif()
+
     add_subdirectory(external/dawn EXCLUDE_FROM_ALL)
 
     # Emscripten vs Native Client Logic
