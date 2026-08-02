@@ -315,8 +315,6 @@ void RunMain()
         std::cerr << "[ERROR] " << e.what() << std::endl;
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", e.what(), nullptr);
     }
-
-    s_app.reset();
 }
 
 void SetName(const char* name)
