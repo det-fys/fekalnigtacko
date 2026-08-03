@@ -1,19 +1,16 @@
-name: Build Server
+name: Build Project
 
 on:
   push:
     tags:
       - 'v*'
   pull_request:
-
+  workflow_dispatch:
+  
 jobs:
-  build-server:
+  build-server-linux:
     name: Build Dedicated Server (Ubuntu 22.04)
     runs-on: ubuntu-22.04
-
-    permissions:
-      contents: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,19 +27,83 @@ jobs:
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON
 
       - name: Build Server Binary
-        # Using -j $(nproc) speeds up the build by running jobs in parallel
         run: cmake --build build --config Release --target server -j $(nproc)
 
       - name: Upload Server Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: fekalnigtacko-server-ubuntu22.04-x86_64
+          name: fekalnigtacko-server-linux-x86_64
           path: build/server
           if-no-files-found: error
 
+  build-client-web:
+    name: Build Web Client (Emscripten)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential cmake python3 git ca-certificates
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+
+      - name: Configure CMake
+        run: emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF
+
+      - name: Build Web Client
+        run: cmake --build build --config Release --target FekalniGtacko -j $(nproc)
+
+      - name: Prepare Web Artifacts
+        run: |
+          mkdir -p dist
+          # Move the 4 required files into a clean directory for upload
+          # (Note: If your CMake outputs to a bin/ folder, change 'build/' to 'build/bin/')
+          cp build/FekalniGtacko.html dist/
+          cp build/FekalniGtacko.js dist/
+          cp build/FekalniGtacko.wasm dist/
+          cp build/FekalniGtacko.data dist/
+
+      - name: Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fekalnigtacko-client-web
+          path: dist/*
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-22.04
+    needs: [build-server-linux, build-client-web] 
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write # Required to create the release
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Prepare Release Assets
+        run: |
+          mv fekalnigtacko-server-linux-x86_64/server ./fekalnigtacko-server-linux-x86_64
+          chmod +x ./fekalnigtacko-server-linux-x86_64
+          
+          cd fekalnigtacko-client-web
+          zip -r ../fekalnigtacko-client-web.zip ./*
+          cd ..
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: build/server
-          generate_release_notes: true # Automatically summarizes PRs/commits in the release notes
+          files: |
+            fekalnigtacko-server-linux-x86_64
+            fekalnigtacko-client-web.zip
+          generate_release_notes: true
