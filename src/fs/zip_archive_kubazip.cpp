@@ -1,6 +1,7 @@
 #include "zip_archive_kubazip.hpp"
 
 #include <stdexcept>
+#include <cstring>
 
 #include <zip.h>
 
