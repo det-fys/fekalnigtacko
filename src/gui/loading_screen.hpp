@@ -6,5 +6,6 @@ namespace gui
 {
 
 void DrawLoadingScreen(Context& ctx, int percent);
+void DrawLoadingScreen(Context& ctx, int percent, std::string_view message);
 
 }

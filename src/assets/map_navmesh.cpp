@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <cstring>
 
 #include <DetourNavMeshBuilder.h>
 
@@ -19,17 +20,22 @@ static glm::vec3 PointFromRc(const glm::vec3& p)
 }
 
 template <typename T>
-static void WriteBinary(std::ofstream& stream, const T& value)
+static void WriteBinary(std::string& data, const T& value)
 {
-    stream.write(reinterpret_cast<const char*>(&value), sizeof(T));
+    data.resize(data.size() + sizeof(T));
+    std::memcpy(data.data() + data.size() - sizeof(T), &value, sizeof(T));
 }
 
 template <typename T>
-static bool ReadBinary(std::ifstream& stream, T& value)
+static bool ReadBinary(std::string_view& data, T& value)
 {
-    stream.read(reinterpret_cast<char*>(&value), sizeof(T));
-    return stream.good();
+    if (sizeof(T) > data.size())
+        return false;
+    std::memcpy(&value, data.data(), sizeof(T));
+    data = data.substr(sizeof(T));
+    return true;
 }
+
 
 namespace
 {
@@ -211,7 +217,7 @@ void assets::MapNavMesh::Build()
 {
     std::cout << "Building navmesh: " << save_name_ << std::endl;
 
-    std::ofstream save_stream(save_name_, std::ios::binary);
+    std::string save_data;
 
     auto& map_aabb = map_->GetAABB();
 
@@ -228,8 +234,8 @@ void assets::MapNavMesh::Build()
     int num_tiles_x = (grid_width + tile_size_cells - 1) / tile_size_cells;
     int num_tiles_y = (grid_height + tile_size_cells - 1) / tile_size_cells;
 
-    WriteBinary(save_stream, num_tiles_x);
-    WriteBinary(save_stream, num_tiles_y);
+    WriteBinary(save_data, num_tiles_x);
+    WriteBinary(save_data, num_tiles_y);
 
     for (int y = 0; y < num_tiles_y; ++y)
     {
@@ -241,23 +247,26 @@ void assets::MapNavMesh::Build()
             }
             auto tile_data = BuildTile(x, y);
 
-            WriteBinary(save_stream, static_cast<uint32_t>(tile_data.size()));
+            WriteBinary(save_data, static_cast<uint32_t>(tile_data.size()));
             if (!tile_data.empty())
             {
-                save_stream.write(reinterpret_cast<const char*>(tile_data.data()), tile_data.size());
+                save_data.insert(save_data.end(), tile_data.begin(), tile_data.end());
             }
         }
     }
+
+    fs::WriteFile(save_name_, save_data);
 }
 
 void assets::MapNavMesh::Load()
 {
-    std::ifstream load_stream(save_name_, std::ios::binary);
-
+    std::string load_data_str = fs::ReadFileAsString(save_name_);
+    std::string_view load_data(load_data_str);
+    
     int num_tiles_x = 0;
     int num_tiles_y = 0;
 
-    if (!ReadBinary(load_stream, num_tiles_x) || !ReadBinary(load_stream, num_tiles_y))
+    if (!ReadBinary(load_data, num_tiles_x) || !ReadBinary(load_data, num_tiles_y))
     {
         throw std::runtime_error("Failed to read navmesh tile count");
     }
@@ -292,7 +301,7 @@ void assets::MapNavMesh::Load()
         for (int x = 0; x < num_tiles_x; ++x)
         {
             uint32_t tile_data_size = 0;
-            if (!ReadBinary(load_stream, tile_data_size))
+            if (!ReadBinary(load_data, tile_data_size))
             {
                 dtFreeNavMesh(navmesh_);
                 navmesh_ = nullptr;
@@ -304,16 +313,17 @@ void assets::MapNavMesh::Load()
                 continue;
             }
 
-            auto tile_data_raw = reinterpret_cast<uint8_t*>(dtAlloc(tile_data_size, DT_ALLOC_PERM));
-            load_stream.read(reinterpret_cast<char*>(tile_data_raw), tile_data_size);
-            if (!load_stream.good())
+            if (load_data.size() < tile_data_size)
             {
-                dtFree(tile_data_raw);
                 dtFreeNavMesh(navmesh_);
                 navmesh_ = nullptr;
-                throw std::runtime_error("Failed to read navmesh tile data");
+                throw std::runtime_error("Insufficient data for navmesh tile");
             }
-            
+
+            auto tile_data_raw = reinterpret_cast<uint8_t*>(dtAlloc(tile_data_size, DT_ALLOC_PERM));
+            std::memcpy(tile_data_raw, load_data.data(), tile_data_size);
+            load_data.remove_prefix(tile_data_size);
+
             dtTileRef tile_ref = 0;
             auto status =
                 navmesh_->addTile(tile_data_raw, static_cast<int>(tile_data_size), DT_TILE_FREE_DATA, 0, &tile_ref);

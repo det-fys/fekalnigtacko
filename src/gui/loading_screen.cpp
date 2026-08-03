@@ -4,6 +4,11 @@
 
 void gui::DrawLoadingScreen(Context& ctx, int percent)
 {
+    DrawLoadingScreen(ctx, percent, {});
+}
+
+void gui::DrawLoadingScreen(Context& ctx, int percent, std::string_view message)
+{
     float margin = 50.0f;
     glm::vec2 size(400.0f, 15.0f);
     glm::vec2 pos(margin, ctx.GetViewportSize().y - margin - size.y);
@@ -15,4 +20,9 @@ void gui::DrawLoadingScreen(Context& ctx, int percent)
 
     std::string load_text = std::to_string(percent) + "%";
     ctx.DrawTextAligned(load_text, pos + glm::vec2(size.x + 50.0f, size.y * 0.5f), glm::vec2(-0.5f, -0.5f));
+
+    if (!message.empty())
+    {
+        ctx.DrawText(message, pos + glm::vec2(0.0f, -40.0f));
+    }
 }

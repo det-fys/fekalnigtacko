@@ -28,6 +28,7 @@
 #include "utils/sdl_utils.hpp"
 #include "gfx/renderer_gl/gl.hpp"
 #include "version.hpp"
+#include "fs/fs.hpp"
 
 CVAR_CL(uint16_t, cl_maxfps, CV_SAVE, 0);
 
@@ -247,6 +248,8 @@ static void Main() {
         s_url = WS_URL;
 
     InitSDL();
+
+    fs::FileSystem::GetInstance().Init();
 
     try
     {

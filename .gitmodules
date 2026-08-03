@@ -31,3 +31,6 @@
 [submodule "external/recastnavigation"]
 	path = external/recastnavigation
 	url = https://github.com/recastnavigation/recastnavigation.git
+[submodule "external/zip"]
+	path = external/zip
+	url = https://github.com/kuba--/zip

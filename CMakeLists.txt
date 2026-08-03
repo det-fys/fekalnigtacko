@@ -67,6 +67,9 @@ set(COMMON_SOURCES
     "src/utils/cvars.cpp"
     "src/db/db.cpp"
     "src/db/db_memory.cpp"
+    "src/fs/archive_fetch.cpp"
+    "src/fs/fs.cpp"
+    "src/fs/zip_archive_kubazip.cpp"
     "src/game/animal.cpp"
     "src/game/character.cpp"
     "src/game/commands.cpp"
@@ -116,6 +119,12 @@ set(RECASTNAVIGATION_DEMO OFF CACHE BOOL "" FORCE)
 set(RECASTNAVIGATION_TESTS OFF CACHE BOOL "" FORCE)
 set(RECASTNAVIGATION_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/recastnavigation)
+
+# Zip
+set(ZIP_ENABLE_INFLATE ON)
+set(ZIP_ENABLE_DEFLATE OFF)
+set(ZIP_HAVE_SYMLINK OFF)
+add_subdirectory(external/zip)
 
 
 # ------------------------------------------------------------------------------
@@ -181,19 +190,26 @@ if(BUILD_CLIENT)
         "src/net/client.cpp"
         "src/net/local_channel.cpp"
         "src/net/server_local.cpp"
-        "src/utils/files.cpp"
         "src/utils/image.cpp"
     )
 
     set(MAIN_NAME "FekalniGtacko")
     add_executable(${MAIN_NAME} ${COMMON_SOURCES} ${CLIENT_ONLY_SOURCES})
     
-    target_include_directories(${MAIN_NAME} PRIVATE "src" "external/stb" "external/bullet3/src" "${CMAKE_BINARY_DIR}/generated")
+    target_include_directories(${MAIN_NAME} PRIVATE 
+        "src"
+        "external/stb"
+        "external/bullet3/src"
+        "${CMAKE_BINARY_DIR}/generated"
+        "external/zip/src"
+    )
+
     target_compile_definitions(${MAIN_NAME} PRIVATE CLIENT)
     target_link_libraries(${MAIN_NAME} PRIVATE 
         glm 
         BulletDynamics BulletCollision LinearMath Bullet3Common 
         RecastNavigation::Recast RecastNavigation::Detour
+        zip
     )
 
     # Client-only external libraries
@@ -204,12 +220,10 @@ if(BUILD_CLIENT)
     # Dawn setup
     set(DAWN_FETCH_DEPENDENCIES ON)
     set(DAWN_ENABLE_D3D11 OFF)
-    set(DAWN_ENABLE_D3D12 ON)
     set(DAWN_ENABLE_METAL OFF)
     set(DAWN_ENABLE_NULL OFF)
     set(DAWN_ENABLE_DESKTOP_GL OFF)
     set(DAWN_ENABLE_OPENGLES OFF)
-    set(DAWN_ENABLE_VULKAN ON)
     set(TINT_BUILD_SPV_READER OFF)
     set(DAWN_BUILD_SAMPLES OFF)
     set(DAWN_USE_GLFW OFF)
@@ -225,6 +239,15 @@ if(BUILD_CLIENT)
     set(TINT_BUILD_BENCHMARKS OFF)
     set(TINT_BUILD_AS_OTHER_OS OFF)
     set(TINT_BUILD_REMOTE_COMPILE OFF)
+    
+    if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+        set(DAWN_ENABLE_D3D12 OFF)
+        set(DAWN_ENABLE_VULKAN OFF)
+    else()
+        set(DAWN_ENABLE_D3D12 ON)
+        set(DAWN_ENABLE_VULKAN ON)
+    endif()
+
     add_subdirectory(external/dawn EXCLUDE_FROM_ALL)
 
     # Emscripten vs Native Client Logic
@@ -242,6 +265,7 @@ if(BUILD_CLIENT)
             "-sUSE_SDL=2"
             "-sASYNCIFY"
             "-sUSE_WEBGL2=1"
+            "-sFETCH"
             "-sNO_DISABLE_EXCEPTION_CATCHING=1"
             "-sALLOW_MEMORY_GROWTH=1"
             "-sGROWABLE_ARRAYBUFFERS=0"
@@ -296,7 +320,6 @@ if(BUILD_SERVER)
         set(SERVER_ONLY_SOURCES
             "src/net/server_ws_crow.cpp"
             "src/server/main.cpp"
-            "src/utils/files_server.cpp"
         )
 
         set(SERVER_NAME "server")
@@ -309,6 +332,7 @@ if(BUILD_SERVER)
             "external/bullet3/src"
             ${ASIO_INCLUDE_DIR}
             "${CMAKE_BINARY_DIR}/generated"
+            "external/zip/src"
         )
         target_compile_definitions(${SERVER_NAME} PRIVATE SERVER)
         
@@ -320,6 +344,7 @@ if(BUILD_SERVER)
             glm 
             BulletDynamics BulletCollision LinearMath Bullet3Common 
             RecastNavigation::Recast RecastNavigation::Detour
+            zip
         )
     endif()
 endif()

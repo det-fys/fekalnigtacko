@@ -2,13 +2,68 @@
 
 #include <stdexcept>
 
-audio::OggFile::OggFile(const char* filename)
+#include "utils/files.hpp"
+
+audio::OggFile::OggFile(const std::string& path)
 {
-    int result = ov_fopen(filename, &ogg_file_);
+    content_ = fs::ReadFileAsString(path);
+    
+    ov_callbacks callbacks{};
+    callbacks.seek_func = [](void* datasource, ogg_int64_t offset, int whence) -> int {
+        OggFile* ogg_file = static_cast<OggFile*>(datasource);
+
+        if (whence == SEEK_SET)
+        {
+            ogg_file->content_pos_ = static_cast<size_t>(offset);
+        }
+        else if (whence == SEEK_CUR)
+        {
+            ogg_file->content_pos_ += static_cast<size_t>(offset);
+        }
+        else if (whence == SEEK_END)
+        {
+            ogg_file->content_pos_ = ogg_file->content_.size() + static_cast<size_t>(offset);
+        }
+        else
+        {
+            return -1; // Invalid whence
+        }
+
+        if (ogg_file->content_pos_ > ogg_file->content_.size())
+        {
+            return -1; // Seeking beyond the end of the content
+        }
+
+        return 0; // Success
+    };
+
+    callbacks.tell_func = [](void* datasource) -> long {
+        OggFile* ogg_file = static_cast<OggFile*>(datasource);
+        return static_cast<long>(ogg_file->content_pos_);
+    };
+
+    callbacks.read_func = [](void* ptr, size_t size, size_t nmemb, void* datasource) -> size_t {
+        OggFile* ogg_file = static_cast<OggFile*>(datasource);
+        size_t bytes_to_read = size * nmemb;
+        if (ogg_file->content_pos_ + bytes_to_read > ogg_file->content_.size())
+        {
+            bytes_to_read = ogg_file->content_.size() - ogg_file->content_pos_;
+        }
+        std::memcpy(ptr, ogg_file->content_.data() + ogg_file->content_pos_, bytes_to_read);
+        ogg_file->content_pos_ += bytes_to_read;
+        return bytes_to_read / size; // Return the number of elements read
+    };
+
+    callbacks.close_func = [](void* datasource) -> int {
+        // No action needed for in-memory data
+        return 0;
+    };
+
+    int result = ov_open_callbacks(this, &ogg_file_, nullptr, 0, callbacks);
 
     if (result < 0)
     {
-        throw std::runtime_error("(OGG) Failed to open OGG file: " + std::string(filename));
+        throw std::runtime_error("(OGG) Failed to open OGG file: " + std::string(path));
     }
 
     try
