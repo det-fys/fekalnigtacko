@@ -11,6 +11,7 @@
 #include "material_desc.hpp"
 #include "skeleton_pose_desc.hpp"
 #include "deform_texture_desc.hpp"
+#include "viewport_desc.hpp"
 
 #include "camera.hpp"
 
@@ -45,6 +46,12 @@ public:
     virtual DeformTextureID CreateDeformTexture(const DeformTextureDescriptor& desc) = 0;
     virtual void SetDeformTextureData(DeformTextureID deform_id, std::span<const glm::i8vec3> data) = 0;
     virtual void ReleaseDeformTexture(DeformTextureID deform_id) = 0;
+
+    virtual ViewportID CreateViewport() = 0;
+    virtual void DrawViewport(ViewportID viewport_id, Scene& scene, const CameraParams& camera,
+                              const glm::u32vec2& size) = 0;
+    virtual ViewportTextureHandle GetViewportNativeHandle(ViewportID viewport_id) = 0;
+    virtual void ReleaseViewport(ViewportID viewport_id) = 0;
 
     virtual void Draw(Scene& scene, const CameraParams& camera) = 0;
     

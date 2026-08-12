@@ -23,6 +23,7 @@
 #include "material_gl.hpp"
 #include "skeleton_pose_gl.hpp"
 #include "deform_texture_gl.hpp"
+#include "viewport_gl.hpp"
 #include "shader_defs.hpp"
 #include "../scene.hpp"
 
@@ -66,6 +67,12 @@ public:
     virtual void SetDeformTextureData(DeformTextureID deform_id, std::span<const glm::i8vec3> data) override;
     virtual void ReleaseDeformTexture(DeformTextureID deform_id) override;
 
+    virtual ViewportID CreateViewport() override;
+    virtual void DrawViewport(ViewportID viewport_id, Scene& scene, const CameraParams& camera,
+                              const glm::u32vec2& size) override;
+    virtual ViewportTextureHandle GetViewportNativeHandle(ViewportID viewport_id) override;
+    virtual void ReleaseViewport(ViewportID viewport_id) override;
+
     virtual void Draw(Scene& scene, const CameraParams& camera) override;
 
     void SetGuiRenderCallback(std::function<void()> callback)
@@ -88,6 +95,8 @@ private:
     void SetupSurfaceShader(SurfaceShader& sshader, const DrawInfo& info);
     void InvalidateSurfaceShader(SurfaceShader& sshader);
 
+    void Render(Scene& scene, const CameraParams& camera, const glm::u32vec2& size, bool is_main_viewport);
+
     void CreateLightGrid(std::span<DrawLightCmd> light_cmds, const DrawInfo& info);
     void AddLightToGrid(const LightData& light, LightGrid& grid, float cell_size);
 
@@ -105,6 +114,7 @@ private:
     ResourceArray<MaterialGL> materials_;
     ResourceArray<SkeletonPoseGL> poses_;
     ResourceArray<DeformTextureGL> deform_textures_;
+    ResourceArray<ViewportGL> viewports_;
 
     bool loaded_ = false;
 

@@ -152,53 +152,45 @@ void gfx::RendererGL::ReleaseDeformTexture(DeformTextureID deform_id)
     deform_textures_.Free(deform_id);
 }
 
-void gfx::RendererGL::Draw(Scene& scene, const CameraParams& camera)
+gfx::ViewportID gfx::RendererGL::CreateViewport()
 {
-    Load();
+    auto id = viewports_.Alloc();
+    return id;
+}
 
-    auto viewport_size = GetViewportSize();
+void gfx::RendererGL::DrawViewport(ViewportID viewport_id, Scene& scene, const CameraParams& camera,
+                                   const glm::u32vec2& size)
+{
+    auto& viewport = viewports_.Get(viewport_id);
+    viewport.Setup(size.x, size.y);
 
-    // compute matrices
-    float aspect = static_cast<float>(viewport_size.x) / static_cast<float>(viewport_size.y);
-
-    const float farplane = 3000.0f;
-
-    auto proj = glm::perspective(glm::radians(camera.fov * 0.5f), aspect, 0.1f, farplane);
-    auto view = glm::lookAt(camera.eye, camera.eye + camera.dir, glm::vec3(0.0f, 0.0f, 1.0f));
-
-    float min_distance = 0.0f;
-    float max_distance = 500.0f;
-
-    // capture scene
-    dlist_.Clear();
-    DrawContext draw_ctx{dlist_, DRAW_PASS_MAIN, camera.eye, view, proj, min_distance, max_distance, viewport_size};
-    scene.Draw(draw_ctx);
-
-    DrawInfo info{draw_ctx};
-    info.env = scene.GetSceneEnvironment();
-
-    current_shader_ = nullptr;
-    glViewport(0, 0, viewport_size.x, viewport_size.y);
-    glClearColor(info.env.clear_color.r, info.env.clear_color.g, info.env.clear_color.b, 1.0f);
-    glDepthMask(GL_TRUE);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    auto& list = dlist_;
-
-    light_grid_chunks_size_ = glm::max(scene.GetMapChunkSize(), 50.0f); // this causes lags if too small so clamp at 50 min
-    CreateLightGrid(list.lights, info);
-
-    DrawSurfaceList(list.surfaces, info);
-    DrawBeamList(list.beams, info);
-    DrawCoronaList(list.coronas, info);
-
-    // external GUI
-    if (gui_render_callback_)
+    if (size.x == 0 || size.y == 0)
     {
-        gui_render_callback_();
+        return;
     }
 
-    DrawHudList(list.huds, info);
+    glBindFramebuffer(GL_FRAMEBUFFER, viewport.GetFramebufferID());
+    Render(scene, camera, size, false);
+    //glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+gfx::ViewportTextureHandle gfx::RendererGL::GetViewportNativeHandle(ViewportID viewport_id)
+{
+    return reinterpret_cast<gfx::ViewportTextureHandle>(viewports_.Get(viewport_id).GetColorTextureID());
+}
+
+void gfx::RendererGL::ReleaseViewport(ViewportID viewport_id)
+{
+    viewports_.Free(viewport_id);
+}
+
+void gfx::RendererGL::Draw(Scene& scene, const CameraParams& camera)
+{
+    // render main viewport
+    auto viewport_size = GetViewportSize();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    Render(scene, camera, viewport_size, true);
 }
 
 gfx::RendererGL::~RendererGL()
@@ -365,6 +357,56 @@ void gfx::RendererGL::InvalidateSurfaceShader(SurfaceShader& sshader)
 {
     sshader.global_setup = false;
     sshader.color = nullptr;
+}
+
+void gfx::RendererGL::Render(Scene& scene, const CameraParams& camera, const glm::u32vec2& viewport_size,
+                             bool is_main_viewport)
+{
+    Load();
+
+    // compute matrices
+    float aspect = static_cast<float>(viewport_size.x) / static_cast<float>(viewport_size.y);
+
+    const float farplane = 3000.0f;
+
+    auto proj = glm::perspective(glm::radians(camera.fov * 0.5f), aspect, 0.1f, farplane);
+    auto view = glm::lookAt(camera.eye, camera.eye + camera.dir, glm::vec3(0.0f, 0.0f, 1.0f));
+
+    float min_distance = 0.0f;
+    float max_distance = 500.0f;
+
+    // capture scene
+    dlist_.Clear();
+    DrawContext draw_ctx{dlist_, DRAW_PASS_MAIN, camera.eye, view, proj, min_distance, max_distance, viewport_size};
+    scene.Draw(draw_ctx);
+
+    DrawInfo info{draw_ctx};
+    info.env = scene.GetSceneEnvironment();
+
+    current_shader_ = nullptr;
+    glViewport(0, 0, viewport_size.x, viewport_size.y);
+    glClearColor(info.env.clear_color.r, info.env.clear_color.g, info.env.clear_color.b, 1.0f);
+    glDepthMask(GL_TRUE);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    auto& list = dlist_;
+
+    light_grid_chunks_size_ =
+        glm::max(scene.GetMapChunkSize(), 50.0f); // this causes lags if too small so clamp at 50 min
+    CreateLightGrid(list.lights, info);
+
+    DrawSurfaceList(list.surfaces, info);
+    DrawBeamList(list.beams, info);
+    DrawCoronaList(list.coronas, info);
+
+    // external GUI
+    if (is_main_viewport && gui_render_callback_)
+    {
+        gui_render_callback_();
+    }
+
+    DrawHudList(list.huds, info);
+
 }
 
 void gfx::RendererGL::CreateLightGrid(std::span<DrawLightCmd> light_cmds, const DrawInfo& info)

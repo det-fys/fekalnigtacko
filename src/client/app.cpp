@@ -242,6 +242,12 @@ bool App::KeyInput(KeyCode key, bool pressed, size_t repeat)
 			return true;
 		}
 
+		if (key == KEY_F9)
+		{
+            SwitchAdvancedMode();
+            return true;
+		}
+
 		// TODO: menu controls here
 	}
 
@@ -300,19 +306,87 @@ void App::Update()
 	
 	settings_.TrySave(time_);
 
+	ShowAdvancedMode();
+}
+
+void App::ShowAdvancedMode()
+{
+	if (!advanced_)
+	{
+        return;
+	}
+
+    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+
 	ImGui::ShowDemoWindow();
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    bool show =
+        ImGui::Begin("App Viewport", nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    ImGui::PopStyleVar();
+
+	if (show)
+	{
+        auto canvas_p0 = ImGui::GetCursorScreenPos();
+        auto canvas_sz = ImGui::GetContentRegionAvail();
+
+        glm::u32vec2 size(canvas_sz.x, canvas_sz.y);
+        advanced_->app_viewport.Draw(*this, GetCameraParams(), size);
+
+		auto native_handle = advanced_->app_viewport.GetNativeHandle();
+		if (native_handle)
+		{
+			ImGui::Image(reinterpret_cast<ImTextureID>(native_handle), ImVec2(size.x, size.y), ImVec2(0, 1), ImVec2(1, 0));
+		}
+
+	}
+    ImGui::End();
+
 }
 
 void App::Draw()
 {
-    gfx::CameraParams cam{};
-	if (session_)
+	// in advanced mode app is drawn to a custom viewport
+	if (!advanced_)
+    {
+        gfx::Renderer::GetInstance().Draw(*this, GetCameraParams());
+    }
+	else
 	{
-        cam = session_->GetCameraParams();
+        struct DummyScene : public gfx::Scene
+        {
+            virtual void Draw(const gfx::DrawContext& ctx) override {}
+            virtual gfx::Environment GetSceneEnvironment() override { return {}; }
+            virtual float GetMapChunkSize() override { return 100.0f; }
+        };
+
+		DummyScene scene{};
+		gfx::Renderer::GetInstance().Draw(scene, {});
 	}
 
-	gfx::Renderer::GetInstance().Draw(*this, cam);
 	++stat_frames_;
+}
+
+gfx::CameraParams App::GetCameraParams() const
+{
+    if (session_)
+    {
+        return session_->GetCameraParams();
+    }
+
+	return {};
+}
+
+void App::SwitchAdvancedMode()
+{
+    if (!advanced_)
+    {
+        advanced_.emplace();
+    }
+    else
+    {
+        advanced_.reset();
+    }
 }
 
 static void AddSlider(gui::Menu& menu, std::string text, int& value, int min, int max, std::function<void()> changed)
@@ -853,3 +927,4 @@ void App::ProcessConnectOrDisconnectCmd(CmdLineStream& line, bool connect)
 	connect_ = connect;
     AddChatMessage(COL_SUCCESS "ok");
 }
+

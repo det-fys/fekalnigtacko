@@ -228,6 +228,12 @@ public:
     virtual void SetDeformTextureData(DeformTextureID deform_id, std::span<const glm::i8vec3> data) override;
     virtual void ReleaseDeformTexture(DeformTextureID deform_id) override;
 
+    virtual ViewportID CreateViewport() override;
+    virtual void DrawViewport(ViewportID viewport_id, Scene& scene, const CameraParams& camera,
+                              const glm::u32vec2& size) override;
+    virtual ViewportTextureHandle GetViewportNativeHandle(ViewportID viewport_id) override;
+    virtual void ReleaseViewport(ViewportID viewport_id) override;
+
     virtual void Draw(Scene& scene, const CameraParams& camera) override;
 
     wgpu::Device GetDevice() const { return device_; }

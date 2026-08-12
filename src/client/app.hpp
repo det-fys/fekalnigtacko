@@ -20,6 +20,7 @@
 #include "utils/keys.hpp"
 #include "utils/cmdlinestream.hpp"
 #include "gfx/scene.hpp"
+#include "gfx/viewport.hpp"
 #include "fs/archive_fetch.hpp"
 
 struct ChatMessage
@@ -44,6 +45,11 @@ enum AppState
     APP_STATE_DISCONNECT_LOCAL,
     APP_STATE_DISCONNECTED_LOCAL,
     APP_STATE_ERROR,
+};
+
+struct AppAdvancedMode
+{
+    gfx::Viewport app_viewport;
 };
 
 class App : public net::ClientInterfaceCallback, public gfx::Scene
@@ -88,7 +94,10 @@ public:
 
 private:
     void Update();
+    void ShowAdvancedMode();
     void Draw();
+    gfx::CameraParams GetCameraParams() const;
+    void SwitchAdvancedMode();
 
     void OpenSettings();
     void UpdateVolume();
@@ -165,4 +174,7 @@ private:
     size_t stat_msglen_max_ = 0;
     std::string fps_text_ = { 0 };
     std::string msglen_text_ = { 0 };
+
+    // advanced mode
+    std::optional<AppAdvancedMode> advanced_;
 };

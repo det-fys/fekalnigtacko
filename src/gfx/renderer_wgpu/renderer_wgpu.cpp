@@ -409,6 +409,28 @@ void gfx::RendererWGPU::ReleaseDeformTexture(DeformTextureID deform_id)
     deforms_.Free(deform_id);
 }
 
+gfx::ViewportID gfx::RendererWGPU::CreateViewport()
+{
+    return 0; // TODO
+}
+
+void gfx::RendererWGPU::DrawViewport(ViewportID viewport_id, Scene& scene, const CameraParams& camera,
+                                     const glm::u32vec2& size)
+{
+    // TODO
+}
+
+gfx::ViewportTextureHandle gfx::RendererWGPU::GetViewportNativeHandle(ViewportID viewport_id)
+{
+    // TODO
+    return nullptr;
+}
+
+void gfx::RendererWGPU::ReleaseViewport(ViewportID viewport_id)
+{
+    // TODO
+}
+
 void gfx::RendererWGPU::Draw(Scene& scene, const CameraParams& camera)
 {
 #if !defined(__EMSCRIPTEN__)
