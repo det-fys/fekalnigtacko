@@ -9,13 +9,14 @@
 #include "gfx/renderer.hpp"
 #include "gfx/renderer_wgpu/renderer_wgpu.hpp"
 #include "gfx/renderer_gl/renderer_gl.hpp"
+#include "gfx/renderer_gl/shader_common.hpp"
 
 static bool using_wgpu = false;
 static bool need_mouse = false;
 
 static void InitForGL(gfx::RendererGL& renderer)
 {
-    ImGui_ImplOpenGL3_Init("#version 330");
+    ImGui_ImplOpenGL3_Init(GLSL_VERSION);
 
     renderer.SetGuiRenderCallback([]() {
         ImGui::Render();
