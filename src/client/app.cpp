@@ -21,6 +21,8 @@
 
 #include "net/client_ws.hpp"
 
+#include <imgui.h>
+
 CVAR_CL(float, sensitivity, CV_SAVE, 0.5f);
 CVAR_CL(float, volume, CV_SAVE, 0.2f, 0.0f);
 
@@ -58,7 +60,7 @@ static const std::map<KeyCode, game::PlayerInputType> s_inputmap = {
     { KEY_F3, game::IN_DEBUG1 },
     { KEY_F4, game::IN_DEBUG2 },
     { KEY_F5, game::IN_DEBUG3 },
-    { KEY_TAB, game::IN_MENU },
+    { KEY_F2, game::IN_MENU },
 };
 
 App::App(const std::string& settings_path)
@@ -297,6 +299,8 @@ void App::Update()
 	chat_.Update();
 	
 	settings_.TrySave(time_);
+
+	ImGui::ShowDemoWindow();
 }
 
 void App::Draw()

@@ -3261,6 +3261,15 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
             EncodeFXAA(pass, main_ctx);
         }
 
+        // render external GUI if any
+        if (gui_render_callback_)
+        {
+            gui_render_callback_(pass);
+
+            // reset the pass state
+            pass.SetScissorRect(0, 0, viewport_size.x, viewport_size.y);
+        }
+
         // hud
         EncodeHudCmds(pass, main_dlist_.huds, main_ctx);
 

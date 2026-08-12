@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <webgpu/webgpu_cpp.h>
 
 #include "../renderer.hpp"
@@ -228,6 +230,14 @@ public:
 
     virtual void Draw(Scene& scene, const CameraParams& camera) override;
 
+    wgpu::Device GetDevice() const { return device_; }
+    wgpu::TextureFormat GetSurfaceFormat() const { return surface_format_; }
+
+    void SetGuiRenderCallback(std::function<void(wgpu::RenderPassEncoder&)> callback)
+    {
+        gui_render_callback_ = std::move(callback);
+    }
+
     virtual ~RendererWGPU();
 
 private:
@@ -438,6 +448,9 @@ private:
 
     // settings
     uint32_t msaa_samples_ = 1;
+
+    // hook for GUI rendering
+    std::function<void(wgpu::RenderPassEncoder&)> gui_render_callback_;
 };
 
 } // namespace gfx

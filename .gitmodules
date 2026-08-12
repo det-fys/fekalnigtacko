@@ -34,3 +34,7 @@
 [submodule "external/zip"]
 	path = external/zip
 	url = https://github.com/kuba--/zip
+[submodule "external/imgui"]
+	path = external/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = docking

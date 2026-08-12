@@ -16,3 +16,4 @@ todo.txt
 /assets/game
 /assets/*.tsrp
 /assets/settings.dat
+imgui.ini

@@ -2,6 +2,7 @@
 
 #include <map>
 #include <memory>
+#include <functional>
 
 #include <SDL.h>
 
@@ -67,6 +68,11 @@ public:
 
     virtual void Draw(Scene& scene, const CameraParams& camera) override;
 
+    void SetGuiRenderCallback(std::function<void()> callback)
+    {
+        gui_render_callback_ = std::move(callback);
+    }
+
     virtual ~RendererGL() override;
 
 private:
@@ -123,6 +129,8 @@ private:
     LightGrid light_grid_chunks_;
     float light_grid_chunks_size_ = 1.0f;
 
+
+    std::function<void()> gui_render_callback_;
 };
 
 }

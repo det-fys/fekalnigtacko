@@ -191,6 +191,13 @@ void gfx::RendererGL::Draw(Scene& scene, const CameraParams& camera)
     DrawSurfaceList(list.surfaces, info);
     DrawBeamList(list.beams, info);
     DrawCoronaList(list.coronas, info);
+
+    // external GUI
+    if (gui_render_callback_)
+    {
+        gui_render_callback_();
+    }
+
     DrawHudList(list.huds, info);
 }
 

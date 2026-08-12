@@ -141,6 +141,7 @@ if(BUILD_CLIENT)
         "src/audio/sound.cpp"
         "src/audio/source.cpp"
         "src/client/app.cpp"
+        "src/client/imgui_integration.cpp"
         "src/client/key_map.cpp"
         "src/client/main.cpp"
         "src/client/settings.cpp"
@@ -216,6 +217,32 @@ if(BUILD_CLIENT)
     add_subdirectory(external/ogg)
     add_subdirectory(external/vorbis)
     target_link_libraries(${MAIN_NAME} PRIVATE vorbisfile vorbis)
+
+    # ImGui
+    set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
+
+    # Core ImGui sources
+    set(IMGUI_SOURCES
+        ${IMGUI_DIR}/imgui.cpp
+        ${IMGUI_DIR}/imgui_demo.cpp
+        ${IMGUI_DIR}/imgui_draw.cpp
+        ${IMGUI_DIR}/imgui_tables.cpp
+        ${IMGUI_DIR}/imgui_widgets.cpp
+        # backends
+        ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+        ${IMGUI_DIR}/backends/imgui_impl_wgpu.cpp
+    )
+
+    set(IMGUI_INCLUDE_DIRS
+        ${IMGUI_DIR}
+        ${IMGUI_DIR}/backends
+    )
+
+    target_sources(${MAIN_NAME} PRIVATE ${IMGUI_SOURCES})
+    target_include_directories(${MAIN_NAME} PRIVATE ${IMGUI_INCLUDE_DIRS})
+
+    target_compile_definitions(${MAIN_NAME} PRIVATE PG_IMGUI)
 
     # Dawn setup
     set(DAWN_FETCH_DEPENDENCIES ON)
@@ -307,6 +334,8 @@ if(BUILD_CLIENT)
         )
 
         target_link_libraries(${MAIN_NAME} PRIVATE webgpu_dawn)
+
+        target_compile_definitions(${MAIN_NAME} PRIVATE IMGUI_IMPL_WEBGPU_BACKEND_DAWN)
     endif()
 endif()
 

@@ -29,6 +29,7 @@
 #include "gfx/renderer_gl/gl.hpp"
 #include "version.hpp"
 #include "fs/fs.hpp"
+#include "imgui_integration.hpp"
 
 CVAR_CL(uint16_t, cl_maxfps, CV_SAVE, 0);
 
@@ -100,6 +101,8 @@ static void PollEvents()
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
+        ImGuiProcessEvent(event);
+
         switch (event.type)
         {
         case SDL_QUIT:
@@ -107,6 +110,7 @@ static void PollEvents()
             return;
 
         case SDL_MOUSEMOTION:
+            if (!ImGuiWantCaptureMouse()) 
             {
                 int xrel = event.motion.xrel;
                 int yrel = event.motion.yrel;
@@ -119,6 +123,7 @@ static void PollEvents()
 
         case SDL_KEYDOWN:
         case SDL_KEYUP:
+            if (!ImGuiWantCaptureKeyboard())
             {
                 auto kc = GetKeyCodeFromSDLScancode(event.key.keysym.scancode);
                 if (kc != KEY_NONE)
@@ -130,11 +135,15 @@ static void PollEvents()
             break;
 
         case SDL_TEXTINPUT:
-            s_app->TextInput(event.text.text);
+            if (!ImGuiWantCaptureKeyboard())
+            {
+                s_app->TextInput(event.text.text);
+            }
             break;
 
         case SDL_MOUSEBUTTONDOWN:
         case SDL_MOUSEBUTTONUP:
+            if (!ImGuiWantCaptureMouse())
             {
                 bool pressed = event.button.state == SDL_PRESSED;
                 if (event.button.button == SDL_BUTTON_LEFT)
@@ -149,6 +158,7 @@ static void PollEvents()
             break;
 
         case SDL_MOUSEWHEEL:
+            if (!ImGuiWantCaptureMouse())
             {
                 s_app->KeyInput(event.wheel.y < 0 ? KEY_WHEELUP : KEY_WHEELDOWN, true, 0);
             }
@@ -197,9 +207,22 @@ static void UpdateFullscreen()
     }
 }
 
+static void UpdateMouseCapture()
+{
+    if (ImGuiWantCaptureMouse())
+    {
+        SDL_SetRelativeMouseMode(SDL_FALSE);
+    }
+    else
+    {
+        SDL_SetRelativeMouseMode(SDL_TRUE);
+    }
+}
+
 static void Frame()
 {
     UpdateFullscreen();
+    UpdateMouseCapture();
 
     Uint32 current_time = SDL_GetTicks();
     last_update = current_time;
@@ -207,6 +230,7 @@ static void Frame()
 
     PollEvents();
 
+    ImGuiFrame();
     s_app->Frame();
 
     SDL_GL_SwapWindow(s_window);
@@ -254,14 +278,13 @@ static void Main() {
     try
     {
         gfx::Renderer::Init(s_window);
+        ImGuiInit(s_window);
     }
     catch (...)
     {
         ShutdownSDL();
         throw;
     }
-
-    SDL_SetRelativeMouseMode(SDL_TRUE);
 
     s_app = std::make_unique<App>(SAVE_PATH);
     s_app->SetUserName(s_username);
@@ -297,6 +320,7 @@ static void Main() {
 
     s_app.reset();
 
+    ImGuiDeinit();
     gfx::Renderer::Uninit();
     ShutdownSDL();
 
