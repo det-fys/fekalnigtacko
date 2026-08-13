@@ -32,6 +32,8 @@ static void APIENTRY GLDebugCallback(GLenum source, GLenum type, GLuint id, GLen
 
 gfx::RendererGL::RendererGL(SDL_Window* window) : Renderer(window)
 {
+    viewport_yflip_ = true;
+
     std::cout << "Initializing GL renderer" << std::endl;
 
     std::cout << "Creating OpenGL context..." << std::endl;

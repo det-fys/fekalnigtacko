@@ -52,6 +52,7 @@ public:
                               const glm::u32vec2& size) = 0;
     virtual ViewportTextureHandle GetViewportNativeHandle(ViewportID viewport_id) = 0;
     virtual void ReleaseViewport(ViewportID viewport_id) = 0;
+    bool NeedsViewportYFlip() const { return viewport_yflip_; }
 
     virtual void Draw(Scene& scene, const CameraParams& camera) = 0;
     
@@ -68,6 +69,7 @@ protected:
 
 protected:
     SDL_Window* const window_;
+    bool viewport_yflip_ = false;
 };
 
 } // namespace gfx

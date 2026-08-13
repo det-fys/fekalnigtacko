@@ -336,7 +336,7 @@ void App::ShowAdvancedMode()
 		auto native_handle = advanced_->app_viewport.GetNativeHandle();
 		if (native_handle)
 		{
-            int y0 = gfx::Viewport::NeedsYFlip() ? 0 : 1;
+            int y0 = gfx::Viewport::NeedsYFlip() ? 1 : 0;
 			ImGui::Image(reinterpret_cast<ImTextureID>(native_handle), ImVec2(size.x, size.y), ImVec2(0, y0), ImVec2(1, 1 - y0));
 		}
 
