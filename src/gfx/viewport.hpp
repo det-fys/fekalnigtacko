@@ -20,6 +20,8 @@ public:
 
     ViewportTextureHandle GetNativeHandle() const;
 
+    static bool NeedsYFlip();
+
     ~Viewport();
 
 private:

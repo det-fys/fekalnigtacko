@@ -17,6 +17,11 @@ gfx::ViewportTextureHandle gfx::Viewport::GetNativeHandle() const
     return Renderer::GetInstance().GetViewportNativeHandle(id_);
 }
 
+bool gfx::Viewport::NeedsYFlip()
+{
+    return Renderer::GetInstance().IsGL();
+}
+
 gfx::Viewport::~Viewport()
 {
     Renderer::GetInstance().ReleaseViewport(id_);

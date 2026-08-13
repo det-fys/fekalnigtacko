@@ -411,24 +411,32 @@ void gfx::RendererWGPU::ReleaseDeformTexture(DeformTextureID deform_id)
 
 gfx::ViewportID gfx::RendererWGPU::CreateViewport()
 {
-    return 0; // TODO
+    auto id = viewports_.Alloc(ViewportWGPU{});
+    return id;
 }
 
 void gfx::RendererWGPU::DrawViewport(ViewportID viewport_id, Scene& scene, const CameraParams& camera,
                                      const glm::u32vec2& size)
 {
-    // TODO
+    auto& viewport = viewports_.Get(viewport_id);
+    SetupViewport(viewport, size);
+
+    UpdateSettings();
+
+    Render(viewport, scene, camera);
 }
 
 gfx::ViewportTextureHandle gfx::RendererWGPU::GetViewportNativeHandle(ViewportID viewport_id)
 {
-    // TODO
-    return nullptr;
+    auto& viewport = viewports_.Get(viewport_id);
+    return viewport.output_texture_view_nonsrgb
+               ? reinterpret_cast<gfx::ViewportTextureHandle>(viewport.output_texture_view_nonsrgb.Get())
+               : nullptr;
 }
 
 void gfx::RendererWGPU::ReleaseViewport(ViewportID viewport_id)
 {
-    // TODO
+    viewports_.Free(viewport_id);
 }
 
 void gfx::RendererWGPU::Draw(Scene& scene, const CameraParams& camera)
@@ -439,7 +447,17 @@ void gfx::RendererWGPU::Draw(Scene& scene, const CameraParams& camera)
 
     UpdateSettings();
 
-    Render(scene, camera);
+    auto viewport_size = GetViewportSize();
+    if (setup_viewport_size_ != viewport_size)
+    {
+        ProcessViewportSizeChange(viewport_size);
+    }
+
+    Render(main_viewport_, scene, camera);
+
+#if !defined(__EMSCRIPTEN__)
+    surface_.Present();
+#endif
 }
 
 gfx::RendererWGPU::~RendererWGPU()
@@ -537,12 +555,26 @@ static wgpu::TextureFormat GetSurfaceSrgbViewFormat(wgpu::TextureFormat format)
     return format; // already srgb or weird format
 }
 
+static wgpu::TextureFormat GetNonSrgbTextureFormat(wgpu::TextureFormat format)
+{
+    switch (format)
+    {
+    case wgpu::TextureFormat::BGRA8UnormSrgb:
+        return wgpu::TextureFormat::BGRA8Unorm;
+    case wgpu::TextureFormat::RGBA8UnormSrgb:
+        return wgpu::TextureFormat::RGBA8Unorm;
+    default:
+        return format;
+    }
+}
+
 void gfx::RendererWGPU::SelectSurfaceFormat()
 {
     wgpu::SurfaceCapabilities caps{};
     surface_.GetCapabilities(adapter_, &caps);
     surface_real_format_ = GetBestSurfaceFormat({caps.formats, caps.formatCount});
     surface_format_ = GetSurfaceSrgbViewFormat(surface_real_format_);
+    surface_format_nonsrgb_ = GetNonSrgbTextureFormat(surface_format_);
 }
 
 void gfx::RendererWGPU::CreateGlobalResources()
@@ -858,7 +890,7 @@ void gfx::RendererWGPU::CreateShadowResources()
 
 void gfx::RendererWGPU::InvalidateShadowResources()
 {
-    InvalidateSurfaceGlobalBindGroup();
+    InvalidateSurfaceGlobalBindGroups();
     InvalidateSurfacePipelines();
     csm_texture_ = nullptr;
     csm_texture_view_ = nullptr;
@@ -881,10 +913,6 @@ void gfx::RendererWGPU::InvalidateShadowResources()
 
 void gfx::RendererWGPU::CreateSurfaceGlobalResources()
 {
-    InvalidateSurfacePipelines();
-    global_bind_group_layout_ = nullptr;
-    global_bind_group_ = nullptr;
-
     // global bind group layout
     {
         std::array<wgpu::BindGroupLayoutEntry, 7> entries;
@@ -947,7 +975,7 @@ void gfx::RendererWGPU::CreateSurfaceGlobalResources()
     }
 }
 
-void gfx::RendererWGPU::CreateSurfaceGlobalBindGroup()
+void gfx::RendererWGPU::CreateSurfaceGlobalBindGroup(ViewportWGPU& viewport)
 {
     std::array<wgpu::BindGroupEntry, 7> entries;
 
@@ -971,8 +999,8 @@ void gfx::RendererWGPU::CreateSurfaceGlobalBindGroup()
 
     auto& visible_lights_entry = entries[4];
     visible_lights_entry.binding = 4;
-    visible_lights_entry.buffer = visible_lights_buffer_;
-    visible_lights_entry.size = visible_lights_buffer_size_;
+    visible_lights_entry.buffer = viewport.visible_lights_buffer;
+    visible_lights_entry.size = viewport.visible_lights_buffer_size;
 
     auto& shadow_texture_entry = entries[5];
     shadow_texture_entry.binding = 5;
@@ -980,19 +1008,26 @@ void gfx::RendererWGPU::CreateSurfaceGlobalBindGroup()
 
     auto& ao_texture_entry = entries[6];
     ao_texture_entry.binding = 6;
-    ao_texture_entry.textureView = ao_output_texture_view_ ? ao_output_texture_view_ : textures_.Get(GetWhiteTexture()).view;
+    ao_texture_entry.textureView =
+        viewport.ao_output_texture_view ? viewport.ao_output_texture_view : textures_.Get(GetWhiteTexture()).view;
 
     wgpu::BindGroupDescriptor desc{};
     desc.layout = global_bind_group_layout_;
     desc.entryCount = entries.size();
     desc.entries = entries.data();
     desc.label = "Global bind group";
-    global_bind_group_ = device_.CreateBindGroup(&desc);
+    viewport.global_bind_group = device_.CreateBindGroup(&desc);
 }
 
-void gfx::RendererWGPU::InvalidateSurfaceGlobalBindGroup()
+void gfx::RendererWGPU::InvalidateSurfaceGlobalBindGroup(ViewportWGPU& viewport)
 {
-    global_bind_group_ = nullptr;
+    viewport.global_bind_group = nullptr;
+}
+
+void gfx::RendererWGPU::InvalidateSurfaceGlobalBindGroups()
+{
+    InvalidateSurfaceGlobalBindGroup(main_viewport_);
+    viewports_.ForEach([this](ID id, ViewportWGPU& viewport) { InvalidateSurfaceGlobalBindGroup(viewport); });
 }
 
 void gfx::RendererWGPU::CreateSurfaceMaterialResources()
@@ -1183,25 +1218,25 @@ void gfx::RendererWGPU::CreateLightCullingResources()
     }
 }
 
-void gfx::RendererWGPU::CreateLightCullingVisibleLightsBuffer()
+void gfx::RendererWGPU::CreateLightCullingVisibleLightsBuffer(ViewportWGPU& viewport)
 {
-    InvalidateLightCullingBindGroup();
-    InvalidateSurfaceGlobalBindGroup();
+    InvalidateLightCullingBindGroup(viewport);
+    InvalidateSurfaceGlobalBindGroup(viewport);
 
-    visible_lights_buffer_ = nullptr;
+    viewport.visible_lights_buffer = nullptr;
     
-    visible_lights_buffer_size_ = std::max(1U, light_tiles_.x * light_tiles_.y * MAX_LIGHTS_PER_TILE) * sizeof(uint32_t);
+    viewport.visible_lights_buffer_size = std::max(1U, viewport.light_tiles.x * viewport.light_tiles.y * MAX_LIGHTS_PER_TILE) * sizeof(uint32_t);
 
     wgpu::BufferDescriptor desc{};
-    desc.size = visible_lights_buffer_size_;
+    desc.size = viewport.visible_lights_buffer_size;
     desc.usage = wgpu::BufferUsage::Storage;
     desc.label = "Visible lights buffer";
-    visible_lights_buffer_ = device_.CreateBuffer(&desc);
+    viewport.visible_lights_buffer = device_.CreateBuffer(&desc);
 }
 
-void gfx::RendererWGPU::CreateLightCullingBindGroup()
+void gfx::RendererWGPU::CreateLightCullingBindGroup(ViewportWGPU& viewport)
 {
-    light_culling_bind_group_ = nullptr;
+    viewport.light_culling_bind_group = nullptr;
 
     std::array<wgpu::BindGroupEntry, 4> entries;
 
@@ -1212,7 +1247,7 @@ void gfx::RendererWGPU::CreateLightCullingBindGroup()
     
     auto& depth_entry = entries[1];
     depth_entry.binding = 1;
-    depth_entry.textureView = depth_texture_view_;
+    depth_entry.textureView = viewport.depth_texture_view;
 
     auto& light_buffer_entry = entries[2];
     light_buffer_entry.binding = 2;
@@ -1221,15 +1256,15 @@ void gfx::RendererWGPU::CreateLightCullingBindGroup()
 
     auto& visible_lights_entry = entries[3];
     visible_lights_entry.binding = 3;
-    visible_lights_entry.buffer = visible_lights_buffer_;
-    visible_lights_entry.size = visible_lights_buffer_size_;
+    visible_lights_entry.buffer = viewport.visible_lights_buffer;
+    visible_lights_entry.size = viewport.visible_lights_buffer_size;
 
     wgpu::BindGroupDescriptor desc{};
     desc.layout = light_culling_bind_group_layout_;
     desc.entryCount = entries.size();
     desc.entries = entries.data();
     desc.label = "Light culling bind group";
-    light_culling_bind_group_ = device_.CreateBindGroup(&desc);
+    viewport.light_culling_bind_group = device_.CreateBindGroup(&desc);
 
 }
 
@@ -1498,9 +1533,9 @@ fn cull_lights(
     light_culling_pipeline_ = device_.CreateComputePipeline(&desc);
 }
 
-void gfx::RendererWGPU::InvalidateLightCullingBindGroup()
+void gfx::RendererWGPU::InvalidateLightCullingBindGroup(ViewportWGPU& viewport)
 {
-    light_culling_bind_group_ = nullptr;
+    viewport.light_culling_bind_group = nullptr;
 }
 
 void gfx::RendererWGPU::CreateCoronaResources()
@@ -1763,9 +1798,9 @@ void gfx::RendererWGPU::CreateAOResources()
     }
 }
 
-void gfx::RendererWGPU::CreateAOBindGroup()
+void gfx::RendererWGPU::CreateAOBindGroup(ViewportWGPU& viewport)
 {
-    ao_bind_group_ = nullptr;
+    viewport.ao_bind_group = nullptr;
 
     std::array<wgpu::BindGroupEntry, 4> entries;
 
@@ -1776,27 +1811,27 @@ void gfx::RendererWGPU::CreateAOBindGroup()
 
     auto& depth_texture_entry = entries[1];
     depth_texture_entry.binding = 1;
-    depth_texture_entry.textureView = depth_texture_view_;
+    depth_texture_entry.textureView = viewport.depth_texture_view;
 
     auto& normal_texture_entry = entries[2];
     normal_texture_entry.binding = 2;
-    normal_texture_entry.textureView = normal_texture_view_;
+    normal_texture_entry.textureView = viewport.normal_texture_view;
 
     auto& output_texture_entry = entries[3];
     output_texture_entry.binding = 3;
-    output_texture_entry.textureView = ao_output_texture_view_;
+    output_texture_entry.textureView = viewport.ao_output_texture_view;
 
     wgpu::BindGroupDescriptor desc{};
     desc.layout = ao_bind_group_layout_;
     desc.entryCount = entries.size();
     desc.entries = entries.data();
     desc.label = "AO bind group";
-    ao_bind_group_ = device_.CreateBindGroup(&desc);
+    viewport.ao_bind_group = device_.CreateBindGroup(&desc);
 }
 
-void gfx::RendererWGPU::InvalidateAOBindGroup()
+void gfx::RendererWGPU::InvalidateAOBindGroup(ViewportWGPU& viewport)
 {
-    ao_bind_group_ = nullptr;
+    viewport.ao_bind_group = nullptr;
 }
 
 void gfx::RendererWGPU::CreateAOPipeline()
@@ -2004,9 +2039,9 @@ void gfx::RendererWGPU::CreateFXAAResources()
     }
 }
 
-void gfx::RendererWGPU::CreateFXAABindGroup()
+void gfx::RendererWGPU::CreateFXAABindGroup(ViewportWGPU& viewport)
 {
-    fxaa_bind_group_ = nullptr;
+    viewport.fxaa_bind_group = nullptr;
 
     std::array<wgpu::BindGroupEntry, 2> entries;
 
@@ -2016,19 +2051,19 @@ void gfx::RendererWGPU::CreateFXAABindGroup()
 
     auto& texture_entry = entries[1];
     texture_entry.binding = 1;
-    texture_entry.textureView = color_texture_view_;
+    texture_entry.textureView = viewport.color_texture_view;
 
     wgpu::BindGroupDescriptor desc{};
     desc.layout = fxaa_bind_group_layout_;
     desc.entryCount = entries.size();
     desc.entries = entries.data();
     desc.label = "FXAA bind group";
-    fxaa_bind_group_ = device_.CreateBindGroup(&desc);
+    viewport.fxaa_bind_group = device_.CreateBindGroup(&desc);
 }
 
-void gfx::RendererWGPU::InvalidateFXAABindGroup()
+void gfx::RendererWGPU::InvalidateFXAABindGroup(ViewportWGPU& viewport)
 {
-    fxaa_bind_group_ = nullptr;
+    viewport.fxaa_bind_group = nullptr;
 }
 
 void gfx::RendererWGPU::CreateFXAAPipeline()
@@ -2453,6 +2488,131 @@ static wgpu::PresentMode GetDesiredPresentMode()
         return wgpu::PresentMode::Mailbox;
 }
 
+void gfx::RendererWGPU::SetupViewport(ViewportWGPU& viewport, const glm::u32vec2& size, bool omit_output_texture)
+{
+    if (viewport.size == size)
+    {
+        return; // already set
+    }
+
+    // force release of resources first to save memory
+    InvalidateViewport(viewport);
+
+    if (size.x == 0 || size.y == 0)
+    {
+        return; // no visible area
+    }
+
+    viewport.size = size;
+
+    // create depth
+    wgpu::TextureDescriptor depth_desc{};
+    depth_desc.dimension = wgpu::TextureDimension::e2D;
+    depth_desc.format = depth_format_;
+    depth_desc.mipLevelCount = 1;
+    depth_desc.sampleCount = msaa_samples_;
+    depth_desc.size = {viewport.size.x, viewport.size.y};
+    depth_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+    depth_desc.viewFormatCount = 1;
+    depth_desc.viewFormats = &depth_format_;
+    depth_desc.label = "Viewport depth texture";
+    viewport.depth_texture = device_.CreateTexture(&depth_desc);
+
+    wgpu::TextureViewDescriptor depth_view_desc{};
+    depth_view_desc.aspect = wgpu::TextureAspect::DepthOnly;
+    depth_view_desc.baseArrayLayer = 0;
+    depth_view_desc.arrayLayerCount = 1;
+    depth_view_desc.baseMipLevel = 0;
+    depth_view_desc.mipLevelCount = 1;
+    depth_view_desc.dimension = wgpu::TextureViewDimension::e2D;
+    depth_view_desc.format = depth_format_;
+    depth_view_desc.label = "Viewport depth texture view";
+    viewport.depth_texture_view = viewport.depth_texture.CreateView(&depth_view_desc);
+
+    // create back color texture if FXAA or secondary viewport
+    if (use_fxaa_)
+    {
+        // create multisample color texture
+        wgpu::TextureDescriptor color_desc{};
+        color_desc.dimension = wgpu::TextureDimension::e2D;
+        color_desc.format = surface_format_;
+        color_desc.size = {viewport.size.x, viewport.size.y};
+        color_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+        viewport.color_texture = device_.CreateTexture(&color_desc);
+        viewport.color_texture_view = viewport.color_texture.CreateView();
+    }
+
+    // create normal texture for AO if enabled
+    if (surface_shader_cfg_.ao)
+    {
+        wgpu::TextureDescriptor normal_texture_desc{};
+        normal_texture_desc.dimension = wgpu::TextureDimension::e2D;
+        normal_texture_desc.format = normal_format_;
+        normal_texture_desc.size = {viewport.size.x, viewport.size.y};
+        normal_texture_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+        viewport.normal_texture = device_.CreateTexture(&normal_texture_desc);
+        viewport.normal_texture_view = viewport.normal_texture.CreateView();
+
+        wgpu::TextureDescriptor ao_output_texture_desc{};
+        ao_output_texture_desc.dimension = wgpu::TextureDimension::e2D;
+        ao_output_texture_desc.format = wgpu::TextureFormat::RGBA8Unorm;
+        ao_output_texture_desc.size = {viewport.size.x, viewport.size.y};
+        ao_output_texture_desc.usage = wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding;
+        viewport.ao_output_texture = device_.CreateTexture(&ao_output_texture_desc);
+        viewport.ao_output_texture_view = viewport.ao_output_texture.CreateView();
+    }
+
+    // create output texture for non-primary viewports
+    if (!omit_output_texture)
+    {
+        wgpu::TextureDescriptor output_texture_desc{};
+        output_texture_desc.dimension = wgpu::TextureDimension::e2D;
+        output_texture_desc.format = surface_format_;
+        output_texture_desc.viewFormatCount = 1;
+        output_texture_desc.viewFormats = &surface_format_nonsrgb_;
+        output_texture_desc.size = {viewport.size.x, viewport.size.y};
+        output_texture_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+        viewport.output_texture = device_.CreateTexture(&output_texture_desc);
+        viewport.output_texture_view = viewport.output_texture.CreateView();
+
+        wgpu::TextureViewDescriptor output_view_nonsrgb_desc{};
+        output_view_nonsrgb_desc.format = surface_format_nonsrgb_;
+        output_view_nonsrgb_desc.dimension = wgpu::TextureViewDimension::e2D;
+        viewport.output_texture_view_nonsrgb = viewport.output_texture.CreateView(&output_view_nonsrgb_desc);
+    }
+
+    // create buffer for visible lights per tile
+    viewport.light_tiles = (viewport.size + (TILE_SIZE - 1)) / TILE_SIZE;
+    CreateLightCullingVisibleLightsBuffer(viewport);
+}
+
+void gfx::RendererWGPU::InvalidateViewport(ViewportWGPU& viewport)
+{
+    viewport.size = {0, 0};
+    viewport.color_texture = nullptr;
+    viewport.color_texture_view = nullptr;
+    viewport.depth_texture = nullptr;
+    viewport.depth_texture_view = nullptr;
+    viewport.color_texture = nullptr;
+    viewport.color_texture_view = nullptr;
+    viewport.normal_texture = nullptr;
+    viewport.normal_texture_view = nullptr;
+    viewport.ao_output_texture = nullptr;
+    viewport.ao_output_texture_view = nullptr;
+    viewport.output_texture = nullptr;
+    viewport.output_texture_view = nullptr;
+
+    InvalidateLightCullingBindGroup(viewport); // depends on depth texture
+    InvalidateAOBindGroup(viewport);
+    InvalidateFXAABindGroup(viewport);
+}
+
+void gfx::RendererWGPU::InvalidateViewports()
+{
+    InvalidateViewport(main_viewport_);
+    viewports_.ForEach([this](ID id, ViewportWGPU& viewport) { InvalidateViewport(viewport); });
+}
+
 void gfx::RendererWGPU::ConfigureSurface(const glm::u32vec2& viewport_size)
 {
     wgpu::SurfaceConfiguration config{};
@@ -2463,7 +2623,7 @@ void gfx::RendererWGPU::ConfigureSurface(const glm::u32vec2& viewport_size)
     config.usage = wgpu::TextureUsage::RenderAttachment;    
     config.format = surface_real_format_;
 
-    // view format - srgb
+    // view formats
     config.viewFormatCount = 1;
     config.viewFormats = &surface_format_;
 
@@ -2478,82 +2638,7 @@ void gfx::RendererWGPU::InvalidateSurface()
 void gfx::RendererWGPU::ProcessViewportSizeChange(const glm::u32vec2& viewport_size)
 {
     ConfigureSurface(viewport_size);
-
-    InvalidateLightCullingBindGroup(); // depends on depth texture
-    InvalidateAOBindGroup();
-    InvalidateFXAABindGroup();
-
-    // create depth
-    depth_texture_ = nullptr;
-    depth_texture_view_ = nullptr;
-
-    depth_format_ = wgpu::TextureFormat::Depth24Plus;
-    wgpu::TextureDescriptor depth_desc{};
-    depth_desc.dimension = wgpu::TextureDimension::e2D;
-    depth_desc.format = depth_format_;
-    depth_desc.mipLevelCount = 1;
-    depth_desc.sampleCount = msaa_samples_;
-    depth_desc.size = {viewport_size.x, viewport_size.y};
-    depth_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
-    depth_desc.viewFormatCount = 1;
-    depth_desc.viewFormats = &depth_format_;
-    depth_desc.label = "Main depth texture";
-    depth_texture_ = device_.CreateTexture(&depth_desc);
-
-    wgpu::TextureViewDescriptor depth_view_desc{};
-    depth_view_desc.aspect = wgpu::TextureAspect::DepthOnly;
-    depth_view_desc.baseArrayLayer = 0;
-    depth_view_desc.arrayLayerCount = 1;
-    depth_view_desc.baseMipLevel = 0;
-    depth_view_desc.mipLevelCount = 1;
-    depth_view_desc.dimension = wgpu::TextureViewDimension::e2D;
-    depth_view_desc.format = depth_format_;
-    depth_view_desc.label = "Main depth texture view";
-    depth_texture_view_ = depth_texture_.CreateView(&depth_view_desc);
-
-    // create back color texture if FXAA
-    color_texture_ = nullptr;
-    color_texture_view_ = nullptr;
-    if (use_fxaa_)
-    {
-        // create multisample color texture
-        wgpu::TextureDescriptor color_desc{};
-        color_desc.dimension = wgpu::TextureDimension::e2D;
-        color_desc.format = surface_format_;
-        color_desc.size = {viewport_size.x, viewport_size.y};
-        color_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
-        color_texture_ = device_.CreateTexture(&color_desc);
-        color_texture_view_ = color_texture_.CreateView();
-    }
-
-    // create normal texture for AO if enabled
-    normal_texture_ = nullptr;
-    normal_texture_view_ = nullptr;
-    ao_output_texture_ = nullptr;
-    ao_output_texture_view_ = nullptr;
-    if (surface_shader_cfg_.ao)
-    {
-        wgpu::TextureDescriptor normal_texture_desc{};
-        normal_texture_desc.dimension = wgpu::TextureDimension::e2D;
-        normal_texture_desc.format = wgpu::TextureFormat::RGBA8Unorm;
-        normal_texture_desc.size = {viewport_size.x, viewport_size.y};
-        normal_texture_desc.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
-        normal_texture_ = device_.CreateTexture(&normal_texture_desc);
-        normal_texture_view_ = normal_texture_.CreateView();
-
-        wgpu::TextureDescriptor output_texture_desc{};
-        output_texture_desc.dimension = wgpu::TextureDimension::e2D;
-        output_texture_desc.format = wgpu::TextureFormat::RGBA8Unorm;
-        output_texture_desc.size = {viewport_size.x, viewport_size.y};
-        output_texture_desc.usage = wgpu::TextureUsage::StorageBinding | wgpu::TextureUsage::TextureBinding;
-        ao_output_texture_ = device_.CreateTexture(&output_texture_desc);
-        ao_output_texture_view_ = ao_output_texture_.CreateView();
-    }
-
-    // create buffer for visible lights per tile
-    light_tiles_ = (viewport_size + (TILE_SIZE - 1)) / TILE_SIZE;
-    CreateLightCullingVisibleLightsBuffer();
-
+    SetupViewport(main_viewport_, viewport_size, true);
     setup_viewport_size_ = viewport_size;
 }
 
@@ -2601,16 +2686,13 @@ gfx::SurfaceViewData gfx::RendererWGPU::GetNextSurfaceViewData()
         return data;
     }
     
-    wgpu::TextureViewDescriptor view_desc{};
-    view_desc.label = "Surface texture view";
-    view_desc.format = surface_format_;
-    view_desc.dimension = wgpu::TextureViewDimension::e2D;
-    view_desc.baseMipLevel = 0;
-    view_desc.mipLevelCount = 1;
-    view_desc.baseArrayLayer = 0;
-    view_desc.arrayLayerCount = 1;
-    view_desc.aspect = wgpu::TextureAspect::All;
-    data.view = data.surface_texture.texture.CreateView(&view_desc);
+    {
+        wgpu::TextureViewDescriptor view_desc{};
+        view_desc.label = "Surface texture view";
+        view_desc.format = surface_format_;
+        view_desc.dimension = wgpu::TextureViewDimension::e2D;
+        data.view = data.surface_texture.texture.CreateView(&view_desc);
+    }
 
     return data;
 }
@@ -2905,7 +2987,7 @@ const wgpu::RenderPipeline& gfx::RendererWGPU::GetSurfacePipeline(SurfacePipelin
     else if ((flags & SPF_DEPTH_ONLY) > 0 && (flags & SPF_SHADOW_MAP) == 0 &&
              surface_shader_cfg_.ao) // depth prepass, write normal for AO
     {
-        color.format = normal_texture_.GetFormat();
+        color.format = normal_format_;
         color.writeMask = wgpu::ColorWriteMask::All;
 
         fragment.targetCount = 1;
@@ -2975,15 +3057,6 @@ void gfx::RendererWGPU::CreateInstanceBufferBindGroup()
 
 void gfx::RendererWGPU::UpdateSettings()
 {
-    //if (r_msaa.IsModified())
-    //{
-    //    msaa_samples_ = GetMultisampleCount();
-    //    CreateGuiPipeline();
-    //    InvalidateSurfacePipelines();
-    //    InvalidateSurface();
-    //    r_msaa.ClearModified();
-    //}
-
     if (r_csm_resolution.IsModified() || r_shadow_resolution.IsModified() || r_csm_cascades.IsModified() ||
         r_shadow_count.IsModified() || r_shadow_quality.IsModified())
     {
@@ -3012,9 +3085,9 @@ void gfx::RendererWGPU::UpdateSettings()
     if (r_ao.IsModified())
     {
         surface_shader_cfg_.ao = r_ao.Get() > 0;
-        InvalidateSurface();
+        InvalidateViewports();
         InvalidateSurfacePipelines();
-        InvalidateSurfaceGlobalBindGroup();
+        InvalidateSurfaceGlobalBindGroups();
         InvalidateAOPipeline();
         r_ao.ClearModified();
     }
@@ -3022,30 +3095,26 @@ void gfx::RendererWGPU::UpdateSettings()
     if (r_fxaa.IsModified())
     {
         use_fxaa_ = r_fxaa.Get() > 0;
-        InvalidateSurface();
+        InvalidateViewports();
         r_fxaa.ClearModified();
     }
 }
 
-void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
+void gfx::RendererWGPU::Render(ViewportWGPU& viewport, Scene& scene, const CameraParams& camera)
 {
-    ++frame_index_;
+    bool is_main_viewport = &viewport == &main_viewport_;
+
+    UpdateSettings();
 
     if (!shadow_resources_setup_)
     {
         CreateShadowResources();
     }
 
-    auto viewport_size = GetViewportSize();
-    if (setup_viewport_size_ != viewport_size)
-    {
-        ProcessViewportSizeChange(viewport_size);
-    }
-
     auto encoder = device_.CreateCommandEncoder();
 
     // compute matrices
-    float aspect = static_cast<float>(viewport_size.x) / static_cast<float>(viewport_size.y);
+    float aspect = static_cast<float>(viewport.size.x) / static_cast<float>(viewport.size.y);
 
     float min_distance = 0.0f;
     float max_distance = static_cast<float>(r_distance.Get());
@@ -3054,194 +3123,203 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
     auto proj = glm::perspectiveRH_ZO(glm::radians(camera.fov * 0.5f), aspect, 0.1f, farplane);
     auto view = glm::lookAt(camera.eye, camera.eye + camera.dir, glm::vec3(0.0f, 0.0f, 1.0f));
 
-
     // main capture
     main_dlist_.Clear();
-    DrawContext main_ctx{main_dlist_, DRAW_PASS_MAIN, camera.eye, view, proj, min_distance, max_distance, viewport_size};
+    DrawContext main_ctx{main_dlist_, DRAW_PASS_MAIN, camera.eye, view, proj, min_distance, max_distance, viewport.size};
     scene.Draw(main_ctx);
     auto env = scene.GetSceneEnvironment();
 
-    // prepare prepass & main cmds
-    PrepareSurfaceCmds(main_dlist_.surfaces, pcmds_prepass_, SPF_DEPTH_ONLY);
-    PrepareSurfaceCmds(main_dlist_.surfaces, pcmds_main_, 0);
+    bool has_surfaces = !main_dlist_.surfaces.empty();
 
-    size_t total_instances = pcmds_prepass_.size() + pcmds_main_.size();
-
-    // prepare CSM cmds
-    ComputeCSMMatrices(main_ctx.view, camera.fov, aspect, env.sun_direction);
-
-    for (uint32_t i = 0; i < csm_num_cascades_; ++i)
-    {
-        auto& cascade = csm_cascades_[i];
-        cascade.dlist.Clear();
-        
-        DrawContext cascade_ctx(cascade.dlist, DRAW_PASS_SHADOW_MAP, camera.eye, cascade.view, cascade.proj,
-                                0.0f, 150.0f, glm::u32vec2(csm_resolution_));
-
-        scene.Draw(cascade_ctx);
-
-        PrepareSurfaceCmds(cascade.dlist.surfaces, cascade.pcmds, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
-        total_instances += cascade.pcmds.size();
-    }
-
-    // prepare spotlight shadow cmds
-    PrepareLights(main_dlist_.lights, main_ctx);
-
-    for (uint32_t i = 0; i < spotlight_shadow_current_count_; ++i)
-    {
-        auto& shadowmap = spotlight_shadows_[i];
-        shadowmap.dlist.Clear();
-
-        DrawContext shadowmap_ctx(shadowmap.dlist, DRAW_PASS_SHADOW_MAP, camera.eye, shadowmap.view, shadowmap.proj,
-                                  0.0f, 150.0f, glm::u32vec2(spotlight_shadow_resolution_));
-
-        scene.Draw(shadowmap_ctx);
-
-        PrepareSurfaceCmds(shadowmap.dlist.surfaces, shadowmap.pcmds, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
-        total_instances += shadowmap.pcmds.size();
-    }
-
-    // setup instance buffer
-    instances_.clear();
-    instances_.reserve(total_instances);
-    if (ReserveBufferCapacity(instance_buffer_, total_instances * sizeof(instances_[0])))
-    {
-        // need to recreate bind group if reallocated
-        CreateInstanceBufferBindGroup();
-    }
-
+    GlobalUniformData globals{};
     uint32_t pass_index = 0;
 
-    // render CSM cascades
-    for (uint32_t i = 0; i < csm_num_cascades_; ++i)
-    {
-        auto& cascade = csm_cascades_[i];
-
-        GlobalUniformData globals{};
-        globals.view = cascade.view;
-        globals.proj = cascade.proj;
-        globals.view_proj = cascade.view_proj;
-
-        // setup cascade depth attachment
-        wgpu::RenderPassDepthStencilAttachment depth_attachment{};
-        depth_attachment.view = cascade.texture_view;
-        depth_attachment.depthLoadOp = wgpu::LoadOp::Clear;
-        depth_attachment.depthStoreOp = wgpu::StoreOp::Store;
-        depth_attachment.depthClearValue = 1.0f;
-
-        wgpu::RenderPassDescriptor pass_desc{};
-        pass_desc.depthStencilAttachment = &depth_attachment;
-        auto pass = encoder.BeginRenderPass(&pass_desc);
-        EncodePreparedCmds(pass, cascade.pcmds, globals, pass_index++, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
-        pass.End();
-    }
-
-    // render spotlight shadowmaps
-    for (uint32_t i = 0; i < spotlight_shadow_current_count_; ++i)
-    {
-        auto& shadowmap = spotlight_shadows_[i];
-
-        GlobalUniformData globals{};
-        globals.view = shadowmap.view;
-        globals.proj = shadowmap.proj;
-        globals.view_proj = shadowmap.view_proj;
-
-        // setup cascade depth attachment
-        wgpu::RenderPassDepthStencilAttachment depth_attachment{};
-        depth_attachment.view = shadowmap.texture_view;
-        depth_attachment.depthLoadOp = wgpu::LoadOp::Clear;
-        depth_attachment.depthStoreOp = wgpu::StoreOp::Store;
-        depth_attachment.depthClearValue = 1.0f;
-
-        wgpu::RenderPassDescriptor pass_desc{};
-        pass_desc.depthStencilAttachment = &depth_attachment;
-        auto pass = encoder.BeginRenderPass(&pass_desc);
-        EncodePreparedCmds(pass, shadowmap.pcmds, globals, pass_index++, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
-        pass.End();
-    }
-
-    // setup main globals
-    GlobalUniformData globals{};
-    globals.view = main_ctx.view;
-    globals.proj = main_ctx.proj;
-    globals.view_proj = main_ctx.view_proj;
-    globals.ambient_color = LinearizeColor(env.ambient_light);
-    globals.sun_color = LinearizeColor(env.sun_color) * 1.5f;
-    globals.sun_direction = glm::mat3(main_ctx.view) * env.sun_direction;
-    globals.camera_pos = main_ctx.eye;
-    globals.fog = glm::vec4(LinearizeColor(env.fog), env.fog.a);
-    globals.tile_count_x = light_tiles_.x;
-
-    globals.csm_texel_size = 1.0f / static_cast<float>(csm_resolution_);
-    globals.csm_cascade_count = csm_num_cascades_;
-
-    auto inv_view = glm::inverse(main_ctx.view);
-    for (uint32_t i = 0; i < csm_num_cascades_; ++i)
-    {
-        globals.csm_splits[i] = csm_splits_[i];
-        globals.csm_matrices[i] = csm_cascades_[i].view_proj * inv_view;
-    }
-
-    globals.spotlight_texel_size = 1.0f / static_cast<float>(spotlight_shadow_resolution_);
-
-    for (uint32_t i = 0; i < spotlight_shadow_current_count_; ++i)
-    {
-        globals.spotlight_matrices[i] = spotlight_shadows_[i].view_proj * inv_view;
-    }
-
-    // setup depth attachment
     wgpu::RenderPassDepthStencilAttachment depth_attachment{};
-    depth_attachment.view = depth_texture_view_;
+    depth_attachment.view = viewport.depth_texture_view;
     depth_attachment.depthLoadOp = wgpu::LoadOp::Clear;
     depth_attachment.depthStoreOp = wgpu::StoreOp::Store;
     depth_attachment.depthClearValue = 1.0f;
 
-    // encode depth prepass
-    {        
-        wgpu::RenderPassDescriptor pass_desc{};
-        pass_desc.depthStencilAttachment = &depth_attachment;
-        
-        // normal texture for AO
-        wgpu::RenderPassColorAttachment color_attachment{};
-        if (surface_shader_cfg_.ao)
+    if (has_surfaces)
+    {
+        // prepare prepass & main cmds
+        PrepareSurfaceCmds(main_dlist_.surfaces, pcmds_prepass_, SPF_DEPTH_ONLY);
+        PrepareSurfaceCmds(main_dlist_.surfaces, pcmds_main_, 0);
+
+        size_t total_instances = pcmds_prepass_.size() + pcmds_main_.size();
+
+        // prepare CSM cmds
+        ComputeCSMMatrices(main_ctx.view, camera.fov, aspect, env.sun_direction);
+
+        for (uint32_t i = 0; i < csm_num_cascades_; ++i)
         {
-            color_attachment.view = normal_texture_view_;
-            color_attachment.loadOp = wgpu::LoadOp::Clear;
-            color_attachment.storeOp = wgpu::StoreOp::Store;
-            color_attachment.clearValue = {0.0, 0.0, 0.0, 1.0};
-            pass_desc.colorAttachmentCount = 1;
-            pass_desc.colorAttachments = &color_attachment;
+            auto& cascade = csm_cascades_[i];
+            cascade.dlist.Clear();
+
+            DrawContext cascade_ctx(cascade.dlist, DRAW_PASS_SHADOW_MAP, camera.eye, cascade.view, cascade.proj, 0.0f,
+                                    150.0f, glm::u32vec2(csm_resolution_));
+
+            scene.Draw(cascade_ctx);
+
+            PrepareSurfaceCmds(cascade.dlist.surfaces, cascade.pcmds, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
+            total_instances += cascade.pcmds.size();
         }
 
-        auto pass = encoder.BeginRenderPass(&pass_desc);
-        EncodePreparedCmds(pass, pcmds_prepass_, globals, pass_index++, SPF_DEPTH_ONLY);
-        pass.End();
-    }
+        // prepare spotlight shadow cmds
+        PrepareLights(main_dlist_.lights, main_ctx);
 
-    // cull lights using depth buffer
-    EncodeLightCullingPass(encoder, main_ctx);
+        for (uint32_t i = 0; i < spotlight_shadow_current_count_; ++i)
+        {
+            auto& shadowmap = spotlight_shadows_[i];
+            shadowmap.dlist.Clear();
 
-    // compute AO
-    if (surface_shader_cfg_.ao)
-    {
-        EncodeAO(encoder, main_ctx);
+            DrawContext shadowmap_ctx(shadowmap.dlist, DRAW_PASS_SHADOW_MAP, camera.eye, shadowmap.view, shadowmap.proj,
+                                      0.0f, 150.0f, glm::u32vec2(spotlight_shadow_resolution_));
+
+            scene.Draw(shadowmap_ctx);
+
+            PrepareSurfaceCmds(shadowmap.dlist.surfaces, shadowmap.pcmds, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
+            total_instances += shadowmap.pcmds.size();
+        }
+
+        // setup instance buffer
+        instances_.clear();
+        instances_.reserve(total_instances);
+        if (ReserveBufferCapacity(instance_buffer_, total_instances * sizeof(instances_[0])))
+        {
+            // need to recreate bind group if reallocated
+            CreateInstanceBufferBindGroup();
+        }
+
+        // render CSM cascades
+        for (uint32_t i = 0; i < csm_num_cascades_; ++i)
+        {
+            auto& cascade = csm_cascades_[i];
+
+            GlobalUniformData globals{};
+            globals.view = cascade.view;
+            globals.proj = cascade.proj;
+            globals.view_proj = cascade.view_proj;
+
+            // setup cascade depth attachment
+            wgpu::RenderPassDepthStencilAttachment depth_attachment{};
+            depth_attachment.view = cascade.texture_view;
+            depth_attachment.depthLoadOp = wgpu::LoadOp::Clear;
+            depth_attachment.depthStoreOp = wgpu::StoreOp::Store;
+            depth_attachment.depthClearValue = 1.0f;
+
+            wgpu::RenderPassDescriptor pass_desc{};
+            pass_desc.depthStencilAttachment = &depth_attachment;
+            auto pass = encoder.BeginRenderPass(&pass_desc);
+            EncodePreparedCmds(viewport, pass, cascade.pcmds, globals, pass_index++, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
+            pass.End();
+        }
+
+        // render spotlight shadowmaps
+        for (uint32_t i = 0; i < spotlight_shadow_current_count_; ++i)
+        {
+            auto& shadowmap = spotlight_shadows_[i];
+
+            GlobalUniformData globals{};
+            globals.view = shadowmap.view;
+            globals.proj = shadowmap.proj;
+            globals.view_proj = shadowmap.view_proj;
+
+            // setup cascade depth attachment
+            wgpu::RenderPassDepthStencilAttachment depth_attachment{};
+            depth_attachment.view = shadowmap.texture_view;
+            depth_attachment.depthLoadOp = wgpu::LoadOp::Clear;
+            depth_attachment.depthStoreOp = wgpu::StoreOp::Store;
+            depth_attachment.depthClearValue = 1.0f;
+
+            wgpu::RenderPassDescriptor pass_desc{};
+            pass_desc.depthStencilAttachment = &depth_attachment;
+            auto pass = encoder.BeginRenderPass(&pass_desc);
+            EncodePreparedCmds(viewport, pass, shadowmap.pcmds, globals, pass_index++, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
+            pass.End();
+        }
+
+        // setup main globals
+        globals.view = main_ctx.view;
+        globals.proj = main_ctx.proj;
+        globals.view_proj = main_ctx.view_proj;
+        globals.ambient_color = LinearizeColor(env.ambient_light);
+        globals.sun_color = LinearizeColor(env.sun_color) * 1.5f;
+        globals.sun_direction = glm::mat3(main_ctx.view) * env.sun_direction;
+        globals.camera_pos = main_ctx.eye;
+        globals.fog = glm::vec4(LinearizeColor(env.fog), env.fog.a);
+        globals.tile_count_x = viewport.light_tiles.x;
+
+        globals.csm_texel_size = 1.0f / static_cast<float>(csm_resolution_);
+        globals.csm_cascade_count = csm_num_cascades_;
+
+        auto inv_view = glm::inverse(main_ctx.view);
+        for (uint32_t i = 0; i < csm_num_cascades_; ++i)
+        {
+            globals.csm_splits[i] = csm_splits_[i];
+            globals.csm_matrices[i] = csm_cascades_[i].view_proj * inv_view;
+        }
+
+        globals.spotlight_texel_size = 1.0f / static_cast<float>(spotlight_shadow_resolution_);
+
+        for (uint32_t i = 0; i < spotlight_shadow_current_count_; ++i)
+        {
+            globals.spotlight_matrices[i] = spotlight_shadows_[i].view_proj * inv_view;
+        }
+
+        // encode depth prepass
+        {
+            wgpu::RenderPassDescriptor pass_desc{};
+            pass_desc.depthStencilAttachment = &depth_attachment;
+
+            // normal texture for AO
+            wgpu::RenderPassColorAttachment color_attachment{};
+            if (surface_shader_cfg_.ao)
+            {
+                color_attachment.view = viewport.normal_texture_view;
+                color_attachment.loadOp = wgpu::LoadOp::Clear;
+                color_attachment.storeOp = wgpu::StoreOp::Store;
+                color_attachment.clearValue = {0.0, 0.0, 0.0, 1.0};
+                pass_desc.colorAttachmentCount = 1;
+                pass_desc.colorAttachments = &color_attachment;
+            }
+
+            auto pass = encoder.BeginRenderPass(&pass_desc);
+            EncodePreparedCmds(viewport, pass, pcmds_prepass_, globals, pass_index++, SPF_DEPTH_ONLY);
+            pass.End();
+        }
+
+        // cull lights using depth buffer
+        EncodeLightCullingPass(viewport, encoder, main_ctx);
+
+        // compute AO
+        if (surface_shader_cfg_.ao)
+        {
+            EncodeAO(viewport, encoder, main_ctx);
+        }
     }
 
     // setup global bind group
-    if (!global_bind_group_)
+    if (!viewport.global_bind_group)
     {
-        CreateSurfaceGlobalBindGroup();
+        CreateSurfaceGlobalBindGroup(viewport);
     }
 
     // setup surface texture
-    auto surface_view = GetNextSurfaceViewData();
+    wgpu::TextureView output_texture_view = viewport.output_texture_view;
+
+    if (is_main_viewport)
+    {
+        auto surface_view = GetNextSurfaceViewData();
+        output_texture_view = surface_view.view;
+    }
 
     // setup color attachment
     wgpu::RenderPassColorAttachment color_attachment{};
-    color_attachment.view = use_fxaa_ ? color_texture_view_ : surface_view.view;
+    color_attachment.view = use_fxaa_ ? viewport.color_texture_view : output_texture_view;
     color_attachment.storeOp = wgpu::StoreOp::Store;
     color_attachment.loadOp = wgpu::LoadOp::Clear;
-    //auto clear_color = env.clear_color;
+    // auto clear_color = env.clear_color;
     auto clear_color = LinearizeColor(env.clear_color);
     color_attachment.clearValue = {clear_color.r, clear_color.g, clear_color.b, 1.0};
 
@@ -3258,7 +3336,10 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
         auto pass = encoder.BeginRenderPass(&pass_desc);
 
         // draw surfaces
-        EncodePreparedCmds(pass, pcmds_main_, globals, pass_index++, 0);
+        if (has_surfaces)
+        {
+            EncodePreparedCmds(viewport, pass, pcmds_main_, globals, pass_index++, 0);
+        }
 
         // also draw coronas in this pass
         EncodeCoronaCmds(pass, main_dlist_.coronas, main_ctx);
@@ -3267,7 +3348,7 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
     }
 
     // setup FXAA/HUD pass
-    color_attachment.view = surface_view.view;
+    color_attachment.view = output_texture_view;
     color_attachment.loadOp = use_fxaa_ ? wgpu::LoadOp::Clear : wgpu::LoadOp::Load; // load directly if FXAA disabled
     color_attachment.clearValue = {0.0, 0.0, 0.0, 1.0};
 
@@ -3280,25 +3361,21 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
 
         if (use_fxaa_)
         {
-            EncodeFXAA(pass, main_ctx);
-        }
-
-        // render external GUI if any
-        if (gui_render_callback_)
-        {
-            gui_render_callback_(pass);
-
-            // reset the pass state
-            pass.SetScissorRect(0, 0, viewport_size.x, viewport_size.y);
+            EncodeFXAA(viewport, pass, main_ctx);
         }
 
         // hud
         EncodeHudCmds(pass, main_dlist_.huds, main_ctx);
 
+        // render external GUI if any
+        if (is_main_viewport && gui_render_callback_)
+        {
+            gui_render_callback_(pass);
+        }
+
         pass.End();
 
     }
-
 
     // upload instance data from all passes
     std::span<const uint8_t> instance_data_view = {reinterpret_cast<const uint8_t*>(instances_.data()),
@@ -3311,10 +3388,6 @@ void gfx::RendererWGPU::Render(Scene& scene, const CameraParams& camera)
     cmd_desc.label = "Command buffer";
     auto command = encoder.Finish(&cmd_desc);
     queue_.Submit(1, &command);
-
-#if !defined(__EMSCRIPTEN__)
-    surface_.Present();
-#endif
 }
 
 void gfx::RendererWGPU::ComputeCSMMatrices(const glm::mat4& view, float fov, float aspect, const glm::vec3& sun_dir)
@@ -3526,9 +3599,9 @@ void gfx::RendererWGPU::PrepareSurfaceCmds(std::span<DrawSurfaceCmd> cmds, std::
     }
 }
 
-void gfx::RendererWGPU::EncodePreparedCmds(wgpu::RenderPassEncoder& pass, std::span<PreparedCmd> pcmds,
-                                           const GlobalUniformData& globals, uint32_t globals_index,
-                                           SurfacePipelineFlags pflags)
+void gfx::RendererWGPU::EncodePreparedCmds(ViewportWGPU& viewport, wgpu::RenderPassEncoder& pass,
+                                           std::span<PreparedCmd> pcmds, const GlobalUniformData& globals,
+                                           uint32_t globals_index, SurfacePipelineFlags pflags)
 {
     if (pcmds.empty())
         return;
@@ -3612,7 +3685,7 @@ void gfx::RendererWGPU::EncodePreparedCmds(wgpu::RenderPassEncoder& pass, std::s
     bool depth_only = (pflags & SPF_DEPTH_ONLY);
 
     uint32_t global_offset = GLOBAL_BUFFER_STRIDE * globals_index;
-    pass.SetBindGroup(0, depth_only ? global_depth_bind_group_ : global_bind_group_, 1, &global_offset);
+    pass.SetBindGroup(0, depth_only ? global_depth_bind_group_ : viewport.global_bind_group, 1, &global_offset);
     pass.SetBindGroup(2, instance_bind_group_);
 
     for (const auto& pcmd : pcmds)
@@ -3740,18 +3813,18 @@ void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawCo
     }
 }
 
-void gfx::RendererWGPU::EncodeLightCullingPass(wgpu::CommandEncoder& encoder, const DrawContext& ctx)
+void gfx::RendererWGPU::EncodeLightCullingPass(ViewportWGPU& viewport, wgpu::CommandEncoder& encoder, const DrawContext& ctx)
 {
     // ensure bind group
-    if (!light_culling_bind_group_)
+    if (!viewport.light_culling_bind_group)
     {
-        CreateLightCullingBindGroup();
+        CreateLightCullingBindGroup(viewport);
     }
 
     // setup globals
     LightCullingGlobalData globals{};
     globals.screen_size = ctx.viewport_size;
-    globals.tile_count = light_tiles_;
+    globals.tile_count = viewport.light_tiles;
     globals.proj = ctx.proj;
     globals.inv_proj = glm::inverse(ctx.proj);
     globals.light_count = lights_.size();
@@ -3766,16 +3839,16 @@ void gfx::RendererWGPU::EncodeLightCullingPass(wgpu::CommandEncoder& encoder, co
     // dispatch
     auto pass = encoder.BeginComputePass();
     pass.SetPipeline(light_culling_pipeline_);
-    pass.SetBindGroup(0, light_culling_bind_group_);
-    pass.DispatchWorkgroups(light_tiles_.x, light_tiles_.y);
+    pass.SetBindGroup(0, viewport.light_culling_bind_group);
+    pass.DispatchWorkgroups(viewport.light_tiles.x, viewport.light_tiles.y);
     pass.End();
 }
 
-void gfx::RendererWGPU::EncodeAO(wgpu::CommandEncoder& encoder, const DrawContext& ctx)
+void gfx::RendererWGPU::EncodeAO(ViewportWGPU& viewport, wgpu::CommandEncoder& encoder, const DrawContext& ctx)
 {
-    if (!ao_bind_group_)
+    if (!viewport.ao_bind_group)
     {
-        CreateAOBindGroup();
+        CreateAOBindGroup(viewport);
     }
 
     if (!ao_pipeline_)
@@ -3801,20 +3874,20 @@ void gfx::RendererWGPU::EncodeAO(wgpu::CommandEncoder& encoder, const DrawContex
 
     auto pass = encoder.BeginComputePass();
     pass.SetPipeline(ao_pipeline_);
-    pass.SetBindGroup(0, ao_bind_group_);
+    pass.SetBindGroup(0, viewport.ao_bind_group);
     pass.DispatchWorkgroups(count_x, count_y);
     pass.End();
 }
 
-void gfx::RendererWGPU::EncodeFXAA(wgpu::RenderPassEncoder& pass, const DrawContext& ctx)
+void gfx::RendererWGPU::EncodeFXAA(ViewportWGPU& viewport, wgpu::RenderPassEncoder& pass, const DrawContext& ctx)
 {
-    if (!fxaa_bind_group_)
+    if (!viewport.fxaa_bind_group)
     {
-        CreateFXAABindGroup();
+        CreateFXAABindGroup(viewport);
     }
 
     pass.SetPipeline(fxaa_pipeline_);
-    pass.SetBindGroup(0, fxaa_bind_group_);
+    pass.SetBindGroup(0, viewport.fxaa_bind_group);
     pass.Draw(4);
 }
 

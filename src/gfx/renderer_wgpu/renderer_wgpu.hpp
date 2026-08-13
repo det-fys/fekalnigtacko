@@ -203,6 +203,35 @@ struct AOGlobalData
     float intensity;
 };
 
+struct ViewportWGPU
+{
+    glm::u32vec2 size{};
+
+    wgpu::Texture depth_texture;
+    wgpu::TextureView depth_texture_view;
+    wgpu::Texture color_texture;
+    wgpu::TextureView color_texture_view;
+    wgpu::Texture normal_texture; // for AO
+    wgpu::TextureView normal_texture_view;
+    wgpu::Texture output_texture;
+    wgpu::TextureView output_texture_view;
+    wgpu::TextureView output_texture_view_nonsrgb; // for imgui
+
+    wgpu::BindGroup global_bind_group;
+
+    wgpu::Buffer visible_lights_buffer;
+    uint32_t visible_lights_buffer_size = 0;
+    wgpu::BindGroup light_culling_bind_group;
+    glm::u32vec2 light_tiles;
+
+    wgpu::Texture ao_output_texture;
+    wgpu::TextureView ao_output_texture_view;
+    wgpu::BindGroup ao_bind_group;
+
+    wgpu::BindGroup fxaa_bind_group;
+
+};
+
 class RendererWGPU : public Renderer
 {
 public:
@@ -259,37 +288,42 @@ private:
     void InvalidateShadowResources();
     
     void CreateSurfaceGlobalResources();
-    void CreateSurfaceGlobalBindGroup();
-    void InvalidateSurfaceGlobalBindGroup();
+    void CreateSurfaceGlobalBindGroup(ViewportWGPU& viewport);
+    void InvalidateSurfaceGlobalBindGroup(ViewportWGPU& viewport);
+    void InvalidateSurfaceGlobalBindGroups();
     void CreateSurfaceMaterialResources();
     void CreateSurfaceInstanceResources();
     
     void CreateDepthResources();
     
     void CreateLightCullingResources();
-    void CreateLightCullingVisibleLightsBuffer();
-    void CreateLightCullingBindGroup();
+    void CreateLightCullingVisibleLightsBuffer(ViewportWGPU& viewport);
+    void CreateLightCullingBindGroup(ViewportWGPU& viewport);
     void CreateLightCullingPipeline();
-    void InvalidateLightCullingBindGroup();
+    void InvalidateLightCullingBindGroup(ViewportWGPU& viewport);
 
     void CreateCoronaResources();
     void CreateCoronaBindGroup();
     void CreateCoronaPipeline();
 
     void CreateAOResources();
-    void CreateAOBindGroup();
-    void InvalidateAOBindGroup();
+    void CreateAOBindGroup(ViewportWGPU& viewport);
+    void InvalidateAOBindGroup(ViewportWGPU& viewport);
     void CreateAOPipeline();
     void InvalidateAOPipeline();
 
     void CreateFXAAResources();
-    void CreateFXAABindGroup();
-    void InvalidateFXAABindGroup();
+    void CreateFXAABindGroup(ViewportWGPU& viewport);
+    void InvalidateFXAABindGroup(ViewportWGPU& viewport);
     void CreateFXAAPipeline();
 
     void CreateGuiResources();
     void CreateGuiPipeline();
     
+    void SetupViewport(ViewportWGPU& viewport, const glm::u32vec2& size, bool omit_output_texture = false);
+    void InvalidateViewport(ViewportWGPU& viewport);
+    void InvalidateViewports();
+
     void ConfigureSurface(const glm::u32vec2& viewport_size);
     void InvalidateSurface();
     void ProcessViewportSizeChange(const glm::u32vec2& viewport_size);
@@ -314,16 +348,16 @@ private:
     void CreateInstanceBufferBindGroup();
     
     void UpdateSettings();
-
-    void Render(Scene& scene, const CameraParams& camera);
+    
+    void Render(ViewportWGPU& viewport, Scene& scene, const CameraParams& camera);
     void ComputeCSMMatrices(const glm::mat4& view, float fov, float aspect, const glm::vec3& sun_dir);
     void PrepareSurfaceCmds(std::span<DrawSurfaceCmd> cmds, std::vector<PreparedCmd>& pcmds, SurfacePipelineFlags pflags);
-    void EncodePreparedCmds(wgpu::RenderPassEncoder& pass, std::span<PreparedCmd> pcmds,
+    void EncodePreparedCmds(ViewportWGPU& viewport, wgpu::RenderPassEncoder& pass, std::span<PreparedCmd> pcmds,
                             const GlobalUniformData& globals, uint32_t globals_index, SurfacePipelineFlags pflags);
     void PrepareLights(std::span<DrawLightCmd> cmds, const DrawContext& ctx);
-    void EncodeLightCullingPass(wgpu::CommandEncoder& encoder, const DrawContext& ctx);
-    void EncodeAO(wgpu::CommandEncoder& encoder, const DrawContext& ctx);
-    void EncodeFXAA(wgpu::RenderPassEncoder& pass, const DrawContext& ctx);
+    void EncodeLightCullingPass(ViewportWGPU& viewport, wgpu::CommandEncoder& encoder, const DrawContext& ctx);
+    void EncodeAO(ViewportWGPU& viewport, wgpu::CommandEncoder& encoder, const DrawContext& ctx);
+    void EncodeFXAA(ViewportWGPU& viewport, wgpu::RenderPassEncoder& pass, const DrawContext& ctx);
     void EncodeCoronaCmds(wgpu::RenderPassEncoder& pass, std::span<DrawCoronaCmd> cmds, const DrawContext& ctx);
     void EncodeHudCmds(wgpu::RenderPassEncoder& pass, std::span<DrawHudCmd> queue, const DrawContext& ctx);
 
@@ -347,7 +381,6 @@ private:
     wgpu::BindGroupLayout skeletal_bind_group_layout_;
     wgpu::BindGroupLayout deform_bind_group_layout_;
     wgpu::Buffer global_buffer_;
-    wgpu::BindGroup global_bind_group_;
     DynamicBuffer instance_buffer_;
     wgpu::BindGroup instance_bind_group_;
     ShaderConfig surface_shader_cfg_{};
@@ -380,10 +413,6 @@ private:
     wgpu::BindGroupLayout light_culling_bind_group_layout_;
     wgpu::Buffer light_culling_global_buffer_;
     wgpu::Buffer light_buffer_;
-    wgpu::Buffer visible_lights_buffer_;
-    uint32_t visible_lights_buffer_size_ = 0;
-    wgpu::BindGroup light_culling_bind_group_;
-    glm::u32vec2 light_tiles_;
     wgpu::ComputePipeline light_culling_pipeline_;
 
     // light coronas
@@ -401,13 +430,11 @@ private:
     // AO
     wgpu::BindGroupLayout ao_bind_group_layout_;
     wgpu::Buffer ao_global_buffer_;
-    wgpu::BindGroup ao_bind_group_;
     wgpu::ComputePipeline ao_pipeline_;
 
     // FXAA
     bool use_fxaa_ = false;
     wgpu::BindGroupLayout fxaa_bind_group_layout_;
-    wgpu::BindGroup fxaa_bind_group_;
     wgpu::RenderPipeline fxaa_pipeline_;
 
     // GUI drawing resources
@@ -421,16 +448,12 @@ private:
     glm::u32vec2 setup_viewport_size_{0};
     wgpu::TextureFormat surface_real_format_;
     wgpu::TextureFormat surface_format_;
+    wgpu::TextureFormat surface_format_nonsrgb_;
     wgpu::Surface surface_;
-    wgpu::TextureFormat depth_format_;
-    wgpu::Texture depth_texture_;
-    wgpu::TextureView depth_texture_view_;
-    wgpu::Texture color_texture_;
-    wgpu::TextureView color_texture_view_;
-    wgpu::Texture normal_texture_; // for AO
-    wgpu::TextureView normal_texture_view_;
-    wgpu::Texture ao_output_texture_;
-    wgpu::TextureView ao_output_texture_view_;
+    wgpu::TextureFormat depth_format_ = wgpu::TextureFormat::Depth24Plus;
+    wgpu::TextureFormat normal_format_ = wgpu::TextureFormat::RGBA8Unorm;
+
+    ViewportWGPU main_viewport_;
 
     // resources
     ResourceArray<MeshWGPU> meshes_;
@@ -438,6 +461,7 @@ private:
     ResourceArray<MaterialWGPU> materials_;
     ResourceArray<SkeletonPoseWGPU> poses_;
     ResourceArray<DeformTextureWGPU> deforms_;
+    ResourceArray<ViewportWGPU> viewports_;
 
     // system resources
     std::shared_ptr<const Texture> white_tex_;

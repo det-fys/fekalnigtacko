@@ -102,6 +102,23 @@ public:
         free_.push_back(id);
     }
 
+    void ForEach(std::function<void(ID, T&)> callback)
+    {
+        for (ID block_id = 0; block_id < blocks_.size(); ++block_id)
+        {
+            auto& block = blocks_[block_id];
+            for (ID item_id = 0; item_id < RES_ARRAY_BLOCK_SIZE; ++item_id)
+            {
+                ID id = (block_id << RES_ARRAY_BLOCK_BITS) | item_id;
+                auto& slot = block->data[item_id];
+                if (slot)
+                {
+                    callback(id, *slot);
+                }
+            }
+        }
+    }
+
 private:
     std::optional<T>& GetSlot(ID id)
     {
