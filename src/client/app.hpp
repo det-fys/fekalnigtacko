@@ -22,6 +22,9 @@
 #include "gfx/scene.hpp"
 #include "gfx/viewport.hpp"
 #include "fs/archive_fetch.hpp"
+#include "utils/input_receiver.hpp"
+#include "im/viewport.hpp"
+#include "im/scene_view.hpp"
 
 struct ChatMessage
 {
@@ -47,12 +50,34 @@ enum AppState
     APP_STATE_ERROR,
 };
 
-struct AppAdvancedMode
+class App;
+
+class AppViewport : public im::Viewport
 {
-    gfx::Viewport app_viewport;
+public:
+    using Super = im::Viewport;
+    
+    AppViewport(App& app);
+
+protected:
+    virtual void Update() override;
+    virtual void Draw(ImDrawList& draw_list) override;
+
+private:
+    App& app_;
+    im::SceneView scene_view_;
 };
 
-class App : public net::ClientInterfaceCallback, public gfx::Scene
+struct DevMode
+{
+    AppViewport app_viewport;
+    bool show_app_viewport = true;
+    bool show_imgui_demo = false;
+
+    DevMode(App& app) : app_viewport(app) {}
+};
+
+class App : public net::ClientInterfaceCallback, public gfx::Scene, public InputReceiver
 {
 public:
     App(const std::string& settings_path);
@@ -67,6 +92,11 @@ public:
     virtual gfx::Environment GetSceneEnvironment() override;
     virtual float GetMapChunkSize() override;
 
+    // InputReceiver
+    virtual void KeyInput(KeyCode key, bool pressed, int repeat) override;
+    virtual void MouseMove(const glm::vec2& delta) override;
+    virtual void TextInput(std::string_view text) override;
+
     void Frame();
 
     void SetTime(float time) { time_ = time; }
@@ -76,10 +106,6 @@ public:
     const std::string& GetUserName() const { return username_; }
 
     void Input(game::PlayerInputType in, bool pressed, bool repeated);
-    void MouseMove(const glm::vec2& delta);
-
-    bool KeyInput(KeyCode key, bool pressed, size_t repeat);
-    void TextInput(std::string_view text);
 
     const float& GetTime() const { return time_; }
     float GetDeltaTime() const { return delta_time_; }
@@ -90,14 +116,16 @@ public:
     void AddChatMessagePrefix(const std::string& prefix, const std::string& text);
     void AddChatMessage(std::string text);
 
+    gfx::CameraParams GetCameraParams() const;
+
     ~App();
 
 private:
     void Update();
-    void ShowAdvancedMode();
     void Draw();
-    gfx::CameraParams GetCameraParams() const;
-    void SwitchAdvancedMode();
+    void SwitchDevMode();
+
+    void ShowDevMode();
 
     void OpenSettings();
     void UpdateVolume();
@@ -175,6 +203,8 @@ private:
     std::string fps_text_ = { 0 };
     std::string msglen_text_ = { 0 };
 
-    // advanced mode
-    std::optional<AppAdvancedMode> advanced_;
+    // dev mode
+    bool enable_dev_mode_ = false;
+    bool dev_mode_first_frame_ = false;
+    std::optional<DevMode> dev_mode_;
 };

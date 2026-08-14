@@ -18,10 +18,12 @@
 #include "server/server_cfg.hpp"
 #include "db/db_memory.hpp"
 #include "version.hpp"
-
+#include "key_map.hpp"
 #include "net/client_ws.hpp"
+#include "im/utils.hpp"
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 CVAR_CL(float, sensitivity, CV_SAVE, 0.5f);
 CVAR_CL(float, volume, CV_SAVE, 0.2f, 0.0f);
@@ -218,47 +220,44 @@ void App::Input(game::PlayerInputType in, bool pressed, bool repeated)
 
 }
 
-void App::MouseMove(const glm::vec2& delta)
+void App::KeyInput(KeyCode key, bool pressed, int repeat)
 {
-	auto sens = glm::mix(0.0005f, 0.0035f, sensitivity.Get());
+    if (pressed)
+    {
+        if (chat_.KeyInput(key))
+            return;
 
-	float delta_yaw = -delta.x * sens;
-	float delta_pitch = -delta.y * sens;
+        if (key == KEY_F)
+        {
+            fullscreen_ = !fullscreen_;
+            return;
+        }
 
-	if (session_)
-		session_->ProcessMouseMove(delta_yaw, delta_pitch);
+        if (key == KEY_F9)
+        {
+            SwitchDevMode();
+            return;
+        }
+
+        // TODO: menu controls here
+    }
+
+    auto it = s_inputmap.find(key);
+    if (it != s_inputmap.end())
+    {
+        Input(it->second, pressed, repeat > 0);
+    }
 }
 
-bool App::KeyInput(KeyCode key, bool pressed, size_t repeat)
+void App::MouseMove(const glm::vec2& delta)
 {
-	if (pressed)
-	{
-		if (chat_.KeyInput(key))
-			return true;
+    auto sens = glm::mix(0.0005f, 0.0035f, sensitivity.Get());
 
-		if (key == KEY_F)
-		{
-			fullscreen_ = !fullscreen_;
-			return true;
-		}
+    float delta_yaw = -delta.x * sens;
+    float delta_pitch = -delta.y * sens;
 
-		if (key == KEY_F9)
-		{
-            SwitchAdvancedMode();
-            return true;
-		}
-
-		// TODO: menu controls here
-	}
-
-	auto it = s_inputmap.find(key);
-	if (it != s_inputmap.end())
-	{
-		Input(it->second, pressed, repeat > 0);
-	}
-
-	return true;
-
+    if (session_)
+        session_->ProcessMouseMove(delta_yaw, delta_pitch);
 }
 
 void App::TextInput(std::string_view text)
@@ -306,49 +305,109 @@ void App::Update()
 	
 	settings_.TrySave(time_);
 
-	ShowAdvancedMode();
+	if (enable_dev_mode_)
+	{
+		ShowDevMode();
+	}
 }
 
-void App::ShowAdvancedMode()
+void App::ShowDevMode()
 {
-	if (!advanced_)
-	{
-        return;
-	}
+    ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
 
-    ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
+    ImGui::SetNextWindowViewport(viewport->ID);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    window_flags |=
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+    window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
-	ImGui::ShowDemoWindow();
+    ImGui::Begin("Dockspace Window", nullptr, window_flags);
+    ImGui::PopStyleVar(3);
 
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    bool show =
-        ImGui::Begin("App Viewport", nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    ImGui::PopStyleVar();
+	auto dockspace_id = ImGui::GetID("Main Dockspace");
 
-	if (show)
-	{
-        auto canvas_p0 = ImGui::GetCursorScreenPos();
-        auto canvas_sz = ImGui::GetContentRegionAvail();
+    if (ImGui::BeginMenuBar())
+    {
+        if (ImGui::BeginMenu("Dev"))
+        {
+            if (ImGui::MenuItem("Exit dev mode", "F9"))
+            {
+                SwitchDevMode();
+            }
+            ImGui::EndMenu();
+        }
 
-        glm::u32vec2 size(canvas_sz.x, canvas_sz.y);
-        advanced_->app_viewport.Draw(*this, GetCameraParams(), size);
+        if (ImGui::BeginMenu("View"))
+        {
+            if (ImGui::MenuItem("Reset layout"))
+            {
+                ImGui::DockBuilderRemoveNode(dockspace_id); // Clear existing layout
+            }
 
-		auto native_handle = advanced_->app_viewport.GetNativeHandle();
-		if (native_handle)
-		{
-            int y0 = gfx::Viewport::NeedsYFlip() ? 1 : 0;
-			ImGui::Image(reinterpret_cast<ImTextureID>(native_handle), ImVec2(size.x, size.y), ImVec2(0, y0), ImVec2(1, 1 - y0));
-		}
+            ImGui::EndMenu();
+        }
 
-	}
+        if (ImGui::BeginMenu("Windows"))
+        {
+            ImGui::MenuItem("App Viewport", nullptr, &dev_mode_->show_app_viewport);
+            ImGui::MenuItem("Map Editor");
+            ImGui::Separator();
+            ImGui::MenuItem("ImGui Demo", nullptr, &dev_mode_->show_imgui_demo);
+
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMenuBar();
+    }
+
+    // check key shortcuts
+    if (ImGui::IsKeyPressed(ImGuiKey_F9) && !dev_mode_first_frame_)
+    {
+        SwitchDevMode();
+    }
+
+	if (!ImGui::DockBuilderGetNode(dockspace_id))
+    {
+        ImGui::DockBuilderRemoveNode(dockspace_id); // Clear existing layout
+        ImGui::DockBuilderAddNode(dockspace_id, dockspace_flags | ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetMainViewport()->WorkSize);
+
+		ImGuiID dock_main_id = dockspace_id;
+        ImGuiID dock_right_id =
+            ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.25f, nullptr, &dock_main_id);
+
+		ImGui::DockBuilderDockWindow("App Viewport", dock_main_id);
+        ImGui::DockBuilderDockWindow("Dear ImGui Demo", dock_right_id);
+
+		ImGui::DockBuilderFinish(dockspace_id);
+    }
+
+	ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
     ImGui::End();
 
+	if (dev_mode_->show_imgui_demo)
+	{
+		ImGui::ShowDemoWindow(&dev_mode_->show_imgui_demo);
+	}
+
+	if (dev_mode_->show_app_viewport)
+	{
+		dev_mode_->app_viewport.Show(&dev_mode_->show_app_viewport);
+	}
+
+	dev_mode_first_frame_ = false;
 }
 
 void App::Draw()
 {
-	// in advanced mode app is drawn to a custom viewport
-	if (!advanced_)
+	// in dev mode app is drawn to a custom viewport
+	if (!enable_dev_mode_)
     {
         gfx::Renderer::GetInstance().Draw(*this, GetCameraParams());
     }
@@ -378,15 +437,19 @@ gfx::CameraParams App::GetCameraParams() const
 	return {};
 }
 
-void App::SwitchAdvancedMode()
+void App::SwitchDevMode()
 {
-    if (!advanced_)
+    enable_dev_mode_ = !enable_dev_mode_;
+	
+	if (enable_dev_mode_)
     {
-        advanced_.emplace();
-    }
-    else
-    {
-        advanced_.reset();
+		// first time open
+		if (!dev_mode_)
+		{
+			dev_mode_.emplace(*this);
+		}
+
+		dev_mode_first_frame_ = true;
     }
 }
 
@@ -929,3 +992,45 @@ void App::ProcessConnectOrDisconnectCmd(CmdLineStream& line, bool connect)
     AddChatMessage(COL_SUCCESS "ok");
 }
 
+AppViewport::AppViewport(App& app) : Super("App Viewport"), app_(app), scene_view_(app) {}
+
+void AppViewport::Update()
+{
+    auto& io = ImGui::GetIO();
+
+    if (IsActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Right))
+    {
+        app_.MouseMove(im::VecFromImGui(io.MouseDelta));
+    }
+
+    if (IsHovered())
+    {
+        for (int key = ImGuiKey_NamedKey_BEGIN; key < ImGuiKey_NamedKey_END; ++key)
+        {
+            ImGuiKey key_enum = (ImGuiKey)key;
+
+            if (key_enum == ImGuiKey_F9)
+            {
+                continue;
+            }
+
+            bool pressed = ImGui::IsKeyPressed(key_enum, false);
+            bool released = ImGui::IsKeyReleased(key_enum);
+
+            if (pressed || released)
+            {
+                auto keycode = GetKeyCodeFromImGuiKey(key_enum);
+                if (keycode != KEY_NONE)
+                {
+                    app_.KeyInput(keycode, pressed, 0);
+                }
+            }
+        }
+    }
+
+}
+
+void AppViewport::Draw(ImDrawList& draw_list)
+{
+    scene_view_.Draw(draw_list, im::VecToImGui(GetCanvasP0()), im::VecToImGui(GetCanvasSize()), app_.GetCameraParams());
+}

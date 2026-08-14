@@ -127,3 +127,136 @@ KeyCode GetKeyCodeFromSDLScancode(SDL_Scancode scancode)
     
     return it->second;
 }
+static std::map<ImGuiKey, KeyCode> imgui_to_kc = {
+    {ImGuiKey_None, KEY_NONE},
+
+    // Alphabet
+    {ImGuiKey_A, KEY_A},
+    {ImGuiKey_B, KEY_B},
+    {ImGuiKey_C, KEY_C},
+    {ImGuiKey_D, KEY_D},
+    {ImGuiKey_E, KEY_E},
+    {ImGuiKey_F, KEY_F},
+    {ImGuiKey_G, KEY_G},
+    {ImGuiKey_H, KEY_H},
+    {ImGuiKey_I, KEY_I},
+    {ImGuiKey_J, KEY_J},
+    {ImGuiKey_K, KEY_K},
+    {ImGuiKey_L, KEY_L},
+    {ImGuiKey_M, KEY_M},
+    {ImGuiKey_N, KEY_N},
+    {ImGuiKey_O, KEY_O},
+    {ImGuiKey_P, KEY_P},
+    {ImGuiKey_Q, KEY_Q},
+    {ImGuiKey_R, KEY_R},
+    {ImGuiKey_S, KEY_S},
+    {ImGuiKey_T, KEY_T},
+    {ImGuiKey_U, KEY_U},
+    {ImGuiKey_V, KEY_V},
+    {ImGuiKey_W, KEY_W},
+    {ImGuiKey_X, KEY_X},
+    {ImGuiKey_Y, KEY_Y},
+    {ImGuiKey_Z, KEY_Z},
+
+    // Numbers
+    {ImGuiKey_1, KEY_1},
+    {ImGuiKey_2, KEY_2},
+    {ImGuiKey_3, KEY_3},
+    {ImGuiKey_4, KEY_4},
+    {ImGuiKey_5, KEY_5},
+    {ImGuiKey_6, KEY_6},
+    {ImGuiKey_7, KEY_7},
+    {ImGuiKey_8, KEY_8},
+    {ImGuiKey_9, KEY_9},
+    {ImGuiKey_0, KEY_0},
+
+    // Control & Editing
+    {ImGuiKey_Enter, KEY_ENTER},
+    {ImGuiKey_Escape, KEY_ESCAPE},
+    {ImGuiKey_Backspace, KEY_BACKSPACE},
+    {ImGuiKey_Tab, KEY_TAB},
+    {ImGuiKey_Space, KEY_SPACE},
+
+    // Punctuation & Symbols
+    {ImGuiKey_Minus, KEY_MINUS},
+    {ImGuiKey_Equal, KEY_EQUALS},
+    {ImGuiKey_LeftBracket, KEY_LEFTBRACKET},
+    {ImGuiKey_RightBracket, KEY_RIGHTBRACKET},
+    {ImGuiKey_Backslash, KEY_BACKSLASH},
+    {ImGuiKey_Semicolon, KEY_SEMICOLON},
+    {ImGuiKey_Apostrophe, KEY_APOSTROPHE},
+    {ImGuiKey_GraveAccent, KEY_GRAVE},
+    {ImGuiKey_Comma, KEY_COMMA},
+    {ImGuiKey_Period, KEY_PERIOD},
+    {ImGuiKey_Slash, KEY_SLASH},
+
+    // Lock & Function Keys
+    {ImGuiKey_CapsLock, KEY_CAPSLOCK},
+    {ImGuiKey_F1, KEY_F1},
+    {ImGuiKey_F2, KEY_F2},
+    {ImGuiKey_F3, KEY_F3},
+    {ImGuiKey_F4, KEY_F4},
+    {ImGuiKey_F5, KEY_F5},
+    {ImGuiKey_F6, KEY_F6},
+    {ImGuiKey_F7, KEY_F7},
+    {ImGuiKey_F8, KEY_F8},
+    {ImGuiKey_F9, KEY_F9},
+    {ImGuiKey_F10, KEY_F10},
+    {ImGuiKey_F11, KEY_F11},
+    {ImGuiKey_F12, KEY_F12},
+
+    // Navigation & System
+    {ImGuiKey_PrintScreen, KEY_PRINTSCREEN},
+    {ImGuiKey_ScrollLock, KEY_SCROLLLOCK},
+    {ImGuiKey_Pause, KEY_PAUSE},
+
+    {ImGuiKey_Insert, KEY_INSERT},
+    {ImGuiKey_Home, KEY_HOME},
+    {ImGuiKey_PageUp, KEY_PAGEUP},
+    {ImGuiKey_Delete, KEY_DELETE},
+    {ImGuiKey_End, KEY_END},
+    {ImGuiKey_PageDown, KEY_PAGEDOWN},
+
+    // Arrow Keys
+    {ImGuiKey_RightArrow, KEY_RIGHT},
+    {ImGuiKey_LeftArrow, KEY_LEFT},
+    {ImGuiKey_DownArrow, KEY_DOWN},
+    {ImGuiKey_UpArrow, KEY_UP},
+
+    // Keypad
+    {ImGuiKey_NumLock, KEY_NUMLOCK},
+    {ImGuiKey_KeypadDivide, KEY_DIVIDE},
+    {ImGuiKey_KeypadMultiply, KEY_MULTIPLY},
+    {ImGuiKey_KeypadSubtract, KEY_MINUS},
+    {ImGuiKey_KeypadAdd, KEY_ADD},
+    {ImGuiKey_KeypadEnter, KEY_ENTER},
+    {ImGuiKey_Keypad1, KEY_NUMPAD1},
+    {ImGuiKey_Keypad2, KEY_NUMPAD2},
+    {ImGuiKey_Keypad3, KEY_NUMPAD3},
+    {ImGuiKey_Keypad4, KEY_NUMPAD4},
+    {ImGuiKey_Keypad5, KEY_NUMPAD5},
+    {ImGuiKey_Keypad6, KEY_NUMPAD6},
+    {ImGuiKey_Keypad7, KEY_NUMPAD7},
+    {ImGuiKey_Keypad8, KEY_NUMPAD8},
+    {ImGuiKey_Keypad9, KEY_NUMPAD9},
+    {ImGuiKey_Keypad0, KEY_NUMPAD0},
+    {ImGuiKey_KeypadDecimal, KEY_DECIMAL},
+
+    // Modifiers & Context
+    {ImGuiKey_LeftCtrl, KEY_LCTRL},
+    {ImGuiKey_LeftShift, KEY_LSHIFT},
+    {ImGuiKey_LeftAlt, KEY_LALT},
+    {ImGuiKey_RightCtrl, KEY_RCTRL},
+    {ImGuiKey_RightShift, KEY_RSHIFT},
+    {ImGuiKey_RightAlt, KEY_RALT},
+    {ImGuiKey_Menu, KEY_MENU}
+};
+
+KeyCode GetKeyCodeFromImGuiKey(ImGuiKey key)
+{
+    auto it = imgui_to_kc.find(key);
+    if (it == imgui_to_kc.end())
+        return KEY_NONE;
+
+    return it->second;
+}

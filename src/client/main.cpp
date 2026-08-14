@@ -29,7 +29,7 @@
 #include "gfx/renderer_gl/gl.hpp"
 #include "version.hpp"
 #include "fs/fs.hpp"
-#include "imgui_integration.hpp"
+#include "im/imgui_integration.hpp"
 
 CVAR_CL(uint16_t, cl_maxfps, CV_SAVE, 0);
 
