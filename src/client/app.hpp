@@ -25,6 +25,7 @@
 #include "utils/input_receiver.hpp"
 #include "im/viewport.hpp"
 #include "im/scene_view.hpp"
+#include "edit/map_edit.hpp"
 
 struct ChatMessage
 {
@@ -72,6 +73,10 @@ struct DevMode
 {
     AppViewport app_viewport;
     bool show_app_viewport = true;
+
+    std::optional<edit::MapEdit> map_edit;
+    bool show_map_edit = false;
+
     bool show_imgui_demo = false;
 
     DevMode(App& app) : app_viewport(app) {}

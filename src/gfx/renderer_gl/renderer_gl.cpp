@@ -372,7 +372,7 @@ void gfx::RendererGL::Render(Scene& scene, const CameraParams& camera, const glm
     const float farplane = 3000.0f;
 
     auto proj = glm::perspective(glm::radians(camera.fov * 0.5f), aspect, 0.1f, farplane);
-    auto view = glm::lookAt(camera.eye, camera.eye + camera.dir, glm::vec3(0.0f, 0.0f, 1.0f));
+    auto view = glm::lookAt(camera.eye, camera.eye + camera.dir, camera.up);
 
     float min_distance = 0.0f;
     float max_distance = 500.0f;

@@ -1,11 +1,9 @@
 #include "scene_view.hpp"
 
-im::SceneView::SceneView(gfx::Scene& scene) : scene_(scene) {}
-
-void im::SceneView::Draw(ImDrawList& draw_list, ImVec2 p0, ImVec2 sz, const gfx::CameraParams& cam)
+void im::SceneView::Draw(ImDrawList& draw_list, ImVec2 p0, ImVec2 sz, gfx::Scene& scene, const gfx::CameraParams& cam)
 {
     glm::u32vec2 size(sz.x, sz.y);
-    viewport_.Draw(scene_, cam, size);
+    viewport_.Draw(scene, cam, size);
 
     auto p1 = ImVec2(p0.x + sz.x, p0.y + sz.y);
 

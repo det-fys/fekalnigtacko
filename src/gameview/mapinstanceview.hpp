@@ -3,7 +3,7 @@
 #include "BulletDynamics/Dynamics/btRigidBody.h"
 #include "assets/map.hpp"
 #include "collision/dynamicsworld.hpp"
-#include "draw_args.hpp"
+#include "gfx/scene.hpp"
 #include "net/defs.hpp"
 #include "utils/defs.hpp"
 #include "modelview.hpp"
@@ -59,7 +59,7 @@ public:
 
     float GetChunkSize() const { return (IsLoaded() && map_) ? map_->GetChunkSize() : 1.0f; }
 
-    void Draw(const game::view::DrawArgs& args);
+    void Draw(const gfx::DrawContext& ctx);
     void Update();
 
     void EnableObj(net::ObjNum num, bool enable);
@@ -71,8 +71,8 @@ private:
     void InitModel(MapModel& mapmodel);
     void InitObjsAndCollisions();
 
-    void DrawChunk(const game::view::DrawArgs& args, const assets::Chunk& chunk);
-    void DrawObj(const DrawArgs& args, MapModel& mapmodel, const glm::mat4& matrix);
+    void DrawChunk(const gfx::DrawContext& ctx, const assets::Chunk& chunk);
+    void DrawObj(const gfx::DrawContext& ctx, MapModel& mapmodel, const glm::mat4& matrix);
 
     void UpdateModelSpecial(MapModel& mapmodel);
 

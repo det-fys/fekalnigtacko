@@ -111,7 +111,7 @@ void game::view::WorldView::Draw(const DrawArgs& args)
 
     DrawEnv(args);
 
-    map_->Draw(args);
+    map_->Draw(args.ctx);
 
     const auto& frustum = args.ctx.frustum;
 
@@ -176,7 +176,7 @@ void game::view::WorldView::DrawEnv(const DrawArgs& args) const
 {
     if (env_)
     {
-        env_->Draw(args);
+        env_->Draw(args.ctx);
     }
 }
 

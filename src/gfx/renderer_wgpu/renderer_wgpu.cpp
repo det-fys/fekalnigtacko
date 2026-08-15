@@ -3121,7 +3121,7 @@ void gfx::RendererWGPU::Render(ViewportWGPU& viewport, Scene& scene, const Camer
     const float farplane = max_distance * 2.0f + 500.0f;
 
     auto proj = glm::perspectiveRH_ZO(glm::radians(camera.fov * 0.5f), aspect, 0.1f, farplane);
-    auto view = glm::lookAt(camera.eye, camera.eye + camera.dir, glm::vec3(0.0f, 0.0f, 1.0f));
+    auto view = glm::lookAt(camera.eye, camera.eye + camera.dir, camera.up);
 
     // main capture
     main_dlist_.Clear();

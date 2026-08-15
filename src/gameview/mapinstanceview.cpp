@@ -33,7 +33,7 @@ int game::view::MapInstanceView::GetLoadingPercent() const
     return loader_->GetPercent();
 }
 
-void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args)
+void game::view::MapInstanceView::Draw(const gfx::DrawContext& ctx)
 {
     if (!map_)
         return;
@@ -45,13 +45,13 @@ void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args)
 
     const float chunk_radius = glm::length(glm::vec2(map_->GetChunkSize()));
 
-    const float min_dist = glm::max(args.ctx.min_distance - chunk_radius, 0.0f);
+    const float min_dist = glm::max(ctx.min_distance - chunk_radius, 0.0f);
     const float min_dist2 = min_dist * min_dist;
 
-    const float max_dist = args.ctx.max_distance + chunk_radius;
+    const float max_dist = ctx.max_distance + chunk_radius;
     const float max_dist2 = max_dist * max_dist;
 
-    const auto& frustum_aabb = args.ctx.frustum.GetAABB();
+    const auto& frustum_aabb = ctx.frustum.GetAABB();
 
     static std::vector<uint32_t> visible_chunks;
     map_->GetOverlappingChunks(frustum_aabb, visible_chunks);
@@ -63,15 +63,15 @@ void game::view::MapInstanceView::Draw(const game::view::DrawArgs& args)
         const auto& chunk = chunks[chunk_idx];
         
         glm::vec3 center = (chunk.aabb.min + chunk.aabb.max) * 0.5f;
-        auto dist2 = glm::distance2(args.ctx.eye, center);
+        auto dist2 = glm::distance2(ctx.eye, center);
 
         if (dist2 < min_dist2 || dist2 > max_dist2)
             continue;
         
-        if (!args.ctx.frustum.IsAABBVisible(chunk.aabb))
+        if (!ctx.frustum.IsAABBVisible(chunk.aabb))
             continue;
 
-        DrawChunk(args, chunk);
+        DrawChunk(ctx, chunk);
     }
 }
 
@@ -174,10 +174,10 @@ void game::view::MapInstanceView::InitObjsAndCollisions()
     }
 }
 
-void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, const assets::Chunk& chunk)
+void game::view::MapInstanceView::DrawChunk(const gfx::DrawContext& ctx, const assets::Chunk& chunk)
 {
     // make basemodel not cast shadows
-    if (args.ctx.pass != gfx::DRAW_PASS_SHADOW_MAP)
+    if (ctx.pass != gfx::DRAW_PASS_SHADOW_MAP)
     {
         auto surfaces = basemodel_view_->GetSurfaces();
 
@@ -185,7 +185,7 @@ void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, co
         cmd.mesh = basemodel_view_->GetMesh().GetID();
         cmd.map_chunk_hash = chunk.light_hash;
 
-        auto& dlist = args.ctx.dlist;
+        auto& dlist = ctx.dlist;
         for (const auto& surface_range : chunk.surfaces)
         {
             auto& surface = surfaces[surface_range.idx];
@@ -211,19 +211,19 @@ void game::view::MapInstanceView::DrawChunk(const game::view::DrawArgs& args, co
 
         const auto& obj = objs[abs_i];
 
-        if (!args.ctx.frustum.IsAABBVisible(obj.aabb))
+        if (!ctx.frustum.IsAABBVisible(obj.aabb))
             continue;
 
-        DrawObj(args, obj_models_[obj.model_idx], obj.node.matrix);
+        DrawObj(ctx, obj_models_[obj.model_idx], obj.node.matrix);
     }
 }
 
-void game::view::MapInstanceView::DrawObj(const DrawArgs& args, MapModel& mapmodel, const glm::mat4& matrix)
+void game::view::MapInstanceView::DrawObj(const gfx::DrawContext& ctx, MapModel& mapmodel, const glm::mat4& matrix)
 {
     if (mapmodel.special == MMS_NONE)
     {
         // no special effect, just draw
-        mapmodel.model->Draw(args.ctx, matrix, {});
+        mapmodel.model->Draw(ctx, matrix, {});
         return;
     }
 
@@ -231,17 +231,17 @@ void game::view::MapInstanceView::DrawObj(const DrawArgs& args, MapModel& mapmod
 
     if (mapmodel.special == MMS_NIGHTLIGHT)
     {
-        mapmodel.model->Draw(args.ctx, matrix, { mapmodel.colors.data(), 1 });
+        mapmodel.model->Draw(ctx, matrix, { mapmodel.colors.data(), 1 });
 
         if (mapmodel.light_on)
         {
             glm::vec3 light_pos = matrix * glm::vec4(mapmodel.light.position, 1.0f);
             glm::vec3 light_dir = glm::mat3(matrix) * mapmodel.light.dir;
 
-            args.ctx.dlist.AddSpotLight(light_pos, mapmodel.light.color, mapmodel.light.radius, light_dir,
-                                        mapmodel.light.cos_inner, mapmodel.light.cos_outer, gfx::LF_SHADOWS);
+            ctx.dlist.AddSpotLight(light_pos, mapmodel.light.color, mapmodel.light.radius, light_dir,
+                                   mapmodel.light.cos_inner, mapmodel.light.cos_outer, gfx::LF_SHADOWS);
 
-            args.ctx.dlist.AddCorona(light_pos, light_dir, mapmodel.light.color, 1.0f);
+            ctx.dlist.AddCorona(light_pos, light_dir, mapmodel.light.color, 1.0f);
         }
     }
 }

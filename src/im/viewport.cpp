@@ -29,7 +29,6 @@ void im::Viewport::DrawWindowLayout()
 
     if (canvas_sz.x < 1.0f || canvas_sz.y < 1.0f)
     {
-        ImGui::End();
         return;
     }
 

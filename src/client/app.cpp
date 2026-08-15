@@ -313,8 +313,22 @@ void App::Update()
 
 void App::ShowDevMode()
 {
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu("Dev"))
+        {
+            if (ImGui::MenuItem("Exit dev mode", "F9"))
+            {
+                SwitchDevMode();
+            }
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMainMenuBar();
+    }
+
     ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking;
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -332,17 +346,8 @@ void App::ShowDevMode()
 
 	auto dockspace_id = ImGui::GetID("Main Dockspace");
 
-    if (ImGui::BeginMenuBar())
+    if (ImGui::BeginMainMenuBar())
     {
-        if (ImGui::BeginMenu("Dev"))
-        {
-            if (ImGui::MenuItem("Exit dev mode", "F9"))
-            {
-                SwitchDevMode();
-            }
-            ImGui::EndMenu();
-        }
-
         if (ImGui::BeginMenu("View"))
         {
             if (ImGui::MenuItem("Reset layout"))
@@ -356,14 +361,14 @@ void App::ShowDevMode()
         if (ImGui::BeginMenu("Windows"))
         {
             ImGui::MenuItem("App Viewport", nullptr, &dev_mode_->show_app_viewport);
-            ImGui::MenuItem("Map Editor");
+            ImGui::MenuItem("Map Editor", nullptr, &dev_mode_->show_map_edit);
             ImGui::Separator();
             ImGui::MenuItem("ImGui Demo", nullptr, &dev_mode_->show_imgui_demo);
 
             ImGui::EndMenu();
         }
 
-        ImGui::EndMenuBar();
+        ImGui::EndMainMenuBar();
     }
 
     // check key shortcuts
@@ -383,6 +388,7 @@ void App::ShowDevMode()
             ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.25f, nullptr, &dock_main_id);
 
 		ImGui::DockBuilderDockWindow("App Viewport", dock_main_id);
+        ImGui::DockBuilderDockWindow("Map Editor", dock_main_id);
         ImGui::DockBuilderDockWindow("Dear ImGui Demo", dock_right_id);
 
 		ImGui::DockBuilderFinish(dockspace_id);
@@ -396,10 +402,23 @@ void App::ShowDevMode()
 		ImGui::ShowDemoWindow(&dev_mode_->show_imgui_demo);
 	}
 
+
+	if (dev_mode_->show_map_edit)
+    {
+		// init on first show
+		if (!dev_mode_->map_edit)
+		{
+            dev_mode_->map_edit.emplace();
+		}
+
+        dev_mode_->map_edit->Show(&dev_mode_->show_map_edit);
+    }
+
 	if (dev_mode_->show_app_viewport)
-	{
-		dev_mode_->app_viewport.Show(&dev_mode_->show_app_viewport);
-	}
+    {
+        dev_mode_->app_viewport.Show(&dev_mode_->show_app_viewport);
+    }
+
 
 	dev_mode_first_frame_ = false;
 }
@@ -992,7 +1011,7 @@ void App::ProcessConnectOrDisconnectCmd(CmdLineStream& line, bool connect)
     AddChatMessage(COL_SUCCESS "ok");
 }
 
-AppViewport::AppViewport(App& app) : Super("App Viewport"), app_(app), scene_view_(app) {}
+AppViewport::AppViewport(App& app) : Super("App Viewport"), app_(app) {}
 
 void AppViewport::Update()
 {
@@ -1032,5 +1051,6 @@ void AppViewport::Update()
 
 void AppViewport::Draw(ImDrawList& draw_list)
 {
-    scene_view_.Draw(draw_list, im::VecToImGui(GetCanvasP0()), im::VecToImGui(GetCanvasSize()), app_.GetCameraParams());
+    scene_view_.Draw(draw_list, im::VecToImGui(GetCanvasP0()), im::VecToImGui(GetCanvasSize()), app_,
+                     app_.GetCameraParams());
 }

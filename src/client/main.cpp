@@ -54,7 +54,7 @@ static void InitSDL()
         ThrowSDLError("SDL_Init");
     }
 
-    Uint32 window_flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
+    Uint32 window_flags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED;
 
     if (gfx::Renderer::IsGL())
     {

@@ -1,5 +1,7 @@
+#pragma once
+
 #include "modelview.hpp"
-#include "draw_args.hpp"
+#include "gfx/scene.hpp"
 
 namespace game::view
 {
@@ -23,7 +25,7 @@ class WorldEnv
 public:
     WorldEnv();
 
-    void Draw(const DrawArgs& args);
+    void Draw(const gfx::DrawContext& ctx);
 
     void SetDayTime(float daytime) { daytime_ = glm::mod(daytime, 24.0f); }
     float GetDayTime() const { return daytime_; }
@@ -31,7 +33,8 @@ public:
     const gfx::Environment& GetEnv() const { return env_; }
 
 private:
-    void DrawEnvModel(const DrawArgs& args, const ModelView& model, const glm::mat4& matrix, const glm::vec4& color, float dist);
+    void DrawEnvModel(const gfx::DrawContext& ctx, const ModelView& model, const glm::mat4& matrix,
+                      const glm::vec4& color, float dist);
 
 private:
     float daytime_ = 0.0f; // 0 - 24

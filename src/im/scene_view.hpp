@@ -10,12 +10,11 @@ namespace im
 class SceneView
 {
 public:
-    SceneView(gfx::Scene& scene);
+    SceneView() = default;
 
-    void Draw(ImDrawList& draw_list, ImVec2 p0, ImVec2 sz, const gfx::CameraParams& cam);
+    void Draw(ImDrawList& draw_list, ImVec2 p0, ImVec2 sz, gfx::Scene& scene, const gfx::CameraParams& cam);
 
 private:
-    gfx::Scene& scene_;
     gfx::Viewport viewport_;
 };
 

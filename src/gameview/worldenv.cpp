@@ -133,9 +133,9 @@ static const game::view::WorldEnvKeyframe env_kfs[] = {
 
 };
 
-void game::view::WorldEnv::Draw(const DrawArgs& args)
+void game::view::WorldEnv::Draw(const gfx::DrawContext& ctx)
 {
-    if (args.ctx.pass != gfx::DRAW_PASS_MAIN)
+    if (ctx.pass != gfx::DRAW_PASS_MAIN)
     {
         return; // only draw this in main pass
     }
@@ -173,7 +173,7 @@ void game::view::WorldEnv::Draw(const DrawArgs& args)
     auto fog = glm::mix(kf1->fog, kf2->fog, t);
     env_.fog = glm::vec4(env_.clear_color * glm::vec3(fog), fog.a);
 
-    float dist = args.ctx.max_distance * 1.5f + 500.0f;
+    float dist = ctx.max_distance * 1.5f + 500.0f;
 
     // std::cout<<daytime_<<std::endl;
 
@@ -181,7 +181,7 @@ void game::view::WorldEnv::Draw(const DrawArgs& args)
 
     sun_color_ = glm::mix(kf1->sun_disc_color, kf2->sun_disc_color, t);
     sun_matrix_ = glm::mat4(1.0f);
-    sun_matrix_ = glm::translate(sun_matrix_, args.ctx.eye);
+    sun_matrix_ = glm::translate(sun_matrix_, ctx.eye);
     sun_matrix_ = glm::scale(sun_matrix_, glm::vec3(dist));
     sun_matrix_ = glm::rotate(sun_matrix_, 0.3f, glm::vec3(1.0f, 0.0f, 0.0f));
     sun_matrix_ = glm::rotate(sun_matrix_, sun_angle, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -193,7 +193,7 @@ void game::view::WorldEnv::Draw(const DrawArgs& args)
 
     moon_color_ = glm::mix(kf1->moon_disc_color, kf2->moon_disc_color, t);
     moon_matrix_ = glm::mat4(1.0f);
-    moon_matrix_ = glm::translate(moon_matrix_, args.ctx.eye);
+    moon_matrix_ = glm::translate(moon_matrix_, ctx.eye);
     moon_matrix_ = glm::scale(moon_matrix_, glm::vec3(dist));
     moon_matrix_ = glm::rotate(moon_matrix_, sun_angle + glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f));
     moon_matrix_ = glm::translate(moon_matrix_, glm::vec3(0.0f, 0.0f, 1.0f));
@@ -215,13 +215,13 @@ void game::view::WorldEnv::Draw(const DrawArgs& args)
         env_.sun_color *= -sun_dir;
     }
 
-    DrawEnvModel(args, *halfspheremodel_, moon_halfsphere_matrix_, moon_halfsphere_color_, dist);
-    DrawEnvModel(args, *halfspheremodel_, sun_halfsphere_matrix_, sun_halfsphere_color_, dist - 1.0f);
-    DrawEnvModel(args, *sunmodel_, moon_matrix_, moon_color_, dist - 2.0f);
-    DrawEnvModel(args, *sunmodel_, sun_matrix_, sun_color_, dist - 3.0f);
+    DrawEnvModel(ctx, *halfspheremodel_, moon_halfsphere_matrix_, moon_halfsphere_color_, dist);
+    DrawEnvModel(ctx, *halfspheremodel_, sun_halfsphere_matrix_, sun_halfsphere_color_, dist - 1.0f);
+    DrawEnvModel(ctx, *sunmodel_, moon_matrix_, moon_color_, dist - 2.0f);
+    DrawEnvModel(ctx, *sunmodel_, sun_matrix_, sun_color_, dist - 3.0f);
 }
 
-void game::view::WorldEnv::DrawEnvModel(const DrawArgs& args, const ModelView& model, const glm::mat4& matrix,
+void game::view::WorldEnv::DrawEnvModel(const gfx::DrawContext& ctx, const ModelView& model, const glm::mat4& matrix,
                                         const glm::vec4& color, float dist)
 {
     gfx::DrawSurfaceCmd cmd{};
@@ -236,6 +236,6 @@ void game::view::WorldEnv::DrawEnvModel(const DrawArgs& args, const ModelView& m
         cmd.tri_offset = surface.tri_offset;
         cmd.tri_count = surface.tri_count;
         cmd.material = surface.material->GetID();
-        args.ctx.dlist.AddSurface(cmd);
+        ctx.dlist.AddSurface(cmd);
     }
 }
