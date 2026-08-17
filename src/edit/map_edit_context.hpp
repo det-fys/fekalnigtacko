@@ -2,6 +2,9 @@
 
 #include <optional>
 
+#include <imgui.h>
+#include <ImGuizmo.h>
+
 #include "map_project.hpp"
 
 namespace edit
@@ -22,7 +25,9 @@ struct MapEditContext
     // world
     float day_time = 12.0f; // 0-24
 
-    std::optional<MapProject> project;
+    std::optional<Project> project;
+
+    ImGuizmo::OPERATION gizmo_operation = ImGuizmo::TRANSLATE;
 };
 
 } // namespace edit

@@ -5,6 +5,7 @@
 #include <imgui_impl_sdl2.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_wgpu.h>
+#include <ImGuizmo.h>
 
 #include "gfx/renderer.hpp"
 #include "gfx/renderer_wgpu/renderer_wgpu.hpp"
@@ -45,7 +46,7 @@ static void InitForWGPU(gfx::RendererWGPU& renderer)
 void ImGuiInit(SDL_Window* window)
 {
     IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
+    auto ctx = ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -67,6 +68,8 @@ void ImGuiInit(SDL_Window* window)
     {
         throw std::runtime_error("ImGui integration: Unsupported renderer");
     }
+
+    ImGuizmo::SetImGuiContext(ctx);
 }
 
 void ImGuiProcessEvent(const SDL_Event& event) 
@@ -87,6 +90,9 @@ void ImGuiFrame()
 
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
+
+    // gizmo
+    ImGuizmo::BeginFrame();
 
     // setup docking space
     //ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());

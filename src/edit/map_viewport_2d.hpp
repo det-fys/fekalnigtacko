@@ -1,26 +1,28 @@
 #pragma once
 
-#include "im/viewport_2d.hpp"
-#include "map_edit_context.hpp"
-#include "im/scene_view.hpp"
+#include "map_viewport.hpp"
+#include "im/viewport_2d_controls.hpp"
 
 namespace edit
 {
 
-class MapViewport2D : public im::Viewport2D
+class MapViewport2D : public MapViewport
 {
 public:
-    using Super = im::Viewport2D;
+    using Super = MapViewport;
 
     MapViewport2D(MapEditContext& context);
 
 protected:
+    virtual void Update();
     virtual void Draw(ImDrawList& draw_list) override;
 
 private:
-    MapEditContext& context_;
+    void ShowContextMenu();
 
-    im::SceneView scene_view_;
+private:
+    im::Viewport2DControls controls_;
+    glm::vec2 new_obj_pos_{0.0f};
 };
 
 } // namespace edit

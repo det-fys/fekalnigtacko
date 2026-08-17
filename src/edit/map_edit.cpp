@@ -1,6 +1,5 @@
 #include "map_edit.hpp"
 
-#include <imgui.h>
 #include <imgui_internal.h>
 
 edit::MapEdit::MapEdit() : viewport_2d_(context_), viewport_3d_(context_) {}

@@ -1,26 +1,21 @@
 #pragma once
 
-#include "im/viewport.hpp"
-#include "map_edit_context.hpp"
-#include "im/scene_view.hpp"
+#include "map_viewport.hpp"
 
 namespace edit
 {
 
-class MapViewport3D : public im::Viewport
+class MapViewport3D : public MapViewport
 {
 public:
-    using Super = im::Viewport;
+    using Super = MapViewport;
 
     MapViewport3D(MapEditContext& context);
 
 protected:
+    virtual void Update() override;
     virtual void Draw(ImDrawList& draw_list) override;
 
-private:
-    MapEditContext& context_;
-
-    im::SceneView scene_view_;
 };
 
 } // namespace edit

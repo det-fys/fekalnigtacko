@@ -146,8 +146,10 @@ if(BUILD_CLIENT)
         "src/client/settings.cpp"
         "src/edit/map_edit.cpp"
         "src/edit/map_project.cpp"
+        "src/edit/map_viewport.cpp"
         "src/edit/map_viewport_2d.cpp"
         "src/edit/map_viewport_3d.cpp"
+        "src/edit/static_object.cpp"
         "src/gameview/characterview.cpp"
         "src/gameview/client_session.cpp"
         "src/gameview/entityview.cpp"
@@ -193,7 +195,7 @@ if(BUILD_CLIENT)
         "src/im/imgui_integration.cpp"
         "src/im/scene_view.cpp"
         "src/im/viewport.cpp"
-        "src/im/viewport_2d.cpp"
+        "src/im/viewport_2d_controls.cpp"
         "src/net/client_local.cpp"
         "src/net/client_ws_easywsclient.cpp"
         "src/net/client_ws_emscripten.cpp"
@@ -229,6 +231,7 @@ if(BUILD_CLIENT)
 
     # ImGui
     set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui)
+    set(IMGUIZMO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/imguizmo)
 
     # Core ImGui sources
     set(IMGUI_SOURCES
@@ -241,11 +244,14 @@ if(BUILD_CLIENT)
         ${IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
         ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
         ${IMGUI_DIR}/backends/imgui_impl_wgpu.cpp
+        # imguizmo
+        ${IMGUIZMO_DIR}/src/ImGuizmo.cpp
     )
 
     set(IMGUI_INCLUDE_DIRS
         ${IMGUI_DIR}
         ${IMGUI_DIR}/backends
+        ${IMGUIZMO_DIR}/src
     )
 
     target_sources(${MAIN_NAME} PRIVATE ${IMGUI_SOURCES})
