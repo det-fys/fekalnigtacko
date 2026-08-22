@@ -3,6 +3,8 @@
 #include "map_project.hpp"
 
 #include <algorithm>
+#include <set>
+#include <tuple>
 
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
@@ -13,24 +15,21 @@
 #include "object.hpp"
 #include "static_object.hpp"
 
-edit::Project::Project() : dynamics_world_(), map_(dynamics_world_, "openworld"), static_models_root_("root")
+edit::Project::Project() : static_models_root_("root")
 {
-    while (!map_.IsLoaded())
-    {
-        map_.LoadNext();
-    }
-
     InitStaticModels();
+
+    SetupChunks(16);
 }
 
 void edit::Project::Update()
 {
-    map_.Update();
+    UpdateChunks();
 }
 
 void edit::Project::Draw(const gfx::DrawContext& ctx)
 {
-    for (auto& obj : objects_)
+    for (auto& obj : all_objs_)
     {
         if (!ctx.frustum.IsSphereVisible({obj->GetPosition(), 5.0f}))
             continue;
@@ -38,11 +37,10 @@ void edit::Project::Draw(const gfx::DrawContext& ctx)
         obj->Draw(ctx);
     }
 
-    map_.SetDayTime(daytime_);
     world_env_.SetDayTime(daytime_);
 
-    map_.Draw(ctx);
-    world_env_.Draw(ctx);
+    if (draw_world_env_)
+        world_env_.Draw(ctx);
 }
 
 gfx::Environment edit::Project::GetSceneEnvironment()
@@ -57,12 +55,12 @@ gfx::Environment edit::Project::GetSceneEnvironment()
 
 float edit::Project::GetMapChunkSize()
 {
-    return map_.GetChunkSize();
+    return map_config_.chunk_size_m;
 }
 
 void edit::Project::DrawOverlay(const DrawOverlayContext& ctx)
 {
-    for (auto& obj : objects_)
+    for (auto& obj : all_objs_)
     {
         if (!ctx.viewport.GetFrustum().IsSphereVisible({obj->GetPosition(), 5.0f}))
             continue;
@@ -73,9 +71,10 @@ void edit::Project::DrawOverlay(const DrawOverlayContext& ctx)
 
 void edit::Project::AddStaticObject(const glm::vec2& pos, const std::string& model_name)
 {
-    auto& obj = objects_.emplace_back(std::make_shared<StaticObject>(model_name));
-    obj->SetTransform(glm::translate(glm::mat4(1.0f), glm::vec3(pos, 0.0f))); // TODO: Z from heightmap
-    NewObjectAdded(*obj);
+    ClearSelection(); // to avoid invalid pointers
+    auto& obj = static_objs_.emplace_back(*this, model_name);
+    obj.SetTransform(glm::translate(glm::mat4(1.0f), glm::vec3(pos, 0.0f))); // TODO: Z from heightmap
+    NewObjectAdded(obj);
 }
 
 void edit::Project::MakeSelection2D(const glm::vec2& min, const glm::vec2* max)
@@ -84,16 +83,17 @@ void edit::Project::MakeSelection2D(const glm::vec2& min, const glm::vec2* max)
     float nearest_dist2 = std::numeric_limits<float>().max();
     Object* nearest_obj = nullptr;
 
-    for (auto& obj : objects_)
+    for (auto& obj : all_objs_)
     {
-        auto d = glm::vec2(obj->GetPosition()) - min;
+        auto pos2d = glm::vec2(obj->GetPosition());
+        auto d = pos2d - min;
         auto dist2 = glm::dot(d, d);
+        
+        if (dist2 > nearest_dist2)
+            continue;
 
-        if (dist2 < nearest_dist2)
-        {
-            nearest_dist2 = dist2;
-            nearest_obj = obj.get();
-        }
+        nearest_obj = obj;
+        nearest_dist2 = dist2;
     }
 
     if (!nearest_obj)
@@ -149,11 +149,25 @@ void edit::Project::ClearSelection()
 
 void edit::Project::DeleteSelection()
 {
-    objects_.erase(std::remove_if(objects_.begin(), objects_.end(),
-                                  [](const std::shared_ptr<Object>& obj) { return obj->IsSelected(); }),
-                   objects_.end());
+    static_objs_.erase(std::remove_if(static_objs_.begin(), static_objs_.end(),
+                                      [](const StaticObject& obj) { return obj.IsSelected(); }),
+                       static_objs_.end());
+
+    all_objs_.erase(std::remove_if(all_objs_.begin(), all_objs_.end(), [](Object* obj) { return obj->IsSelected(); }),
+                    all_objs_.end());
 
     selection_.clear();
+}
+
+void edit::Project::InvalidateChunk(const glm::ivec2& chunk_pos)
+{
+    invalid_chunks_.insert(chunk_pos);
+    DelayChunkUpdates();
+}
+
+void edit::Project::DelayChunkUpdates()
+{
+    chunk_update_time_ = ImGui::GetTime() + 0.1f;
 }
 
 void edit::Project::InitStaticModels()
@@ -207,6 +221,108 @@ void edit::Project::FixSelectionList()
 
 void edit::Project::NewObjectAdded(Object& obj)
 {
-    ClearSelection();
+    UpdateAllObjectsList();
+
+    // select the new object
     Select(obj);
+}
+
+void edit::Project::UpdateAllObjectsList()
+{
+    all_objs_.clear();
+
+    for (auto& obj : static_objs_)
+    {
+        all_objs_.emplace_back(&obj);
+    }
+}
+
+void edit::Project::SetupChunks(uint32_t size)
+{
+    map_config_.chunks = size;
+    map_config_.chunk_size_m = 128.0f;
+    map_config_.chunk_tiles = 256;
+
+    chunks_.clear();
+
+    int half_size = static_cast<int>(size) / 2;
+
+    for (int y = -half_size; y < half_size; ++y)
+    {
+        for (int x = -half_size; x < half_size; ++x)
+        {
+            glm::ivec2 chunk_pos(x, y);
+            InvalidateChunk(chunk_pos);
+        }
+    }
+}
+
+void edit::Project::UpdateChunks()
+{
+    if (invalid_chunks_.empty())
+        return;
+
+    if (chunk_update_time_ > ImGui::GetTime())
+        return;
+
+    // pick one chunk to update
+    auto chunk_pos = *invalid_chunks_.begin();
+    invalid_chunks_.erase(invalid_chunks_.begin());
+    UpdateChunk(chunk_pos);
+
+}
+
+void edit::Project::UpdateChunk(const glm::ivec2& chunk_pos)
+{
+    AABB2 chunk_aabb = mg::GetChunkAABB(map_config_, chunk_pos, true);
+
+    std::vector<mg::ChunkStaticObject> objs;
+    
+    // collect relevant objs
+    for (const auto& obj : static_objs_)
+    {
+        //auto pos2d = glm::vec2(obj.GetPosition());
+        const auto& obj_aabb = obj.GetAABB();
+        AABB2 obj_aabb_2d(glm::vec2(obj_aabb.min), glm::vec2(obj_aabb.max));
+
+        if (!chunk_aabb.CollidesWith(obj_aabb_2d))
+            continue;
+
+        auto& mgobj = objs.emplace_back();
+        mgobj.trans = obj.GetTransform();
+        mgobj.model_name = obj.GetModelName();
+        mgobj.heightmesh = obj.GetHeightMesh();
+    }
+
+    mg::ChunkParams params{};
+    params.coord = chunk_pos;
+    params.objs = objs;
+
+    Chunk& chunk = chunks_[chunk_pos];
+    chunk.mgchunk = mg::GenerateChunk(map_config_, params);
+    
+    chunk.vis_verts.clear();
+    chunk.vis_edges.clear();
+    chunk.vis_tris.clear();
+
+    // generate verts & edges for vis
+    for (const auto& vert : chunk.mgchunk.mesh.verts)
+    {
+        chunk.vis_verts.push_back(vert.pos);
+    }
+
+    std::set<std::tuple<uint32_t, uint32_t>> edges_set;
+    for (const auto& tri : chunk.mgchunk.mesh.tris)
+    {
+        chunk.vis_tris.emplace_back(tri[0], tri[1], tri[2]);
+
+        edges_set.emplace(std::min(tri[0], tri[1]), std::max(tri[0], tri[1]));
+        edges_set.emplace(std::min(tri[1], tri[2]), std::max(tri[1], tri[2]));
+        edges_set.emplace(std::min(tri[2], tri[0]), std::max(tri[2], tri[0]));
+    }
+
+    for (const auto& edge : edges_set)
+    {
+        chunk.vis_edges.push_back(edge);
+    }
 }

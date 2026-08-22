@@ -95,6 +95,10 @@ set(COMMON_SOURCES
     "src/game/vehicle_tuning.cpp"
     "src/game/vehicle.cpp"
     "src/game/world.cpp"
+    "src/mapgen/common.cpp"
+    "src/mapgen/chunk.cpp"
+    "src/mapgen/global_layout.cpp"
+    "src/mapgen/heightmesh.cpp"
     "src/server/client.cpp"
     "src/server/server.cpp"
     "src/server/server_cfg.cpp"
@@ -126,6 +130,8 @@ set(ZIP_ENABLE_DEFLATE OFF)
 set(ZIP_HAVE_SYMLINK OFF)
 add_subdirectory(external/zip)
 
+# TrianglePP
+add_subdirectory(external/trianglepp EXCLUDE_FROM_ALL)
 
 # ------------------------------------------------------------------------------
 # Client Target
@@ -149,6 +155,7 @@ if(BUILD_CLIENT)
         "src/edit/map_viewport.cpp"
         "src/edit/map_viewport_2d.cpp"
         "src/edit/map_viewport_3d.cpp"
+        "src/edit/object.cpp"
         "src/edit/static_object.cpp"
         "src/gameview/characterview.cpp"
         "src/gameview/client_session.cpp"
@@ -216,12 +223,13 @@ if(BUILD_CLIENT)
         "external/zip/src"
     )
 
-    target_compile_definitions(${MAIN_NAME} PRIVATE CLIENT)
+    target_compile_definitions(${MAIN_NAME} PRIVATE CLIENT GLM_ENABLE_EXPERIMENTAL)
     target_link_libraries(${MAIN_NAME} PRIVATE 
         glm 
         BulletDynamics BulletCollision LinearMath Bullet3Common 
         RecastNavigation::Recast RecastNavigation::Detour
         zip
+        TrianglePP
     )
 
     # Client-only external libraries
@@ -378,7 +386,7 @@ if(BUILD_SERVER)
             "${CMAKE_BINARY_DIR}/generated"
             "external/zip/src"
         )
-        target_compile_definitions(${SERVER_NAME} PRIVATE SERVER)
+        target_compile_definitions(${SERVER_NAME} PRIVATE SERVER GLM_ENABLE_EXPERIMENTAL)
         
         # Add Server-specific libraries
         add_subdirectory(external/Crow)
@@ -389,6 +397,7 @@ if(BUILD_SERVER)
             BulletDynamics BulletCollision LinearMath Bullet3Common 
             RecastNavigation::Recast RecastNavigation::Detour
             zip
+            TrianglePP
         )
     endif()
 endif()

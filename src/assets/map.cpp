@@ -16,22 +16,7 @@ static AABB3 TransformAABB(const assets::Model& model, const glm::mat4& mat)
         aabb.AddPoint(custom_aabb_loc->position + custom_aabb_loc->scale);
     }
 
-    const glm::vec3 corners[] = {
-        glm::vec3(aabb.min.x, aabb.min.y, aabb.min.z), glm::vec3(aabb.max.x, aabb.min.y, aabb.min.z),
-        glm::vec3(aabb.min.x, aabb.max.y, aabb.min.z), glm::vec3(aabb.max.x, aabb.max.y, aabb.min.z),
-        glm::vec3(aabb.min.x, aabb.min.y, aabb.max.z), glm::vec3(aabb.max.x, aabb.min.y, aabb.max.z),
-        glm::vec3(aabb.min.x, aabb.max.y, aabb.max.z), glm::vec3(aabb.max.x, aabb.max.y, aabb.max.z),
-    };
-
-    AABB3 new_aabb;
-
-    for (size_t i = 0; i < 8; ++i)
-    {
-        glm::vec3 p = mat * glm::vec4(corners[i], 1.0f);
-        new_aabb.AddPoint(p);
-    }
-
-    return new_aabb;
+    return TransformAABB(aabb, mat);
 }
 
 std::shared_ptr<assets::Map> assets::Map::Load(const std::string& name)

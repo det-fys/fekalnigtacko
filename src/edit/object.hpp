@@ -4,6 +4,7 @@
 #include <imgui.h>
 
 #include "gfx/scene.hpp"
+#include "utils/aabb.hpp"
 
 namespace edit
 {
@@ -18,10 +19,12 @@ struct DrawOverlayContext
     DrawOverlayContext(const MapViewport& viewport, ImDrawList& draw_list) : viewport(viewport), draw_list(draw_list) {}
 };
 
+class Project;
+
 class Object
 {
 public:
-    Object() = default;
+    Object(Project& project);
 
     virtual void Draw(const gfx::DrawContext& ctx) {}
     virtual void DrawOverlay(const DrawOverlayContext& ctx) {}
@@ -36,11 +39,20 @@ public:
     const glm::mat4& GetTransform() const { return trans_; }
 
     glm::vec3 GetPosition() const { return trans_[3]; }
+    const AABB3& GetAABB() const { return aabb_; }
 
-    virtual ~Object() = default;
+    Project& GetProject() { return *project_; }
+
+protected:
+    void SetAABB(const AABB3& aabb) { aabb_ = aabb; }
+
+    void InvalidateChunks(const AABB3& aabb);
 
 private:
+    Project* project_ = nullptr;
+
     glm::mat4 trans_{1.0f};
+    AABB3 aabb_;
     bool visible_ = false;
     bool selected_ = false;
 };

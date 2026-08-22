@@ -19,8 +19,18 @@ void edit::MapViewport::Draw(ImDrawList& draw_list)
 
     auto& project = *context_.project;
 
-    // draw scene
-    scene_view_.Draw(draw_list, im::VecToImGui(GetCanvasP0()), im::VecToImGui(GetCanvasSize()), project, cam_);
+
+    if (context_.draw_world)
+    {
+        // draw scene
+        scene_view_.Draw(draw_list, im::VecToImGui(GetCanvasP0()), im::VecToImGui(GetCanvasSize()), project, cam_);
+    }
+    else
+    {
+        // draw empty background
+        draw_list.AddRectFilled(im::VecToImGui(GetCanvasP0()), im::VecToImGui(GetCanvasP0() + GetCanvasSize()),
+                                IM_COL32(128, 128, 128, 255));
+    }
 
     // draw gizmo
     if (ImGui::IsKeyPressed(ImGuiKey_E))

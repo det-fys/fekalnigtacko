@@ -24,6 +24,8 @@ struct MapEditContext
 
     // world
     float day_time = 12.0f; // 0-24
+    bool draw_world_env = true;
+    bool draw_world = true;
 
     std::optional<Project> project;
 

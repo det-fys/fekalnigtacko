@@ -36,6 +36,11 @@ struct AABB
         Vec new_max = glm::min(max, other.max);
         return AABB<dim>(new_min, new_max);
     }
+
+    bool Contains(const Vec& point) const
+    {
+        return glm::all(glm::greaterThanEqual(point, min)) && glm::all(glm::lessThanEqual(point, max));
+    }
 };
 
 template <>
@@ -53,3 +58,23 @@ inline bool AABB<3>::CollidesWith(const AABB<3>& other) const
 
 using AABB2 = AABB<2>;
 using AABB3 = AABB<3>;
+
+inline AABB3 TransformAABB(const AABB3& aabb, const glm::mat4& mat)
+{
+    const glm::vec3 corners[] = {
+        glm::vec3(aabb.min.x, aabb.min.y, aabb.min.z), glm::vec3(aabb.max.x, aabb.min.y, aabb.min.z),
+        glm::vec3(aabb.min.x, aabb.max.y, aabb.min.z), glm::vec3(aabb.max.x, aabb.max.y, aabb.min.z),
+        glm::vec3(aabb.min.x, aabb.min.y, aabb.max.z), glm::vec3(aabb.max.x, aabb.min.y, aabb.max.z),
+        glm::vec3(aabb.min.x, aabb.max.y, aabb.max.z), glm::vec3(aabb.max.x, aabb.max.y, aabb.max.z),
+    };
+
+    AABB3 new_aabb;
+    
+    for (size_t i = 0; i < 8; ++i)
+    {
+        glm::vec3 p = mat * glm::vec4(corners[i], 1.0f);
+        new_aabb.AddPoint(p);
+    }
+    
+    return new_aabb;
+}

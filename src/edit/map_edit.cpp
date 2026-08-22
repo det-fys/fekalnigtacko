@@ -21,8 +21,11 @@ void edit::MapEdit::Update()
 {
     if (context_.project)
     {
-        context_.project->SetDayTime(context_.day_time);
-        context_.project->Update();
+        auto& project = *context_.project;
+
+        project.SetDayTime(context_.day_time);
+        project.SetDrawWorldEnv(context_.draw_world_env);
+        project.Update();
     }
 }
 
@@ -139,6 +142,8 @@ void edit::MapEdit::ShowPropertiesWindow(bool* open)
         {
             context_.day_time = glm::mod(context_.day_time, 24.0f);
         }
+        ImGui::Checkbox("Draw World Env", &context_.draw_world_env);
+        ImGui::Checkbox("Draw World", &context_.draw_world);
         ImGui::PopID();
 
     }

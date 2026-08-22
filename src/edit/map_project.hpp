@@ -2,23 +2,39 @@
 
 #include <vector>
 #include <memory>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
 
 #include <imgui.h>
 #include <ImGuizmo.h>
+#include <glm/gtx/hash.hpp>
 
 #include "collision/dynamicsworld.hpp"
 #include "gameview/mapinstanceview.hpp"
 #include "gameview/modelview.hpp"
 #include "gameview/worldenv.hpp"
 #include "gfx/scene.hpp"
+#include "mapgen/chunk.hpp"
+#include "static_object.hpp"
+
 
 namespace edit
 {
 
 using namespace game::view;
 
-class Object;
-struct DrawOverlayContext;
+struct Chunk
+{
+    mg::Chunk mgchunk;
+
+    std::shared_ptr<const ModelView> model;
+
+    // visualization
+    std::vector<glm::vec2> vis_verts;
+    std::vector<std::tuple<uint32_t, uint32_t>> vis_edges;
+    std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> vis_tris;
+};
 
 struct SelectionListEntry
 {
@@ -58,6 +74,7 @@ public:
 
     // world
     void SetDayTime(float daytime) { daytime_ = daytime; }
+    void SetDrawWorldEnv(bool draw) { draw_world_env_ = draw; }
 
     // assets
     const StaticModelsEntry& GetStaticModelsRoot() const { return static_models_root_; }
@@ -73,6 +90,13 @@ public:
     void ClearSelection();
     void DeleteSelection();
 
+    // generation
+    void InvalidateChunk(const glm::ivec2& chunk_pos);
+    void DelayChunkUpdates();
+
+    const std::unordered_map<glm::ivec2, Chunk>& GetChunks() const { return chunks_; }
+    const mg::MapConfig& GetMapConfig() const { return map_config_; }
+
 private:
     void InitStaticModels();
 
@@ -81,20 +105,34 @@ private:
     void FixSelectionList();
 
     void NewObjectAdded(Object& obj);
+    void UpdateAllObjectsList();
+
+    // generation
+    void SetupChunks(uint32_t size);
+    void UpdateChunks();
+    void UpdateChunk(const glm::ivec2& chunk_pos);
 
 private:
-    collision::DynamicsWorld dynamics_world_;
-    MapInstanceView map_;
-    WorldEnv world_env_;
-
     StaticModelsEntry static_models_root_;
 
+    WorldEnv world_env_;
     float daytime_ = 12.0f; // 0-24
+    bool draw_world_env_ = true;
 
-    std::vector<std::shared_ptr<Object>> objects_;
+    // object lists
+    std::vector<StaticObject> static_objs_;
+    std::vector<Object*> all_objs_; // pointers to all objects 4 ez iteration
+
+    // selection & manipulation
     std::vector<SelectionListEntry> selection_;
-
     ImGuizmo::OPERATION gizmo_operation_ = ImGuizmo::TRANSLATE;
+
+
+    // chunk generation
+    mg::MapConfig map_config_{};
+    std::unordered_map<glm::ivec2, Chunk> chunks_;
+    std::unordered_set<glm::ivec2> invalid_chunks_;
+    float chunk_update_time_ = 0.0f;
 };
 
 } // namespace edit

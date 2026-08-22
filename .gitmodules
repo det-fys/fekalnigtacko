@@ -41,3 +41,6 @@
 [submodule "external/imguizmo"]
 	path = external/imguizmo
 	url = https://github.com/cedricguillemet/imguizmo
+[submodule "external/trianglepp"]
+	path = external/trianglepp
+	url = https://github.com/mrkkrj/TrianglePP.git
