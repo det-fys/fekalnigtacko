@@ -37,6 +37,17 @@ void edit::Project::Draw(const gfx::DrawContext& ctx)
         obj->Draw(ctx);
     }
 
+    static glm::mat4 identity(1.0f);
+
+    for (auto& [chunk_pos, chunk] : chunks_)
+    {
+        if (!ctx.frustum.IsAABBVisible(chunk.mgchunk.aabb))
+            continue;
+
+        if (chunk.model)
+            chunk.model->Draw(ctx, identity, {});
+    }
+
     world_env_.SetDayTime(daytime_);
 
     if (draw_world_env_)
@@ -325,4 +336,28 @@ void edit::Project::UpdateChunk(const glm::ivec2& chunk_pos)
     {
         chunk.vis_edges.push_back(edge);
     }
+
+    assets::ModelDescriptor model_desc{};
+    //model_desc.make_triangle_mesh = true;
+
+    for (const auto& vert : chunk.mgchunk.mesh.verts)
+    {
+        model_desc.verts.positions.push_back(vert.pos);
+        model_desc.verts.normals.push_back(vert.normal);
+        model_desc.verts.uvs.push_back(vert.uv);
+    }
+
+    for (const auto& tri : chunk.mgchunk.mesh.tris)
+    {
+        model_desc.tris.emplace_back(tri[0], tri[1], tri[2]);
+    }
+
+    auto& surface = model_desc.surfaces.emplace_back();
+    surface.name = "grass";
+    surface.texture_name = "grass";
+    surface.tri_offset = 0;
+    surface.tri_count = static_cast<uint32_t>(model_desc.tris.size());
+
+    auto model = std::make_shared<assets::Model>(std::move(model_desc));
+    chunk.model = std::make_shared<ModelView>(model);
 }

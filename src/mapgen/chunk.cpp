@@ -388,11 +388,15 @@ void TriangulateTerrain(ChunkGenContext& ctx)
 
                 auto pos = vert_pos[i];
                 auto& vert = ctx.chunk->mesh.verts.emplace_back();
-                vert.pos = glm::vec3(pos.x, pos.y, 0.0f); // Placeholder height; replace with actual terrain height
+                vert.pos = pos; // Placeholder height; replace with actual terrain height
+                vert.normal = glm::vec3(0.0f, 0.0f, 1.0f); // Placeholder normal; replace with actual terrain normal
+                vert.uv = glm::vec2(pos) * 0.25f;
 
                 vertex_map[v[i]] = new_idx;
 
                 tri[i] = new_idx;
+
+                ctx.chunk->aabb.AddPoint(vert.pos);
             }
             else
             {

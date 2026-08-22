@@ -69,6 +69,7 @@ struct Chunk
 {
     ChunkMesh mesh{};
     std::vector<ChunkStaticObject> objs;
+    AABB3 aabb;
 };
 
 AABB2 GetChunkAABB(const MapConfig& cfg, const glm::ivec2& chunk_pos, bool include_border = false);
