@@ -28,6 +28,111 @@ static collision::Material GetMaterialByName(const std::string& name)
         return collision::PM_STONE;
 }
 
+assets::Model::Model(ModelDescriptor desc)
+    : skeleton_(std::move(desc.skeleton)), vertices_(std::move(desc.verts)), tris_(std::move(desc.tris)),
+      surfaces_(std::move(desc.surfaces)), col_offset_(desc.col_offset), params_(std::move(desc.params)),
+      locations_(std::move(desc.locations))
+{
+    // surface map
+    for (size_t i = 0; i < surfaces_.size(); ++i)
+    {
+        surface_indices_[surfaces_[i].name] = i;
+    }
+
+    // aabb
+    for (const auto& v : vertices_.positions)
+    {
+        aabb_.AddPoint(v);
+    }
+
+    // tri mesh
+    if (desc.make_triangle_mesh)
+    {
+        cmesh_ = std::make_unique<collision::TriangleMesh>();
+        for (const auto& col_surface : desc.col_surfaces)
+        {
+            if (col_surface.material == collision::PM_NONE)
+                continue;
+
+            if (col_surface.tri_count == 0)
+                continue;
+
+            cmesh_->BeginMaterial(col_surface.material);
+
+            for (size_t i = 0; i < col_surface.tri_count; ++i)
+            {
+                const auto& tri = tris_[col_surface.tri_offset + i];
+                glm::vec3 p[3];
+                for (size_t j = 0; j < 3; ++j)
+                {
+                    size_t index = tri.vertices[j];
+                    if (index >= vertices_.positions.size())
+                        throw std::runtime_error("Vertex index out of bounds in model");
+                    p[j] = vertices_.positions[index] - col_offset_;
+                }
+                cmesh_->AddTriangle(p[0], p[1], p[2]);
+            }
+        }
+
+        cmesh_->Build();
+    }
+
+    // convex hull
+    if (desc.make_convex_hull)
+    {
+        auto temp_hull = std::make_unique<btConvexHullShape>();
+
+        for (const auto& v : vertices_.positions)
+        {
+            auto offset_pos = v - col_offset_;
+            temp_hull->addPoint(btVector3(offset_pos.x, offset_pos.y, offset_pos.z), false);
+        }
+
+        temp_hull->recalcLocalAabb();
+
+        auto shape_hull = std::make_unique<btShapeHull>(temp_hull.get());
+        shape_hull->buildHull(temp_hull->getMargin());
+
+        cshape_ = std::make_unique<btConvexHullShape>((btScalar*)shape_hull->getVertexPointer(),
+                                                      shape_hull->numVertices(), sizeof(btVector3));
+    }
+    else if (!desc.col_shapes.empty())
+    {
+        auto compound = std::make_unique<btCompoundShape>();
+
+        for (const auto& col_shape : desc.col_shapes)
+        {
+            std::unique_ptr<btCollisionShape> shape;
+            switch (col_shape.type)
+            {
+            case MODEL_COLLISION_SHAPE_BOX:
+                shape = std::make_unique<btBoxShape>(btVector3(col_shape.size.x, col_shape.size.y, col_shape.size.z));
+                break;
+            case MODEL_COLLISION_SHAPE_SPHERE:
+                shape = std::make_unique<btSphereShape>(col_shape.size.x);
+                break;
+            default:
+                throw std::runtime_error("Unknown collision shape type in model");
+            }
+
+            auto transform = col_shape.transform;
+            transform.position -= col_offset_;
+
+            compound->addChildShape(transform.ToBtTransform(), shape.get());
+            subshapes_.emplace_back(std::move(shape));
+        }
+
+        cshape_ = std::move(compound);
+    }
+
+    if (cshape_)
+    {
+        collision::SetShapeMaterial(*cshape_, desc.col_material);
+        if (desc.col_material != collision::PM_NONE)
+            cshape_is_bullet_target_ = true;
+    }
+}
+
 std::shared_ptr<assets::Model> assets::Model::Load(const std::string& name)
 {
     return LoadFromFile("data/" + name + ".mdl");
@@ -35,13 +140,7 @@ std::shared_ptr<assets::Model> assets::Model::Load(const std::string& name)
 
 std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& filename)
 {
-    auto model = std::make_shared<Model>();
-    std::vector<glm::vec3> vert_pos; // rember for collision trimesh
-    
-    std::unique_ptr<btConvexHullShape> temp_hull;
-    std::unique_ptr<btCompoundShape> compound;
-
-    collision::Material col_material = collision::PM_NONE;
+    ModelDescriptor desc{};
 
     LoadCMDFile(filename, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "v")
@@ -57,12 +156,12 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
 
             uv.y = 1.0f - uv.y; // FLIP FOR GL // TODO: rly?
 
-            auto& vert_data = model->vertices_;
+            auto& vert_data = desc.verts;
             vert_data.positions.emplace_back(pos);
             vert_data.normals.emplace_back(normal);
             vert_data.uvs.emplace_back(uv);
 
-            if (model->skeleton_)
+            if (desc.skeleton)
             {
                 gfx::MeshVertexBoneData bones{};
 
@@ -83,19 +182,6 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             }
 
 #endif // CLIENT
-
-            if (model->cmesh_)
-                vert_pos.emplace_back(pos);
-
-            if (temp_hull)
-            {
-                auto offset_pos = pos - model->col_offset_;
-
-                temp_hull->addPoint(btVector3(offset_pos.x, offset_pos.y, offset_pos.z), false);
-
-            }
-
-            model->aabb_.AddPoint(pos);
         }
         else if (command == "f")
         {
@@ -103,28 +189,18 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             iss >> t.vertices[0] >> t.vertices[1] >> t.vertices[2];
             
 #ifdef CLIENT
-            if (model->surfaces_.empty())
+            if (desc.surfaces.empty())
             {
                 throw std::runtime_error("Face without surface in model");
             }
 
-            model->tris_.emplace_back(t);
-            ++model->surfaces_.back().tri_count;
+            desc.tris.emplace_back(t);
+            ++desc.surfaces.back().tri_count;
 #endif // CLIENT
 
-            if (model->cmesh_)
+            if (!desc.col_surfaces.empty())
             {
-                glm::vec3 p[3];
-                for (size_t i = 0; i < 3; ++i)
-                {
-                    size_t index = t.vertices[i];
-                    if (index >= vert_pos.size())
-                        throw std::runtime_error("Vertex index out of bounds in model");
-                    
-                    p[i] = vert_pos[index] - model->col_offset_;
-                }
-
-                model->cmesh_->AddTriangle(p[0], p[1], p[2]);
+                ++desc.col_surfaces.back().tri_count;
             }
         }
         else if (command == "surface")
@@ -132,15 +208,15 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             std::string surface_name;
             iss >> surface_name;
 
-            size_t first = 0;
-            if (!model->surfaces_.empty())
+            uint32_t first = 0;
+            if (!desc.surfaces.empty())
             {
-                first = model->surfaces_.back().tri_offset + model->surfaces_.back().tri_count;
+                first = desc.surfaces.back().tri_offset + desc.surfaces.back().tri_count;
             }
 
-            model->surface_indices_[surface_name] = model->surfaces_.size();
-            auto& surface = model->surfaces_.emplace_back();
+            auto& surface = desc.surfaces.emplace_back();
             surface.tri_offset = first;
+            surface.name = surface_name;
 
             // Optional flags
             std::string flag;
@@ -190,17 +266,17 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
         }
         else if (command == "makecoltrimesh")
         {
-            model->cmesh_ = std::make_unique<collision::TriangleMesh>();
+            desc.make_triangle_mesh = true;
         }
         else if (command == "makeconvexhull")
         {
-            temp_hull = std::make_unique<btConvexHullShape>();
+            desc.make_convex_hull = true;
         }
         else if (command == "skeleton")
         {
             std::string skel_name;
             iss >> skel_name;
-            model->skeleton_ = AssetManager::GetInstance().Get<Skeleton>(skel_name);
+            desc.skeleton = AssetManager::GetInstance().Get<Skeleton>(skel_name);
         }
         else if (command == "col")
         {
@@ -213,57 +289,63 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             glm::vec3 scale(trans.scale, sy, sz);
             trans.scale = 1.0f; 
 
-            trans.position -= model->col_offset_; // apply offset
-
-            if (!compound)
-            {
-                compound = std::make_unique<btCompoundShape>();
-            }
+            ModelCollisionShape model_shape{};
+            model_shape.size = scale;
+            model_shape.transform = trans;
 
             if (shape_type == "box")
             {
-                auto box_shape = std::make_unique<btBoxShape>(btVector3(scale.x, scale.y, scale.z));
-                compound->addChildShape(trans.ToBtTransform(), box_shape.get());
-                model->subshapes_.push_back(std::move(box_shape));
+                model_shape.type = MODEL_COLLISION_SHAPE_BOX;
+            }
+            else if (shape_type == "sphere")
+            {
+                model_shape.type = MODEL_COLLISION_SHAPE_SPHERE;
             }
             else
             {
                 throw std::runtime_error("Unknown collision shape type: " + shape_type);
             }
+
+            desc.col_shapes.emplace_back(model_shape);
         }
         else if (command == "centerofmass")
         {
             glm::vec3 com;
             iss >> com.x >> com.y >> com.z;
-            model->col_offset_ = com;
+            desc.col_offset = com;
         }
         else if (command == "param")
         {
             std::string key, val;
             iss >> key >> val;
-            model->params_[key] = val;
+            desc.params[key] = val;
         }
         else if (command == "pm")
         {
             std::string pm_name;
             iss >> pm_name;
 
-            if (model->cmesh_)
+            ModelCollisionSurface col_surface{};
+            col_surface.material = GetMaterialByName(pm_name);
+
+            if (!desc.col_surfaces.empty())
             {
-                model->cmesh_->BeginMaterial(GetMaterialByName(pm_name));
+                col_surface.tri_offset = desc.col_surfaces.back().tri_offset + desc.col_surfaces.back().tri_count;
             }
+
+            desc.col_surfaces.emplace_back(col_surface);
         }
         else if (command == "cpm")
         {
             std::string pm_name;
             iss >> pm_name;
-            col_material = GetMaterialByName(pm_name);
+            desc.col_material = GetMaterialByName(pm_name);
         }
         else if (command == "loc")
         {
             std::string loc_name;
             iss >> loc_name;
-            ParseTransform(iss, model->locations_[loc_name]);
+            ParseTransform(iss, desc.locations[loc_name]);
         }
         else
         {
@@ -271,33 +353,7 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
         }
     });
     
-    // tri mesh
-    if (model->cmesh_)
-        model->cmesh_->Build();
-
-    // convex hull
-    if (temp_hull)
-    {
-        temp_hull->recalcLocalAabb();
-
-        auto shape_hull = std::make_unique<btShapeHull>(temp_hull.get());
-        shape_hull->buildHull(temp_hull->getMargin());
-
-        model->cshape_ = std::make_unique<btConvexHullShape>((btScalar*)shape_hull->getVertexPointer(), shape_hull->numVertices(), sizeof(btVector3));
-    }
-    else
-    {
-        model->cshape_ = std::move(compound);
-    }
-
-    if (model->cshape_)
-    {
-        collision::SetShapeMaterial(*model->cshape_, col_material);
-        if (col_material != collision::PM_NONE)
-            model->cshape_is_bullet_target_ = true;
-    }
-
-    return model;
+    return std::make_shared<Model>(std::move(desc));
 }
 
 bool assets::Model::GetSurfaceIndex(const std::string& name, size_t & idx) const

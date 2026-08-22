@@ -32,10 +32,47 @@ struct ModelSurface
     gfx::MaterialProperties properties;
 };
 
+struct ModelCollisionSurface
+{
+    collision::Material material = collision::PM_NONE;
+    uint32_t tri_offset = 0;
+    uint32_t tri_count = 0;
+};
+
+enum ModelCollisionShapeType
+{
+    MODEL_COLLISION_SHAPE_BOX,
+    MODEL_COLLISION_SHAPE_SPHERE,
+};
+
+struct ModelCollisionShape
+{
+    ModelCollisionShapeType type;
+    glm::vec3 size;
+    Transform transform;
+};
+
+struct ModelDescriptor
+{
+    std::shared_ptr<const Skeleton> skeleton;
+    ModelVertexData verts;
+    std::vector<gfx::MeshTriangle> tris;
+    std::vector<ModelSurface> surfaces;
+    std::vector<ModelCollisionSurface> col_surfaces;
+    collision::Material col_material = collision::PM_NONE;
+    std::vector<ModelCollisionShape> col_shapes;
+    bool make_convex_hull = false;
+    bool make_triangle_mesh = false;
+    glm::vec3 col_offset = glm::vec3(0.0f);
+    std::map<std::string, std::string> params;
+    std::map<std::string, Transform> locations;
+};
+
 class Model : public Asset
 {
 public:
-    Model() = default;
+    Model(ModelDescriptor desc);
+
     static std::shared_ptr<Model> Load(const std::string& name);
     static std::shared_ptr<Model> LoadFromFile(const std::string& filename);
     
