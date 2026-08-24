@@ -19,7 +19,7 @@ edit::Project::Project() : static_models_root_("root")
 {
     InitStaticModels();
 
-    SetupChunks(16);
+    SetupChunks(8);
 }
 
 void edit::Project::Update()
@@ -173,7 +173,7 @@ void edit::Project::DeleteSelection()
 void edit::Project::InvalidateChunk(const glm::ivec2& chunk_pos)
 {
     invalid_chunks_.insert(chunk_pos);
-    DelayChunkUpdates();
+    //DelayChunkUpdates();
 }
 
 void edit::Project::DelayChunkUpdates()
@@ -252,7 +252,7 @@ void edit::Project::SetupChunks(uint32_t size)
 {
     map_config_.chunks = size;
     map_config_.chunk_size_m = 128.0f;
-    map_config_.chunk_tiles = 256;
+    map_config_.chunk_tiles = 128;
 
     chunks_.clear();
 

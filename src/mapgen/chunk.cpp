@@ -5,6 +5,7 @@
 #include <set>
 
 #include <tpp_interface.hpp>
+#include "FastNoiseLite.h"
 
 namespace
 {
@@ -15,6 +16,9 @@ struct ChunkGenContext
     glm::ivec2 chunk_coord;
     mg::Chunk* chunk;
     AABB2 bounds;
+
+    // seeds
+    uint32_t heightmap_seed;
 
     // tiles
     float tile_size_m;
@@ -237,6 +241,43 @@ mg::ChunkTile* GetTileAtPos(ChunkGenContext& ctx, const glm::vec2& pos)
     return &ctx.tiles[tile_idx.y * ctx.tiles_stride + tile_idx.x];
 }
 
+void InitHeightmap(ChunkGenContext& ctx)
+{
+    FastNoiseLite noise;
+    noise.SetSeed(ctx.heightmap_seed);
+    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    noise.SetFrequency(0.00001f);
+    noise.SetFractalType(FastNoiseLite::FractalType_FBm);
+    noise.SetFractalOctaves(5);
+
+    FastNoiseLite noise2;
+    noise2.SetSeed(ctx.heightmap_seed ^ 0xAAAAAAAA);
+    noise2.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    noise2.SetFrequency(0.001f);
+    noise2.SetFractalType(FastNoiseLite::FractalType_FBm);
+    noise2.SetFractalOctaves(5);
+
+    for (uint32_t y = 0; y < ctx.tiles_stride; ++y)
+    {
+        for (uint32_t x = 0; x < ctx.tiles_stride; ++x)
+        {
+            glm::vec2 tile_pos = ctx.tiles_aabb.min + glm::vec2(x, y) * ctx.tile_size_m;
+            float nx = tile_pos.x;
+            float ny = tile_pos.y;
+            float height = (noise.GetNoise(nx, ny) * 0.5f + 0.5f) * 1500.0f;
+            //height *= glm::mix(0.1f, 1.0f, GetHeightFalloff(nx, ny, ctx.map_cfg->chunks * ctx.map_cfg->chunk_size_m));
+            height -= 500.0f;
+
+            height += (noise2.GetNoise(nx, ny) * 0.5f + 0.5f) * 25.0f; // add finer detail
+
+            height -= 250.0f;
+
+            auto& tile = ctx.tiles[y * ctx.tiles_stride + x];
+            tile.height = height;
+        }
+    }
+}
+
 void TriangulateTerrain(ChunkGenContext& ctx)
 {
     const float chunk_tile_m = ctx.tile_size_m;
@@ -244,7 +285,7 @@ void TriangulateTerrain(ChunkGenContext& ctx)
     auto terrain_points_offset = ctx.hm_verts.size();
     std::vector<glm::vec2> terrain_points;
 
-    const float r = 5.0f;
+    const float r = 3.0f;
     const float r_min = 2.0f;
     const float r_border = r * 5.0f;
 
@@ -335,6 +376,8 @@ void TriangulateTerrain(ChunkGenContext& ctx)
 
     std::map<uint32_t, uint32_t> vertex_map; // maps delaunay vertex index to chunk vertex index
 
+    std::vector<glm::vec3> normals(terrain_points_offset + terrain_points.size(), glm::vec3(0.0f));
+
     for (const auto& face : delaunay.faces())
     {
         std::array<int, 3> v = {face.Org(), face.Dest(), face.Apex()};
@@ -353,10 +396,17 @@ void TriangulateTerrain(ChunkGenContext& ctx)
             else
             {
                 int terrain_idx = v[i] - static_cast<int>(terrain_points_offset);
-                vert_pos[i] = glm::vec3(terrain_points[terrain_idx],
-                                        0.0f); // Placeholder height; replace with actual terrain height
-
+                auto tile = GetTileAtPos(ctx, terrain_points[terrain_idx]);
+                auto height = tile ? tile->height : 0.0f;
+                vert_pos[i] = glm::vec3(terrain_points[terrain_idx], height);
             }
+        }
+
+        // accumulate normals
+        auto tri_normal = glm::normalize(glm::cross(vert_pos[1] - vert_pos[0], vert_pos[2] - vert_pos[0]));
+        for (int i = 0; i < 3; ++i)
+        {
+            normals[v[i]] += tri_normal;
         }
 
         // check if triangle is not a heightmesh triangle
@@ -377,6 +427,7 @@ void TriangulateTerrain(ChunkGenContext& ctx)
 
         auto& tri = ctx.chunk->mesh.tris.emplace_back();
 
+
         // push vertices
         for (int i = 0; i < 3; ++i)
         {
@@ -389,8 +440,7 @@ void TriangulateTerrain(ChunkGenContext& ctx)
                 auto pos = vert_pos[i];
                 auto& vert = ctx.chunk->mesh.verts.emplace_back();
                 vert.pos = pos; // Placeholder height; replace with actual terrain height
-                vert.normal = glm::vec3(0.0f, 0.0f, 1.0f); // Placeholder normal; replace with actual terrain normal
-                vert.uv = glm::vec2(pos) * 0.25f;
+                vert.uv = glm::vec2(pos) * 0.1f;
 
                 vertex_map[v[i]] = new_idx;
 
@@ -403,6 +453,13 @@ void TriangulateTerrain(ChunkGenContext& ctx)
                 tri[i] = it->second;
             }
         }
+    }
+
+    // finalize normals
+    for (const auto& [v_idx, c_idx] : vertex_map)
+    {
+        auto& vert = ctx.chunk->mesh.verts[c_idx];
+        vert.normal = glm::normalize(normals[v_idx]);
     }
 }
 
@@ -441,6 +498,14 @@ float SignedDistanceToLine(const glm::vec2& p0, const glm::vec2& p1, const glm::
 
 void RasterizeHeightmesh(ChunkGenContext& ctx)
 {
+    struct TileUpdate
+    {
+        float override_height[3] = { 0.0f, 0.0f, 0.0f };
+        float override_height_weight[3] = { 0.0f, 0.0f, 0.0f };
+    };
+
+    std::vector<TileUpdate> tile_updates(ctx.tiles.size());
+
     const glm::ivec2 grid_size(ctx.tiles_stride);
     const float eps = 1e-6f;
 
@@ -496,6 +561,7 @@ void RasterizeHeightmesh(ChunkGenContext& ctx)
                 bool inside = (e0 >= 0.0f && e1 >= 0.0f && e2 >= 0.0f);
 
                 auto& tile = ctx.tiles[y * ctx.tiles_stride + x];
+                auto& tile_update = tile_updates[y * ctx.tiles_stride + x];
 
                 if (inside)
                 {
@@ -507,40 +573,30 @@ void RasterizeHeightmesh(ChunkGenContext& ctx)
 
                     float height = u * ctx.hm_verts[tri[0]].z + w * ctx.hm_verts[tri[1]].z + v * ctx.hm_verts[tri[2]].z;
 
-                    tile.height += height;
-                    tile.height_weight += 1.0f;
+                    tile_update.override_height[0] += height;
+                    tile_update.override_height_weight[0] += 1.0f;
                     tile.obstruction_level = 255;
                 }
-                else
-                {
-                    // Compute approximate distance to triangle for margin obstruction
-                    float sd0 = SignedDistanceToLine(pos_ts[0], pos_ts[1], tile_center);
-                    float sd1 = SignedDistanceToLine(pos_ts[1], pos_ts[2], tile_center);
-                    float sd2 = SignedDistanceToLine(pos_ts[2], pos_ts[0], tile_center);
-                    if (area2 < 0.0f)
-                    {
-                        sd0 = -sd0;
-                        sd1 = -sd1;
-                        sd2 = -sd2;
-                    }
+                //else
+                //{
+                //    // Compute approximate distance to triangle for margin obstruction
+                //    float sd0 = SignedDistanceToLine(pos_ts[0], pos_ts[1], tile_center);
+                //    float sd1 = SignedDistanceToLine(pos_ts[1], pos_ts[2], tile_center);
+                //    float sd2 = SignedDistanceToLine(pos_ts[2], pos_ts[0], tile_center);
+                //    if (area2 < 0.0f)
+                //    {
+                //        sd0 = -sd0;
+                //        sd1 = -sd1;
+                //        sd2 = -sd2;
+                //    }
 
-                    float sd = glm::min(glm::min(sd0, sd1), sd2);
-                    if (sd >= -static_cast<float>(margin))
-                    {
-                        tile.obstruction_level = glm::max(tile.obstruction_level, static_cast<uint8_t>(128));
-                    }
-                }
+                //    float sd = glm::min(glm::min(sd0, sd1), sd2);
+                //    if (sd >= -static_cast<float>(margin))
+                //    {
+                //        tile.obstruction_level = glm::max(tile.obstruction_level, static_cast<uint8_t>(128));
+                //    }
+                //}
             }
-        }
-    }
-
-    // Normalize heights across updated tiles
-    for (auto& tile : ctx.tiles)
-    {
-        if (tile.height_weight > 0.0f)
-        {
-            tile.height /= tile.height_weight;
-            tile.height_weight = 1.0f;
         }
     }
 
@@ -574,6 +630,107 @@ void RasterizeHeightmesh(ChunkGenContext& ctx)
                     }
                 }
             }
+        }
+    }
+    //
+    // Linear Height Ramp via 2-Pass Distance Field
+    //
+    constexpr int radius = 30;
+    int size = static_cast<int>(ctx.tiles_stride);
+    float radius_tiles = static_cast<float>(radius);
+
+    struct DistTile
+    {
+        float dist = 1e9f; // Distance in tile units
+        float height = 0.0f;
+    };
+    std::vector<DistTile> dt(size * size);
+
+    // 1. Initialize building source tiles
+    for (int i = 0; i < size * size; ++i)
+    {
+        if (ctx.tiles[i].obstruction_level == 255)
+        {
+            dt[i].dist = 0.0f;
+            dt[i].height = tile_updates[i].override_height[0];
+        }
+    }
+
+    constexpr float d_ortho = 1.0f;      // Straight neighbor distance
+    constexpr float d_diag = 1.4142135f; // Diagonal neighbor distance
+
+    // 2. Pass 1: Forward Sweep (Top-Left to Bottom-Right)
+    for (int y = 0; y < size; ++y)
+    {
+        for (int x = 0; x < size; ++x)
+        {
+            int idx = y * size + x;
+            if (dt[idx].dist == 0.0f)
+                continue;
+
+            auto propagate = [&](int nx, int ny, float step) {
+                if (nx >= 0 && nx < size && ny >= 0 && ny < size)
+                {
+                    int nidx = ny * size + nx;
+                    if (dt[nidx].dist + step < dt[idx].dist)
+                    {
+                        dt[idx].dist = dt[nidx].dist + step;
+                        dt[idx].height = dt[nidx].height;
+                    }
+                }
+            };
+
+            propagate(x - 1, y, d_ortho);    // Left
+            propagate(x, y - 1, d_ortho);    // Top
+            propagate(x - 1, y - 1, d_diag); // Top-Left
+            propagate(x + 1, y - 1, d_diag); // Top-Right
+        }
+    }
+
+    // 3. Pass 2: Backward Sweep (Bottom-Right to Top-Left)
+    for (int y = size - 1; y >= 0; --y)
+    {
+        for (int x = size - 1; x >= 0; --x)
+        {
+            int idx = y * size + x;
+
+            auto propagate = [&](int nx, int ny, float step) {
+                if (nx >= 0 && nx < size && ny >= 0 && ny < size)
+                {
+                    int nidx = ny * size + nx;
+                    if (dt[nidx].dist + step < dt[idx].dist)
+                    {
+                        dt[idx].dist = dt[nidx].dist + step;
+                        dt[idx].height = dt[nidx].height;
+                    }
+                }
+            };
+
+            propagate(x + 1, y, d_ortho);    // Right
+            propagate(x, y + 1, d_ortho);    // Bottom
+            propagate(x + 1, y + 1, d_diag); // Bottom-Right
+            propagate(x - 1, y + 1, d_diag); // Bottom-Left
+        }
+    }
+
+    // 4. Apply True Linear Blend
+    for (int i = 0; i < size * size; ++i)
+    {
+        auto& tile = ctx.tiles[i];
+
+        // Keep building footprints perfectly flat
+        if (tile.obstruction_level == 255)
+            continue;
+
+        if (dt[i].dist <= radius_tiles)
+        {
+            // Exact linear falloff from 1.0 at building wall to 0.0 at radius
+            float dist = dt[i].dist;
+            float weight = 1.0f - (dist / radius_tiles);
+
+            weight = glm::smoothstep(0.0f, 1.0f, weight); // Smooth the transition
+            
+            tile.height = glm::mix(tile.height, dt[i].height, weight);
         }
     }
 }
@@ -615,6 +772,8 @@ mg::Chunk mg::GenerateChunk(const MapConfig& cfg, const ChunkParams& params)
     ctx.chunk = &chunk;
     ctx.bounds = GetChunkAABB(cfg, params.coord);
 
+    ctx.heightmap_seed = params.heightmap_seed;
+
     ctx.tiles_border = cfg.chunk_border;
     ctx.tiles_stride = cfg.chunk_tiles + cfg.chunk_border * 2;
     ctx.tiles.resize(ctx.tiles_stride * ctx.tiles_stride);
@@ -622,6 +781,7 @@ mg::Chunk mg::GenerateChunk(const MapConfig& cfg, const ChunkParams& params)
     ctx.tiles_aabb.min = ctx.bounds.min - glm::vec2(cfg.chunk_border) * ctx.tile_size_m;
     ctx.tiles_aabb.max = ctx.bounds.max + glm::vec2(cfg.chunk_border) * ctx.tile_size_m;
 
+    InitHeightmap(ctx);
     AppendObjectsHeightmeshes(ctx, params.objs);
     RasterizeHeightmesh(ctx);
     TriangulateTerrain(ctx);

@@ -46,7 +46,6 @@ enum ChunkTileFlag : ChunkTileFlags
 struct ChunkTile
 {
     float height = 0.0f;
-    float height_weight = 0.0f;
     uint8_t obstruction_level = 0;
     ChunkTileFlags flags = 0;
 };
@@ -63,6 +62,7 @@ struct ChunkParams
 {
     glm::ivec2 coord;
     std::span<ChunkStaticObject> objs;
+    uint32_t heightmap_seed = 420;
 };
 
 struct Chunk
