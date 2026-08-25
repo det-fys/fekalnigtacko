@@ -27,10 +27,13 @@ public:
     Object(Project& project);
 
     virtual void Draw(const gfx::DrawContext& ctx) {}
-    virtual void DrawOverlay(const DrawOverlayContext& ctx) {}
+    virtual void DrawOverlay(const DrawOverlayContext& ctx);
 
     void SetVisible(bool visible) { visible_ = visible; }
     bool IsVisible() const { return visible_; }
+
+    void SetHovered(bool hovered) { hovered_ = hovered; }
+    bool IsHovered() const { return hovered_; }
 
     virtual void SetSelected(bool selected) { selected_ = selected; }
     bool IsSelected() const { return selected_; }
@@ -49,11 +52,15 @@ protected:
     void InvalidateChunks(const AABB3& aabb);
 
 private:
+    void DrawAABBOverlay(const DrawOverlayContext& ctx, uint32_t color, float width) const;
+
+private:
     Project* project_ = nullptr;
 
     glm::mat4 trans_{1.0f};
     AABB3 aabb_;
     bool visible_ = false;
+    bool hovered_ = false;
     bool selected_ = false;
 };
 

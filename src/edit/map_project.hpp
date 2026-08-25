@@ -17,15 +17,23 @@
 #include "gfx/scene.hpp"
 #include "mapgen/chunk.hpp"
 #include "static_object.hpp"
-
+#include "utils/worker.hpp"
 
 namespace edit
 {
 
 using namespace game::view;
 
+enum ChunkState
+{
+    CHUNK_STATE_INVALID,
+    CHUNK_STATE_UPDATING,
+    CHUNK_STATE_READY,
+};
+
 struct Chunk
 {
+    ChunkState state = CHUNK_STATE_INVALID;
     mg::Chunk mgchunk;
 
     std::shared_ptr<const ModelView> model;
@@ -83,7 +91,9 @@ public:
     void AddStaticObject(const glm::vec2& pos, const std::string& model_name);
 
     // selection operations
-    void MakeSelection2D(const glm::vec2& min, const glm::vec2* max);
+    void SetHover(const glm::vec3& start, const glm::vec3& end);
+    void MakeSelection(const glm::vec3& start, const glm::vec3& end, bool additive);
+    void MakeSelection2D(const glm::vec2& min, const glm::vec2* max, bool additive);
     bool HasSelection() const;
     const glm::mat4* GetSelectionMatrix() const;
     void ApplySelectionTransform(const glm::mat4& delta);
@@ -91,6 +101,7 @@ public:
     void DeleteSelection();
 
     // generation
+    void SetChunkPriorityPos(const glm::vec2& pos) { chunk_priority_pos_ = pos; }
     void InvalidateChunk(const glm::ivec2& chunk_pos);
     void DelayChunkUpdates();
 
@@ -101,16 +112,20 @@ private:
     void InitStaticModels();
 
     void Select(Object& obj);
-    void Deselect(Object& obj);
+    void Deselect(Object& obj, bool fix_list = true);
+    void SelectOrDeselect(std::span<Object*> objs, bool additive, bool allow_deselect);
     void FixSelectionList();
 
     void NewObjectAdded(Object& obj);
     void UpdateAllObjectsList();
 
+    Object* ObjectRaycast(const glm::vec3& start, const glm::vec3& end);
+
     // generation
     void SetupChunks(uint32_t size);
     void UpdateChunks();
-    void UpdateChunk(const glm::ivec2& chunk_pos);
+    void ScheduleChunkUpdate(const glm::ivec2& chunk_pos);
+    void FinalizeChunk(mg::Chunk&& mgchunk);
 
 private:
     StaticModelsEntry static_models_root_;
@@ -127,12 +142,15 @@ private:
     std::vector<SelectionListEntry> selection_;
     ImGuizmo::OPERATION gizmo_operation_ = ImGuizmo::TRANSLATE;
 
-
     // chunk generation
+    glm::vec2 chunk_priority_pos_;
     mg::MapConfig map_config_{};
     std::unordered_map<glm::ivec2, Chunk> chunks_;
     std::unordered_set<glm::ivec2> invalid_chunks_;
     float chunk_update_time_ = 0.0f;
+
+    WorkerThread worker_;
+    std::future<mg::Chunk> future_chunk_;
 };
 
 } // namespace edit

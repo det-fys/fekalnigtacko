@@ -19,7 +19,7 @@ edit::Project::Project() : static_models_root_("root")
 {
     InitStaticModels();
 
-    SetupChunks(8);
+    SetupChunks(16);
 }
 
 void edit::Project::Update()
@@ -88,32 +88,25 @@ void edit::Project::AddStaticObject(const glm::vec2& pos, const std::string& mod
     NewObjectAdded(obj);
 }
 
-void edit::Project::MakeSelection2D(const glm::vec2& min, const glm::vec2* max)
+void edit::Project::SetHover(const glm::vec3& start, const glm::vec3& end)
 {
-    // find nearest obj
-    float nearest_dist2 = std::numeric_limits<float>().max();
-    Object* nearest_obj = nullptr;
+    Object* hovered_obj = ObjectRaycast(start, end);
 
     for (auto& obj : all_objs_)
     {
-        auto pos2d = glm::vec2(obj->GetPosition());
-        auto d = pos2d - min;
-        auto dist2 = glm::dot(d, d);
-        
-        if (dist2 > nearest_dist2)
-            continue;
+        obj->SetHovered(obj == hovered_obj);
+    }   
+}
 
-        nearest_obj = obj;
-        nearest_dist2 = dist2;
-    }
+void edit::Project::MakeSelection(const glm::vec3& start, const glm::vec3& end, bool additive)
+{
+    auto obj = ObjectRaycast(start, end);
+    SelectOrDeselect({&obj, static_cast<size_t>(obj ? 1 : 0)}, additive, true);
+}
 
-    if (!nearest_obj)
-        return;
-
-    if (nearest_obj->IsSelected())
-        Deselect(*nearest_obj);
-    else
-        Select(*nearest_obj);
+void edit::Project::MakeSelection2D(const glm::vec2& min, const glm::vec2* max, bool additive)
+{
+    MakeSelection(glm::vec3(min, 1000.0f), glm::vec3(min, 1000.0f), additive);
 }
 
 bool edit::Project::HasSelection() const
@@ -144,7 +137,7 @@ void edit::Project::ApplySelectionTransform(const glm::mat4& delta)
     {
         auto& entry = selection_[i];
         auto& obj = entry.obj;
-        obj->SetTransform(entry.offset * first_trans);
+        obj->SetTransform(first_trans * entry.offset);
     }
 }
 
@@ -173,6 +166,7 @@ void edit::Project::DeleteSelection()
 void edit::Project::InvalidateChunk(const glm::ivec2& chunk_pos)
 {
     invalid_chunks_.insert(chunk_pos);
+    chunks_[chunk_pos].state = CHUNK_STATE_INVALID;
     //DelayChunkUpdates();
 }
 
@@ -213,14 +207,43 @@ void edit::Project::Select(Object& obj)
     selection_.emplace_back(&obj, offset);
 }
 
-void edit::Project::Deselect(Object& obj)
+void edit::Project::Deselect(Object& obj, bool fix_list)
 {
     if (!obj.IsSelected())
         return;
 
     obj.SetSelected(false);
 
-    FixSelectionList();
+    if (fix_list)
+        FixSelectionList();
+}
+
+void edit::Project::SelectOrDeselect(std::span<Object*> objs, bool additive, bool allow_deselect)
+{
+    if (!additive)
+        ClearSelection();
+
+    bool any_deselected = false;
+
+    for (auto* obj : objs)
+    {
+        if (obj->IsSelected())
+        {
+            if (allow_deselect)
+            {
+                Deselect(*obj, false);
+                any_deselected = true;
+            }
+        }
+        else
+        {
+            Select(*obj);
+        }
+    }
+
+    if (any_deselected)
+        FixSelectionList();
+
 }
 
 void edit::Project::FixSelectionList()
@@ -248,6 +271,82 @@ void edit::Project::UpdateAllObjectsList()
     }
 }
 
+static bool LineVsAABB(const glm::vec3& start, const glm::vec3& end, const AABB3& aabb)
+{
+    glm::vec3 dir = end - start;
+
+    // Initialize bounds to the line segment [0.0 (start), 1.0 (end)]
+    float tmin = 0.0f;
+    float tmax = 1.0f;
+
+    for (int i = 0; i < 3; ++i)
+    {
+        // If the line is parallel to the slab, handle carefully to avoid division by zero
+        if (std::abs(dir[i]) < 1e-6f)
+        {
+            // If the segment's origin is completely outside the parallel slab, it's a miss
+            if (start[i] < aabb.min[i] || start[i] > aabb.max[i])
+            {
+                return false;
+            }
+        }
+        else
+        {
+            float inv_dir = 1.0f / dir[i];
+            float t1 = (aabb.min[i] - start[i]) * inv_dir;
+            float t2 = (aabb.max[i] - start[i]) * inv_dir;
+
+            if (t1 > t2)
+            {
+                std::swap(t1, t2);
+            }
+
+            if (t1 > tmin)
+                tmin = t1;
+            if (t2 < tmax)
+                tmax = t2;
+
+            // If the valid interval becomes empty, there is no intersection
+            if (tmin > tmax)
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+static float Distance2ToAABB(const glm::vec3& point, const AABB3& aabb)
+{
+    glm::vec3 closest = glm::clamp(point, aabb.min, aabb.max);
+    glm::vec3 d = point - closest;
+    return glm::dot(d, d);
+}
+
+edit::Object* edit::Project::ObjectRaycast(const glm::vec3& start, const glm::vec3& end)
+{
+    float nearest_dist2 = std::numeric_limits<float>().max();
+    Object* nearest_obj = nullptr;
+
+    for (auto& obj : all_objs_)
+    {
+        const auto& aabb = obj->GetAABB();
+
+        if (!LineVsAABB(start, end, aabb))
+            continue;
+
+        auto dist2 = Distance2ToAABB(start, aabb);
+        if (dist2 > nearest_dist2)
+            continue;
+
+        nearest_obj = obj;
+        nearest_dist2 = dist2;
+    }
+
+    return nearest_obj;
+}
+
 void edit::Project::SetupChunks(uint32_t size)
 {
     map_config_.chunks = size;
@@ -264,35 +363,72 @@ void edit::Project::SetupChunks(uint32_t size)
         {
             glm::ivec2 chunk_pos(x, y);
             InvalidateChunk(chunk_pos);
+            chunks_[chunk_pos];
         }
     }
 }
 
 void edit::Project::UpdateChunks()
 {
+    // check if there is a chunk being generated
+    if (future_chunk_.valid())
+    {
+        // check if the chunk generation is done and finalize
+        if (future_chunk_.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+        {
+            auto chunk = future_chunk_.get();
+            FinalizeChunk(std::move(chunk));
+        }
+
+        return; // don't start generating a new chunk while one is being generated
+    }
+
+    // no invalid chunks to update
     if (invalid_chunks_.empty())
         return;
 
+    // debounce
     if (chunk_update_time_ > ImGui::GetTime())
         return;
 
     // pick one chunk to update
-    auto chunk_pos = *invalid_chunks_.begin();
-    invalid_chunks_.erase(invalid_chunks_.begin());
-    UpdateChunk(chunk_pos);
+    float nearest_dist = std::numeric_limits<float>().max();
+    glm::ivec2 chunk_coord{0, 0};
 
+    for (const auto& chunk_pos : invalid_chunks_)
+    {
+        auto chunk_center = (glm::vec2(chunk_pos) + 0.5f) * map_config_.chunk_size_m;
+        auto dist = glm::distance(chunk_priority_pos_, chunk_center);
+
+        // add some randomness to avoid always picking the same chunk when repeatedly invalid
+        float f = static_cast<float>(rand() % 1000) / 1000.0f;
+        dist += map_config_.chunk_size_m * 5.0f * f; 
+
+        if (dist < nearest_dist)
+        {
+            nearest_dist = dist;
+            chunk_coord = chunk_pos;
+        }
+    }
+
+    //auto random_idx = rand() % invalid_chunks_.size();
+    //auto chunk_coord = *std::next(invalid_chunks_.begin(), random_idx);
+
+    invalid_chunks_.erase(chunk_coord);
+    //std::cout << "Scheduling chunk update for " << glm::to_string(chunk_coord) << std::endl;
+    ScheduleChunkUpdate(chunk_coord);
 }
 
-void edit::Project::UpdateChunk(const glm::ivec2& chunk_pos)
+void edit::Project::ScheduleChunkUpdate(const glm::ivec2& chunk_pos)
 {
     AABB2 chunk_aabb = mg::GetChunkAABB(map_config_, chunk_pos, true);
 
     std::vector<mg::ChunkStaticObject> objs;
-    
+
     // collect relevant objs
     for (const auto& obj : static_objs_)
     {
-        //auto pos2d = glm::vec2(obj.GetPosition());
+        // auto pos2d = glm::vec2(obj.GetPosition());
         const auto& obj_aabb = obj.GetAABB();
         AABB2 obj_aabb_2d(glm::vec2(obj_aabb.min), glm::vec2(obj_aabb.max));
 
@@ -305,13 +441,25 @@ void edit::Project::UpdateChunk(const glm::ivec2& chunk_pos)
         mgobj.heightmesh = obj.GetHeightMesh();
     }
 
-    mg::ChunkParams params{};
-    params.coord = chunk_pos;
-    params.objs = objs;
+    auto func = [this, chunk_pos, objs = std::move(objs)]() mutable {
+        mg::ChunkParams params{};
+        params.coord = chunk_pos;
+        params.objs = objs;
+        return mg::GenerateChunk(map_config_, params);
+    };
 
-    Chunk& chunk = chunks_[chunk_pos];
-    chunk.mgchunk = mg::GenerateChunk(map_config_, params);
-    
+    //future_chunk_ = std::async(std::launch::async, func);
+    future_chunk_ = worker_.Schedule(std::move(func));
+
+    chunks_[chunk_pos].state = CHUNK_STATE_UPDATING;
+}
+
+void edit::Project::FinalizeChunk(mg::Chunk&& mgchunk)
+{
+    Chunk& chunk = chunks_[mgchunk.coord];
+    chunk.mgchunk = std::move(mgchunk);
+    chunk.state = CHUNK_STATE_READY;
+
     chunk.vis_verts.clear();
     chunk.vis_edges.clear();
     chunk.vis_tris.clear();
@@ -338,7 +486,7 @@ void edit::Project::UpdateChunk(const glm::ivec2& chunk_pos)
     }
 
     assets::ModelDescriptor model_desc{};
-    //model_desc.make_triangle_mesh = true;
+    // model_desc.make_triangle_mesh = true;
 
     for (const auto& vert : chunk.mgchunk.mesh.verts)
     {
@@ -360,4 +508,5 @@ void edit::Project::UpdateChunk(const glm::ivec2& chunk_pos)
 
     auto model = std::make_shared<assets::Model>(std::move(model_desc));
     chunk.model = std::make_shared<ModelView>(model);
+
 }

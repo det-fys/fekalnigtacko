@@ -23,6 +23,7 @@ public:
     const gfx::Frustum GetFrustum() const { return frustum_; }
 
 protected:
+    virtual void Update() override;
     virtual void Draw(ImDrawList& draw_list) override;
 
     void SetCameraParams(const gfx::CameraParams& cam) { cam_ = cam; }

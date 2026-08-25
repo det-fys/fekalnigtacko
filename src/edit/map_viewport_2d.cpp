@@ -32,8 +32,6 @@ static gfx::CameraParams GetCameraParams(const glm::vec2& p0, const glm::vec2& p
 
 void edit::MapViewport2D::Update()
 {
-    Super::Update();
-
     controls_.Update();
 
     // update cam
@@ -44,6 +42,8 @@ void edit::MapViewport2D::Update()
     auto proj = glm::ortho(-half_size_ws.x, half_size_ws.x, -half_size_ws.y, half_size_ws.y, -1000.0f, 1000.0f);
     auto view = glm::lookAt(center_ws, center_ws + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     SetOverlayMatrices(view, proj);
+
+    Super::Update();
 
     // make world space aabb for current view
     aabb_ = AABB2();
@@ -56,12 +56,6 @@ void edit::MapViewport2D::Update()
     }
 
     auto& project = *GetContext().project;
-
-    // selection
-    if (IsHovered() && !IsGizmoHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-    {
-        project.MakeSelection2D(controls_.GetMousePosWs(), nullptr);
-    }
 
     ImVec2 drag_delta_r = ImGui::GetMouseDragDelta(ImGuiMouseButton_Right);
     if (drag_delta_r.x == 0.0f && drag_delta_r.y == 0.0f)
@@ -144,7 +138,7 @@ void edit::MapViewport2D::DrawChunks(ImDrawList& draw_list)
     auto half_chunks = static_cast<int>(map_cfg.chunks / 2);
     auto [min_chunk, max_chunk] = mg::GetChunkRange(map_cfg, aabb_);
 
-    auto grid_color = IM_COL32(128, 128, 128, 128);
+    auto grid_color = IM_COL32(255, 255, 255, 128);
 
     auto x0 = glm::max(GetCanvasP0().x, controls_.WsToCanvas(glm::vec2(-half_chunks * map_cfg.chunk_size_m, 0.0f)).x);
     auto x1 = glm::min(GetCanvasP0().x + GetCanvasSize().x, controls_.WsToCanvas(glm::vec2(half_chunks * map_cfg.chunk_size_m, 0.0f)).x);
@@ -176,7 +170,8 @@ void edit::MapViewport2D::DrawChunks(ImDrawList& draw_list)
 
 void edit::MapViewport2D::DrawChunk(ImDrawList& draw_list, const glm::ivec2& coord)
 {
-    const auto& project = *GetContext().project;
+    const auto& context = GetContext();
+    const auto& project = *context.project;
     const auto& chunks = project.GetChunks();
 
     auto it = chunks.find(coord);
@@ -186,6 +181,36 @@ void edit::MapViewport2D::DrawChunk(ImDrawList& draw_list, const glm::ivec2& coo
 
     const auto& chunk = it->second;
 
+    if (context.draw_chunk_state)
+    {
+        DrawChunkState(draw_list, coord, chunk.state);
+    }
+
+    if (context.draw_chunk_mesh)
+    {
+        DrawChunkMesh(draw_list, coord, chunk);
+    }
+}
+
+void edit::MapViewport2D::DrawChunkState(ImDrawList& draw_list, const glm::ivec2& coord, ChunkState state)
+{
+    if (state == CHUNK_STATE_READY)
+        return;
+
+    auto chunk_size_m = GetContext().project->GetMapConfig().chunk_size_m;
+    uint32_t color = state == CHUNK_STATE_INVALID ? IM_COL32(255, 0, 0, 64) : IM_COL32(255, 255, 0, 64);
+
+    draw_list.AddRectFilled(
+        im::VecToImGui(controls_.WsToCanvas(
+            glm::vec2(coord.x * chunk_size_m, coord.y * chunk_size_m))),
+        im::VecToImGui(controls_.WsToCanvas(glm::vec2((coord.x + 1) * chunk_size_m,
+                                                      (coord.y + 1) * chunk_size_m))),
+        color);
+
+}
+
+void edit::MapViewport2D::DrawChunkMesh(ImDrawList& draw_list, const glm::ivec2& coord, const Chunk& chunk)
+{
     auto color = (coord.x + coord.y) % 2 == 0 ? IM_COL32(128, 0, 0, 255) : IM_COL32(0, 0, 128, 255);
     auto color2 = (coord.x + coord.y) % 2 == 0 ? IM_COL32(128, 0, 0, 32) : IM_COL32(0, 0, 128, 32);
 
@@ -207,4 +232,5 @@ void edit::MapViewport2D::DrawChunk(ImDrawList& draw_list, const glm::ivec2& coo
 
         draw_list.AddLine(im::VecToImGui(controls_.WsToCanvas(p0)), im::VecToImGui(controls_.WsToCanvas(p1)), color);
     }
+
 }

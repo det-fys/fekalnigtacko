@@ -15,7 +15,7 @@ public:
     MapViewport2D(MapEditContext& context);
 
 protected:
-    virtual void Update();
+    virtual void Update() override;
     virtual void Draw(ImDrawList& draw_list) override;
 
 private:
@@ -23,6 +23,8 @@ private:
 
     void DrawChunks(ImDrawList& draw_list);
     void DrawChunk(ImDrawList& draw_list, const glm::ivec2& coord);
+    void DrawChunkState(ImDrawList& draw_list, const glm::ivec2& coord, ChunkState state);
+    void DrawChunkMesh(ImDrawList& draw_list, const glm::ivec2& coord, const Chunk& chunk);
 
 private:
     im::Viewport2DControls controls_;

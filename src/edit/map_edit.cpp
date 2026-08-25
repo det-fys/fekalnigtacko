@@ -25,6 +25,7 @@ void edit::MapEdit::Update()
 
         project.SetDayTime(context_.day_time);
         project.SetDrawWorldEnv(context_.draw_world_env);
+        project.SetChunkPriorityPos(context_.cam_pos_3d);
         project.Update();
     }
 }
@@ -144,6 +145,8 @@ void edit::MapEdit::ShowPropertiesWindow(bool* open)
         }
         ImGui::Checkbox("Draw World Env", &context_.draw_world_env);
         ImGui::Checkbox("Draw World", &context_.draw_world);
+        ImGui::Checkbox("Draw Chunk Mesh", &context_.draw_chunk_mesh);
+        ImGui::Checkbox("Draw Chunk State", &context_.draw_chunk_state);
         ImGui::PopID();
 
     }

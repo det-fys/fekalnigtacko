@@ -67,13 +67,14 @@ struct ChunkParams
 
 struct Chunk
 {
+    glm::ivec2 coord;
     ChunkMesh mesh{};
     std::vector<ChunkStaticObject> objs;
     AABB3 aabb;
 };
 
 AABB2 GetChunkAABB(const MapConfig& cfg, const glm::ivec2& chunk_pos, bool include_border = false);
-std::tuple<glm::ivec2, glm::ivec2> GetChunkRange(const MapConfig& cfg, const AABB2& aabb);
+std::tuple<glm::ivec2, glm::ivec2> GetChunkRange(const MapConfig& cfg, const AABB2& aabb, bool include_margin = false);
 
 Chunk GenerateChunk(const MapConfig& cfg, const ChunkParams& params);
 

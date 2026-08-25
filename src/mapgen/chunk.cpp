@@ -752,12 +752,23 @@ AABB2 mg::GetChunkAABB(const MapConfig& cfg, const glm::ivec2& chunk_pos, bool i
     return AABB2(min, max);
 }
 
-std::tuple<glm::ivec2, glm::ivec2> mg::GetChunkRange(const MapConfig& cfg, const AABB2& aabb)
+std::tuple<glm::ivec2, glm::ivec2> mg::GetChunkRange(const MapConfig& cfg, const AABB2& aabb, bool include_margin)
 {
+    auto bounds_min = aabb.min;
+    auto bounds_max = aabb.max;
+    
+    if (include_margin)
+    {
+        float border_m = static_cast<float>(cfg.chunk_border) * cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles);
+        //border_m += 30.0f; // additional margin for heightmap bleed
+        bounds_min -= border_m;
+        bounds_max += border_m;
+    }
+
     int half_chunks = static_cast<int>(cfg.chunks / 2);
 
-    glm::ivec2 min_chunk = glm::clamp(glm::ivec2(glm::floor(aabb.min / cfg.chunk_size_m)), -half_chunks, half_chunks);
-    glm::ivec2 max_chunk = glm::clamp(glm::ivec2(glm::ceil(aabb.max / cfg.chunk_size_m)), -half_chunks, half_chunks);
+    glm::ivec2 min_chunk = glm::clamp(glm::ivec2(glm::floor(bounds_min / cfg.chunk_size_m)), -half_chunks, half_chunks);
+    glm::ivec2 max_chunk = glm::clamp(glm::ivec2(glm::floor(bounds_max / cfg.chunk_size_m)), -half_chunks, half_chunks);
 
     return {min_chunk, max_chunk};
 }
@@ -765,6 +776,7 @@ std::tuple<glm::ivec2, glm::ivec2> mg::GetChunkRange(const MapConfig& cfg, const
 mg::Chunk mg::GenerateChunk(const MapConfig& cfg, const ChunkParams& params)
 {
     mg::Chunk chunk{};
+    chunk.coord = params.coord;
 
     ChunkGenContext ctx{};
     ctx.map_cfg = &cfg;

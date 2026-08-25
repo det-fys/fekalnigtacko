@@ -84,6 +84,8 @@ void edit::MapViewport3D::Update()
     auto proj = glm::perspective(glm::radians(cam.fov * 0.5f), GetCanvasSize().x / GetCanvasSize().y, 0.1f, 1000.0f);
     auto view = glm::lookAt(cam.eye, cam.eye + cam.dir, cam.up);
     SetOverlayMatrices(view, proj);
+
+    Super::Update();
 }
 
 void edit::MapViewport3D::Draw(ImDrawList& draw_list)

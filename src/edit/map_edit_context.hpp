@@ -23,9 +23,11 @@ struct MapEditContext
     float cam_yaw_3d = 0.0f;
 
     // world
-    float day_time = 12.0f; // 0-24
+    float day_time = 14.0f; // 0-24
     bool draw_world_env = true;
     bool draw_world = true;
+    bool draw_chunk_mesh = false;
+    bool draw_chunk_state = false;
 
     std::optional<Project> project;
 
