@@ -37,6 +37,19 @@
             display: block;
             width: 100vw;
             height: 100vh;
+
+            /* Disable text selection */
+            -webkit-user-select: none;
+            user-select: none;
+            
+            /* Disable element dragging */
+            -webkit-user-drag: none;
+            
+            /* Disable browser handling of touch gestures (panning, double-tap zoom) */
+            touch-action: none;
+            
+            /* Remove the focus outline when clicking the canvas */
+            outline: none;
         }
 
         #vyplnitmeno{
