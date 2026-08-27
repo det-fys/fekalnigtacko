@@ -80,12 +80,44 @@ void edit::Project::DrawOverlay(const DrawOverlayContext& ctx)
     }
 }
 
-void edit::Project::AddStaticObject(const glm::vec2& pos, const std::string& model_name)
+void edit::Project::AddStaticObject(const glm::mat4& trans, const std::string& model_name)
 {
     ClearSelection(); // to avoid invalid pointers
-    auto& obj = static_objs_.emplace_back(*this, model_name);
-    obj.SetTransform(glm::translate(glm::mat4(1.0f), glm::vec3(pos, 0.0f))); // TODO: Z from heightmap
+    auto& obj = static_objs_.emplace_back(*this, trans, model_name);
     NewObjectAdded(obj);
+}
+
+void edit::Project::AddStaticObject(const glm::vec2& pos, const std::string& model_name)
+{
+    AddStaticObject(GetNewObjectTransform(pos), model_name);
+}
+
+edit::Waypoint* edit::Project::AddWaypoint(const glm::mat4& trans)
+{
+    ClearSelection(); // to avoid invalid pointers
+    auto id = utils::AllocNum(waypoints_, last_waypoint_id_);
+    if (!id)
+    {
+        return nullptr; // max waypoints reached - should never happen
+    }
+
+    auto& wp = waypoints_.emplace(id, Waypoint(*this, trans, id)).first->second;
+    NewObjectAdded(wp);
+    return &wp;
+}
+
+edit::Waypoint* edit::Project::AddWaypoint(const glm::vec2& pos)
+{
+    return AddWaypoint(GetNewObjectTransform(pos));
+}
+
+edit::Waypoint* edit::Project::GetWaypoint(WaypointID id)
+{
+    if (id == 0)
+        return nullptr;
+
+    auto it = waypoints_.find(id);
+    return (it != waypoints_.end()) ? &it->second : nullptr;
 }
 
 void edit::Project::SetHover(const glm::vec3& start, const glm::vec3& end)
@@ -95,7 +127,7 @@ void edit::Project::SetHover(const glm::vec3& start, const glm::vec3& end)
     for (auto& obj : all_objs_)
     {
         obj->SetHovered(obj == hovered_obj);
-    }   
+    }
 }
 
 void edit::Project::MakeSelection(const glm::vec3& start, const glm::vec3& end, bool additive)
@@ -141,6 +173,28 @@ void edit::Project::ApplySelectionTransform(const glm::mat4& delta)
     }
 }
 
+void edit::Project::CloneSelection(const glm::mat4& trans)
+{
+    if (!HasSelection())
+        return;
+
+    // currently can only clone a single obj due to selection invalidation issues
+    selection_[0].obj->Clone(trans);
+}
+
+void edit::Project::CloneSelection(const glm::vec2& pos)
+{
+    CloneSelection(GetNewObjectTransform(pos));
+}
+
+void edit::Project::LinkSelection(bool link)
+{
+    if (selection_.size() < 2)
+        return;
+
+    selection_[0].obj->Link(*selection_[1].obj, link);
+}
+
 void edit::Project::ClearSelection()
 {
     for (auto& entry : selection_)
@@ -153,21 +207,38 @@ void edit::Project::ClearSelection()
 
 void edit::Project::DeleteSelection()
 {
+    // notify objects that they are being deleted
+    for (auto obj : all_objs_)
+    {
+        if (obj->IsSelected())
+            obj->Delete();
+    }
+
+    // remove selected static objects
     static_objs_.erase(std::remove_if(static_objs_.begin(), static_objs_.end(),
                                       [](const StaticObject& obj) { return obj.IsSelected(); }),
                        static_objs_.end());
 
-    all_objs_.erase(std::remove_if(all_objs_.begin(), all_objs_.end(), [](Object* obj) { return obj->IsSelected(); }),
-                    all_objs_.end());
+    // remove selected waypoints
+    for (auto it = waypoints_.begin(); it != waypoints_.end();)
+    {
+        if (it->second.IsSelected())
+            it = waypoints_.erase(it);
+        else
+            ++it;
+    }
 
+    // clear selection list
     selection_.clear();
+
+    UpdateAllObjectsList();
 }
 
 void edit::Project::InvalidateChunk(const glm::ivec2& chunk_pos)
 {
     invalid_chunks_.insert(chunk_pos);
     chunks_[chunk_pos].state = CHUNK_STATE_INVALID;
-    //DelayChunkUpdates();
+    // DelayChunkUpdates();
 }
 
 void edit::Project::DelayChunkUpdates()
@@ -243,7 +314,6 @@ void edit::Project::SelectOrDeselect(std::span<Object*> objs, bool additive, boo
 
     if (any_deselected)
         FixSelectionList();
-
 }
 
 void edit::Project::FixSelectionList()
@@ -251,6 +321,11 @@ void edit::Project::FixSelectionList()
     selection_.erase(std::remove_if(selection_.begin(), selection_.end(),
                                     [](const SelectionListEntry& entry) { return !entry.obj->IsSelected(); }),
                      selection_.end());
+}
+
+glm::mat4 edit::Project::GetNewObjectTransform(const glm::vec2& pos) const
+{
+    return glm::translate(glm::mat4(1.0f), glm::vec3(pos, 0.0f)); // TODO: use terrain height
 }
 
 void edit::Project::NewObjectAdded(Object& obj)
@@ -266,6 +341,11 @@ void edit::Project::UpdateAllObjectsList()
     all_objs_.clear();
 
     for (auto& obj : static_objs_)
+    {
+        all_objs_.emplace_back(&obj);
+    }
+
+    for (auto& [id, obj] : waypoints_)
     {
         all_objs_.emplace_back(&obj);
     }
@@ -402,7 +482,7 @@ void edit::Project::UpdateChunks()
 
         // add some randomness to avoid always picking the same chunk when repeatedly invalid
         float f = static_cast<float>(rand() % 1000) / 1000.0f;
-        dist += map_config_.chunk_size_m * 5.0f * f; 
+        dist += map_config_.chunk_size_m * 5.0f * f;
 
         if (dist < nearest_dist)
         {
@@ -411,11 +491,11 @@ void edit::Project::UpdateChunks()
         }
     }
 
-    //auto random_idx = rand() % invalid_chunks_.size();
-    //auto chunk_coord = *std::next(invalid_chunks_.begin(), random_idx);
+    // auto random_idx = rand() % invalid_chunks_.size();
+    // auto chunk_coord = *std::next(invalid_chunks_.begin(), random_idx);
 
     invalid_chunks_.erase(chunk_coord);
-    //std::cout << "Scheduling chunk update for " << glm::to_string(chunk_coord) << std::endl;
+    // std::cout << "Scheduling chunk update for " << glm::to_string(chunk_coord) << std::endl;
     ScheduleChunkUpdate(chunk_coord);
 }
 
@@ -448,7 +528,7 @@ void edit::Project::ScheduleChunkUpdate(const glm::ivec2& chunk_pos)
         return mg::GenerateChunk(map_config_, params);
     };
 
-    //future_chunk_ = std::async(std::launch::async, func);
+    // future_chunk_ = std::async(std::launch::async, func);
     future_chunk_ = worker_.Schedule(std::move(func));
 
     chunks_[chunk_pos].state = CHUNK_STATE_UPDATING;
@@ -508,5 +588,4 @@ void edit::Project::FinalizeChunk(mg::Chunk&& mgchunk)
 
     auto model = std::make_shared<assets::Model>(std::move(model_desc));
     chunk.model = std::make_shared<ModelView>(model);
-
 }

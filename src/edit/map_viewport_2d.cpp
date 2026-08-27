@@ -61,14 +61,28 @@ void edit::MapViewport2D::Update()
     if (drag_delta_r.x == 0.0f && drag_delta_r.y == 0.0f)
     {
         ImGui::OpenPopupOnItemClick("2d_context", ImGuiPopupFlags_MouseButtonRight);
-        if (IsHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-            new_obj_pos_ = controls_.GetMousePosWs();
+        //if (IsHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+        //    new_obj_pos_ = controls_.GetMousePosWs();
     }
 
     if (ImGui::BeginPopup("2d_context"))
     {
         ShowContextMenu();
         ImGui::EndPopup();
+    }
+    else if (IsHovered())
+    {
+        new_obj_pos_ = controls_.GetMousePosWs();
+    }
+
+    // keys
+    if (IsFocused() && IsHovered())
+    {
+        // clone
+        if (ImGui::IsKeyPressed(ImGuiKey_Space))
+        {
+            project.CloneSelection(new_obj_pos_);
+        }
     }
 }
 
@@ -125,6 +139,13 @@ void edit::MapViewport2D::ShowContextMenu()
 
     ShowStaticModelsMenu(project.GetStaticModelsRoot(),
                          [&](const std::string& model_name) { project.AddStaticObject(new_obj_pos_, model_name); });
+
+    ImGui::SeparatorText("add other");
+
+    if (ImGui::MenuItem("add waypoint"))
+    {
+        project.AddWaypoint(new_obj_pos_);
+    }
 }
 
 void edit::MapViewport2D::DrawChunks(ImDrawList& draw_list)

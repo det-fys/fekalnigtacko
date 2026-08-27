@@ -157,6 +157,7 @@ if(BUILD_CLIENT)
         "src/edit/map_viewport_3d.cpp"
         "src/edit/object.cpp"
         "src/edit/static_object.cpp"
+        "src/edit/waypoint.cpp"
         "src/gameview/characterview.cpp"
         "src/gameview/client_session.cpp"
         "src/gameview/entityview.cpp"

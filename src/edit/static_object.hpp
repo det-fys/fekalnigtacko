@@ -16,12 +16,14 @@ class StaticObject : public Object
 public:
     using Super = Object;
 
-    StaticObject(Project& project, const std::string& model_name);
+    StaticObject(Project& project, const glm::mat4& trans, const std::string& model_name);
 
     virtual void Draw(const gfx::DrawContext& ctx) override;
     virtual void DrawOverlay(const DrawOverlayContext& ctx) override;
 
-    virtual void SetTransform(const glm::mat4& trans);
+    virtual void SetTransform(const glm::mat4& trans) override;
+    virtual void Clone(const glm::mat4& trans) override;
+    virtual void Delete() override;
 
     const std::string& GetModelName() const { return model_name_; }
     const std::shared_ptr<const ModelView>& GetModel() const { return model_; }
@@ -29,6 +31,8 @@ public:
 
 private:
     void UpdateAABB();
+
+    void MaybeInvalidateChunks();
 
 private:
     std::string model_name_;

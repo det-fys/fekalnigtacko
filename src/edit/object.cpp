@@ -4,35 +4,7 @@
 #include "map_viewport.hpp"
 #include "im/utils.hpp"
 
-edit::Object::Object(Project& project) : project_(&project) {}
-
-
-static bool GetScreenPos(const edit::MapViewport& viewport, const glm::vec3& world_pos, glm::vec2& out_screen_pos)
-{
-    glm::vec4 clip_pos = viewport.GetViewProj() * glm::vec4(world_pos, 1.0f);
-    if (clip_pos.w == 0.0f)
-        return false;
-
-    glm::vec3 ndc_pos = glm::vec3(clip_pos) / clip_pos.w;
-    if (ndc_pos.z < -1.0f || ndc_pos.z > 1.0f)
-        return false; // behind camera
-
-    glm::vec2 anchor = ndc_pos * 0.5f + 0.5f;
-    anchor.y = 1.0f - anchor.y;
-    anchor *= viewport.GetCanvasSize();
-    out_screen_pos = viewport.GetCanvasP0() + anchor;
-    return true;
-}
-
-static void DrawLineWs(const edit::DrawOverlayContext& ctx, const glm::vec3& p0, const glm::vec3& p1, ImU32 color, float width)
-{
-    glm::vec2 screen_p0, screen_p1;
-    if (!GetScreenPos(ctx.viewport, p0, screen_p0))
-        return;
-    if (!GetScreenPos(ctx.viewport, p1, screen_p1))
-        return;
-    ctx.draw_list.AddLine(im::VecToImGui(screen_p0), im::VecToImGui(screen_p1), color, width);
-}
+edit::Object::Object(Project& project, const glm::mat4& trans) : project_(&project), trans_(trans) {}
 
 void edit::Object::DrawOverlay(const DrawOverlayContext& ctx)
 {
@@ -56,6 +28,42 @@ void edit::Object::InvalidateChunks(const AABB3& aabb)
             project_->InvalidateChunk(glm::ivec2(chunk_x, chunk_y));
         }
     }
+}
+
+bool edit::Object::GetScreenPos(const edit::MapViewport& viewport, const glm::vec3& world_pos,
+                                glm::vec2& out_screen_pos)
+{
+    glm::vec4 clip_pos = viewport.GetViewProj() * glm::vec4(world_pos, 1.0f);
+    if (clip_pos.w == 0.0f)
+        return false;
+
+    glm::vec3 ndc_pos = glm::vec3(clip_pos) / clip_pos.w;
+    if (ndc_pos.z < -1.0f || ndc_pos.z > 1.0f)
+        return false; // behind camera
+
+    glm::vec2 anchor = ndc_pos * 0.5f + 0.5f;
+    anchor.y = 1.0f - anchor.y;
+    anchor *= viewport.GetCanvasSize();
+    out_screen_pos = viewport.GetCanvasP0() + anchor;
+    return true;
+}
+
+void edit::Object::DrawLineWs(const DrawOverlayContext& ctx, const glm::vec3& p0, const glm::vec3& p1, uint32_t color,
+                              float thickness)
+{
+    glm::vec2 sp0, sp1;
+    if (!GetScreenPos(ctx.viewport, p0, sp0))
+        return;
+    if (!GetScreenPos(ctx.viewport, p1, sp1))
+        return;
+
+    ctx.draw_list.AddLine(ImVec2(sp0.x, sp0.y), ImVec2(sp1.x, sp1.y), color, thickness);
+}
+
+glm::mat4 edit::Object::GetTranslationOnly(const glm::mat4& trans)
+{
+    return glm::mat4{glm::vec4(1.0f, 0.0f, 0.0f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 0.0f),
+                     glm::vec4(0.0f, 0.0f, 1.0f, 0.0f), glm::vec4(glm::vec3(trans[3]), 1.0f)};
 }
 
 void edit::Object::DrawAABBOverlay(const DrawOverlayContext& ctx, uint32_t color, float width) const

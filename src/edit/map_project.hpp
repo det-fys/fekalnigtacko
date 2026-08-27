@@ -16,8 +16,10 @@
 #include "gameview/worldenv.hpp"
 #include "gfx/scene.hpp"
 #include "mapgen/chunk.hpp"
-#include "static_object.hpp"
 #include "utils/worker.hpp"
+#include "static_object.hpp"
+#include "waypoint.hpp"
+#include "utils/allocnum.hpp"
 
 namespace edit
 {
@@ -87,8 +89,13 @@ public:
     // assets
     const StaticModelsEntry& GetStaticModelsRoot() const { return static_models_root_; }
 
-    // new objects
+    // objects
+    void AddStaticObject(const glm::mat4& trans, const std::string& model_name);
     void AddStaticObject(const glm::vec2& pos, const std::string& model_name);
+    Waypoint* AddWaypoint(const glm::mat4& trans);
+    Waypoint* AddWaypoint(const glm::vec2& pos);
+
+    Waypoint* GetWaypoint(WaypointID id);
 
     // selection operations
     void SetHover(const glm::vec3& start, const glm::vec3& end);
@@ -97,6 +104,9 @@ public:
     bool HasSelection() const;
     const glm::mat4* GetSelectionMatrix() const;
     void ApplySelectionTransform(const glm::mat4& delta);
+    void CloneSelection(const glm::mat4& trans);
+    void CloneSelection(const glm::vec2& pos);
+    void LinkSelection(bool link);
     void ClearSelection();
     void DeleteSelection();
 
@@ -116,6 +126,7 @@ private:
     void SelectOrDeselect(std::span<Object*> objs, bool additive, bool allow_deselect);
     void FixSelectionList();
 
+    glm::mat4 GetNewObjectTransform(const glm::vec2& pos) const;
     void NewObjectAdded(Object& obj);
     void UpdateAllObjectsList();
 
@@ -136,6 +147,8 @@ private:
 
     // object lists
     std::vector<StaticObject> static_objs_;
+    std::map<WaypointID, Waypoint> waypoints_;
+    WaypointID last_waypoint_id_ = 0;
     std::vector<Object*> all_objs_; // pointers to all objects 4 ez iteration
 
     // selection & manipulation

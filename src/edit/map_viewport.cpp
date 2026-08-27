@@ -13,33 +13,70 @@ edit::MapViewport::MapViewport(std::string title, MapEditContext& context)
 void edit::MapViewport::Update()
 {
     auto& io = ImGui::GetIO();
-    
-    // hover & selection
-    if (context_.project && IsHovered() && !IsGizmoHovered())
+
+    if (context_.project && IsHovered())
     {
-        auto inv_vp = glm::inverse(view_proj_);
+        auto& project = *context_.project;
 
-        auto pos = (im::VecFromImGui(io.MousePos) - GetCanvasP0()) / GetCanvasSize();
-        float ndc_x = pos.x * 2.0f - 1.0f;
-        float ndc_y = 1.0f - (pos.y * 2.0f);
-
-        glm::vec4 ndc_start(ndc_x, ndc_y, -1.0f, 1.0f);
-        glm::vec4 ndc_end(ndc_x, ndc_y, 1.0f, 1.0f);
-
-        glm::vec4 world_start = inv_vp * ndc_start;
-        glm::vec4 world_end = inv_vp * ndc_end;
-
-        glm::vec3 start = glm::vec3(world_start) / world_start.w;
-        glm::vec3 end = glm::vec3(world_end) / world_end.w;
-        
-        context_.project->SetHover(start, end);
-
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        // hover & selection
+        if (!IsGizmoHovered())
         {
-            context_.project->MakeSelection(start, end, ImGui::IsKeyDown(ImGuiKey_LeftShift));
+            auto inv_vp = glm::inverse(view_proj_);
+
+            auto pos = (im::VecFromImGui(io.MousePos) - GetCanvasP0()) / GetCanvasSize();
+            float ndc_x = pos.x * 2.0f - 1.0f;
+            float ndc_y = 1.0f - (pos.y * 2.0f);
+
+            glm::vec4 ndc_start(ndc_x, ndc_y, -1.0f, 1.0f);
+            glm::vec4 ndc_end(ndc_x, ndc_y, 1.0f, 1.0f);
+
+            glm::vec4 world_start = inv_vp * ndc_start;
+            glm::vec4 world_end = inv_vp * ndc_end;
+
+            glm::vec3 start = glm::vec3(world_start) / world_start.w;
+            glm::vec3 end = glm::vec3(world_end) / world_end.w;
+
+            project.SetHover(start, end);
+
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            {
+                project.MakeSelection(start, end, ImGui::IsKeyDown(ImGuiKey_LeftShift));
+            }
+        }
+
+        if (IsFocused())
+        {
+            // gizmo operation hotkeys
+            if (ImGui::IsKeyPressed(ImGuiKey_R))
+            {
+                context_.gizmo_operation = ImGuizmo::ROTATE;
+            }
+            else if (ImGui::IsKeyPressed(ImGuiKey_T))
+            {
+                context_.gizmo_operation = ImGuizmo::TRANSLATE;
+            }
+            else if (ImGui::IsKeyPressed(ImGuiKey_Z))
+            {
+                context_.gizmo_operation = ImGuizmo::ROTATE_Z | ImGuizmo::TRANSLATE;
+            }
+
+            // delete selection
+            if (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace))
+            {
+                project.DeleteSelection();
+            }
+
+            // link/unlink selection
+            if (ImGui::IsKeyPressed(ImGuiKey_C))
+            {
+                project.LinkSelection(true);
+            }
+            else if (ImGui::IsKeyPressed(ImGuiKey_X))
+            {
+                project.LinkSelection(false);
+            }
         }
     }
-
 }
 
 void edit::MapViewport::Draw(ImDrawList& draw_list)
@@ -50,7 +87,6 @@ void edit::MapViewport::Draw(ImDrawList& draw_list)
     }
 
     auto& project = *context_.project;
-
 
     if (context_.draw_world)
     {
@@ -65,19 +101,6 @@ void edit::MapViewport::Draw(ImDrawList& draw_list)
     }
 
     // draw gizmo
-    if (ImGui::IsKeyPressed(ImGuiKey_E))
-    {
-        context_.gizmo_operation = ImGuizmo::TRANSLATE;
-    }
-    else if (ImGui::IsKeyPressed(ImGuiKey_R))
-    {
-        context_.gizmo_operation = ImGuizmo::ROTATE;
-    }
-    else if (ImGui::IsKeyPressed(ImGuiKey_T))
-    {
-        context_.gizmo_operation = ImGuizmo::SCALE;
-    }
-
     glm::vec3 snap = glm::vec3(0.1f);
     if (context_.gizmo_operation == ImGuizmo::ROTATE)
     {
