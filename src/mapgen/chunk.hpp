@@ -9,7 +9,7 @@
 #include "map_config.hpp"
 #include "defs.hpp"
 #include "heightmesh.hpp"
-
+#include "resources.hpp"
 
 namespace mg
 {
@@ -58,11 +58,26 @@ struct ChunkStaticObject
     std::shared_ptr<const HeightMesh> heightmesh;
 };
 
+enum ChunkSplineNodeType : uint8_t
+{
+    CHUNK_SPLINE_NODE_NORMAL,
+    CHUNK_SPLINE_NODE_JUNCTION,
+};
+
+struct ChunkSplineNode
+{
+    glm::vec3 pos{0.0f};
+    std::array<uint32_t, 4> links = { 0, 0, 0, 0 };
+    ChunkSplineNodeType type = CHUNK_SPLINE_NODE_NORMAL;
+    uint32_t res_id = 0; // mesh id for CHUNK_SPLINE_NODE_MESH, might be used for something else for other types
+};
+
 struct ChunkParams
 {
     glm::ivec2 coord;
-    std::span<ChunkStaticObject> objs;
+    std::vector<ChunkStaticObject> objs;
     uint32_t heightmap_seed = 420;
+    std::map<uint32_t, ChunkSplineNode> nodes;
 };
 
 struct Chunk
@@ -76,7 +91,7 @@ struct Chunk
 AABB2 GetChunkAABB(const MapConfig& cfg, const glm::ivec2& chunk_pos, bool include_border = false);
 std::tuple<glm::ivec2, glm::ivec2> GetChunkRange(const MapConfig& cfg, const AABB2& aabb, bool include_margin = false);
 
-Chunk GenerateChunk(const MapConfig& cfg, const ChunkParams& params);
+Chunk GenerateChunk(const ResourceSet& res, const MapConfig& cfg, const ChunkParams& params);
 
 }
 

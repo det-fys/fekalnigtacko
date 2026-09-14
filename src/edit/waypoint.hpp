@@ -26,6 +26,9 @@ public:
     void Link(Waypoint& other, bool link);
     virtual void Delete() override;
 
+    WaypointID GetID() const { return id_; }
+    WaypointID GetLink(uint32_t index) const { return links_[index]; }
+
 private:
     void UpdateAABB();
 

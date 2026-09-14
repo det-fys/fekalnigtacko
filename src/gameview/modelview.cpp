@@ -75,12 +75,13 @@ void game::view::ModelView::CreateSurfaces()
     for (auto surfaces = model_->GetSurfaces(); const auto& mdl_surface : surfaces)
     {
         gfx::MaterialInfo material_info{};
-        material_info.properties = mdl_surface.properties;
+        material_info.properties = mdl_surface.material.properties;
 
         // texture
-        if (!mdl_surface.texture_name.empty())
+        if (!mdl_surface.material.texture_name.empty())
         {
-            material_info.texture = assets::AssetManager::GetInstance().Get<gfx::Texture>(mdl_surface.texture_name);
+            material_info.texture =
+                assets::AssetManager::GetInstance().Get<gfx::Texture>(mdl_surface.material.texture_name);
         }
 
         ModelViewSurface surface{};

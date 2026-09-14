@@ -7,11 +7,44 @@
 #include <tpp_interface.hpp>
 #include "FastNoiseLite.h"
 
+#include "utils/spline.hpp"
+
 namespace
 {
 
+constexpr uint32_t INVALID_ID = 0xFFFFFFFF;
+
+struct JunctionLinkInfo
+{
+    uint32_t path_id = INVALID_ID;
+    bool path_from_end = false;
+    uint32_t profile_id = 0;
+    float margin = 0.0f;
+};
+
+struct JunctionInfo
+{
+    uint32_t mesh_id = 0;
+    uint32_t base_vertex = 0;
+    std::array<JunctionLinkInfo, 4> links;
+};
+
+struct PathEndpointInfo
+{
+    uint32_t junction_node_id = INVALID_ID; // original node id
+    uint32_t junction_idx = INVALID_ID;     // idx in junctions vector
+    uint32_t link_idx = INVALID_ID;
+};
+
+struct PathInfo
+{
+    SplinePath spline;
+    std::array<PathEndpointInfo, 2> endpoints;
+};
+
 struct ChunkGenContext
 {
+    const mg::ResourceSet* res;
     const mg::MapConfig* map_cfg;
     glm::ivec2 chunk_coord;
     mg::Chunk* chunk;
@@ -26,6 +59,14 @@ struct ChunkGenContext
     uint32_t tiles_stride;
     std::vector<mg::ChunkTile> tiles;
     AABB2 tiles_aabb;
+
+    // splines
+    const std::map<uint32_t, mg::ChunkSplineNode>* spline_nodes;
+    
+    std::vector<JunctionInfo> junctions;
+    std::vector<PathInfo> paths;
+    std::map<std::tuple<uint32_t, uint32_t>, std::tuple<uint32_t, bool>>
+        link2path; // (node_id, link_index) -> (path_id, from_end)
 
     // heightmesh
     std::vector<glm::vec3> hm_verts;
@@ -278,188 +319,339 @@ void InitHeightmap(ChunkGenContext& ctx)
     }
 }
 
-void TriangulateTerrain(ChunkGenContext& ctx)
+uint32_t GetPathContinuation(const mg::ChunkSplineNode& node, uint32_t prev_node_id)
 {
-    const float chunk_tile_m = ctx.tile_size_m;
+    if (node.links[0] == prev_node_id)
+        return node.links[1];
 
-    auto terrain_points_offset = ctx.hm_verts.size();
-    std::vector<glm::vec2> terrain_points;
+    if (node.links[1] == prev_node_id)
+        return node.links[0];
 
-    const float r = 3.0f;
-    const float r_min = 2.0f;
-    const float r_border = r * 5.0f;
+    return 0;
+}
 
-    const auto& chunk_aabb = ctx.bounds;
+uint32_t GetLinkIndex(const mg::ChunkSplineNode& node, uint32_t link_node_id)
+{
+    for (uint32_t i = 0; i < node.links.size(); ++i)
+    {
+        if (node.links[i] == link_node_id)
+            return i;
+    }
+    return INVALID_ID; // not found
+}
 
-    // append corners
-    auto c0 = glm::vec2(ctx.chunk_coord) * ctx.map_cfg->chunk_size_m - r_border;
-    auto c1 = c0 + (ctx.map_cfg->chunk_size_m + r_border * 2.0f);
-    terrain_points.emplace_back(c0);
-    terrain_points.emplace_back(glm::vec2(c1.x, c0.y));
-    terrain_points.emplace_back(c1);
-    terrain_points.emplace_back(glm::vec2(c0.x, c1.y));
+std::optional<std::tuple<uint32_t, bool>> CreateSplinePath(ChunkGenContext& ctx, uint32_t start_junction_id,
+                                                           uint32_t start_link_idx)
+{
+    auto start_key = std::make_tuple(start_junction_id, start_link_idx);
 
-    ChunkPoissonVariable(
-        ctx.map_cfg->seed, ctx.chunk_coord, ctx.map_cfg->chunk_size_m, r_min, r, r_border, terrain_points,
-        [&](glm::vec2 pos) {
-            auto tile = GetTileAtPos(ctx, pos);
+    if (auto it = ctx.link2path.find(start_key); it != ctx.link2path.end())
+    {
+        return it->second; // already processed
+    }
 
+    const auto& start_node = ctx.spline_nodes->at(start_junction_id);
+    auto second_node_id = start_node.links[start_link_idx];
+    if (second_node_id == 0)
+        return std::nullopt; // invalid link
 
-            float density = tile ? static_cast<float>(tile->obstruction_level) / 64.0f : 0.0f;
-            density = glm::clamp(density, 0.0f, 1.0f);
-            return glm::mix(r, r_min, density);
-        },
-        [&](glm::vec2 pos) { 
-            auto tile = GetTileAtPos(ctx, pos);
-            if (!tile)
-            {
-                return false;
-            }
+    const auto& second_node = ctx.spline_nodes->at(second_node_id);
+    
+    std::vector<glm::vec3> spline_points;
+    spline_points.reserve(16);
+
+    // find the point before junction for correct direction
+    auto prev_node_id = GetPathContinuation(start_node, second_node_id);
+    spline_points.push_back(prev_node_id > 0 ? ctx.spline_nodes->at(prev_node_id).pos : start_node.pos);
+
+    // add start and second node
+    spline_points.push_back(start_node.pos);
+    //spline_points.push_back(second_node.pos);
+
+    // traverse the spline until we reach another junction
+    prev_node_id = start_junction_id;
+    uint32_t current_node_id = second_node_id;
+
+    while (true)
+    {
+        auto& current_node = ctx.spline_nodes->at(current_node_id);
+        spline_points.push_back(current_node.pos);
+
+        auto next_node_id = GetPathContinuation(current_node, prev_node_id);
+
+        // terminate if current node is a junction
+        if (current_node.type == mg::CHUNK_SPLINE_NODE_JUNCTION)
+        {
+            // add next node position for correct direction
+            spline_points.push_back(next_node_id > 0 ? ctx.spline_nodes->at(next_node_id).pos : current_node.pos);
+            
+            break;
+        }
+
+        if (next_node_id == 0)
+        {
+            // reached end without junction -> invalid path
+            return std::nullopt;
+        }
+
+        prev_node_id = current_node_id;
+        current_node_id = next_node_id;
+    }
+
+    const auto& end_junction_id = current_node_id;
+
+    auto end_link_idx = GetLinkIndex(ctx.spline_nodes->at(end_junction_id), prev_node_id);
+    auto end_key = std::make_tuple(end_junction_id, end_link_idx);
+
+    // store path
+    auto path_id = static_cast<uint32_t>(ctx.paths.size());
+    auto& path = ctx.paths.emplace_back();
+    path.spline = SplinePath(spline_points);
+    path.endpoints[0].junction_node_id = start_junction_id;
+    path.endpoints[0].link_idx = start_link_idx;
+    path.endpoints[1].junction_node_id = end_junction_id;
+    path.endpoints[1].link_idx = end_link_idx;
+
+    // store path mapping for both ends
+    ctx.link2path[start_key] = std::make_tuple(path_id, false);
+    ctx.link2path[end_key] = std::make_tuple(path_id, true);
+
+    return std::make_tuple(path_id, false);
+}
+
+void MakeJunctionsAndPaths(ChunkGenContext& ctx)
+{
+    std::map<uint32_t, uint32_t> node2junction; // node id -> junction idx
+
+    // iterate over junctions and create paths from their links
+    for (const auto& [node_id, node] : *ctx.spline_nodes)
+    {
+        if (node.type != mg::CHUNK_SPLINE_NODE_JUNCTION)
+            continue; // not junction
+
+        JunctionInfo junction{};
+        junction.mesh_id = node.res_id;
+
+        const auto& mesh = ctx.res->GetMeshes()[junction.mesh_id];
+
+        for (uint32_t i = 0; i < node.links.size(); ++i)
+        {
+            const auto& node_link = node.links[i];
+            auto& junction_link = junction.links[i];
+
+            if (node_link == 0)
+                continue; // no link
+
+            auto path_info = CreateSplinePath(ctx, node_id, i);
+            if (!path_info)
+                continue; // failed to create path
+
+            std::tie(junction_link.path_id, junction_link.path_from_end) = *path_info;
+
+            const auto& mesh_link = mesh.links[i];
+            junction_link.margin = mesh_link.margin;
+            junction_link.profile_id = mesh_link.profile_id;
         
-            return tile->obstruction_level < 127;
-        });
-
-    std::vector<tpp::Delaunay::Point> del_points;
-    for (const auto& p : ctx.hm_verts)
-    {
-        del_points.emplace_back(p.x, p.y);
-    }
-
-    for (const auto& p : terrain_points)
-    {
-        del_points.emplace_back(p.x, p.y);
-    }
-
-    tpp::Delaunay delaunay(del_points);
-
-    std::vector<int> segments;
-
-    // add corners segments
-    segments.push_back(static_cast<int>(terrain_points_offset + 0));
-    segments.push_back(static_cast<int>(terrain_points_offset + 1));
-    segments.push_back(static_cast<int>(terrain_points_offset + 1));
-    segments.push_back(static_cast<int>(terrain_points_offset + 2));
-    segments.push_back(static_cast<int>(terrain_points_offset + 2));
-    segments.push_back(static_cast<int>(terrain_points_offset + 3));
-    segments.push_back(static_cast<int>(terrain_points_offset + 3));
-    segments.push_back(static_cast<int>(terrain_points_offset + 0));
-
-    // extract edges from tris
-    std::set<std::tuple<uint32_t, uint32_t>> mesh_edges;
-    std::set<mg::Triangle> mesh_tris_set;
-    for (auto tri : ctx.hm_tris)
-    {
-        const auto& v = tri.verts;
-        for (int i = 0; i < 3; ++i)
-        {
-            size_t v0 = v[i];
-            size_t v1 = v[(i + 1) % 3];
-            if (v0 > v1)
-                std::swap(v0, v1);
-            mesh_edges.emplace(v0, v1);
         }
 
-        // add sorted tri to set
-        tri.Sort();
-        mesh_tris_set.insert(tri);
+        auto junction_idx = static_cast<uint32_t>(ctx.junctions.size());
+        ctx.junctions.emplace_back(junction);
+        node2junction[node_id] = junction_idx;
     }
 
-    for (const auto& [v0, v1] : mesh_edges)
+    // update path endpoints with junction indices
+    for (auto& path : ctx.paths)
     {
-        segments.push_back(static_cast<int>(v0));
-        segments.push_back(static_cast<int>(v1));
-    }
-
-    delaunay.setSegmentConstraint(segments);
-
-    delaunay.Triangulate();
-
-    std::map<uint32_t, uint32_t> vertex_map; // maps delaunay vertex index to chunk vertex index
-
-    std::vector<glm::vec3> normals(terrain_points_offset + terrain_points.size(), glm::vec3(0.0f));
-
-    for (const auto& face : delaunay.faces())
-    {
-        std::array<int, 3> v = {face.Org(), face.Dest(), face.Apex()};
-        if (v[0] < 0 || v[1] < 0 || v[2] < 0)
+        for (uint32_t i = 0; i < 2; ++i)
         {
-            continue; // skip invalid faces
+            auto& endpoint = path.endpoints[i];
+            endpoint.junction_idx = node2junction.at(endpoint.junction_node_id);
         }
+    }
+}
 
-        std::array<glm::vec3, 3> vert_pos;
-        for (int i = 0; i < 3; ++i)
+void GenerateJunctionMesh(ChunkGenContext& ctx, JunctionInfo& junction)
+{
+    const auto& mesh = ctx.res->GetMeshes()[junction.mesh_id];
+
+    auto& chunk_verts = ctx.chunk->mesh.verts;
+    auto& chunk_tris = ctx.chunk->mesh.tris;
+
+    junction.base_vertex = static_cast<uint32_t>(chunk_verts.size());
+
+    for (const auto& vert : mesh.verts)
+    {
+        mg::ChunkMeshVertex chunk_vert{};
+        chunk_vert.uv = vert.uv;
+        chunk_vert.color = 0xFFFFFFFF; // TODO
+        chunk_vert.normal = glm::vec3(0.0f, 0.0f, 1.0f); // TODO
+        
+        chunk_vert.pos = glm::vec3(0.0f);
+
+        for (uint32_t i = 0; i < mesh.links.size(); ++i)
         {
-            if (v[i] < static_cast<int>(terrain_points_offset))
+            auto& mesh_link = mesh.links[i];
+            auto& junction_link = junction.links[i];
+
+            if (junction_link.path_id == INVALID_ID)
+                continue; // no path for this link
+
+            const auto& path = ctx.paths[junction_link.path_id];
+
+            glm::vec3 spline_pos;
+            if (!junction_link.path_from_end)
             {
-                vert_pos[i] = ctx.hm_verts[v[i]];
+                spline_pos = mesh_link.start_matrix * glm::vec4(vert.pos, 1.0f);
             }
             else
             {
-                int terrain_idx = v[i] - static_cast<int>(terrain_points_offset);
-                auto tile = GetTileAtPos(ctx, terrain_points[terrain_idx]);
-                auto height = tile ? tile->height : 0.0f;
-                vert_pos[i] = glm::vec3(terrain_points[terrain_idx], height);
+                spline_pos = mesh_link.end_matrix * glm::vec4(vert.pos, 1.0f);
+                spline_pos.y += path.spline.GetTotalLength();
             }
+
+            auto w = vert.link_weights[i];
+            chunk_vert.pos += path.spline.DeformVertex(spline_pos) * w;
         }
 
-        // accumulate normals
-        auto tri_normal = glm::normalize(glm::cross(vert_pos[1] - vert_pos[0], vert_pos[2] - vert_pos[0]));
-        for (int i = 0; i < 3; ++i)
-        {
-            normals[v[i]] += tri_normal;
-        }
-
-        // check if triangle is not a heightmesh triangle
-        mg::Triangle tri_check(v[0], v[1], v[2]);
-        tri_check.Sort();
-
-        if (mesh_tris_set.contains(tri_check))
-        {
-            continue; // skip heightmesh triangles
-        }
-
-        auto centroid = (vert_pos[0] + vert_pos[1] + vert_pos[2]) / 3.0f;
-
-        if (!chunk_aabb.Contains(centroid))
-        {
-            continue;
-        }
-
-        auto& tri = ctx.chunk->mesh.tris.emplace_back();
-
-
-        // push vertices
-        for (int i = 0; i < 3; ++i)
-        {
-            auto it = vertex_map.find(v[i]);
-
-            if (it == vertex_map.end())
-            {
-                uint32_t new_idx = static_cast<uint32_t>(ctx.chunk->mesh.verts.size());
-
-                auto pos = vert_pos[i];
-                auto& vert = ctx.chunk->mesh.verts.emplace_back();
-                vert.pos = pos; // Placeholder height; replace with actual terrain height
-                vert.uv = glm::vec2(pos) * 0.1f;
-
-                vertex_map[v[i]] = new_idx;
-
-                tri[i] = new_idx;
-
-                ctx.chunk->aabb.AddPoint(vert.pos);
-            }
-            else
-            {
-                tri[i] = it->second;
-            }
-        }
+        chunk_verts.emplace_back(chunk_vert);
     }
 
-    // finalize normals
-    for (const auto& [v_idx, c_idx] : vertex_map)
+    for (const auto& tri : mesh.tris)
     {
-        auto& vert = ctx.chunk->mesh.verts[c_idx];
-        vert.normal = glm::normalize(normals[v_idx]);
+        mg::Triangle chunk_tri{};
+        //chunk_tri.material = tri.material; // TODO
+        chunk_tri[0] = junction.base_vertex + tri.tri[0];
+        chunk_tri[1] = junction.base_vertex + tri.tri[1];
+        chunk_tri[2] = junction.base_vertex + tri.tri[2];
+        chunk_tris.emplace_back(chunk_tri);
+    }
+    
+}
+
+void LoadJunctionLinkProfileVertices(ChunkGenContext& ctx, const JunctionInfo& junction, uint32_t link_idx,
+                                     std::span<uint32_t> out_verts)
+{
+    const auto& mesh = ctx.res->GetMeshes()[junction.mesh_id];
+    const auto& mesh_link = mesh.links[link_idx];
+    for (uint32_t i = 0; i < mesh_link.profile_vert_mappings.size(); ++i)
+    {
+        const auto& profile_vert = mesh_link.profile_vert_mappings[i];
+        out_verts[i] = junction.base_vertex + profile_vert;
+    }
+}
+
+void InsertPathProfileVertices(ChunkGenContext& ctx, const mg::TemplateProfile& profile,
+                                                    const SplinePath& spline, float t, std::span<uint32_t> out_verts)
+{
+    auto& chunk_verts = ctx.chunk->mesh.verts;
+    auto base_vertex = static_cast<uint32_t>(chunk_verts.size());
+    chunk_verts.resize(base_vertex + profile.verts.size());
+    for (uint32_t i = 0; i < profile.verts.size(); ++i)
+    {
+        const auto& profile_vert = profile.verts[i];
+        auto& chunk_vert = chunk_verts[base_vertex + i];
+
+        chunk_vert.pos = spline.DeformVertex(glm::vec3(profile_vert.pos.x, t, profile_vert.pos.z));
+        chunk_vert.normal = profile_vert.normal; // TODO: transform normal
+        chunk_vert.uv = profile_vert.uv;
+        chunk_vert.color = 0xFFFFFFFF; // TODO: color
+
+        out_verts[i] = base_vertex + i;
+    }
+}
+
+void TriangulatePathSegment(ChunkGenContext& ctx, const mg::TemplateProfile& profile, std::span<uint32_t> start_verts,
+                            std::span<uint32_t> end_verts, bool is_final)
+{
+    //auto& chunk_verts = ctx.chunk->mesh.verts; // TODO: fix uvs on final segment
+    auto& chunk_tris = ctx.chunk->mesh.tris;
+
+    for (uint32_t i = 0; i < profile.edges.size(); ++i)
+    {
+        const auto& start_edge = profile.edges[i];
+        const auto& end_edge = is_final ? profile.edges_reverse[i] : profile.edges[i];
+
+        mg::Triangle tri0{};
+        tri0[0] = start_verts[start_edge.verts[0]];
+        tri0[1] = start_verts[start_edge.verts[1]];
+        tri0[2] = end_verts[end_edge.verts[0]];
+        chunk_tris.emplace_back(tri0);
+        
+        mg::Triangle tri1{};
+        tri1[0] = end_verts[end_edge.verts[1]];
+        tri1[1] = end_verts[end_edge.verts[0]];
+        tri1[2] = start_verts[start_edge.verts[1]];
+        chunk_tris.emplace_back(tri1);
+        
+        // TODO: materials
+    }
+}
+
+void GeneratePathMesh(ChunkGenContext& ctx, const PathInfo& path)
+{
+    std::array<uint32_t, 2> endpoint_profiles;
+
+    for (uint32_t i = 0; i < 2; ++i)
+    {
+        const auto& junction = ctx.junctions[path.endpoints[i].junction_idx];
+        endpoint_profiles[i] = junction.links[path.endpoints[i].link_idx].profile_id;
+    }
+
+    if (endpoint_profiles[0] != endpoint_profiles[1])
+    {
+        return; // incompatible ends
+    }
+
+    const auto& profile = ctx.res->GetProfiles()[endpoint_profiles[0]];
+
+    const auto verts_count = static_cast<uint32_t>(profile.verts.size());
+    std::vector<uint32_t> vertices(verts_count * 2);
+    std::span<uint32_t> start_verts(vertices.data(), verts_count);
+    std::span<uint32_t> end_verts(vertices.data() + verts_count, verts_count);
+
+    auto& chunk_verts = ctx.chunk->mesh.verts;
+    auto& chunk_tris = ctx.chunk->mesh.tris;
+
+    const auto& spline = path.spline;
+
+    const auto& start_endpoint = path.endpoints[0];
+    const auto& end_endpoint = path.endpoints[1];
+
+    // load start verts from junction mesh
+    LoadJunctionLinkProfileVertices(ctx, ctx.junctions[start_endpoint.junction_idx], start_endpoint.link_idx,
+                                    start_verts);
+
+    constexpr float step_size = 3.0f; // meters
+    constexpr float min_step = step_size * 0.5f;
+    const auto start_t = ctx.junctions[start_endpoint.junction_idx].links[start_endpoint.link_idx].margin + step_size;
+    const auto end_t =
+        path.spline.GetTotalLength() - ctx.junctions[end_endpoint.junction_idx].links[end_endpoint.link_idx].margin - min_step;
+    for (float t = start_t; t < end_t; t += step_size)
+    {
+        InsertPathProfileVertices(ctx, profile, spline, t, end_verts);
+        TriangulatePathSegment(ctx, profile, start_verts, end_verts, false);
+
+        std::swap(start_verts, end_verts);
+    }
+
+    // make final segment connecting to the end junction
+    LoadJunctionLinkProfileVertices(ctx, ctx.junctions[end_endpoint.junction_idx], end_endpoint.link_idx,
+                                    end_verts);
+    TriangulatePathSegment(ctx, profile, start_verts, end_verts, true);
+
+
+}
+
+void GenerateJunctionAndPathMeshes(ChunkGenContext& ctx)
+{
+    for (auto& junction : ctx.junctions)
+    {
+        GenerateJunctionMesh(ctx, junction);
+    }
+
+    for (const auto& path : ctx.paths)
+    {
+        GeneratePathMesh(ctx, path);
     }
 }
 
@@ -735,6 +927,189 @@ void RasterizeHeightmesh(ChunkGenContext& ctx)
     }
 }
 
+void TriangulateTerrain(ChunkGenContext& ctx)
+{
+    const float chunk_tile_m = ctx.tile_size_m;
+
+    auto terrain_points_offset = ctx.hm_verts.size();
+    std::vector<glm::vec2> terrain_points;
+
+    const float r = 3.0f;
+    const float r_min = 2.0f;
+    const float r_border = r * 5.0f;
+
+    const auto& chunk_aabb = ctx.bounds;
+
+    // append corners
+    auto c0 = glm::vec2(ctx.chunk_coord) * ctx.map_cfg->chunk_size_m - r_border;
+    auto c1 = c0 + (ctx.map_cfg->chunk_size_m + r_border * 2.0f);
+    terrain_points.emplace_back(c0);
+    terrain_points.emplace_back(glm::vec2(c1.x, c0.y));
+    terrain_points.emplace_back(c1);
+    terrain_points.emplace_back(glm::vec2(c0.x, c1.y));
+
+    ChunkPoissonVariable(
+        ctx.map_cfg->seed, ctx.chunk_coord, ctx.map_cfg->chunk_size_m, r_min, r, r_border, terrain_points,
+        [&](glm::vec2 pos) {
+            auto tile = GetTileAtPos(ctx, pos);
+
+            float density = tile ? static_cast<float>(tile->obstruction_level) / 64.0f : 0.0f;
+            density = glm::clamp(density, 0.0f, 1.0f);
+            return glm::mix(r, r_min, density);
+        },
+        [&](glm::vec2 pos) {
+            auto tile = GetTileAtPos(ctx, pos);
+            if (!tile)
+            {
+                return false;
+            }
+
+            return tile->obstruction_level < 127;
+        });
+
+    std::vector<tpp::Delaunay::Point> del_points;
+    for (const auto& p : ctx.hm_verts)
+    {
+        del_points.emplace_back(p.x, p.y);
+    }
+
+    for (const auto& p : terrain_points)
+    {
+        del_points.emplace_back(p.x, p.y);
+    }
+
+    tpp::Delaunay delaunay(del_points);
+
+    std::vector<int> segments;
+
+    // add corners segments
+    segments.push_back(static_cast<int>(terrain_points_offset + 0));
+    segments.push_back(static_cast<int>(terrain_points_offset + 1));
+    segments.push_back(static_cast<int>(terrain_points_offset + 1));
+    segments.push_back(static_cast<int>(terrain_points_offset + 2));
+    segments.push_back(static_cast<int>(terrain_points_offset + 2));
+    segments.push_back(static_cast<int>(terrain_points_offset + 3));
+    segments.push_back(static_cast<int>(terrain_points_offset + 3));
+    segments.push_back(static_cast<int>(terrain_points_offset + 0));
+
+    // extract edges from tris
+    std::set<std::tuple<uint32_t, uint32_t>> mesh_edges;
+    std::set<mg::Triangle> mesh_tris_set;
+    for (auto tri : ctx.hm_tris)
+    {
+        const auto& v = tri.verts;
+        for (int i = 0; i < 3; ++i)
+        {
+            size_t v0 = v[i];
+            size_t v1 = v[(i + 1) % 3];
+            if (v0 > v1)
+                std::swap(v0, v1);
+            mesh_edges.emplace(v0, v1);
+        }
+
+        // add sorted tri to set
+        tri.Sort();
+        mesh_tris_set.insert(tri);
+    }
+
+    for (const auto& [v0, v1] : mesh_edges)
+    {
+        segments.push_back(static_cast<int>(v0));
+        segments.push_back(static_cast<int>(v1));
+    }
+
+    delaunay.setSegmentConstraint(segments);
+
+    delaunay.Triangulate();
+
+    std::map<uint32_t, uint32_t> vertex_map; // maps delaunay vertex index to chunk vertex index
+
+    std::vector<glm::vec3> normals(terrain_points_offset + terrain_points.size(), glm::vec3(0.0f));
+
+    for (const auto& face : delaunay.faces())
+    {
+        std::array<int, 3> v = {face.Org(), face.Dest(), face.Apex()};
+        if (v[0] < 0 || v[1] < 0 || v[2] < 0)
+        {
+            continue; // skip invalid faces
+        }
+
+        std::array<glm::vec3, 3> vert_pos;
+        for (int i = 0; i < 3; ++i)
+        {
+            if (v[i] < static_cast<int>(terrain_points_offset))
+            {
+                vert_pos[i] = ctx.hm_verts[v[i]];
+            }
+            else
+            {
+                int terrain_idx = v[i] - static_cast<int>(terrain_points_offset);
+                auto tile = GetTileAtPos(ctx, terrain_points[terrain_idx]);
+                auto height = tile ? tile->height : 0.0f;
+                vert_pos[i] = glm::vec3(terrain_points[terrain_idx], height);
+            }
+        }
+
+        // accumulate normals
+        auto tri_normal = glm::normalize(glm::cross(vert_pos[1] - vert_pos[0], vert_pos[2] - vert_pos[0]));
+        for (int i = 0; i < 3; ++i)
+        {
+            normals[v[i]] += tri_normal;
+        }
+
+        // check if triangle is not a heightmesh triangle
+        mg::Triangle tri_check(v[0], v[1], v[2]);
+        tri_check.Sort();
+
+        if (mesh_tris_set.contains(tri_check))
+        {
+            continue; // skip heightmesh triangles
+        }
+
+        auto centroid = (vert_pos[0] + vert_pos[1] + vert_pos[2]) / 3.0f;
+
+        if (!chunk_aabb.Contains(centroid))
+        {
+            continue;
+        }
+
+        auto& tri = ctx.chunk->mesh.tris.emplace_back();
+
+        // push vertices
+        for (int i = 0; i < 3; ++i)
+        {
+            auto it = vertex_map.find(v[i]);
+
+            if (it == vertex_map.end())
+            {
+                uint32_t new_idx = static_cast<uint32_t>(ctx.chunk->mesh.verts.size());
+
+                auto pos = vert_pos[i];
+                auto& vert = ctx.chunk->mesh.verts.emplace_back();
+                vert.pos = pos; // Placeholder height; replace with actual terrain height
+                vert.uv = glm::vec2(pos) * 0.1f;
+
+                vertex_map[v[i]] = new_idx;
+
+                tri[i] = new_idx;
+
+                ctx.chunk->aabb.AddPoint(vert.pos);
+            }
+            else
+            {
+                tri[i] = it->second;
+            }
+        }
+    }
+
+    // finalize normals
+    for (const auto& [v_idx, c_idx] : vertex_map)
+    {
+        auto& vert = ctx.chunk->mesh.verts[c_idx];
+        vert.normal = glm::normalize(normals[v_idx]);
+    }
+}
+
 } // namespace
 
 AABB2 mg::GetChunkAABB(const MapConfig& cfg, const glm::ivec2& chunk_pos, bool include_border)
@@ -773,13 +1148,15 @@ std::tuple<glm::ivec2, glm::ivec2> mg::GetChunkRange(const MapConfig& cfg, const
     return {min_chunk, max_chunk};
 }
 
-mg::Chunk mg::GenerateChunk(const MapConfig& cfg, const ChunkParams& params)
+mg::Chunk mg::GenerateChunk(const ResourceSet& res, const MapConfig& cfg, const ChunkParams& params)
 {
     mg::Chunk chunk{};
     chunk.coord = params.coord;
 
     ChunkGenContext ctx{};
+    ctx.res = &res;
     ctx.map_cfg = &cfg;
+    ctx.spline_nodes = &params.nodes;
     ctx.chunk_coord = params.coord;
     ctx.chunk = &chunk;
     ctx.bounds = GetChunkAABB(cfg, params.coord);
@@ -794,9 +1171,13 @@ mg::Chunk mg::GenerateChunk(const MapConfig& cfg, const ChunkParams& params)
     ctx.tiles_aabb.max = ctx.bounds.max + glm::vec2(cfg.chunk_border) * ctx.tile_size_m;
 
     InitHeightmap(ctx);
+
+    MakeJunctionsAndPaths(ctx);
+    GenerateJunctionAndPathMeshes(ctx);
+    
     AppendObjectsHeightmeshes(ctx, params.objs);
     RasterizeHeightmesh(ctx);
-    TriangulateTerrain(ctx);
+    //TriangulateTerrain(ctx);
 
     return chunk;
 }

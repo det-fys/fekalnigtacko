@@ -8,9 +8,8 @@
 #include "utils/aabb.hpp"
 #include "collision/trianglemesh.hpp"
 #include "asset_manager.hpp"
-
+#include "material.hpp"
 #include "gfx/mesh_desc.hpp"
-#include "gfx/material_desc.hpp"
 
 namespace assets
 {
@@ -28,15 +27,14 @@ struct ModelSurface
     std::string name;
     uint32_t tri_offset = 0;
     uint32_t tri_count = 0;
-    std::string texture_name;
-    gfx::MaterialProperties properties;
+    ModelMaterial material;
 };
 
 struct ModelCollisionSurface
 {
-    collision::Material material = collision::PM_NONE;
     uint32_t tri_offset = 0;
     uint32_t tri_count = 0;
+    collision::Material material = collision::PM_NONE;
 };
 
 enum ModelCollisionShapeType

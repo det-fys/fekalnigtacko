@@ -20,6 +20,7 @@
 #include "static_object.hpp"
 #include "waypoint.hpp"
 #include "utils/allocnum.hpp"
+#include "mapgen/resources.hpp"
 
 namespace edit
 {
@@ -139,6 +140,7 @@ private:
     void FinalizeChunk(mg::Chunk&& mgchunk);
 
 private:
+    std::shared_ptr<const mg::ResourceSet> mg_res_;
     StaticModelsEntry static_models_root_;
 
     WorldEnv world_env_;

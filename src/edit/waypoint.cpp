@@ -36,6 +36,7 @@ void edit::Waypoint::DrawOverlay(const DrawOverlayContext& ctx)
 void edit::Waypoint::SetTransform(const glm::mat4& trans)
 {
     Super::SetTransform(GetTranslationOnly(trans));
+    InvalidateChunks(GetAABB());
     UpdateAABB();
 }
 

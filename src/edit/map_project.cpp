@@ -17,6 +17,7 @@
 
 edit::Project::Project() : static_models_root_("root")
 {
+    mg_res_ = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
     InitStaticModels();
 
     SetupChunks(16);
@@ -503,7 +504,9 @@ void edit::Project::ScheduleChunkUpdate(const glm::ivec2& chunk_pos)
 {
     AABB2 chunk_aabb = mg::GetChunkAABB(map_config_, chunk_pos, true);
 
-    std::vector<mg::ChunkStaticObject> objs;
+    mg::ChunkParams params{};
+    params.coord = chunk_pos;
+    params.heightmap_seed = map_config_.seed;
 
     // collect relevant objs
     for (const auto& obj : static_objs_)
@@ -515,17 +518,37 @@ void edit::Project::ScheduleChunkUpdate(const glm::ivec2& chunk_pos)
         if (!chunk_aabb.CollidesWith(obj_aabb_2d))
             continue;
 
-        auto& mgobj = objs.emplace_back();
+        auto& mgobj = params.objs.emplace_back();
         mgobj.trans = obj.GetTransform();
         mgobj.model_name = obj.GetModelName();
         mgobj.heightmesh = obj.GetHeightMesh();
     }
+    
+    // collect splines
+    for (const auto& [id, waypoint] : waypoints_)
+    {
+        mg::ChunkSplineNode node{};
+        node.pos = waypoint.GetPosition();
+        
+        uint32_t link_count = 0;
+        for (uint32_t i = 0; i < 4; ++i)
+        {
+            auto link_id = waypoint.GetLink(i);
+            node.links[i] = link_id;
 
-    auto func = [this, chunk_pos, objs = std::move(objs)]() mutable {
-        mg::ChunkParams params{};
-        params.coord = chunk_pos;
-        params.objs = objs;
-        return mg::GenerateChunk(map_config_, params);
+            if (link_id != 0)
+                ++link_count;
+        }
+
+        node.type = link_count == 2 ? mg::CHUNK_SPLINE_NODE_NORMAL : mg::CHUNK_SPLINE_NODE_JUNCTION;
+        node.res_id =
+            link_count < 2 ? mg_res_->GetMeshIndexByName("deadend1") : mg_res_->GetMeshIndexByName("intersection1");
+
+        params.nodes[id] = node;
+    }
+
+    auto func = [this, params = std::move(params)]() mutable {
+        return mg::GenerateChunk(*mg_res_, map_config_, params);
     };
 
     // future_chunk_ = std::async(std::launch::async, func);
@@ -543,6 +566,11 @@ void edit::Project::FinalizeChunk(mg::Chunk&& mgchunk)
     chunk.vis_verts.clear();
     chunk.vis_edges.clear();
     chunk.vis_tris.clear();
+
+    chunk.model.reset();
+
+    if (chunk.mgchunk.mesh.tris.empty())
+        return;
 
     // generate verts & edges for vis
     for (const auto& vert : chunk.mgchunk.mesh.verts)
@@ -582,9 +610,9 @@ void edit::Project::FinalizeChunk(mg::Chunk&& mgchunk)
 
     auto& surface = model_desc.surfaces.emplace_back();
     surface.name = "grass";
-    surface.texture_name = "grass";
     surface.tri_offset = 0;
     surface.tri_count = static_cast<uint32_t>(model_desc.tris.size());
+    surface.material.texture_name = "grass";
 
     auto model = std::make_shared<assets::Model>(std::move(model_desc));
     chunk.model = std::make_shared<ModelView>(model);

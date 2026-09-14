@@ -187,7 +187,7 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
         {
             gfx::MeshTriangle t;
             iss >> t.vertices[0] >> t.vertices[1] >> t.vertices[2];
-            
+
 #ifdef CLIENT
             if (desc.surfaces.empty())
             {
@@ -205,9 +205,6 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
         }
         else if (command == "surface")
         {
-            std::string surface_name;
-            iss >> surface_name;
-
             uint32_t first = 0;
             if (!desc.surfaces.empty())
             {
@@ -216,53 +213,8 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
 
             auto& surface = desc.surfaces.emplace_back();
             surface.tri_offset = first;
-            surface.name = surface_name;
-
-            // Optional flags
-            std::string flag;
-            while (!iss.Eol())
-            {
-                iss >> flag;
-
-                if (flag == "+texture")
-                {
-                    iss >> surface.texture_name;
-                }
-                else if (flag == "+2sided")
-                {
-                    surface.properties.twosided = true;
-                }
-                else if (flag == "+ocolor")
-                {
-                    surface.properties.color = gfx::MATERIAL_OBJECT_COLOR_TYPE_BACKGROUND;
-                }
-                else if (flag == "+ocolor_mult")
-                {
-                    surface.properties.color = gfx::MATERIAL_OBJECT_COLOR_TYPE_MULTIPLY;
-                }
-                else if (flag == "+multicolor")
-                {
-                    surface.properties.color = gfx::MATERIAL_OBJECT_COLOR_TYPE_MULTICOLOR;
-                }
-                else if (flag == "+blend")
-                {
-                    std::string blend_str;
-                    iss >> blend_str;
-
-                    if (blend_str == "additive")
-                        surface.properties.blend = gfx::MATERIAL_BLEND_TYPE_ADDITIVE;
-                    else
-                        surface.properties.blend = gfx::MATERIAL_BLEND_TYPE_OPACITY;
-                }
-                else if (flag == "+unlit")
-                {
-                    surface.properties.lighting = gfx::MATERIAL_LIGHTING_TYPE_UNLIT;
-                }
-                else if (flag == "+translucent")
-                {
-                    surface.properties.translucent = true;
-                }
-            }
+            surface.material = ParseMaterial(iss);
+            surface.name = surface.material.name; // inherit from material
         }
         else if (command == "makecoltrimesh")
         {
@@ -287,7 +239,7 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             ParseTransform(iss, trans);
             iss >> sy >> sz;
             glm::vec3 scale(trans.scale, sy, sz);
-            trans.scale = 1.0f; 
+            trans.scale = 1.0f;
 
             ModelCollisionShape model_shape{};
             model_shape.size = scale;
@@ -352,11 +304,11 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             throw std::runtime_error("Unknown command in model file: " + command);
         }
     });
-    
+
     return std::make_shared<Model>(std::move(desc));
 }
 
-bool assets::Model::GetSurfaceIndex(const std::string& name, size_t & idx) const
+bool assets::Model::GetSurfaceIndex(const std::string& name, size_t& idx) const
 {
     auto it = surface_indices_.find(name);
     if (it == surface_indices_.end())
@@ -382,7 +334,7 @@ bool assets::Model::GetParamFloat(const std::string& key, float& out) const
         return false;
 
     std::string str = *str_val;
-    
+
     auto dashpos = str.find(',');
     if (dashpos != std::string::npos)
         str[dashpos] = '.';
