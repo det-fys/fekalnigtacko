@@ -26,7 +26,7 @@ struct ChunkMeshSurface
 {
     uint32_t tri_offset = 0;
     uint32_t tri_count = 0;
-    std::string material;
+    uint32_t material_id;
 };
 
 struct ChunkMesh

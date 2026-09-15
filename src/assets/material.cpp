@@ -51,6 +51,14 @@ assets::ModelMaterial assets::ParseMaterial(CmdLineStream& iss)
         {
             mat.properties.translucent = true;
         }
+        else if (flag == "+decal")
+        {
+            mat.properties.decal = true;
+        }
+        else
+        {
+            throw std::runtime_error("Unknown material flag: " + flag);
+        }
     }
 
     return mat;

@@ -160,7 +160,7 @@ static mg::TemplateProfile LoadTemplateProfile(const mg::ResourceSet& res, CmdLi
             
             // uv and calc advance
             profile_vert.uv = verts.uvs[model_vert_idx];
-            auto pos_diff_y = verts.positions[model_vert_idx_next].y - profile_vert.pos.y;
+            auto pos_diff_y = verts.positions[model_vert_idx_next].y - verts.positions[model_vert_idx].y;
             auto uv_diff = verts.uvs[model_vert_idx_next] - profile_vert.uv;
             profile_vert.uv_advance = glm::abs(pos_diff_y) > 0.001f ? uv_diff / pos_diff_y : glm::vec2(0.0f, 0.0f);
             
@@ -349,7 +349,7 @@ static mg::TemplateMesh LoadTemplateMesh(const mg::ResourceSet& res, CmdLineStre
                 }
 
                 bool swapped = match_swapped && !match_direct;
-;
+
                 auto mapped_verts = mesh_edge.verts;
                 if (swapped)
                 {

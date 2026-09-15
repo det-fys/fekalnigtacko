@@ -608,11 +608,16 @@ void edit::Project::FinalizeChunk(mg::Chunk&& mgchunk)
         model_desc.tris.emplace_back(tri[0], tri[1], tri[2]);
     }
 
-    auto& surface = model_desc.surfaces.emplace_back();
-    surface.name = "grass";
-    surface.tri_offset = 0;
-    surface.tri_count = static_cast<uint32_t>(model_desc.tris.size());
-    surface.material.texture_name = "grass";
+    for (const auto& surface : chunk.mgchunk.mesh.surfaces)
+    {
+        const auto& mg_material = mg_res_->GetMaterials()[surface.material_id];
+        
+        auto& model_surface = model_desc.surfaces.emplace_back();
+        model_surface.name = mg_material.name;
+        model_surface.tri_offset = surface.tri_offset;
+        model_surface.tri_count = surface.tri_count;
+        model_surface.material = mg_material;
+    }
 
     auto model = std::make_shared<assets::Model>(std::move(model_desc));
     chunk.model = std::make_shared<ModelView>(model);

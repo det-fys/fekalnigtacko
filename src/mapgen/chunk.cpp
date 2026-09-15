@@ -42,6 +42,21 @@ struct PathInfo
     std::array<PathEndpointInfo, 2> endpoints;
 };
 
+struct RawMeshVertex
+{
+    glm::vec3 pos;
+    glm::vec3 normal;
+    glm::vec2 uv;
+
+    uint32_t out_vertex_idx = INVALID_ID;
+};
+
+struct RawMeshTriangle
+{
+    mg::Triangle tri;
+    mg::TemplateMaterialRef material;
+};
+
 struct ChunkGenContext
 {
     const mg::ResourceSet* res;
@@ -67,6 +82,10 @@ struct ChunkGenContext
     std::vector<PathInfo> paths;
     std::map<std::tuple<uint32_t, uint32_t>, std::tuple<uint32_t, bool>>
         link2path; // (node_id, link_index) -> (path_id, from_end)
+
+    // raw mesh - both visual/collision and heightmesh
+    std::vector<RawMeshVertex> raw_verts;
+    std::vector<RawMeshTriangle> raw_tris;
 
     // heightmesh
     std::vector<glm::vec3> hm_verts;
@@ -470,21 +489,42 @@ void MakeJunctionsAndPaths(ChunkGenContext& ctx)
     }
 }
 
+void AddTriangle(ChunkGenContext& ctx, uint32_t v0, uint32_t v1, uint32_t v2, mg::TemplateMaterialRef material)
+{
+    auto& verts = ctx.raw_verts;
+
+    // smooth vertex normals
+    auto normal = glm::normalize(glm::cross(verts[v1].pos - verts[v0].pos, verts[v2].pos - verts[v0].pos));
+    verts[v0].normal += normal;
+    verts[v1].normal += normal;
+    verts[v2].normal += normal;
+
+    auto centroid = (verts[v0].pos + verts[v1].pos + verts[v2].pos) / 3.0f;
+    if (!ctx.bounds.Contains(centroid))
+    {
+        return; // triangle outside chunk bounds
+    }
+
+    // add triangle
+    auto& tri = ctx.raw_tris.emplace_back();
+    tri.tri[0] = v0;
+    tri.tri[1] = v1;
+    tri.tri[2] = v2;
+    tri.material = material;
+}
+
 void GenerateJunctionMesh(ChunkGenContext& ctx, JunctionInfo& junction)
 {
     const auto& mesh = ctx.res->GetMeshes()[junction.mesh_id];
 
-    auto& chunk_verts = ctx.chunk->mesh.verts;
-    auto& chunk_tris = ctx.chunk->mesh.tris;
-
-    junction.base_vertex = static_cast<uint32_t>(chunk_verts.size());
+    junction.base_vertex = static_cast<uint32_t>(ctx.raw_verts.size());
 
     for (const auto& vert : mesh.verts)
     {
-        mg::ChunkMeshVertex chunk_vert{};
+        auto& chunk_vert = ctx.raw_verts.emplace_back();
         chunk_vert.uv = vert.uv;
-        chunk_vert.color = 0xFFFFFFFF; // TODO
-        chunk_vert.normal = glm::vec3(0.0f, 0.0f, 1.0f); // TODO
+        //chunk_vert.color = 0xFFFFFFFF; // TODO
+        chunk_vert.normal = glm::vec3(0.0f);
         
         chunk_vert.pos = glm::vec3(0.0f);
 
@@ -512,18 +552,12 @@ void GenerateJunctionMesh(ChunkGenContext& ctx, JunctionInfo& junction)
             auto w = vert.link_weights[i];
             chunk_vert.pos += path.spline.DeformVertex(spline_pos) * w;
         }
-
-        chunk_verts.emplace_back(chunk_vert);
     }
 
     for (const auto& tri : mesh.tris)
     {
-        mg::Triangle chunk_tri{};
-        //chunk_tri.material = tri.material; // TODO
-        chunk_tri[0] = junction.base_vertex + tri.tri[0];
-        chunk_tri[1] = junction.base_vertex + tri.tri[1];
-        chunk_tri[2] = junction.base_vertex + tri.tri[2];
-        chunk_tris.emplace_back(chunk_tri);
+        AddTriangle(ctx, junction.base_vertex + tri.tri[0], junction.base_vertex + tri.tri[1],
+                    junction.base_vertex + tri.tri[2], tri.material);
     }
     
 }
@@ -540,21 +574,20 @@ void LoadJunctionLinkProfileVertices(ChunkGenContext& ctx, const JunctionInfo& j
     }
 }
 
-void InsertPathProfileVertices(ChunkGenContext& ctx, const mg::TemplateProfile& profile,
-                                                    const SplinePath& spline, float t, std::span<uint32_t> out_verts)
+void InsertPathProfileVertices(ChunkGenContext& ctx, const mg::TemplateProfile& profile, const SplinePath& spline,
+                               float t, float uv_t, std::span<uint32_t> out_verts)
 {
-    auto& chunk_verts = ctx.chunk->mesh.verts;
-    auto base_vertex = static_cast<uint32_t>(chunk_verts.size());
-    chunk_verts.resize(base_vertex + profile.verts.size());
+    auto base_vertex = static_cast<uint32_t>(ctx.raw_verts.size());
+    ctx.raw_verts.resize(base_vertex + profile.verts.size());
     for (uint32_t i = 0; i < profile.verts.size(); ++i)
     {
         const auto& profile_vert = profile.verts[i];
-        auto& chunk_vert = chunk_verts[base_vertex + i];
+        auto& chunk_vert = ctx.raw_verts[base_vertex + i];
 
         chunk_vert.pos = spline.DeformVertex(glm::vec3(profile_vert.pos.x, t, profile_vert.pos.z));
-        chunk_vert.normal = profile_vert.normal; // TODO: transform normal
-        chunk_vert.uv = profile_vert.uv;
-        chunk_vert.color = 0xFFFFFFFF; // TODO: color
+        chunk_vert.normal = glm::vec3(0.0f); // profile_vert.normal; // TODO: transform normal
+        chunk_vert.uv = profile_vert.uv + profile_vert.uv_advance * uv_t;
+        //chunk_vert.color = 0xFFFFFFFF; // TODO: color
 
         out_verts[i] = base_vertex + i;
     }
@@ -563,27 +596,18 @@ void InsertPathProfileVertices(ChunkGenContext& ctx, const mg::TemplateProfile& 
 void TriangulatePathSegment(ChunkGenContext& ctx, const mg::TemplateProfile& profile, std::span<uint32_t> start_verts,
                             std::span<uint32_t> end_verts, bool is_final)
 {
-    //auto& chunk_verts = ctx.chunk->mesh.verts; // TODO: fix uvs on final segment
-    auto& chunk_tris = ctx.chunk->mesh.tris;
+    // TODO: fix uvs on final segment
 
     for (uint32_t i = 0; i < profile.edges.size(); ++i)
     {
         const auto& start_edge = profile.edges[i];
         const auto& end_edge = is_final ? profile.edges_reverse[i] : profile.edges[i];
 
-        mg::Triangle tri0{};
-        tri0[0] = start_verts[start_edge.verts[0]];
-        tri0[1] = start_verts[start_edge.verts[1]];
-        tri0[2] = end_verts[end_edge.verts[0]];
-        chunk_tris.emplace_back(tri0);
-        
-        mg::Triangle tri1{};
-        tri1[0] = end_verts[end_edge.verts[1]];
-        tri1[1] = end_verts[end_edge.verts[0]];
-        tri1[2] = start_verts[start_edge.verts[1]];
-        chunk_tris.emplace_back(tri1);
-        
-        // TODO: materials
+        AddTriangle(ctx, start_verts[start_edge.verts[0]], start_verts[start_edge.verts[1]],
+                    end_verts[end_edge.verts[0]], start_edge.material);
+
+        AddTriangle(ctx, end_verts[end_edge.verts[1]], end_verts[end_edge.verts[0]], start_verts[start_edge.verts[1]],
+                    end_edge.material);
     }
 }
 
@@ -609,9 +633,6 @@ void GeneratePathMesh(ChunkGenContext& ctx, const PathInfo& path)
     std::span<uint32_t> start_verts(vertices.data(), verts_count);
     std::span<uint32_t> end_verts(vertices.data() + verts_count, verts_count);
 
-    auto& chunk_verts = ctx.chunk->mesh.verts;
-    auto& chunk_tris = ctx.chunk->mesh.tris;
-
     const auto& spline = path.spline;
 
     const auto& start_endpoint = path.endpoints[0];
@@ -623,12 +644,13 @@ void GeneratePathMesh(ChunkGenContext& ctx, const PathInfo& path)
 
     constexpr float step_size = 3.0f; // meters
     constexpr float min_step = step_size * 0.5f;
-    const auto start_t = ctx.junctions[start_endpoint.junction_idx].links[start_endpoint.link_idx].margin + step_size;
-    const auto end_t =
-        path.spline.GetTotalLength() - ctx.junctions[end_endpoint.junction_idx].links[end_endpoint.link_idx].margin - min_step;
+    const auto start_margin = ctx.junctions[start_endpoint.junction_idx].links[start_endpoint.link_idx].margin;
+    const auto start_t = start_margin + step_size;
+    const auto end_margin = ctx.junctions[end_endpoint.junction_idx].links[end_endpoint.link_idx].margin;
+    const auto end_t = path.spline.GetTotalLength() - end_margin - min_step;
     for (float t = start_t; t < end_t; t += step_size)
     {
-        InsertPathProfileVertices(ctx, profile, spline, t, end_verts);
+        InsertPathProfileVertices(ctx, profile, spline, t, t - start_margin, end_verts);
         TriangulatePathSegment(ctx, profile, start_verts, end_verts, false);
 
         std::swap(start_verts, end_verts);
@@ -1110,6 +1132,82 @@ void TriangulateTerrain(ChunkGenContext& ctx)
     }
 }
 
+void GenerateOutputMesh(ChunkGenContext& ctx)
+{
+    // TODO: get these from somewhere
+    auto terrain_material_id = ctx.res->GetMaterialIndexByName("grass"); 
+    const float terrain_uv_scale = 0.1f;                                 
+
+    // set material for terrain triangles
+    for (auto& tri : ctx.raw_tris)
+    {
+        if (tri.material.type == mg::TPL_MATERIAL_TERRAIN)
+        {
+            tri.material.id = terrain_material_id;
+        }
+    }
+
+    // sort by material for batching
+    std::sort(ctx.raw_tris.begin(), ctx.raw_tris.end(),
+              [](const RawMeshTriangle& a, const RawMeshTriangle& b) { return a.material.id < b.material.id; });
+
+    auto& chunk_mesh = ctx.chunk->mesh;
+
+    for (const auto& tri : ctx.raw_tris)
+    {
+        if (tri.material.type == mg::TPL_MATERIAL_HEIGHTMESH)
+            continue; // dont export that
+
+        // add surface range if material changed
+        if (chunk_mesh.surfaces.empty() || chunk_mesh.surfaces.back().material_id != tri.material.id)
+        {
+            auto& surface = chunk_mesh.surfaces.emplace_back();
+            surface.material_id = tri.material.id;
+            surface.tri_offset = static_cast<uint32_t>(chunk_mesh.tris.size());
+            surface.tri_count = 1;
+        }
+        else
+        {
+            ++chunk_mesh.surfaces.back().tri_count;
+        }
+
+        const bool is_terrain = tri.material.type == mg::TPL_MATERIAL_TERRAIN;
+
+        auto& out_tri = ctx.chunk->mesh.tris.emplace_back();
+
+        for (uint32_t i = 0; i < 3; ++i)
+        {
+            auto& vert = ctx.raw_verts[tri.tri[i]];
+
+            // check if already in output
+            if (vert.out_vertex_idx != INVALID_ID)
+            {
+                out_tri[i] = vert.out_vertex_idx;
+                continue;
+            }
+
+            vert.out_vertex_idx = static_cast<uint32_t>(chunk_mesh.verts.size());
+            out_tri[i] = vert.out_vertex_idx;
+
+            auto& out_vert = chunk_mesh.verts.emplace_back();
+
+            // copy position
+            out_vert.pos = vert.pos;
+
+            // normalize normal
+            out_vert.normal = glm::dot(vert.normal, vert.normal) > 0.0001f ? glm::normalize(vert.normal)
+                                                                           : glm::vec3(0.0f, 0.0f, 1.0f);
+
+            // calc uv
+            out_vert.uv = is_terrain ? vert.pos * terrain_uv_scale : vert.uv;
+
+            // TODO: color
+            out_vert.color = 0xFFFFFFFF;
+        }
+    }
+}
+
+
 } // namespace
 
 AABB2 mg::GetChunkAABB(const MapConfig& cfg, const glm::ivec2& chunk_pos, bool include_border)
@@ -1178,6 +1276,8 @@ mg::Chunk mg::GenerateChunk(const ResourceSet& res, const MapConfig& cfg, const 
     AppendObjectsHeightmeshes(ctx, params.objs);
     RasterizeHeightmesh(ctx);
     //TriangulateTerrain(ctx);
+
+    GenerateOutputMesh(ctx);
 
     return chunk;
 }
