@@ -48,6 +48,7 @@ struct RawMeshVertex
     glm::vec3 normal;
     glm::vec2 uv;
 
+    uint32_t hm_vertex_idx = INVALID_ID;
     uint32_t out_vertex_idx = INVALID_ID;
 };
 
@@ -677,6 +678,33 @@ void GenerateJunctionAndPathMeshes(ChunkGenContext& ctx)
     }
 }
 
+void GenerateHeightmesh(ChunkGenContext& ctx)
+{
+    for (const auto& tri : ctx.raw_tris)
+    {
+        if (tri.material.type != mg::TPL_MATERIAL_HEIGHTMESH)
+            continue; // not heightmesh
+
+        const auto& v0 = ctx.raw_verts[tri.tri[0]];
+        const auto& v1 = ctx.raw_verts[tri.tri[1]];
+        const auto& v2 = ctx.raw_verts[tri.tri[2]];
+
+        mg::Triangle hm_tri{};
+        for (uint32_t i = 0; i < 3; ++i)
+        {
+            auto& v = ctx.raw_verts[tri.tri[i]];
+            if (v.hm_vertex_idx == INVALID_ID)
+            {
+                v.hm_vertex_idx = static_cast<uint32_t>(ctx.hm_verts.size());
+                ctx.hm_verts.emplace_back(v.pos);
+            }
+            hm_tri[i] = v.hm_vertex_idx;
+        }
+
+        ctx.hm_tris.emplace_back(hm_tri);
+    }
+}
+
 void AppendObjectsHeightmeshes(ChunkGenContext& ctx, std::span<const mg::ChunkStaticObject> objs)
 {
     for (const auto& obj : objs)
@@ -1044,7 +1072,7 @@ void TriangulateTerrain(ChunkGenContext& ctx)
 
     delaunay.Triangulate();
 
-    std::map<uint32_t, uint32_t> vertex_map; // maps delaunay vertex index to chunk vertex index
+    std::map<uint32_t, uint32_t> vertex_map; // maps delaunay vertex index to raw vertex index
 
     std::vector<glm::vec3> normals(terrain_points_offset + terrain_points.size(), glm::vec3(0.0f));
 
@@ -1095,7 +1123,8 @@ void TriangulateTerrain(ChunkGenContext& ctx)
             continue;
         }
 
-        auto& tri = ctx.chunk->mesh.tris.emplace_back();
+        auto& tri = ctx.raw_tris.emplace_back();
+        tri.material.type = mg::TPL_MATERIAL_TERRAIN;
 
         // push vertices
         for (int i = 0; i < 3; ++i)
@@ -1104,22 +1133,22 @@ void TriangulateTerrain(ChunkGenContext& ctx)
 
             if (it == vertex_map.end())
             {
-                uint32_t new_idx = static_cast<uint32_t>(ctx.chunk->mesh.verts.size());
+                uint32_t new_idx = static_cast<uint32_t>(ctx.raw_verts.size());
 
                 auto pos = vert_pos[i];
-                auto& vert = ctx.chunk->mesh.verts.emplace_back();
+                auto& vert = ctx.raw_verts.emplace_back();
                 vert.pos = pos; // Placeholder height; replace with actual terrain height
                 vert.uv = glm::vec2(pos) * 0.1f;
 
                 vertex_map[v[i]] = new_idx;
 
-                tri[i] = new_idx;
+                tri.tri[i] = new_idx;
 
-                ctx.chunk->aabb.AddPoint(vert.pos);
+                //ctx.chunk->aabb.AddPoint(vert.pos);
             }
             else
             {
-                tri[i] = it->second;
+                tri.tri[i] = it->second;
             }
         }
     }
@@ -1127,7 +1156,7 @@ void TriangulateTerrain(ChunkGenContext& ctx)
     // finalize normals
     for (const auto& [v_idx, c_idx] : vertex_map)
     {
-        auto& vert = ctx.chunk->mesh.verts[c_idx];
+        auto& vert = ctx.raw_verts[c_idx];
         vert.normal = glm::normalize(normals[v_idx]);
     }
 }
@@ -1273,9 +1302,10 @@ mg::Chunk mg::GenerateChunk(const ResourceSet& res, const MapConfig& cfg, const 
     MakeJunctionsAndPaths(ctx);
     GenerateJunctionAndPathMeshes(ctx);
     
+    GenerateHeightmesh(ctx);
     AppendObjectsHeightmeshes(ctx, params.objs);
     RasterizeHeightmesh(ctx);
-    //TriangulateTerrain(ctx);
+    TriangulateTerrain(ctx);
 
     GenerateOutputMesh(ctx);
 
