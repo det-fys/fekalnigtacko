@@ -454,14 +454,13 @@ void edit::Project::UpdateChunks()
     // check if there is a chunk being generated
     if (future_chunk_.valid())
     {
-        // check if the chunk generation is done and finalize
-        if (future_chunk_.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-        {
-            auto chunk = future_chunk_.get();
-            FinalizeChunk(std::move(chunk));
-        }
+        // done yet?
+        if (future_chunk_.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+            return;
 
-        return; // don't start generating a new chunk while one is being generated
+        // done - make model and stuff
+        auto chunk = future_chunk_.get();
+        FinalizeChunk(std::move(chunk));    
     }
 
     // no invalid chunks to update
