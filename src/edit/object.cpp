@@ -16,7 +16,7 @@ void edit::Object::DrawOverlay(const DrawOverlayContext& ctx)
     }
 }
 
-void edit::Object::InvalidateChunks(const AABB3& aabb)
+void edit::Object::InvalidateChunks(const AABB3& aabb) const
 {
     auto& map_cfg = project_->GetMapConfig();
     auto [min_chunk, max_chunk] = mg::GetChunkRange(map_cfg, AABB2(aabb.min, aabb.max), true);

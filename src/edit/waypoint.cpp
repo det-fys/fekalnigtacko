@@ -37,7 +37,9 @@ void edit::Waypoint::SetTransform(const glm::mat4& trans)
 {
     Super::SetTransform(GetTranslationOnly(trans));
     InvalidateChunks(GetAABB());
+    InvalidatePathsChunks();
     UpdateAABB();
+    InvalidatePathsChunks();
 }
 
 void edit::Waypoint::Clone(const glm::mat4& trans)
@@ -87,9 +89,11 @@ void edit::Waypoint::Link(Waypoint& other, bool link)
 
         links_[my_idx] = other.id_;
         other.links_[other_idx] = id_;
+        InvalidatePathsChunks();
     }
     else
     {
+        InvalidatePathsChunks();
         links_[my_idx] = 0;
         other.links_[other_idx] = 0;
     
@@ -100,6 +104,7 @@ void edit::Waypoint::Link(Waypoint& other, bool link)
 
 void edit::Waypoint::Delete()
 {
+    InvalidatePathsChunks();
     UnlinkAll();
 }
 
@@ -333,4 +338,44 @@ void edit::Waypoint::FixLinksToPrioritizeMainPath()
 edit::WaypointID edit::Waypoint::GetMainPathContinuation(WaypointID from_id) const
 {
     return (links_[0] == from_id) ? links_[1] : ((links_[1] == from_id) ? links_[0] : 0);
+}
+
+void edit::Waypoint::InvalidatePathsChunks() const
+{
+    for (auto other_id : links_)
+    {
+        if (other_id == 0)
+            continue;
+
+        InvalidatePathChunks(other_id);
+    }
+}
+
+void edit::Waypoint::InvalidatePathChunks(WaypointID next_id) const
+{
+    const Waypoint* current_wp = this;
+
+    while (next_id)
+    {
+        auto next_wp = GetProject().GetWaypoint(next_id);
+        if (!next_wp)
+            break;
+        
+        // Trace the path from current_wp to next_wp and invalidate chunks along the way
+        constexpr uint32_t NUM_SEGMENTS = 16;
+        std::array<glm::vec3, NUM_SEGMENTS + 1> path_positions; // 16 segments + 1
+        GetPath(*current_wp, *next_wp, path_positions);
+        for (uint32_t i = 0; i < NUM_SEGMENTS; ++i)
+        {
+            constexpr float margin = 5.0f;
+            AABB3 segment_aabb(path_positions[i], path_positions[i + 1]);
+            segment_aabb.min -= margin;
+            segment_aabb.max += margin;
+            InvalidateChunks(segment_aabb);
+        }
+
+        // Move to the next waypoint in the main path
+        next_id = next_wp->GetMainPathContinuation(current_wp->id_);
+        current_wp = next_wp;
+    }
 }

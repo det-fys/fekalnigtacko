@@ -56,7 +56,7 @@ public:
 protected:
     void SetAABB(const AABB3& aabb) { aabb_ = aabb; }
 
-    void InvalidateChunks(const AABB3& aabb);
+    void InvalidateChunks(const AABB3& aabb) const;
 
     static bool GetScreenPos(const edit::MapViewport& viewport, const glm::vec3& world_pos, glm::vec2& out_screen_pos);
     static void DrawLineWs(const DrawOverlayContext& ctx, const glm::vec3& p0, const glm::vec3& p1, uint32_t color,

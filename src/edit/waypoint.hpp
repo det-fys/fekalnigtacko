@@ -49,6 +49,9 @@ private:
 
     WaypointID GetMainPathContinuation(WaypointID from_id) const;
 
+    void InvalidatePathsChunks() const;
+    void InvalidatePathChunks(WaypointID next_id) const;
+
 private:
     WaypointID id_ = 0;
 
