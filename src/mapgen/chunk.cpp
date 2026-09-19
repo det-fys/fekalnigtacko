@@ -24,8 +24,9 @@ struct JunctionLinkInfo
 
 struct JunctionInfo
 {
+    glm::vec3 pos{0.0f};
     uint32_t mesh_id = 0;
-    uint32_t base_vertex = 0;
+    uint32_t base_vertex = INVALID_ID;
     std::array<JunctionLinkInfo, 4> links;
 };
 
@@ -65,6 +66,7 @@ struct ChunkGenContext
     glm::ivec2 chunk_coord;
     mg::Chunk* chunk;
     AABB2 bounds;
+    AABB2 extended_bounds;
 
     // seeds
     uint32_t heightmap_seed;
@@ -450,6 +452,7 @@ void MakeJunctionsAndPaths(ChunkGenContext& ctx)
             continue; // not junction
 
         JunctionInfo junction{};
+        junction.pos = node.pos;
         junction.mesh_id = node.res_id;
 
         const auto& mesh = ctx.res->GetMeshes()[junction.mesh_id];
@@ -500,10 +503,15 @@ void AddTriangle(ChunkGenContext& ctx, uint32_t v0, uint32_t v1, uint32_t v2, mg
     verts[v1].normal += normal;
     verts[v2].normal += normal;
 
-    auto centroid = (verts[v0].pos + verts[v1].pos + verts[v2].pos) / 3.0f;
-    if (!ctx.bounds.Contains(centroid))
+    // check if triangle is within chunk bounds
+    // heightmesh triangles always added for correct terrain triangulation and tiling
+    if (material.type != mg::TPL_MATERIAL_HEIGHTMESH)
     {
-        return; // triangle outside chunk bounds
+        auto centroid = (verts[v0].pos + verts[v1].pos + verts[v2].pos) / 3.0f;
+        if (!ctx.bounds.Contains(centroid))
+        {
+            return; // triangle outside chunk bounds
+        }
     }
 
     // add triangle
@@ -517,6 +525,13 @@ void AddTriangle(ChunkGenContext& ctx, uint32_t v0, uint32_t v1, uint32_t v2, mg
 void GenerateJunctionMesh(ChunkGenContext& ctx, JunctionInfo& junction)
 {
     const auto& mesh = ctx.res->GetMeshes()[junction.mesh_id];
+
+    // check if within chunk bounds
+    constexpr float radius = 15.0f; // TODO: calculate actual radius from mesh bounds
+    if (!ctx.extended_bounds.CollidesWith(AABB2(junction.pos - radius, junction.pos + radius)))
+    {
+        return; // junction mesh outside chunk bounds
+    }
 
     junction.base_vertex = static_cast<uint32_t>(ctx.raw_verts.size());
 
@@ -639,30 +654,53 @@ void GeneratePathMesh(ChunkGenContext& ctx, const PathInfo& path)
     const auto& start_endpoint = path.endpoints[0];
     const auto& end_endpoint = path.endpoints[1];
 
+    const auto& start_junction = ctx.junctions[start_endpoint.junction_idx];
+    const auto& end_junction = ctx.junctions[end_endpoint.junction_idx];
+
+    bool have_start_verts = false;
+
     // load start verts from junction mesh
-    LoadJunctionLinkProfileVertices(ctx, ctx.junctions[start_endpoint.junction_idx], start_endpoint.link_idx,
-                                    start_verts);
+    if (start_junction.base_vertex != INVALID_ID)
+    {
+        LoadJunctionLinkProfileVertices(ctx, start_junction, start_endpoint.link_idx, start_verts);
+        have_start_verts = true;
+    }
 
     constexpr float step_size = 3.0f; // meters
     constexpr float min_step = step_size * 0.5f;
-    const auto start_margin = ctx.junctions[start_endpoint.junction_idx].links[start_endpoint.link_idx].margin;
+    const auto start_margin = start_junction.links[start_endpoint.link_idx].margin;
     const auto start_t = start_margin + step_size;
-    const auto end_margin = ctx.junctions[end_endpoint.junction_idx].links[end_endpoint.link_idx].margin;
+    const auto end_margin = end_junction.links[end_endpoint.link_idx].margin;
     const auto end_t = path.spline.GetTotalLength() - end_margin - min_step;
     for (float t = start_t; t < end_t; t += step_size)
     {
-        InsertPathProfileVertices(ctx, profile, spline, t, t - start_margin, end_verts);
-        TriangulatePathSegment(ctx, profile, start_verts, end_verts, false);
+        bool have_end_verts = false;
+
+        // check if this segment collides with the chunk
+        auto pos = spline.DeformVertex(glm::vec3(0.0f, t, 0.0f));
+        constexpr float margin = 10.0f; // meters
+        if (ctx.extended_bounds.CollidesWith(AABB2(pos - margin, pos + margin)))
+        {
+            InsertPathProfileVertices(ctx, profile, spline, t, t - start_margin, end_verts);
+            have_end_verts = true;
+        }
+
+        // try generate segment if have both start and end verts
+        if (have_start_verts && have_end_verts)
+        {
+            TriangulatePathSegment(ctx, profile, start_verts, end_verts, false);
+        }
 
         std::swap(start_verts, end_verts);
+        have_start_verts = have_end_verts;
     }
 
     // make final segment connecting to the end junction
-    LoadJunctionLinkProfileVertices(ctx, ctx.junctions[end_endpoint.junction_idx], end_endpoint.link_idx,
-                                    end_verts);
-    TriangulatePathSegment(ctx, profile, start_verts, end_verts, true);
-
-
+    if (end_junction.base_vertex != INVALID_ID && have_start_verts)
+    {
+        LoadJunctionLinkProfileVertices(ctx, end_junction, end_endpoint.link_idx, end_verts);
+        TriangulatePathSegment(ctx, profile, start_verts, end_verts, true);
+    }
 }
 
 void GenerateJunctionAndPathMeshes(ChunkGenContext& ctx)
@@ -991,8 +1029,9 @@ void TriangulateTerrain(ChunkGenContext& ctx)
     const auto& chunk_aabb = ctx.bounds;
 
     // append corners
-    auto c0 = glm::vec2(ctx.chunk_coord) * ctx.map_cfg->chunk_size_m - r_border;
-    auto c1 = c0 + (ctx.map_cfg->chunk_size_m + r_border * 2.0f);
+    const auto terrain_points_margin = ctx.map_cfg->chunk_size_m;
+    auto c0 = ctx.bounds.min - terrain_points_margin;
+    auto c1 = ctx.bounds.max + terrain_points_margin;
     terrain_points.emplace_back(c0);
     terrain_points.emplace_back(glm::vec2(c1.x, c0.y));
     terrain_points.emplace_back(c1);
@@ -1287,6 +1326,7 @@ mg::Chunk mg::GenerateChunk(const ResourceSet& res, const MapConfig& cfg, const 
     ctx.chunk_coord = params.coord;
     ctx.chunk = &chunk;
     ctx.bounds = GetChunkAABB(cfg, params.coord);
+    ctx.extended_bounds = GetChunkAABB(cfg, params.coord, true);
 
     ctx.heightmap_seed = params.heightmap_seed;
 
