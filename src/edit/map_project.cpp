@@ -539,6 +539,9 @@ void edit::Project::ScheduleChunkUpdate(const glm::ivec2& chunk_pos)
                 ++link_count;
         }
 
+        if (link_count == 0)
+            continue; // skip unlinked waypoints
+
         node.type = link_count == 2 ? mg::CHUNK_SPLINE_NODE_NORMAL : mg::CHUNK_SPLINE_NODE_JUNCTION;
         node.res_id =
             link_count < 2 ? mg_res_->GetMeshIndexByName("deadend1") : mg_res_->GetMeshIndexByName("intersection1");
