@@ -477,6 +477,7 @@ void gfx::RendererWGPU::InitWGPU()
 #if !defined(__EMSCRIPTEN__)
     options.backendType = wgpu::BackendType::Vulkan;
 #endif
+    options.powerPreference = wgpu::PowerPreference::HighPerformance;
 
     auto f1 = instance_.RequestAdapter(
         &options, wgpu::CallbackMode::WaitAnyOnly,
@@ -494,6 +495,13 @@ void gfx::RendererWGPU::InitWGPU()
         throw std::runtime_error("could not request adapter");
     }
 
+    wgpu::AdapterInfo adapter_info{};
+    if (adapter_.GetInfo(&adapter_info))
+    {
+        std::cout << "WebGPU Adapter Info:\n";
+        std::cout << "  Description: " << adapter_info.description << "\n";
+    }
+    
     // 4. Request Device
     wgpu::DeviceDescriptor desc{};
     desc.SetUncapturedErrorCallback([](const wgpu::Device&, wgpu::ErrorType errorType, wgpu::StringView message) {
