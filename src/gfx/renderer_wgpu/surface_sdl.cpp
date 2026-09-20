@@ -32,33 +32,51 @@ wgpu::Surface CreateWGPUSurfaceFromSDLWindow(wgpu::Instance instance, SDL_Window
 
     wgpu::SurfaceDescriptor surfaceDesc{};
 
-#if defined(SDL_VIDEO_DRIVER_WINDOWS)
+    
+    #if defined(SDL_VIDEO_DRIVER_WINDOWS)
     wgpu::SurfaceSourceWindowsHWND winDesc{};
-    winDesc.sType = wgpu::SType::SurfaceSourceWindowsHWND;
-    winDesc.hinstance = GetModuleHandle(nullptr);
-    winDesc.hwnd = wmInfo.info.win.window;
-    surfaceDesc.nextInChain = &winDesc;
-
-#elif defined(SDL_VIDEO_DRIVER_COCOA)
+    if (wmInfo.subsystem == SDL_SYSWM_WINDOWS)
+    {
+        winDesc.sType = wgpu::SType::SurfaceSourceWindowsHWND;
+        winDesc.hinstance = GetModuleHandle(nullptr);
+        winDesc.hwnd = wmInfo.info.win.window;
+        surfaceDesc.nextInChain = &winDesc;
+    }
+    #elif defined(SDL_VIDEO_DRIVER_COCOA)
     wgpu::SurfaceSourceMetalLayer metalDesc{};
-    metalDesc.sType = wgpu::SType::SurfaceSourceMetalLayer;
-    metalDesc.layer = wmInfo.info.cocoa.window;
-    surfaceDesc.nextInChain = &metalDesc;
-
+    if (wmInfo.subsystem == SDL_SYSWM_COCOA)
+    {
+        metalDesc.sType = wgpu::SType::SurfaceSourceMetalLayer;
+        metalDesc.layer = wmInfo.info.cocoa.window;
+        surfaceDesc.nextInChain = &metalDesc;
+    }
 #elif defined(SDL_VIDEO_DRIVER_X11)
     wgpu::SurfaceSourceXlibWindow x11Desc{};
-    x11Desc.sType = wgpu::SType::SurfaceSourceXlibWindow;
-    x11Desc.display = wmInfo.info.x11.display;
-    x11Desc.window = wmInfo.info.x11.window;
-    surfaceDesc.nextInChain = &x11Desc;
-
+    if (wmInfo.subsystem == SDL_SYSWM_X11)
+    {
+        x11Desc.sType = wgpu::SType::SurfaceSourceXlibWindow;
+        x11Desc.display = wmInfo.info.x11.display;
+        x11Desc.window = wmInfo.info.x11.window;
+        surfaceDesc.nextInChain = &x11Desc;
+    }
 #elif defined(SDL_VIDEO_DRIVER_WAYLAND)
     wgpu::SurfaceSourceWaylandSurface waylandDesc{};
-    waylandDesc.sType = wgpu::SType::SurfaceSourceWaylandSurface;
-    waylandDesc.display = wmInfo.info.wl.display;
-    waylandDesc.surface = wmInfo.info.wl.surface;
-    surfaceDesc.nextInChain = &waylandDesc;
+    if (wmInfo.subsystem == SDL_SYSWM_WAYLAND)
+    {
+        waylandDesc.sType = wgpu::SType::SurfaceSourceWaylandSurface;
+        waylandDesc.display = wmInfo.info.wl.display;
+        waylandDesc.surface = wmInfo.info.wl.surface;
+        surfaceDesc.nextInChain = &waylandDesc;
+    }
+#else
+#error "No suitable SDL video driver!"
 #endif
+
+    if (!surfaceDesc.nextInChain)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Unsupported SDL video driver: %d", wmInfo.subsystem);
+        return nullptr;
+    }
 
     return instance.CreateSurface(&surfaceDesc);
 #endif
