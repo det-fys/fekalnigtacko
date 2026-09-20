@@ -293,7 +293,9 @@ void edit::Waypoint::DrawPathTypeMarker(const DrawOverlayContext& ctx, std::span
 
 void edit::Waypoint::UnlinkAll()
 {
-    for (auto other_id : links_)
+    const auto old_links = links_;
+
+    for (auto other_id : old_links)
     {
         if (other_id == 0)
             continue;
@@ -323,6 +325,11 @@ uint32_t edit::Waypoint::FindFreeLinkIndex() const
 
 void edit::Waypoint::FixLinksToPrioritizeMainPath()
 {
+    if (links_[0] == 0 && links_[1] != 0)
+    {
+        std::swap(links_[0], links_[1]);
+    }
+
     bool main_path_full = links_[0] != 0 && links_[1] != 0;
     bool has_side_path = links_[2] != 0 || links_[3] != 0;
 
@@ -355,7 +362,7 @@ void edit::Waypoint::InvalidatePathChunks(WaypointID next_id) const
 {
     const Waypoint* current_wp = this;
 
-    while (next_id)
+    while (next_id != 0 && next_id != id_)
     {
         auto next_wp = GetProject().GetWaypoint(next_id);
         if (!next_wp)
