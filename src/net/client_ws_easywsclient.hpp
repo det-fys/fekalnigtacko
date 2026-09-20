@@ -23,7 +23,7 @@ public:
     virtual void Send(std::string_view data) override;
     virtual void Poll() override;
 
-    virtual ~EasyWsClientWSClientInterface() override = default;
+    virtual ~EasyWsClientWSClientInterface() override;
 
 private:
     std::unique_ptr<easywsclient::WebSocket> ws_;

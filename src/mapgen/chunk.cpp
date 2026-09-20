@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <set>
+#include <optional>
 
 #include <tpp_interface.hpp>
 #include "FastNoiseLite.h"

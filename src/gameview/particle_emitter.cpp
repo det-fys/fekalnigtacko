@@ -1,4 +1,7 @@
 #include "particle_emitter.hpp"
+
+#include <algorithm>
+
 #include "assets/asset_manager.hpp"
 #include "utils/random.hpp"
 #include "utils/math.hpp"

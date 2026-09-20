@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "client.hpp"
 #include "local_channel_pair.hpp"
 

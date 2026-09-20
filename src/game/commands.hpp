@@ -3,6 +3,7 @@
 #include "utils/cmdlinestream.hpp"
 #include <functional>
 #include <map>
+#include <cstdint>
 
 namespace game
 {

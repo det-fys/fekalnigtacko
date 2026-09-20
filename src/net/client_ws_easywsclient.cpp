@@ -3,6 +3,8 @@
 #include "client_ws_easywsclient.hpp"
 
 #include <stdexcept>
+#include <cstdint>
+#include <cstring>
 
 #include <easywsclient.hpp>
 
@@ -81,5 +83,7 @@ void net::EasyWsClientWSClientInterface::Poll()
         return;
     }
 }
+
+net::EasyWsClientWSClientInterface::~EasyWsClientWSClientInterface() {}
 
 #endif // EMSCRIPTEN

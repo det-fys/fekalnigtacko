@@ -1,6 +1,8 @@
 #include "ogg.hpp"
 
 #include <stdexcept>
+#include <cstddef>
+#include <cstring>
 
 #include "utils/files.hpp"
 

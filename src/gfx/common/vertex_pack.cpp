@@ -1,5 +1,7 @@
 #include "vertex_pack.hpp"
 
+#include <cstring>
+
 template <typename T>
 static void PackVertexAttrsArray(std::span<const T> data, size_t max_count, uint8_t* dst, size_t stride)
 {
