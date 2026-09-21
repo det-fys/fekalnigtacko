@@ -146,11 +146,9 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
         if (command == "v")
         {
             glm::vec3 pos{};
-            iss >> pos.x >> pos.y >> pos.z;
-
-#ifdef CLIENT
             glm::vec3 normal{};
             glm::vec2 uv{};
+            iss >> pos.x >> pos.y >> pos.z;
             iss >> normal.x >> normal.y >> normal.z;
             iss >> uv.x >> uv.y;
 
@@ -180,15 +178,12 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
                 }
                 vert_data.bones.emplace_back(bones);
             }
-
-#endif // CLIENT
         }
         else if (command == "f")
         {
             gfx::MeshTriangle t;
             iss >> t.vertices[0] >> t.vertices[1] >> t.vertices[2];
 
-#ifdef CLIENT
             if (desc.surfaces.empty())
             {
                 throw std::runtime_error("Face without surface in model");
@@ -196,7 +191,6 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
 
             desc.tris.emplace_back(t);
             ++desc.surfaces.back().tri_count;
-#endif // CLIENT
 
             if (!desc.col_surfaces.empty())
             {
