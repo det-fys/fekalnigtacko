@@ -1,5 +1,3 @@
-#define GLM_ENABLE_EXPERIMENTAL
-
 #include "map_project.hpp"
 
 #include <algorithm>
@@ -15,11 +13,12 @@
 #include "object.hpp"
 #include "static_object.hpp"
 
-edit::Project::Project() : static_models_root_("root")
+edit::Project::Project(MapEditProperties& properties) : properties_(properties), static_models_root_("root")
 {
     mg_res_ = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
     InitStaticModels();
 
+    height_sampler_.emplace(map_config_.seed);
     SetupChunks(16);
 }
 
@@ -49,9 +48,9 @@ void edit::Project::Draw(const gfx::DrawContext& ctx)
             chunk.model->Draw(ctx, identity, {});
     }
 
-    world_env_.SetDayTime(daytime_);
+    world_env_.SetDayTime(properties_.day_time);
 
-    if (draw_world_env_)
+    if (properties_.draw_world_env)
         world_env_.Draw(ctx);
 }
 
@@ -79,6 +78,14 @@ void edit::Project::DrawOverlay(const DrawOverlayContext& ctx)
 
         obj->DrawOverlay(ctx);
     }
+}
+
+float edit::Project::GetTerrainHeight(const glm::vec2& pos) const
+{
+    if (!height_sampler_)
+        return 0.0f;
+
+    return height_sampler_->Get(pos);
 }
 
 void edit::Project::AddStaticObject(const glm::mat4& trans, const std::string& model_name)
@@ -162,15 +169,15 @@ void edit::Project::ApplySelectionTransform(const glm::mat4& delta)
 
     auto& first_entry = selection_.front();
     auto& first_obj = *first_entry.obj;
-    first_obj.SetTransform(delta * first_obj.GetTransform());
 
-    const auto& first_trans = first_obj.GetTransform();
+    auto first_trans = delta * first_obj.GetTransform();
+    first_obj.SetTransform(SnapTransform(first_trans));
 
     for (uint32_t i = 1; i < selection_.size(); ++i)
     {
         auto& entry = selection_[i];
         auto& obj = entry.obj;
-        obj->SetTransform(first_trans * entry.offset);
+        obj->SetTransform(SnapTransform(first_trans * entry.offset));
     }
 }
 
@@ -326,7 +333,17 @@ void edit::Project::FixSelectionList()
 
 glm::mat4 edit::Project::GetNewObjectTransform(const glm::vec2& pos) const
 {
-    return glm::translate(glm::mat4(1.0f), glm::vec3(pos, 0.0f)); // TODO: use terrain height
+    return glm::translate(glm::mat4(1.0f), glm::vec3(pos, GetTerrainHeight(pos)));
+}
+
+glm::mat4 edit::Project::SnapTransform(const glm::mat4& trans) const
+{
+    if (!properties_.snap_to_terrain_height)
+        return trans;
+
+    auto new_trans = trans;
+    new_trans[3].z = GetTerrainHeight(glm::vec2(trans[3]));
+    return new_trans;
 }
 
 void edit::Project::NewObjectAdded(Object& obj)

@@ -9,7 +9,7 @@
 #include "map_project.hpp"
 
 edit::MapViewport2D::MapViewport2D(MapEditContext& context)
-    : Super("2D viewport", context), controls_(*this, GetContext().cam_pos_2d, GetContext().zoom_2d)
+    : Super("2D viewport", context), controls_(*this, GetProperties().cam_pos_2d, GetProperties().zoom_2d)
 {
 }
 
@@ -35,7 +35,9 @@ void edit::MapViewport2D::Update()
     controls_.Update();
 
     // update cam
-    SetCameraParams(GetCameraParams(controls_.GetPosWsP0(), controls_.GetPosWsP1(), GetContext().cam_fov_2d));
+    auto cam_params = GetCameraParams(controls_.GetPosWsP0(), controls_.GetPosWsP1(), GetProperties().cam_fov_2d);
+    cam_params.eye.z += GetContext().project ? GetContext().project->GetTerrainHeight(cam_params.eye) : 0.0f;
+    SetCameraParams(cam_params);
 
     auto half_size_ws = controls_.GetSizeWs() * 0.5f;
     auto center_ws = glm::vec3((controls_.GetPosWsP0() + controls_.GetPosWsP1()) * 0.5f, 100.0f);
@@ -191,8 +193,8 @@ void edit::MapViewport2D::DrawChunks(ImDrawList& draw_list)
 
 void edit::MapViewport2D::DrawChunk(ImDrawList& draw_list, const glm::ivec2& coord)
 {
-    const auto& context = GetContext();
-    const auto& project = *context.project;
+    const auto& properties = GetProperties();
+    const auto& project = *GetContext().project;
     const auto& chunks = project.GetChunks();
 
     auto it = chunks.find(coord);
@@ -202,12 +204,12 @@ void edit::MapViewport2D::DrawChunk(ImDrawList& draw_list, const glm::ivec2& coo
 
     const auto& chunk = it->second;
 
-    if (context.draw_chunk_state)
+    if (properties.draw_chunk_state)
     {
         DrawChunkState(draw_list, coord, chunk.state);
     }
 
-    if (context.draw_chunk_mesh)
+    if (properties.draw_chunk_mesh)
     {
         DrawChunkMesh(draw_list, coord, chunk);
     }

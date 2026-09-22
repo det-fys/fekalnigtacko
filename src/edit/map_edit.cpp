@@ -21,11 +21,7 @@ void edit::MapEdit::Update()
 {
     if (context_.project)
     {
-        auto& project = *context_.project;
-
-        project.SetDayTime(context_.day_time);
-        project.SetDrawWorldEnv(context_.draw_world_env);
-        project.SetChunkPriorityPos(context_.cam_pos_3d);
+        auto& project = *context_.project;        
         project.Update();
     }
 }
@@ -119,36 +115,43 @@ void edit::MapEdit::ShowListWindow(bool* open)
 
 void edit::MapEdit::ShowPropertiesWindow(bool* open)
 {
+    auto& properties = context_.properties;
+
     if (ImGui::Begin("Properties", open))
     {
         // 2D camera widgets
         ImGui::Text("2D Camera");
         ImGui::PushID("2D Camera Properties");
-        ImGui::DragFloat2("Position", &context_.cam_pos_2d.x, 0.1f);
-        ImGui::DragFloat("FOV", &context_.cam_fov_2d, 0.1f, 1.0f, 179.0f);
+        ImGui::DragFloat2("Position", &properties.cam_pos_2d.x, 0.1f);
+        ImGui::DragFloat("FOV", &properties.cam_fov_2d, 0.1f, 1.0f, 179.0f);
         ImGui::PopID();
 
         // 3D camera widgets
         ImGui::Text("3D Camera");
         ImGui::PushID("3D Camera Properties");
-        ImGui::DragFloat3("Position", &context_.cam_pos_3d.x, 0.1f);
-        ImGui::DragFloat("Pitch", &context_.cam_pitch_3d, 0.01f);
-        ImGui::DragFloat("Yaw", &context_.cam_yaw_3d, 0.01f);
+        ImGui::DragFloat3("Position", &properties.cam_pos_3d.x, 0.1f);
+        ImGui::DragFloat("Pitch", &properties.cam_pitch_3d, 0.01f);
+        ImGui::DragFloat("Yaw", &properties.cam_yaw_3d, 0.01f);
         ImGui::PopID();
 
         // world
         ImGui::Text("World");
         ImGui::PushID("World Properties");
-        if (ImGui::DragFloat("Day Time", &context_.day_time, 0.1f))
+        if (ImGui::DragFloat("Day Time", &properties.day_time, 0.1f))
         {
-            context_.day_time = glm::mod(context_.day_time, 24.0f);
+            properties.day_time = glm::mod(properties.day_time, 24.0f);
         }
-        ImGui::Checkbox("Draw World Env", &context_.draw_world_env);
-        ImGui::Checkbox("Draw World", &context_.draw_world);
-        ImGui::Checkbox("Draw Chunk Mesh", &context_.draw_chunk_mesh);
-        ImGui::Checkbox("Draw Chunk State", &context_.draw_chunk_state);
+        ImGui::Checkbox("Draw World Env", &properties.draw_world_env);
+        ImGui::Checkbox("Draw World", &properties.draw_world);
+        ImGui::Checkbox("Draw Chunk Mesh", &properties.draw_chunk_mesh);
+        ImGui::Checkbox("Draw Chunk State", &properties.draw_chunk_state);
         ImGui::PopID();
 
+        // editor
+        ImGui::Text("Editor");
+        ImGui::PushID("Editor Properties");
+        ImGui::Checkbox("Snap to Terrain Height", &properties.snap_to_terrain_height);
+        ImGui::PopID();
     }
     ImGui::End();
 }
@@ -156,7 +159,7 @@ void edit::MapEdit::ShowPropertiesWindow(bool* open)
 void edit::MapEdit::NewMap()
 {
     MapClose();
-    context_.project.emplace();
+    context_.project.emplace(context_.properties);
 }
 
 void edit::MapEdit::MapClose()

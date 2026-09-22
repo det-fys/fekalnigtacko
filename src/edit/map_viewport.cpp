@@ -13,6 +13,7 @@ edit::MapViewport::MapViewport(std::string title, MapEditContext& context)
 void edit::MapViewport::Update()
 {
     auto& io = ImGui::GetIO();
+    auto& properties = GetProperties();
 
     if (context_.project && IsHovered())
     {
@@ -49,15 +50,15 @@ void edit::MapViewport::Update()
             // gizmo operation hotkeys
             if (ImGui::IsKeyPressed(ImGuiKey_R))
             {
-                context_.gizmo_operation = ImGuizmo::ROTATE;
+                properties.gizmo_operation = ImGuizmo::ROTATE;
             }
             else if (ImGui::IsKeyPressed(ImGuiKey_T))
             {
-                context_.gizmo_operation = ImGuizmo::TRANSLATE;
+                properties.gizmo_operation = ImGuizmo::TRANSLATE;
             }
             else if (ImGui::IsKeyPressed(ImGuiKey_Z))
             {
-                context_.gizmo_operation = ImGuizmo::ROTATE_Z | ImGuizmo::TRANSLATE;
+                properties.gizmo_operation = ImGuizmo::ROTATE_Z | ImGuizmo::TRANSLATE;
             }
 
             // delete selection
@@ -88,7 +89,8 @@ void edit::MapViewport::Draw(ImDrawList& draw_list)
 
     auto& project = *context_.project;
 
-    if (context_.draw_world)
+    auto& properties = GetProperties();
+    if (properties.draw_world)
     {
         // draw scene
         scene_view_.Draw(draw_list, im::VecToImGui(GetCanvasP0()), im::VecToImGui(GetCanvasSize()), project, cam_);
@@ -102,11 +104,11 @@ void edit::MapViewport::Draw(ImDrawList& draw_list)
 
     // draw gizmo
     glm::vec3 snap = glm::vec3(0.1f);
-    if (context_.gizmo_operation == ImGuizmo::ROTATE)
+    if (properties.gizmo_operation == ImGuizmo::ROTATE)
     {
         snap = glm::vec3(5.0f);
     }
-    else if (context_.gizmo_operation == ImGuizmo::SCALE)
+    else if (properties.gizmo_operation == ImGuizmo::SCALE)
     {
         snap = glm::vec3(0.01f);
     }
@@ -119,7 +121,7 @@ void edit::MapViewport::Draw(ImDrawList& draw_list)
         auto matrix = *selection_matrix;
         glm::mat4 delta_matrix{1.0f};
 
-        if (ImGuizmo::Manipulate(glm::value_ptr(view_), glm::value_ptr(proj_), context_.gizmo_operation,
+        if (ImGuizmo::Manipulate(glm::value_ptr(view_), glm::value_ptr(proj_), properties.gizmo_operation,
                                  ImGuizmo::LOCAL, glm::value_ptr(matrix), glm::value_ptr(delta_matrix),
                                  ImGui::IsKeyDown(ImGuiKey_LeftCtrl) ? glm::value_ptr(snap) : nullptr))
         {

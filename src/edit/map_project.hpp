@@ -10,6 +10,7 @@
 #include <ImGuizmo.h>
 #include <glm/gtx/hash.hpp>
 
+#include "map_edit_properties.hpp"
 #include "collision/dynamicsworld.hpp"
 #include "gameview/mapinstanceview.hpp"
 #include "gameview/modelview.hpp"
@@ -21,6 +22,7 @@
 #include "waypoint.hpp"
 #include "utils/allocnum.hpp"
 #include "mapgen/resources.hpp"
+#include "mapgen/samplers.hpp"
 
 namespace edit
 {
@@ -72,7 +74,7 @@ struct StaticModelsEntry
 class Project : public gfx::Scene
 {
 public:
-    Project();
+    Project(MapEditProperties& properties);
 
     void Update();
 
@@ -84,8 +86,7 @@ public:
     void DrawOverlay(const DrawOverlayContext& ctx);
 
     // world
-    void SetDayTime(float daytime) { daytime_ = daytime; }
-    void SetDrawWorldEnv(bool draw) { draw_world_env_ = draw; }
+    float GetTerrainHeight(const glm::vec2& pos) const;
 
     // assets
     const StaticModelsEntry& GetStaticModelsRoot() const { return static_models_root_; }
@@ -128,6 +129,7 @@ private:
     void FixSelectionList();
 
     glm::mat4 GetNewObjectTransform(const glm::vec2& pos) const;
+    glm::mat4 SnapTransform(const glm::mat4& trans) const;
     void NewObjectAdded(Object& obj);
     void UpdateAllObjectsList();
 
@@ -140,12 +142,14 @@ private:
     void FinalizeChunk(mg::Chunk&& mgchunk);
 
 private:
+    MapEditProperties& properties_;
+
     std::shared_ptr<const mg::ResourceSet> mg_res_;
     StaticModelsEntry static_models_root_;
 
+    std::optional<mg::TerrainHeightSampler> height_sampler_;
+
     WorldEnv world_env_;
-    float daytime_ = 12.0f; // 0-24
-    bool draw_world_env_ = true;
 
     // object lists
     std::vector<StaticObject> static_objs_;

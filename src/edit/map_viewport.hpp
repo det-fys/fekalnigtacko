@@ -37,6 +37,7 @@ protected:
     }
 
     MapEditContext& GetContext() { return context_; }
+    MapEditProperties& GetProperties() { return context_.properties; }
 
 private:
     MapEditContext& context_;

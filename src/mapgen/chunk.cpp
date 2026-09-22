@@ -6,7 +6,7 @@
 #include <optional>
 
 #include <tpp_interface.hpp>
-#include "FastNoiseLite.h"
+#include "samplers.hpp"
 
 #include "utils/spline.hpp"
 
@@ -307,37 +307,15 @@ mg::ChunkTile* GetTileAtPos(ChunkGenContext& ctx, const glm::vec2& pos)
 
 void InitHeightmap(ChunkGenContext& ctx)
 {
-    FastNoiseLite noise;
-    noise.SetSeed(ctx.heightmap_seed);
-    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    noise.SetFrequency(0.00001f);
-    noise.SetFractalType(FastNoiseLite::FractalType_FBm);
-    noise.SetFractalOctaves(5);
-
-    FastNoiseLite noise2;
-    noise2.SetSeed(ctx.heightmap_seed ^ 0xAAAAAAAA);
-    noise2.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    noise2.SetFrequency(0.001f);
-    noise2.SetFractalType(FastNoiseLite::FractalType_FBm);
-    noise2.SetFractalOctaves(5);
+    mg::TerrainHeightSampler sampler(ctx.heightmap_seed);
 
     for (uint32_t y = 0; y < ctx.tiles_stride; ++y)
     {
         for (uint32_t x = 0; x < ctx.tiles_stride; ++x)
         {
-            glm::vec2 tile_pos = ctx.tiles_aabb.min + glm::vec2(x, y) * ctx.tile_size_m;
-            float nx = tile_pos.x;
-            float ny = tile_pos.y;
-            float height = (noise.GetNoise(nx, ny) * 0.5f + 0.5f) * 1500.0f;
-            //height *= glm::mix(0.1f, 1.0f, GetHeightFalloff(nx, ny, ctx.map_cfg->chunks * ctx.map_cfg->chunk_size_m));
-            height -= 500.0f;
-
-            height += (noise2.GetNoise(nx, ny) * 0.5f + 0.5f) * 25.0f; // add finer detail
-
-            height -= 250.0f;
-
             auto& tile = ctx.tiles[y * ctx.tiles_stride + x];
-            tile.height = height;
+            auto pos = ctx.tiles_aabb.min + glm::vec2(x, y) * ctx.tile_size_m;
+            tile.height = sampler.Get(pos);
         }
     }
 }
