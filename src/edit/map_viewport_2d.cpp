@@ -59,32 +59,9 @@ void edit::MapViewport2D::Update()
 
     auto& project = *GetContext().project;
 
-    ImVec2 drag_delta_r = ImGui::GetMouseDragDelta(ImGuiMouseButton_Right);
-    if (drag_delta_r.x == 0.0f && drag_delta_r.y == 0.0f)
-    {
-        ImGui::OpenPopupOnItemClick("2d_context", ImGuiPopupFlags_MouseButtonRight);
-        //if (IsHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-        //    new_obj_pos_ = controls_.GetMousePosWs();
-    }
-
-    if (ImGui::BeginPopup("2d_context"))
-    {
-        ShowContextMenu();
-        ImGui::EndPopup();
-    }
-    else if (IsHovered())
+    if (!IsContextMenuShown() && IsHovered())
     {
         new_obj_pos_ = controls_.GetMousePosWs();
-    }
-
-    // keys
-    if (IsFocused() && IsHovered())
-    {
-        // clone
-        if (ImGui::IsKeyPressed(ImGuiKey_Space))
-        {
-            project.CloneSelection(new_obj_pos_);
-        }
     }
 }
 
@@ -130,12 +107,22 @@ static void ShowStaticModelsMenu(const edit::StaticModelsEntry& entry, std::func
     }
 }
 
-void edit::MapViewport2D::ShowContextMenu()
+void edit::MapViewport2D::ShowContextMenuContent()
 {
+    Super::ShowContextMenuContent();
+
     if (!GetContext().project)
         return;
 
     auto& project = *GetContext().project;
+
+    if (ContextMenuItem("Duplicate", "Space", ImGuiKey_Space, project.HasSelection()))
+    {
+        project.CloneSelection(new_obj_pos_);
+    }
+
+    if (!IsContextMenuShown())
+        return;
 
     ImGui::SeparatorText("add static object");
 

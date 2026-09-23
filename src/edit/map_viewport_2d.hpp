@@ -18,9 +18,9 @@ protected:
     virtual void Update() override;
     virtual void Draw(ImDrawList& draw_list) override;
 
-private:
-    void ShowContextMenu();
+    virtual void ShowContextMenuContent() override;
 
+private:
     void DrawChunks(ImDrawList& draw_list);
     void DrawChunk(ImDrawList& draw_list, const glm::ivec2& coord);
     void DrawChunkState(ImDrawList& draw_list, const glm::ivec2& coord, ChunkState state);

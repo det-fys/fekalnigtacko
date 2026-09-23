@@ -44,39 +44,20 @@ void edit::MapViewport::Update()
                 project.MakeSelection(start, end, ImGui::IsKeyDown(ImGuiKey_LeftShift));
             }
         }
+    }
 
-        if (IsFocused())
-        {
-            // gizmo operation hotkeys
-            if (ImGui::IsKeyPressed(ImGuiKey_R))
-            {
-                properties.gizmo_operation = ImGuizmo::ROTATE;
-            }
-            else if (ImGui::IsKeyPressed(ImGuiKey_T))
-            {
-                properties.gizmo_operation = ImGuizmo::TRANSLATE;
-            }
-            else if (ImGui::IsKeyPressed(ImGuiKey_Z))
-            {
-                properties.gizmo_operation = ImGuizmo::ROTATE_Z | ImGuizmo::TRANSLATE;
-            }
+    // context menu
+    ImVec2 drag_delta_r = ImGui::GetMouseDragDelta(ImGuiMouseButton_Right);
+    if (drag_delta_r.x == 0.0f && drag_delta_r.y == 0.0f)
+    {
+        ImGui::OpenPopupOnItemClick("Context Menu", ImGuiPopupFlags_MouseButtonRight);
+    }
 
-            // delete selection
-            if (ImGui::IsKeyPressed(ImGuiKey_Delete) || ImGui::IsKeyPressed(ImGuiKey_Backspace))
-            {
-                project.DeleteSelection();
-            }
-
-            // link/unlink selection
-            if (ImGui::IsKeyPressed(ImGuiKey_C))
-            {
-                project.LinkSelection(true);
-            }
-            else if (ImGui::IsKeyPressed(ImGuiKey_X))
-            {
-                project.LinkSelection(false);
-            }
-        }
+    context_menu_shown_ = ImGui::BeginPopup("Context Menu");
+    ShowContextMenuContent(); // call this anyways for shortcut keys to work
+    if (context_menu_shown_)
+    {
+        ImGui::EndPopup();
     }
 }
 
@@ -132,4 +113,53 @@ void edit::MapViewport::Draw(ImDrawList& draw_list)
     }
 
     project.DrawOverlay(DrawOverlayContext(*this, draw_list));
+}
+
+void edit::MapViewport::ShowContextMenuContent()
+{
+    auto& properties = GetProperties();
+    
+    if (context_menu_shown_)
+    {
+        ImGui::SeparatorText("transform");
+    }
+
+    if (ContextMenuItem("Translate", "T", ImGuiKey_T))
+        properties.gizmo_operation = ImGuizmo::TRANSLATE;
+
+    if (ContextMenuItem("Rotate", "R", ImGuiKey_R))
+        properties.gizmo_operation = ImGuizmo::ROTATE;
+
+    if (ContextMenuItem("Translate/Rotate Z", "Z", ImGuiKey_Z))
+        properties.gizmo_operation = ImGuizmo::ROTATE_Z | ImGuizmo::TRANSLATE;   
+
+    if (context_.project)
+    {
+        auto& project = *context_.project;
+
+        // if (ContextMenuItem("Duplicate/Extrude", "Space", ImGuiKey_Space, project.HasSelection()))
+        //     project.DuplicateSelection();
+
+        if (context_menu_shown_)
+        {
+            ImGui::SeparatorText("selection");
+        }
+
+        if (ContextMenuItem("Delete", "Del", ImGuiKey_Delete, project.HasSelection()))
+            project.DeleteSelection();
+
+        if (ContextMenuItem("Link", "C", ImGuiKey_C, project.HasSelection()))
+            project.LinkSelection(true);
+
+        if (ContextMenuItem("Unlink", "X", ImGuiKey_X, project.HasSelection()))
+            project.LinkSelection(false);
+    }
+}
+
+bool edit::MapViewport::ContextMenuItem(const char* label, const char* shortcut_str, ImGuiKey shortcut_key,
+                                        bool enabled) const
+{
+    return ((context_menu_shown_ && ImGui::MenuItem(label, shortcut_str, false, enabled)) ||
+            (IsFocused() && ImGui::IsKeyPressed(shortcut_key))) &&
+           enabled;
 }

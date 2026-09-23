@@ -26,6 +26,8 @@ protected:
     virtual void Update() override;
     virtual void Draw(ImDrawList& draw_list) override;
 
+    virtual void ShowContextMenuContent();
+
     void SetCameraParams(const gfx::CameraParams& cam) { cam_ = cam; }
 
     void SetOverlayMatrices(const glm::mat4& view, const glm::mat4& proj)
@@ -36,8 +38,12 @@ protected:
         frustum_ = gfx::Frustum(view_proj_);
     }
 
+    bool ContextMenuItem(const char* label, const char* shortcut_str, ImGuiKey shortcut_key, bool enabled = true) const;
+
     MapEditContext& GetContext() { return context_; }
     MapEditProperties& GetProperties() { return context_.properties; }
+
+    bool IsContextMenuShown() const { return context_menu_shown_; }
 
 private:
     MapEditContext& context_;
@@ -49,6 +55,8 @@ private:
     glm::mat4 view_{1.0f};
     glm::mat4 view_proj_{1.0f};
     gfx::Frustum frustum_;
+
+    bool context_menu_shown_ = false;
 };
 
 } // namespace edit
