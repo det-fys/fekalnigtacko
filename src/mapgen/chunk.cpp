@@ -542,20 +542,48 @@ struct ChunkGenerator
     }
 
     void TriangulatePathSegment(const mg::TemplateProfile& profile, std::span<uint32_t> start_verts,
-                                std::span<uint32_t> end_verts, bool is_final)
+                                std::span<uint32_t> end_verts, bool is_final, float uv_t = 0.0f)
     {
-        // TODO: fix uvs on final segment
+        // copy vertices to be able to fix uvs
+        auto final_end_base = static_cast<uint32_t>(raw_verts.size());
+        if (is_final)
+        {
+            for (uint32_t i = 0; i < profile.verts.size(); ++i)
+            {
+                const auto& profile_vert = profile.verts[i];
+                const auto& orig_vert = raw_verts[end_verts[i]];
+                
+                raw_verts.emplace_back(orig_vert);
+            }
+        }
 
         for (uint32_t i = 0; i < profile.edges.size(); ++i)
         {
             const auto& start_edge = profile.edges[i];
             const auto& end_edge = is_final ? profile.edges_reverse[i] : profile.edges[i];
 
-            AddTriangle(start_verts[start_edge.verts[0]], start_verts[start_edge.verts[1]],
-                        end_verts[end_edge.verts[0]], start_edge.material);
+            std::array<uint32_t, 2> chunk_start_verts = {start_verts[start_edge.verts[0]],
+                                                         start_verts[start_edge.verts[1]]};
+            std::array<uint32_t, 2> chunk_end_verts = {end_verts[end_edge.verts[0]], end_verts[end_edge.verts[1]]};
 
-            AddTriangle(end_verts[end_edge.verts[1]], end_verts[end_edge.verts[0]], start_verts[start_edge.verts[1]],
-                        end_edge.material);
+            // use fixed end verts for final segment
+            if (is_final && end_edge.material.type == mg::TPL_MATERIAL_NORMAL)
+            {
+                for (uint32_t j = 0; j < 2; ++j)
+                {
+                    auto profile_vert_idx = end_edge.verts[j];
+                    auto fixed_vert_idx = final_end_base + profile_vert_idx;
+
+                    const auto& start_profile_vert = profile.verts[start_edge.verts[j]];
+                    // fix uv
+                    raw_verts[fixed_vert_idx].uv = start_profile_vert.uv + start_profile_vert.uv_advance * uv_t;
+
+                    chunk_end_verts[j] = fixed_vert_idx;
+                }
+            }
+
+            AddTriangle(chunk_start_verts[0], chunk_start_verts[1], chunk_end_verts[0], start_edge.material);
+            AddTriangle(chunk_end_verts[1], chunk_end_verts[0], chunk_start_verts[1], end_edge.material);
         }
     }
 
@@ -603,7 +631,9 @@ struct ChunkGenerator
         const auto start_margin = start_junction.links[start_endpoint.link_idx].margin;
         const auto start_t = start_margin + step_size;
         const auto end_margin = end_junction.links[end_endpoint.link_idx].margin;
-        const auto end_t = path.spline.GetTotalLength() - end_margin - min_step;
+        const auto end_with_margin =  path.spline.GetTotalLength() - end_margin;
+        const auto end_t = end_with_margin - min_step;
+
         for (float t = start_t; t < end_t; t += step_size)
         {
             bool have_end_verts = false;
@@ -631,7 +661,7 @@ struct ChunkGenerator
         if (end_junction.base_vertex != INVALID_ID && have_start_verts)
         {
             LoadJunctionLinkProfileVertices(end_junction, end_endpoint.link_idx, end_verts);
-            TriangulatePathSegment(profile, start_verts, end_verts, true);
+            TriangulatePathSegment(profile, start_verts, end_verts, true, end_with_margin - start_margin);
         }
     }
 
