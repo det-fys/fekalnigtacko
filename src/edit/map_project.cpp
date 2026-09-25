@@ -492,10 +492,12 @@ void edit::Project::UpdateChunks()
     float nearest_dist = std::numeric_limits<float>().max();
     glm::ivec2 chunk_coord{0, 0};
 
+    glm::vec2 priority_pos = properties_.cam_pos_3d;
+
     for (const auto& chunk_pos : invalid_chunks_)
     {
         auto chunk_center = (glm::vec2(chunk_pos) + 0.5f) * map_config_.chunk_size_m;
-        auto dist = glm::distance(chunk_priority_pos_, chunk_center);
+        auto dist = glm::distance(priority_pos, chunk_center);
 
         // add some randomness to avoid always picking the same chunk when repeatedly invalid
         float f = static_cast<float>(rand() % 1000) / 1000.0f;

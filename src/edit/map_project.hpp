@@ -113,7 +113,6 @@ public:
     void DeleteSelection();
 
     // generation
-    void SetChunkPriorityPos(const glm::vec2& pos) { chunk_priority_pos_ = pos; }
     void InvalidateChunk(const glm::ivec2& chunk_pos);
     void DelayChunkUpdates();
 
@@ -162,7 +161,6 @@ private:
     ImGuizmo::OPERATION gizmo_operation_ = ImGuizmo::TRANSLATE;
 
     // chunk generation
-    glm::vec2 chunk_priority_pos_;
     mg::MapConfig map_config_{};
     std::unordered_map<glm::ivec2, Chunk> chunks_;
     std::unordered_set<glm::ivec2> invalid_chunks_;
