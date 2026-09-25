@@ -2908,6 +2908,11 @@ const wgpu::RenderPipeline& gfx::RendererWGPU::GetSurfacePipeline(SurfacePipelin
 
     // vertex
     MeshVertexAttributeFlags attrs = MESH_VERTEX_ATTR_POSITION | MESH_VERTEX_ATTR_NORMAL | MESH_VERTEX_ATTR_UV0;
+    if (flags & SPF_VERTEX_COLOR)
+    {
+        attrs |= MESH_VERTEX_ATTR_COLOR;
+    }
+
     if (flags & SPF_SKELETAL)
     {
         attrs |= MESH_VERTEX_ATTR_BONE_DATA;
@@ -3505,6 +3510,12 @@ void gfx::RendererWGPU::PrepareSurfaceCmds(std::span<DrawSurfaceCmd> cmds, std::
         {
             // deform grid
             pcmd.pflags |= SPF_DEFORM;
+        }
+
+        // vertex color
+        if ((mesh.desc.attributes & MESH_VERTEX_ATTR_COLOR) > 0)
+        {
+            pcmd.pflags |= SPF_VERTEX_COLOR;
         }
 
         // MATERIAL

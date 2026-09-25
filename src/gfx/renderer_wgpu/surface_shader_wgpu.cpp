@@ -101,6 +101,20 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
         )WGSL";
     }
 
+    if (flags & gfx::SPF_VERTEX_COLOR)
+    {
+        functions += R"GLSL(
+            fn srgbToLinear(c: vec3<f32>) -> vec3<f32> {
+                return c * c; // approx
+            }
+        )GLSL";
+
+        vertex_ins += "@location(2) color : vec4f,\n";
+        vertex_main += "out.color = vec4f(srgbToLinear(in.color.rgb), in.color.a);\n";
+        vertex_outs += "@location(4) color : vec4f,\n";
+        fragment_main += "out *= in.color;\n";
+    }
+
     if (flags & gfx::SPF_TEXTURE)
     {
         fragment_main += "out *= textureSample(color_texture, texture_sampler, in.uv0);\n";

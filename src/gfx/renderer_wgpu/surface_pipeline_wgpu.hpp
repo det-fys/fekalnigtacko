@@ -23,14 +23,15 @@ enum SurfacePipelineFlag : SurfacePipelineFlags
     SPF_DEFORM = 512,
     SPF_SKELETAL = 1024,
     SPF_TEXTURE = 2048,
+    SPF_VERTEX_COLOR = 4096,
 
     // order dependent
-    SPF_DECAL = 4096,
-    SPF_BLEND = 8192,
+    SPF_DECAL = 8192,
+    SPF_BLEND = 16384,
 
     // whole pass
-    SPF_DEPTH_ONLY = 16384,
-    SPF_SHADOW_MAP = 32768,
+    SPF_DEPTH_ONLY = 32768,
+    SPF_SHADOW_MAP = 65536,
 };
 
 }
