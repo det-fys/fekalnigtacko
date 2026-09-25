@@ -28,7 +28,8 @@ public:
     glm::vec3 Get(const glm::vec2& pos) const;
 
 private:
-    FastNoiseLite noise_;
+    FastNoiseLite main_noise_;
+    FastNoiseLite detail_noise_;
 };
 
 } // namespace mg

@@ -28,12 +28,19 @@ float mg::TerrainHeightSampler::Get(const glm::vec2& pos) const
 
 mg::TerrainColorSampler::TerrainColorSampler(uint32_t seed)
 {
-    noise_.SetSeed(seed);
-    noise_.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    noise_.SetFrequency(0.004f);
-    noise_.SetFractalType(FastNoiseLite::FractalType_FBm);
-    noise_.SetFractalLacunarity(4.0f);
-    noise_.SetFractalOctaves(5);
+    main_noise_.SetSeed(seed);
+    main_noise_.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    main_noise_.SetFrequency(0.004f);
+    main_noise_.SetFractalType(FastNoiseLite::FractalType_FBm);
+    main_noise_.SetFractalLacunarity(4.0f);
+    main_noise_.SetFractalOctaves(5);
+
+    detail_noise_.SetSeed(seed ^ 0x55555555);
+    detail_noise_.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    detail_noise_.SetFrequency(0.02f);
+    detail_noise_.SetFractalType(FastNoiseLite::FractalType_FBm);
+    detail_noise_.SetFractalLacunarity(4.0f);
+    detail_noise_.SetFractalOctaves(5);
 }
 
 glm::vec3 mg::TerrainColorSampler::Get(const glm::vec2& pos) const
@@ -41,6 +48,11 @@ glm::vec3 mg::TerrainColorSampler::Get(const glm::vec2& pos) const
     constexpr glm::vec3 col0 = glm::vec3(0.4f, 0.6f, 0.3f);
     constexpr glm::vec3 col1 = glm::vec3(0.8f, 0.8f, 0.4f);
 
-    auto t = noise_.GetNoise(pos.x, pos.y) * 0.5f + 0.5f;
-    return glm::mix(col0, col1, t) * 0.8f;
+    auto t = main_noise_.GetNoise(pos.x, pos.y) * 0.5f + 0.5f;
+    auto tint = glm::mix(col0, col1, t);
+    
+    auto t_detail = detail_noise_.GetNoise(pos.x, pos.y) * 0.5f + 0.5f;
+    auto mult = glm::mix(0.9f, 1.1f, t_detail);
+
+    return tint * mult;
 }
