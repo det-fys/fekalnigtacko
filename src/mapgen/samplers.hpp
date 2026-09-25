@@ -20,4 +20,15 @@ private:
     FastNoiseLite noise2_;
 };
 
+class TerrainColorSampler
+{
+public:
+    TerrainColorSampler(uint32_t seed);
+
+    glm::vec3 Get(const glm::vec2& pos) const;
+
+private:
+    FastNoiseLite noise_;
+};
+
 } // namespace mg

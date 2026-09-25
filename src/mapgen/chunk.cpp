@@ -197,6 +197,9 @@ struct ChunkGenerator
     // seeds
     uint32_t heightmap_seed;
 
+    mg::TerrainHeightSampler height_sampler;
+    mg::TerrainColorSampler color_sampler;
+
     // tiles
     float tile_size_m;
     uint32_t tiles_border;
@@ -224,9 +227,9 @@ struct ChunkGenerator
                    mg::Chunk& chunk)
         : res(res), map_cfg(cfg), spline_nodes(&params.nodes), chunk_coord(params.coord), objs(params.objs),
           chunk(chunk), bounds(GetChunkAABB(cfg, params.coord)), extended_bounds(GetChunkAABB(cfg, params.coord, true)),
-          heightmap_seed(params.heightmap_seed), tiles_border(cfg.chunk_border),
-          tiles_stride(cfg.chunk_tiles + cfg.chunk_border * 2), tiles(tiles_stride * tiles_stride),
-          tile_size_m(cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles)),
+          heightmap_seed(params.heightmap_seed), height_sampler(heightmap_seed), color_sampler(heightmap_seed),
+          tiles_border(cfg.chunk_border), tiles_stride(cfg.chunk_tiles + cfg.chunk_border * 2),
+          tiles(tiles_stride * tiles_stride), tile_size_m(cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles)),
           tiles_aabb(bounds.min - glm::vec2(cfg.chunk_border) * tile_size_m,
                      bounds.max + glm::vec2(cfg.chunk_border) * tile_size_m)
     {
@@ -264,15 +267,13 @@ struct ChunkGenerator
 
     void InitHeightmap()
     {
-        mg::TerrainHeightSampler sampler(heightmap_seed);
-
         for (uint32_t y = 0; y < tiles_stride; ++y)
         {
             for (uint32_t x = 0; x < tiles_stride; ++x)
             {
                 auto& tile = tiles[y * tiles_stride + x];
                 auto pos = tiles_aabb.min + glm::vec2(x, y) * tile_size_m;
-                tile.height = sampler.Get(pos);
+                tile.height = height_sampler.Get(pos);
             }
         }
     }
@@ -1139,6 +1140,12 @@ struct ChunkGenerator
         }
     }
 
+    uint32_t GetTerrainColor(const glm::vec2& pos)
+    {
+        auto color = color_sampler.Get(pos);
+        return glm::packUnorm4x8(glm::vec4(color, 1.0f));
+    }
+
     void GenerateOutputMesh()
     {
         // TODO: get these from somewhere
@@ -1208,8 +1215,8 @@ struct ChunkGenerator
                 // calc uv
                 out_vert.uv = is_terrain ? vert.pos * terrain_uv_scale : vert.uv;
 
-                // TODO: color
-                out_vert.color = 0xFFFFFFFF;
+                // set color
+                out_vert.color = is_terrain ? GetTerrainColor(vert.pos) : 0xFFFFFFFF;
             }
         }
     }

@@ -51,9 +51,14 @@ void game::view::ModelView::CreateMesh()
     auto& tris = model_->GetTriangles();
 
     gfx::MeshDescriptor desc{};
-    desc.attributes = gfx::MESH_VERTEX_ATTR_POSITION | gfx::MESH_VERTEX_ATTR_NORMAL | gfx::MESH_VERTEX_ATTR_UV0 |
-                      (skeletal ? gfx::MESH_VERTEX_ATTR_BONE_DATA : 0);
+    desc.attributes = gfx::MESH_VERTEX_ATTR_POSITION | gfx::MESH_VERTEX_ATTR_NORMAL | gfx::MESH_VERTEX_ATTR_UV0;
     desc.use_index_buffer = true;
+
+    if (!verts.colors.empty())
+        desc.attributes |= gfx::MESH_VERTEX_ATTR_COLOR;
+
+    if (skeletal)
+        desc.attributes |= gfx::MESH_VERTEX_ATTR_BONE_DATA;
 
     mesh_.emplace(desc);
 
@@ -62,6 +67,7 @@ void game::view::ModelView::CreateMesh()
     vertex_data.position = verts.positions;
     vertex_data.normal = verts.normals;
     vertex_data.uv0 = verts.uvs;
+    vertex_data.color = verts.colors;
     vertex_data.bone = verts.bones;
     mesh_->SetVertexData(vertex_data);
 

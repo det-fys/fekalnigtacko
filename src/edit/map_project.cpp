@@ -620,6 +620,7 @@ void edit::Project::FinalizeChunk(mg::Chunk&& mgchunk)
         model_desc.verts.positions.push_back(vert.pos);
         model_desc.verts.normals.push_back(vert.normal);
         model_desc.verts.uvs.push_back(vert.uv);
+        model_desc.verts.colors.push_back(vert.color);
     }
 
     for (const auto& tri : chunk.mgchunk.mesh.tris)

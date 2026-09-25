@@ -19,6 +19,7 @@ struct ModelVertexData
     std::vector<glm::vec3> positions;
     std::vector<glm::vec3> normals;
     std::vector<glm::vec2> uvs;
+    std::vector<uint32_t> colors;
     std::vector<gfx::MeshVertexBoneData> bones;
 };
 
