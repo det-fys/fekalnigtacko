@@ -2,6 +2,7 @@
 
 #include <string>
 #include <memory>
+#include <optional>
 
 #include "skeleton.hpp"
 #include "utils/defs.hpp"
@@ -65,6 +66,8 @@ struct ModelDescriptor
     glm::vec3 col_offset = glm::vec3(0.0f);
     std::map<std::string, std::string> params;
     std::map<std::string, Transform> locations;
+    std::vector<std::string> weight_groups;
+    std::vector<float> vertex_weights;
 };
 
 class Model : public Asset
@@ -92,6 +95,9 @@ public:
     bool GetParamFloat(const std::string& key, float& out) const;
     
     const Transform* GetLocation(const std::string& key) const;
+
+    std::optional<uint32_t> GetWeightGroupIndex(const std::string& name) const;
+    std::span<const float> GetVertexWeights(uint32_t vertex_idx) const;
     
 private:
     ModelVertexData vertices_;
@@ -112,6 +118,9 @@ private:
 
     std::map<std::string, std::string> params_;
     std::map<std::string, Transform> locations_;
+
+    std::vector<float> vertex_weights_;
+    std::map<std::string, uint32_t> weight_groups_;
 
 };
 

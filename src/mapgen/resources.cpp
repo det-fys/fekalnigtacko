@@ -374,46 +374,92 @@ static mg::TemplateMesh LoadTemplateMesh(const mg::ResourceSet& res, CmdLineStre
     }
 
     // calc vertex weights for links
+    std::vector<std::optional<uint32_t>> weight_groups(mesh.links.size());
+
+    std::string wg_name = "link0";
+    bool has_weight_groups = false;
+    for (uint32_t i = 0; i < mesh.links.size(); ++i)
+    {
+        wg_name[4] = '0' + i;
+        auto wg_idx = model->GetWeightGroupIndex(wg_name);
+        if (wg_idx)
+        {
+            weight_groups[i] = *wg_idx;
+            has_weight_groups = true;
+        }
+    }
+
+    // init weights to a small value to avoid zero weights
     for (auto& v : mesh.verts)
     {
-        for (auto& w : v.link_weights)
-        {
-            w = 0.0001f;
-        }
-
-        if (mesh.links.empty())
-            continue;
-
-        uint32_t closest_link = 0;
-        float closest_dist2 = std::numeric_limits<float>::max();
-
+        v.link_weights.fill(0.0f);
         for (uint32_t i = 0; i < mesh.links.size(); ++i)
         {
-            //const auto& link = mesh.links[i];
-            //auto lpos = link.start_matrix * glm::vec4(v.pos, 1.0f);
-            //float weight = 1.0f - glm::clamp(lpos.y / link.margin, 0.0f, 1.0f);
-            //v.link_weights[i] = weight;
+            v.link_weights[i] = 0.0001f;
+        }
+    }
 
-            auto d = v.pos - mesh.links[i].pos;
-            float d2 = glm::dot(d, d);
-            if (d2 < closest_dist2)
+    if (has_weight_groups)
+    {
+        // weight groups defined, use them
+        for (uint32_t i = 0; i < mesh.verts.size(); ++i)
+        {
+            auto& v = mesh.verts[i];
+            auto weights = model->GetVertexWeights(i);              
+
+            for (uint32_t i = 0; i < mesh.links.size(); ++i)
             {
-                closest_dist2 = d2;
-                closest_link = i;
+                auto wg_idx = weight_groups[i];
+                if (!wg_idx)
+                    continue;
+            
+                float weight = weights[*wg_idx];
+                v.link_weights[i] = weight;
             }
         }
+    }
+    else
+    {
+        // no weight groups defined, use distance-based weights
+        for (auto& v : mesh.verts)
+        {
+            if (mesh.links.empty())
+                continue;
 
-        v.link_weights[closest_link] = 1.0f;
+            uint32_t closest_link = 0;
+            float closest_dist2 = std::numeric_limits<float>::max();
 
+            for (uint32_t i = 0; i < mesh.links.size(); ++i)
+            {
+                // const auto& link = mesh.links[i];
+                // auto lpos = link.start_matrix * glm::vec4(v.pos, 1.0f);
+                // float weight = 1.0f - glm::clamp(lpos.y / link.margin, 0.0f, 1.0f);
+                // v.link_weights[i] = weight;
+
+                auto d = v.pos - mesh.links[i].pos;
+                float d2 = glm::dot(d, d);
+                if (d2 < closest_dist2)
+                {
+                    closest_dist2 = d2;
+                    closest_link = i;
+                }
+            }
+
+            v.link_weights[closest_link] = 1.0f;
+        }
+    }
+
+    // normalize weights
+    for (auto& v : mesh.verts)
+    {
         float sum = 0.0f;
-        for (auto w : v.link_weights)
+        for (float w : v.link_weights)
         {
             sum += w;
         }
-
         if (sum > 0.0f)
         {
-            for (auto& w : v.link_weights)
+            for (float& w : v.link_weights)
             {
                 w /= sum;
             }

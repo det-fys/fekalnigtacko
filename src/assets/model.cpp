@@ -31,7 +31,7 @@ static collision::Material GetMaterialByName(const std::string& name)
 assets::Model::Model(ModelDescriptor desc)
     : skeleton_(std::move(desc.skeleton)), vertices_(std::move(desc.verts)), tris_(std::move(desc.tris)),
       surfaces_(std::move(desc.surfaces)), col_offset_(desc.col_offset), params_(std::move(desc.params)),
-      locations_(std::move(desc.locations))
+      locations_(std::move(desc.locations)), vertex_weights_(std::move(desc.vertex_weights))
 {
     // surface map
     for (size_t i = 0; i < surfaces_.size(); ++i)
@@ -131,6 +131,12 @@ assets::Model::Model(ModelDescriptor desc)
         if (desc.col_material != collision::PM_NONE)
             cshape_is_bullet_target_ = true;
     }
+
+    // vertex groups
+    for (size_t i = 0; i < desc.weight_groups.size(); ++i)
+    {
+        weight_groups_[desc.weight_groups[i]] = static_cast<uint32_t>(i);
+    }
 }
 
 std::shared_ptr<assets::Model> assets::Model::Load(const std::string& name)
@@ -177,6 +183,13 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
                     bones.bone_weights[i] = bone_weight;
                 }
                 vert_data.bones.emplace_back(bones);
+            }
+
+            for (size_t i = 0; i < desc.weight_groups.size(); ++i)
+            {
+                float weight = 0.0f;
+                iss >> weight;
+                desc.vertex_weights.emplace_back(weight);
             }
         }
         else if (command == "f")
@@ -293,6 +306,12 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             iss >> loc_name;
             ParseTransform(iss, desc.locations[loc_name]);
         }
+        else if (command == "wg")
+        {
+            std::string wg_name;
+            iss >> wg_name;
+            desc.weight_groups.emplace_back(wg_name);
+        }
         else
         {
             throw std::runtime_error("Unknown command in model file: " + command);
@@ -345,4 +364,18 @@ const Transform* assets::Model::GetLocation(const std::string& key) const
         return nullptr;
 
     return &it->second;
+}
+
+std::optional<uint32_t> assets::Model::GetWeightGroupIndex(const std::string& name) const
+{
+    auto it = weight_groups_.find(name);
+    return it != weight_groups_.end() ? std::optional<uint32_t>(it->second) : std::nullopt;
+}
+
+std::span<const float> assets::Model::GetVertexWeights(uint32_t vertex_idx) const
+{
+    if (vertex_weights_.empty())
+        return {};
+
+    return {vertex_weights_.data() + vertex_idx * weight_groups_.size(), weight_groups_.size()};
 }
