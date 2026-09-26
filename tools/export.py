@@ -83,6 +83,7 @@ class Surface:
     multicolor: bool
     blend: str|None
     unlit: bool
+    translucent: bool
     pm: str|None
 
     def __init__(self, name: str):
@@ -93,6 +94,7 @@ class Surface:
         self.ocolor_mult = False
         self.blend = None
         self.unlit = False
+        self.translucent = False
         self.pm = None
 
 class Model:
@@ -107,6 +109,8 @@ class Model:
     centerofmass: tuple[float, float, float]|None
     params: list[tuple[str, str]]
     locations: list[tuple[str, Transform]]
+    height_vertices: list[tuple[float, float, float]]
+    height_tris: list[tuple[int, int, int]]
 
     def __init__(self, skeleton=None):
         self.skeleton = skeleton
@@ -120,6 +124,8 @@ class Model:
         self.centerofmass = None
         self.params = []
         self.locations = []
+        self.height_vertices = []
+        self.height_tris = []
 
     def add_vertex(self, vertex: Vertex) -> int:
         if vertex in self.vertex_map:
@@ -175,12 +181,20 @@ class Graph:
         edge = GraphEdge(node1_index, node2_index)
         self.edges.append(edge)
 
+class MapObjectData:
+    trans: Transform
+    ocolor: str|None
+
+    def __init__(self, trans: Transform):
+        self.trans = trans
+        self.ocolor = None
+
 class Chunk:
     coord: tuple[int, int] # x,y
     shifted_coord: tuple[int, int]
     aabb_min: Vec3
     aabb_max: Vec3
-    static_objects: list[tuple[str, Transform]]
+    static_objects: list[tuple[str, MapObjectData]]
     surface_ranges: list[tuple[str, int, int]] # name, first, count
 
     def __init__(self, coord: tuple[int, int]):
@@ -201,7 +215,7 @@ class Map:
     basemodel_name: str
     static_models: list
     static_models_idx: dict[str, int]
-    static_objects: list[tuple[int, Transform]]
+    static_objects: list[tuple[int, MapObjectData]]
     graphs: list[Graph]
     chunks: dict[tuple[int, int], Chunk]
     max_chunk: tuple[int, int]
@@ -286,14 +300,14 @@ class Map:
 
         # objects
         for obj in self.static_objects:
-            name, trans = obj
-            pos = Vec3(*trans.position)
+            name, data = obj
+            pos = Vec3(*data.trans.position)
 
             idx = self.get_static_model_idx(name)
 
             chunk = get_chunk(pos_to_chunk(pos))
             chunk.extend_aabb(pos)
-            chunk.static_objects.append((idx, trans))
+            chunk.static_objects.append((idx, data))
 
         # min/max
         min_chunk = (100000, 100000)
@@ -491,6 +505,7 @@ class Exporter:
                 surface.ocolor_mult = "OCOLOR_MULT" in mat_params
                 surface.multicolor = "MULTICOLOR" in mat_params
                 surface.unlit = "UNLIT" in mat_params
+                surface.translucent = "TRANSLUCENT" in mat_params
                 
                 blend = mat_params.get("BLEND")
                 if isinstance(blend, str):
@@ -507,6 +522,43 @@ class Exporter:
                 model.materials[mat_name] = surface
 
             model.add_triangle(mat_name, *face_indices)
+
+    @staticmethod
+    def add_heightmesh_to_model(obj, model: Model):
+        if obj.type != "MESH":
+            print("warning: tried to export object that is not a mesh")
+            return
+        
+        print(f"  processing height mesh: {obj.name}")
+
+        mesh = obj.data
+        mesh.calc_loop_triangles()
+
+        vert_map: dict[tuple[float, float, float], int] = {}
+
+        model.height_vertices = []
+        model.height_tris = []
+
+        for tri in mesh.loop_triangles:
+            face_indices = []
+
+            for loop_index in tri.loops:
+                loop = mesh.loops[loop_index]
+                vertex = mesh.vertices[loop.vertex_index]
+
+                pos = tuple(c for c in vertex.co)
+                rounded_pos = tuple(round(c, 3) for c in pos)
+
+                if rounded_pos in vert_map:
+                    vert_index = vert_map[rounded_pos]
+                else:
+                    vert_index = len(model.height_vertices)
+                    model.height_vertices.append(pos)
+                    vert_map[rounded_pos] = vert_index
+
+                face_indices.append(vert_index)
+
+            model.height_tris.append(tuple(face_indices))
 
     @staticmethod
     def add_mesh_to_graph(obj, graph: Graph):
@@ -541,7 +593,7 @@ class Exporter:
         return f"{t[0]:.6f} {t[1]:.6f} {t[2]:.6f} {r[0]:.6f} {r[1]:.6f} {r[2]:.6f} {r[3]:.6f} {s:.6f}"
 
     def export_mdl(self, model: Model, filepath: str):
-        with open(filepath, "w") as f:
+        with open(f"{filepath}.mdl", "w") as f:
             if model.make_col_trimesh:
                 f.write("makecoltrimesh\n")
 
@@ -585,6 +637,8 @@ class Exporter:
                     f.write(" +multicolor")
                 if surface.unlit:
                     f.write(" +unlit")
+                if surface.translucent:
+                    f.write(" +translucent")
                 if surface.blend is not None:
                     f.write(f" +blend {surface.blend}")
                 f.write("\n")
@@ -594,6 +648,14 @@ class Exporter:
 
                 for tri in surface.tris:
                     f.write(f"f {tri[0]} {tri[1]} {tri[2]}\n")
+
+        if (len(model.height_vertices) > 0) and (len(model.height_tris) > 0):
+            with open(f"{filepath}.hm", "w") as f:
+                for v in model.height_vertices:
+                    f.write(f"hv {v[0]} {v[1]} {v[2]}\n")
+
+                for tri in model.height_tris:
+                    f.write(f"ht {tri[0]} {tri[1]} {tri[2]}\n")
     
     def export_map(self, map: Map, filepath: str):
         with open(filepath, "w") as f:
@@ -621,7 +683,7 @@ class Exporter:
             # for obj_name, transform in map.static_objects:
             #     f.write(f"static {obj_name} {Exporter.transform_str(transform)}\n")
 
-            f.write(f"chunks {map.max_chunk[0]} {map.max_chunk[1]}\n")
+            f.write(f"chunks {map.max_chunk[0]} {map.max_chunk[1]} {CHUNK_SIZE}\n")
 
             chunks_sorted = [c[1] for c in map.chunks.items()]
             chunks_sorted.sort(key=lambda c: c.shifted_coord)
@@ -632,8 +694,11 @@ class Exporter:
                 for name, first, count in chunk.surface_ranges:
                     f.write(f"surface {name} {first} {count}\n")
 
-                for model_idx, transform in chunk.static_objects:
-                    f.write(f"static {model_idx} {self.transform_str(transform)}\n")
+                for model_idx, data in chunk.static_objects:
+                    f.write(f"static {model_idx} {self.transform_str(data.trans)}")
+                    if data.ocolor is not None:
+                        f.write(f" +ocolor {data.ocolor}")
+                    f.write("\n")
 
     def export_veh(self, veh: Vehicle, filepath: str):
         with open(filepath, "w") as f:
@@ -741,8 +806,10 @@ class Exporter:
             elif type == "LOC":
                 trans = self.get_obj_transform(obj)
                 model.locations.append((obj_name, trans))
-
-        mdl_filepath = os.path.join(self.out_path, f"{name}.mdl")
+            elif type == "H":
+                self.add_heightmesh_to_model(obj, model)
+                
+        mdl_filepath = os.path.join(self.out_path, f"{name}")
         self.export_mdl(model, mdl_filepath)
 
     def process_MAP(self, col, name, params):
@@ -753,13 +820,16 @@ class Exporter:
 
         def proc_col(col):
             for obj in col.objects:
-                type, obj_name, _ = self.extract_name(obj.name)
+                type, obj_name, params = self.extract_name(obj.name)
 
                 if type == "M":
                     self.add_mesh_to_model(obj, map.basemodel)
                 elif type == "OBJ":
                     transform = self.get_obj_transform(obj)
-                    map.static_objects.append((obj_name, transform))
+                    obj_data = MapObjectData(transform)
+                    if "OCOLOR" in params:
+                        obj_data.ocolor = params["OCOLOR"]
+                    map.static_objects.append((obj_name, obj_data))
                 elif type == "GRAPH":
                     graph = Graph(obj_name)
                     self.add_mesh_to_graph(obj, graph)
