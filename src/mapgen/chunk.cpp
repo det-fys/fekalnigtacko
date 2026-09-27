@@ -1057,20 +1057,40 @@ struct ChunkGenerator
             if (type_vals[0] < 0.15f)
                 continue; // skip some for variety
 
+            auto bush_chance = 0.3f;
+            auto deciduous_chance = 0.4f;
+
+            if (tile->forest_level > 200)
+            {
+                bush_chance = 0.2f;
+                deciduous_chance = 0.0f;
+
+            }
+            else if (tile->forest_level > 100)
+            {
+                bush_chance = 0.4f;
+                deciduous_chance = 0.2f;
+            }
+
             std::span<uint32_t> model_group;
 
-            if (type_vals[1] < 0.3f)
+            if (type_vals[1] < bush_chance)
             {
                 model_group = bush_model_indices;
                 scale *= 2.0f;
             }
-            else if (type_vals[1] < 0.8f)
+            else if (type_vals[1] < (bush_chance + deciduous_chance))
             {
                 model_group = deciduous_model_indices;
             }
             else
             {
                 model_group = conifer_model_indices;
+
+                if (tile->forest_level > 127)
+                {
+                    scale *= 1.5f; // larger trees in dense forest
+                }
             }
         
             auto model_idx = model_group[static_cast<size_t>(type_vals[2] * 1000000.0f) % model_group.size()];
