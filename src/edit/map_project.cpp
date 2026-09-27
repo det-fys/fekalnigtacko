@@ -46,6 +46,15 @@ void edit::Project::Draw(const gfx::DrawContext& ctx)
 
         if (chunk.model)
             chunk.model->Draw(ctx, identity, {});
+
+        // draw chunks objs
+        for (auto& obj : chunk.objs)
+        {
+            if (!ctx.frustum.IsAABBVisible(obj.aabb))
+                continue;
+
+            obj.model->Draw(ctx, obj.trans, {});
+        }
     }
 
     world_env_.SetDayTime(properties_.day_time);
@@ -562,8 +571,7 @@ void edit::Project::ScheduleChunkUpdate(const glm::ivec2& chunk_pos)
             continue; // skip unlinked waypoints
 
         node.type = link_count == 2 ? mg::CHUNK_SPLINE_NODE_NORMAL : mg::CHUNK_SPLINE_NODE_JUNCTION;
-        node.res_id =
-            link_count < 2 ? mg_res_->GetMeshIndexByName("deadend1") : mg_res_->GetMeshIndexByName("intersection1");
+        node.res_id = mg_res_->GetMeshes().GetIndexByName(link_count < 2 ? "deadend1" : "intersection1");
 
         params.nodes[id] = node;
     }
@@ -589,6 +597,18 @@ void edit::Project::FinalizeChunk(mg::Chunk&& mgchunk)
     chunk.vis_tris.clear();
 
     chunk.model.reset();
+    chunk.objs.clear();
+
+    // append chunk objs
+    for (const auto& mgobj : chunk.mgchunk.objs)
+    {
+        auto& obj_model = mg_res_->GetModels().GetByIndex(mgobj.model_id);
+        
+        auto& obj = chunk.objs.emplace_back();
+        obj.trans = mgobj.trans;
+        obj.model = assets::AssetManager::GetInstance().Get<ModelView>(obj_model.name);
+        obj.aabb = TransformAABB(obj_model.model->GetAABB(), obj.trans);
+    }
 
     if (chunk.mgchunk.mesh.tris.empty())
         return;
@@ -632,7 +652,7 @@ void edit::Project::FinalizeChunk(mg::Chunk&& mgchunk)
 
     for (const auto& surface : chunk.mgchunk.mesh.surfaces)
     {
-        const auto& mg_material = mg_res_->GetMaterials()[surface.material_id];
+        const auto& mg_material = mg_res_->GetMaterials().GetByIndex(surface.material_id);
         
         auto& model_surface = model_desc.surfaces.emplace_back();
         model_surface.name = mg_material.name;

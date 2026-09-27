@@ -10,6 +10,7 @@
 
 #include "assets/asset_manager.hpp"
 #include "assets/material.hpp"
+#include "assets/model.hpp"
 #include "defs.hpp"
 
 namespace mg
@@ -99,7 +100,59 @@ struct TemplateMesh
     std::vector<TemplateMeshLink> links;
 };
 
+// model
+
+struct StaticObjectModel
+{
+    std::string name;
+    std::shared_ptr<const assets::Model> model;
+    // TODO: info about coloring, billboarding etc.
+};
+
 // set
+
+template <typename T>
+class ResourceArray
+{
+public:
+    ResourceArray() = default;
+
+    uint32_t Add(const std::string& name, T&& item)
+    {
+        uint32_t idx = static_cast<uint32_t>(resources_.size());
+        resources_.emplace_back(std::move(item));
+        name_map_[name] = idx;
+        return idx;
+    }
+
+    uint32_t GetIndexByName(const std::string& name) const
+    {
+        auto it = name_map_.find(name);
+        return it != name_map_.end() ? it->second : UINT32_MAX;
+    }
+
+    const T* TryGetByIndex(uint32_t idx) const { return idx < resources_.size() ? &resources_[idx] : nullptr; }
+    const T* TryGetByName(const std::string& name) const { return TryGetByIndex(GetIndexByName(name)); }
+
+    const T& GetByIndex(uint32_t idx) const
+    {
+        if (idx >= resources_.size())
+            throw std::out_of_range("Index out of range");
+        return resources_[idx];
+    }
+
+    const T& GetByName(const std::string& name) const
+    {
+        uint32_t idx = GetIndexByName(name);
+        if (idx == UINT32_MAX)
+            throw std::out_of_range("Name not found");
+        return GetByIndex(idx);
+    }
+
+private:
+    std::vector<T> resources_;
+    std::map<std::string, uint32_t> name_map_;
+};
 
 struct ResourceSet : public assets::Asset
 {
@@ -109,27 +162,16 @@ public:
     static std::shared_ptr<ResourceSet> Load(const std::string& path);
     static std::shared_ptr<ResourceSet> LoadFromFile(const std::string& path);
 
-    const std::vector<assets::ModelMaterial>& GetMaterials() const { return materials_; }
-    const assets::ModelMaterial* GetMaterialByName(const std::string& name) const;
-    uint32_t GetMaterialIndexByName(const std::string& name) const;
-
-    const std::vector<TemplateProfile>& GetProfiles() const { return profiles_; }
-    const TemplateProfile* GetProfileByName(const std::string& name) const;
-    uint32_t GetProfileIndexByName(const std::string& name) const;
-
-    const std::vector<TemplateMesh>& GetMeshes() const { return meshes_; }
-    const TemplateMesh* GetMeshByName(const std::string& name) const;
-    uint32_t GetMeshIndexByName(const std::string& name) const;
+    const ResourceArray<assets::ModelMaterial>& GetMaterials() const { return materials_; }
+    const ResourceArray<TemplateProfile>& GetProfiles() const { return profiles_; }
+    const ResourceArray<TemplateMesh>& GetMeshes() const { return meshes_; }
+    const ResourceArray<StaticObjectModel>& GetModels() const { return models_; }
 
 private:
-    std::vector<assets::ModelMaterial> materials_;
-    std::map<std::string, uint32_t> material_map_;
-
-    std::vector<TemplateProfile> profiles_;
-    std::map<std::string, uint32_t> profile_map_;
-
-    std::vector<TemplateMesh> meshes_;
-    std::map<std::string, uint32_t> mesh_map_;
+    ResourceArray<assets::ModelMaterial> materials_;
+    ResourceArray<TemplateProfile> profiles_;
+    ResourceArray<TemplateMesh> meshes_;
+    ResourceArray<StaticObjectModel> models_;
 };
 
 } // namespace mg

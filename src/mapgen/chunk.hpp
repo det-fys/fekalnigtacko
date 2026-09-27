@@ -47,6 +47,7 @@ struct ChunkTile
 {
     float height = 0.0f;
     uint8_t obstruction_level = 0;
+    uint8_t forest_level = 0;
     ChunkTileFlags flags = 0;
 };
 
@@ -80,11 +81,17 @@ struct ChunkParams
     std::map<uint32_t, ChunkSplineNode> nodes;
 };
 
+struct ChunkOutputObject
+{
+    glm::mat4 trans{1.0f};
+    uint32_t model_id = 0;
+};
+
 struct Chunk
 {
     glm::ivec2 coord;
     ChunkMesh mesh{};
-    std::vector<ChunkStaticObject> objs;
+    std::vector<ChunkOutputObject> objs;
     AABB3 aabb;
 };
 

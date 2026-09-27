@@ -36,12 +36,20 @@ enum ChunkState
     CHUNK_STATE_READY,
 };
 
+struct ChunkObj
+{
+    glm::mat4 trans{1.0f};
+    AABB3 aabb{};
+    std::shared_ptr<const ModelView> model;
+};
+
 struct Chunk
 {
     ChunkState state = CHUNK_STATE_INVALID;
     mg::Chunk mgchunk;
 
     std::shared_ptr<const ModelView> model;
+    std::vector<ChunkObj> objs;
 
     // visualization
     std::vector<glm::vec2> vis_verts;

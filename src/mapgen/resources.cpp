@@ -3,7 +3,6 @@
 #include <set>
 
 #include "assets/asset_manager.hpp"
-#include "assets/model.hpp"
 
 std::shared_ptr<mg::ResourceSet> mg::ResourceSet::Load(const std::string& path)
 {
@@ -24,7 +23,7 @@ static mg::TemplateMaterialRef GetMaterialRef(const mg::ResourceSet& res, const 
     else
     {
         ref.type = mg::TPL_MATERIAL_NORMAL;
-        ref.id = res.GetMaterialIndexByName(name);
+        ref.id = res.GetMaterials().GetIndexByName(name);
     }
     return ref;
 }
@@ -293,7 +292,7 @@ static mg::TemplateMesh LoadTemplateMesh(const mg::ResourceSet& res, CmdLineStre
 
         // TODO: get profile from model param
         link.profile_id = 0;
-        auto& profile = res.GetProfiles()[link.profile_id];
+        auto& profile = res.GetProfiles().GetByIndex(link.profile_id);
 
         link.pos = loc->position;
 
@@ -469,6 +468,21 @@ static mg::TemplateMesh LoadTemplateMesh(const mg::ResourceSet& res, CmdLineStre
     return mesh;
 }
 
+static mg::StaticObjectModel LoadStaticObjectModel(const mg::ResourceSet& res, CmdLineStream& iss)
+{
+    mg::StaticObjectModel obj_model{};
+    iss >> obj_model.name;
+
+    auto model = assets::AssetManager::GetInstance().Get<assets::Model>(obj_model.name);
+    if (!model)
+    {
+        throw std::runtime_error("Failed to load model: " + obj_model.name);
+    }
+
+    obj_model.model = model;
+    return obj_model;
+}
+
 std::shared_ptr<mg::ResourceSet> mg::ResourceSet::LoadFromFile(const std::string& path)
 {
     auto res = std::make_shared<ResourceSet>();
@@ -476,56 +490,33 @@ std::shared_ptr<mg::ResourceSet> mg::ResourceSet::LoadFromFile(const std::string
     assets::LoadCMDFile(path, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "mat")
         {
-            res->materials_.emplace_back(assets::ParseMaterial(iss));
-            res->material_map_[res->materials_.back().name] = static_cast<uint32_t>(res->materials_.size() - 1);
+            auto material = assets::ParseMaterial(iss);
+            auto name = material.name;
+            res->materials_.Add(name, std::move(material));
         }
         else if (command == "tpl_profile")
         {
-            res->profiles_.emplace_back(LoadTemplateProfile(*res, iss));
-            res->profile_map_[res->profiles_.back().name] = static_cast<uint32_t>(res->profiles_.size() - 1);
+            auto profile = LoadTemplateProfile(*res, iss);
+            auto name = profile.name;
+            res->profiles_.Add(name, std::move(profile));
         }
         else if (command == "tpl_mesh")
         {
-            res->meshes_.emplace_back(LoadTemplateMesh(*res, iss));
-            res->mesh_map_[res->meshes_.back().name] = static_cast<uint32_t>(res->meshes_.size() - 1);
+            auto mesh = LoadTemplateMesh(*res, iss);
+            auto name = mesh.name;
+            res->meshes_.Add(name, std::move(mesh));
+        }
+        else if (command == "model")
+        {
+            auto obj_model = LoadStaticObjectModel(*res, iss);
+            auto name = obj_model.name;
+            res->models_.Add(name, std::move(obj_model));
+        }
+        else
+        {
+            throw std::runtime_error("Unknown command in resource file: " + command);
         }
     });
 
     return res;
-}
-
-const assets::ModelMaterial* mg::ResourceSet::GetMaterialByName(const std::string& name) const
-{
-    auto it = material_map_.find(name);
-    return it != material_map_.end() ? &materials_[it->second] : nullptr;
-}
-
-uint32_t mg::ResourceSet::GetMaterialIndexByName(const std::string& name) const
-{
-    auto it = material_map_.find(name);
-    return it != material_map_.end() ? it->second : 0;
-}
-
-const mg::TemplateProfile* mg::ResourceSet::GetProfileByName(const std::string& name) const
-{
-    auto it = profile_map_.find(name);
-    return it != profile_map_.end() ? &profiles_[it->second] : nullptr;
-}
-
-uint32_t mg::ResourceSet::GetProfileIndexByName(const std::string& name) const
-{
-    auto it = profile_map_.find(name);
-    return it != profile_map_.end() ? it->second : 0;
-}
-
-const mg::TemplateMesh* mg::ResourceSet::GetMeshByName(const std::string& name) const
-{
-    auto it = mesh_map_.find(name);
-    return it != mesh_map_.end() ? &meshes_[it->second] : nullptr;
-}
-
-uint32_t mg::ResourceSet::GetMeshIndexByName(const std::string& name) const
-{
-    auto it = mesh_map_.find(name);
-    return it != mesh_map_.end() ? it->second : 0;
 }

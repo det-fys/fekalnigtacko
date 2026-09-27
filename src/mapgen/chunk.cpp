@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <set>
+#include <random>
 
 #include "samplers.hpp"
 #include <tpp_interface.hpp>
@@ -197,7 +198,9 @@ struct ChunkGenerator
     // seeds
     uint32_t heightmap_seed;
 
+    // samplers
     mg::TerrainHeightSampler height_sampler;
+    mg::ForestSampler forest_sampler;
     mg::TerrainColorSampler color_sampler;
 
     // tiles
@@ -227,9 +230,10 @@ struct ChunkGenerator
                    mg::Chunk& chunk)
         : res(res), map_cfg(cfg), spline_nodes(&params.nodes), chunk_coord(params.coord), objs(params.objs),
           chunk(chunk), bounds(GetChunkAABB(cfg, params.coord)), extended_bounds(GetChunkAABB(cfg, params.coord, true)),
-          heightmap_seed(params.heightmap_seed), height_sampler(heightmap_seed), color_sampler(heightmap_seed),
-          tiles_border(cfg.chunk_border), tiles_stride(cfg.chunk_tiles + cfg.chunk_border * 2),
-          tiles(tiles_stride * tiles_stride), tile_size_m(cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles)),
+          heightmap_seed(params.heightmap_seed), height_sampler(heightmap_seed), forest_sampler(heightmap_seed),
+          color_sampler(heightmap_seed), tiles_border(cfg.chunk_border),
+          tiles_stride(cfg.chunk_tiles + cfg.chunk_border * 2), tiles(tiles_stride * tiles_stride),
+          tile_size_m(cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles)),
           tiles_aabb(bounds.min - glm::vec2(cfg.chunk_border) * tile_size_m,
                      bounds.max + glm::vec2(cfg.chunk_border) * tile_size_m)
     {
@@ -243,26 +247,38 @@ struct ChunkGenerator
         GenerateHeightmesh();
         AppendObjectsHeightmeshes();
         RasterizeHeightmesh();
+        InitForest();
         TriangulateTerrain();
         GenerateOutputMesh();
     }
 
-    mg::ChunkTile* GetTileAtPos(const glm::vec2& pos)
+    uint32_t GetTileIndexAtPos(const glm::vec2& pos) const
     {
         if (!tiles_aabb.Contains(pos))
         {
-            return nullptr;
+            return INVALID_ID;
         }
 
         glm::ivec2 tile_idx = glm::floor((pos - tiles_aabb.min) / tile_size_m);
-
         if (tile_idx.x < 0 || tile_idx.x >= static_cast<int>(tiles_stride) || tile_idx.y < 0 ||
             tile_idx.y >= static_cast<int>(tiles_stride))
         {
-            return nullptr;
+            return INVALID_ID;
         }
 
-        return &tiles[tile_idx.y * tiles_stride + tile_idx.x];
+        return static_cast<uint32_t>(tile_idx.y * tiles_stride + tile_idx.x);
+    }
+
+    mg::ChunkTile* GetTileAtPos(const glm::vec2& pos)
+    { 
+        auto tile_idx = GetTileIndexAtPos(pos);
+        return tile_idx != INVALID_ID ? &tiles[tile_idx] : nullptr;
+    }
+
+    const mg::ChunkTile* GetTileAtPos(const glm::vec2& pos) const
+    {
+        auto tile_idx = GetTileIndexAtPos(pos);
+        return tile_idx != INVALID_ID ? &tiles[tile_idx] : nullptr;
     }
 
     void InitHeightmap()
@@ -391,7 +407,7 @@ struct ChunkGenerator
             junction.pos = node.pos;
             junction.mesh_id = node.res_id;
 
-            const auto& mesh = res.GetMeshes()[junction.mesh_id];
+            const auto& mesh = res.GetMeshes().GetByIndex(junction.mesh_id);
 
             for (uint32_t i = 0; i < node.links.size(); ++i)
             {
@@ -458,7 +474,7 @@ struct ChunkGenerator
 
     void GenerateJunctionMesh(JunctionInfo& junction)
     {
-        const auto& mesh = res.GetMeshes()[junction.mesh_id];
+        const auto& mesh = res.GetMeshes().GetByIndex(junction.mesh_id);
 
         // check if within chunk bounds
         constexpr float radius = 15.0f; // TODO: calculate actual radius from mesh bounds
@@ -514,7 +530,7 @@ struct ChunkGenerator
     void LoadJunctionLinkProfileVertices(const JunctionInfo& junction, uint32_t link_idx,
                                          std::span<uint32_t> out_verts) const
     {
-        const auto& mesh = res.GetMeshes()[junction.mesh_id];
+        const auto& mesh = res.GetMeshes().GetByIndex(junction.mesh_id);
         const auto& mesh_link = mesh.links[link_idx];
         for (uint32_t i = 0; i < mesh_link.profile_vert_mappings.size(); ++i)
         {
@@ -603,7 +619,7 @@ struct ChunkGenerator
             return; // incompatible ends
         }
 
-        const auto& profile = res.GetProfiles()[endpoint_profiles[0]];
+        const auto& profile = res.GetProfiles().GetByIndex(endpoint_profiles[0]);
 
         const auto verts_count = static_cast<uint32_t>(profile.verts.size());
         std::vector<uint32_t> vertices(verts_count * 2);
@@ -959,6 +975,117 @@ struct ChunkGenerator
         }
     }
 
+    void InitForest()
+    {
+        for (uint32_t y = 0; y < tiles_stride; ++y)
+        {
+            for (uint32_t x = 0; x < tiles_stride; ++x)
+            {
+                auto& tile = tiles[y * tiles_stride + x];
+                auto pos = tiles_aabb.min + glm::vec2(x, y) * tile_size_m;
+                
+                auto forest = forest_sampler.Get(pos);
+                tile.forest_level = static_cast<uint8_t>(forest.intensity * 255.0f);
+                if (tile.obstruction_level > 0)
+                {
+                    tile.forest_level = 0;
+                }
+
+                // TODO: store density/type
+
+                // TODO: reduce forest intensity by obstruction level
+                //int deforestation = static_cast<int>(tile.obstruction_level);
+                //tile.forest_level =
+                //    static_cast<uint8_t>(glm::clamp(static_cast<int>(tile.forest_level) - deforestation, 0, 255));
+            }
+        }
+
+        // place trees
+        std::vector<glm::vec2> tree_positions;
+
+        constexpr float tree_radius = 5.0f; // meters
+
+        ChunkPoissonVariable(
+            map_cfg.seed, chunk_coord, map_cfg.chunk_size_m, tree_radius, tree_radius, tree_radius, tree_positions,
+            [&](glm::vec2 pos) {
+                //auto tile = GetTileAtPos(pos);
+                //if (!tile)
+                //    return 10.0f; // default radius
+
+                //float density = static_cast<float>(tile->forest_level) / 255.0f;
+                //density = glm::clamp(density, 0.0f, 1.0f);
+                //return glm::mix(10.0f, 5.0f, density); // radius based on forest density
+                return tree_radius; // fixed radius for now
+            },
+            [&](glm::vec2 pos) {
+                auto tile = GetTileAtPos(pos);
+                if (!tile)
+                    return false;
+
+                return tile->forest_level > 0 && tile->obstruction_level < 127;
+            });
+
+        std::array<uint32_t, 2> conifer_model_indices = {res.GetModels().GetIndexByName("spruce"),
+                                                         res.GetModels().GetIndexByName("pine")};
+
+        std::array<uint32_t, 2> deciduous_model_indices = {res.GetModels().GetIndexByName("commontree"),
+                                                           res.GetModels().GetIndexByName("biggertree")};
+
+        std::array<uint32_t, 2> bush_model_indices = {res.GetModels().GetIndexByName("bush1"),
+                                                      res.GetModels().GetIndexByName("bush2")};
+
+        std::mt19937 rng(map_cfg.seed + chunk_coord.x * 73856093 + chunk_coord.y * 19349663);
+        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+
+        for (const auto& pos : tree_positions)
+        {
+            if (!bounds.Contains(pos))
+                continue;
+
+            auto tile = GetTileAtPos(pos);
+            if (!tile)
+                continue;
+
+            auto height = tile->height;
+            height -= 1.0f;
+            
+            // random params
+            auto type_vals = glm::vec3(dist(rng), dist(rng), dist(rng));
+            auto scale = glm::mix(0.8f, 1.2f, dist(rng));
+            auto angle_z = glm::mix(0.0f, glm::two_pi<float>(), dist(rng));
+
+            if (type_vals[0] < 0.15f)
+                continue; // skip some for variety
+
+            std::span<uint32_t> model_group;
+
+            if (type_vals[1] < 0.3f)
+            {
+                model_group = bush_model_indices;
+                scale *= 2.0f;
+            }
+            else if (type_vals[1] < 0.8f)
+            {
+                model_group = deciduous_model_indices;
+            }
+            else
+            {
+                model_group = conifer_model_indices;
+            }
+        
+            auto model_idx = model_group[static_cast<size_t>(type_vals[2] * 1000000.0f) % model_group.size()];
+
+            auto obj_pos = glm::vec3(pos, height);
+            auto trans = glm::translate(glm::mat4(1.0f), obj_pos) *
+                         glm::rotate(glm::mat4(1.0f), angle_z, glm::vec3(0.0f, 0.0f, 1.0f)) *
+                         glm::scale(glm::mat4(1.0f), glm::vec3(scale));
+
+            auto& obj = chunk.objs.emplace_back();
+            obj.model_id = model_idx;
+            obj.trans = trans;
+        }
+    }
+
     void TriangulateTerrain()
     {
         auto terrain_points_offset = hm_verts.size();
@@ -1140,16 +1267,21 @@ struct ChunkGenerator
         }
     }
 
-    uint32_t GetTerrainColor(const glm::vec2& pos)
+    uint32_t GetTerrainColor(const glm::vec2& pos) const
     {
-        auto color = color_sampler.Get(pos);
+        auto tile = GetTileAtPos(pos);
+
+        mg::ForestSample forest{};
+        forest.intensity = tile ? static_cast<float>(tile->forest_level) / 255.0f : 0.0f;
+
+        auto color = color_sampler.Get(pos, forest);
         return glm::packUnorm4x8(glm::vec4(color, 1.0f));
     }
 
     void GenerateOutputMesh()
     {
         // TODO: get these from somewhere
-        auto terrain_material_id = res.GetMaterialIndexByName("grass");
+        auto terrain_material_id = res.GetMaterials().GetIndexByName("grass");
         const float terrain_uv_scale = 0.1f;
 
         // set material for terrain triangles
