@@ -174,6 +174,7 @@ struct RawMeshVertex
     glm::vec3 pos;
     glm::vec3 normal;
     glm::vec2 uv;
+    uint32_t color = 0xFFFFFFFF;
 
     uint32_t hm_vertex_idx = INVALID_ID;
     uint32_t out_vertex_idx = INVALID_ID;
@@ -247,7 +248,8 @@ struct ChunkGenerator
         GenerateHeightmesh();
         AppendObjectsHeightmeshes();
         RasterizeHeightmesh();
-        InitForest();
+        GenerateForest();
+        GenerateGrass();
         TriangulateTerrain();
         GenerateOutputMesh();
     }
@@ -975,7 +977,7 @@ struct ChunkGenerator
         }
     }
 
-    void InitForest()
+    void GenerateForest()
     {
         for (uint32_t y = 0; y < tiles_stride; ++y)
         {
@@ -1103,6 +1105,83 @@ struct ChunkGenerator
             auto& obj = chunk.objs.emplace_back();
             obj.model_id = model_idx;
             obj.trans = trans;
+        }
+    }
+
+    void AddGrassMesh(const glm::vec3& pos, uint32_t mesh_id, float scale, float angle_z)
+    {
+        auto trans = glm::translate(glm::mat4(1.0f), pos) *
+                     glm::rotate(glm::mat4(1.0f), angle_z, glm::vec3(0.0f, 0.0f, 1.0f)) *
+                     glm::scale(glm::mat4(1.0f), glm::vec3(scale));
+
+        auto color = glm::packUnorm4x8(glm::vec4(color_sampler.GetGrassColor(pos), 1.0f));
+
+        auto& mesh = res.GetMeshes().GetByIndex(mesh_id);
+
+        auto base_vertex = static_cast<uint32_t>(raw_verts.size());
+        for (const auto& mesh_vert : mesh.verts)
+        {
+            auto& vert = raw_verts.emplace_back();
+            vert.pos = glm::vec3(trans * glm::vec4(mesh_vert.pos, 1.0f));
+            vert.normal = glm::vec3(trans * glm::vec4(mesh_vert.normal, 0.0f));
+            vert.uv = mesh_vert.uv;
+            vert.color = color;
+        }
+
+        for (const auto& mesh_tri : mesh.tris)
+        {
+            AddTriangle(base_vertex + mesh_tri.tri[0], base_vertex + mesh_tri.tri[1], base_vertex + mesh_tri.tri[2],
+                        mesh_tri.material);
+        }
+    }
+
+    void GenerateGrass()
+    {
+        constexpr float grass_radius = 1.0f; // meters
+        std::vector<glm::vec2> grass_positions;
+
+        auto grass_seed = map_cfg.seed ^ 0x62455000;
+
+        ChunkPoissonVariable(
+            grass_seed, chunk_coord, map_cfg.chunk_size_m, grass_radius, grass_radius, grass_radius, grass_positions,
+            [&](glm::vec2 pos) {
+                return grass_radius; // fixed radius for now
+            },
+            [&](glm::vec2 pos) {
+                return true;
+            });
+
+        std::array<uint32_t, 5> grass_mesh_ids = {
+            res.GetMeshes().GetIndexByName("grass1"), res.GetMeshes().GetIndexByName("grass2"),
+            res.GetMeshes().GetIndexByName("grass3"), res.GetMeshes().GetIndexByName("grass4"),
+            res.GetMeshes().GetIndexByName("grass5")};
+
+        std::mt19937 rng(grass_seed + chunk_coord.x * 73856093 + chunk_coord.y * 19349663);
+        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+
+        for (const auto& pos : grass_positions)
+        {
+            if (!bounds.Contains(pos))
+                continue;
+
+            auto tile = GetTileAtPos(pos);
+            if (!tile)
+                continue;
+
+            // random vals
+            auto mesh_idx = grass_mesh_ids[static_cast<size_t>(rng() % grass_mesh_ids.size())];
+            auto scale = glm::mix(1.1f, 2.5f, dist(rng));
+            auto angle_z = glm::mix(0.0f, glm::two_pi<float>(), dist(rng));
+
+            if (tile->forest_level > 200 || tile->obstruction_level > 30)
+                continue; // skip grass in forest or obstruction
+            
+            auto height = tile->height;
+            height -= 0.2f;
+
+            auto obj_pos = glm::vec3(pos, height);
+
+            AddGrassMesh(obj_pos, mesh_idx, scale, angle_z);
         }
     }
 
@@ -1368,7 +1447,7 @@ struct ChunkGenerator
                 out_vert.uv = is_terrain ? vert.pos * terrain_uv_scale : vert.uv;
 
                 // set color
-                out_vert.color = is_terrain ? GetTerrainColor(vert.pos) : 0xFFFFFFFF;
+                out_vert.color = is_terrain ? GetTerrainColor(vert.pos) : vert.color;
             }
         }
     }

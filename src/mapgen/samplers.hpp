@@ -49,8 +49,6 @@ public:
     TerrainColorSampler(uint32_t seed);
 
     glm::vec3 Get(const glm::vec2& pos, const ForestSample& forest) const;
-
-private:
     glm::vec3 GetGrassColor(const glm::vec2& pos) const;
     glm::vec3 GetForestGroundColor(const glm::vec2& pos, const ForestSample& forest) const;
 

@@ -44,7 +44,7 @@ void edit::Project::Draw(const gfx::DrawContext& ctx)
         if (!ctx.frustum.IsAABBVisible(chunk.mgchunk.aabb))
             continue;
 
-        if (chunk.model)
+        if (ctx.pass == gfx::DRAW_PASS_MAIN && chunk.model)
             chunk.model->Draw(ctx, identity, {});
 
         // draw chunks objs
