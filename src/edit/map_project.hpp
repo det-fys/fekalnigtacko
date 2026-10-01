@@ -16,46 +16,16 @@
 #include "gameview/modelview.hpp"
 #include "gameview/worldenv.hpp"
 #include "gfx/scene.hpp"
-#include "mapgen/chunk.hpp"
-#include "utils/worker.hpp"
 #include "static_object.hpp"
 #include "waypoint.hpp"
 #include "utils/allocnum.hpp"
-#include "mapgen/resources.hpp"
 #include "mapgen/samplers.hpp"
+#include "chunk_manager_project.hpp"
 
 namespace edit
 {
 
 using namespace game::view;
-
-enum ChunkState
-{
-    CHUNK_STATE_INVALID,
-    CHUNK_STATE_UPDATING,
-    CHUNK_STATE_READY,
-};
-
-struct ChunkObj
-{
-    glm::mat4 trans{1.0f};
-    AABB3 aabb{};
-    std::shared_ptr<const ModelView> model;
-};
-
-struct Chunk
-{
-    ChunkState state = CHUNK_STATE_INVALID;
-    mg::Chunk mgchunk;
-
-    std::shared_ptr<const ModelView> model;
-    std::vector<ChunkObj> objs;
-
-    // visualization
-    std::vector<glm::vec2> vis_verts;
-    std::vector<std::tuple<uint32_t, uint32_t>> vis_edges;
-    std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> vis_tris;
-};
 
 struct SelectionListEntry
 {
@@ -122,9 +92,10 @@ public:
 
     // generation
     void InvalidateChunk(const glm::ivec2& chunk_pos);
-    void DelayChunkUpdates();
+    void GetChunkParams(mg::ChunkParams& out_params);
 
-    const std::unordered_map<glm::ivec2, Chunk>& GetChunks() const { return chunks_; }
+    const std::unordered_map<glm::ivec2, ProjectChunkData>& GetChunks() const { return chunk_manager_->GetChunks(); }
+    mg::ChunkState GetChunkState(const glm::ivec2& chunk_pos) const { return chunk_manager_->GetChunkState(chunk_pos); }
     const mg::MapConfig& GetMapConfig() const { return map_config_; }
 
 private:
@@ -145,8 +116,6 @@ private:
     // generation
     void SetupChunks(uint32_t size);
     void UpdateChunks();
-    void ScheduleChunkUpdate(const glm::ivec2& chunk_pos);
-    void FinalizeChunk(mg::Chunk&& mgchunk);
 
 private:
     MapEditProperties& properties_;
@@ -170,12 +139,10 @@ private:
 
     // chunk generation
     mg::MapConfig map_config_{};
-    std::unordered_map<glm::ivec2, Chunk> chunks_;
-    std::unordered_set<glm::ivec2> invalid_chunks_;
-    float chunk_update_time_ = 0.0f;
+    int64_t chunk_gen_time_ = 0;
+    std::optional<ProjectChunkManager> chunk_manager_;
+    
 
-    WorkerThread worker_;
-    std::future<mg::Chunk> future_chunk_;
 };
 
 } // namespace edit

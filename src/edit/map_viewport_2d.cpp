@@ -184,6 +184,12 @@ void edit::MapViewport2D::DrawChunk(ImDrawList& draw_list, const glm::ivec2& coo
     const auto& project = *GetContext().project;
     const auto& chunks = project.GetChunks();
 
+    if (properties.draw_chunk_state)
+    {
+        auto state = project.GetChunkState(coord);
+        DrawChunkState(draw_list, coord, state);
+    }
+
     auto it = chunks.find(coord);
 
     if (it == chunks.end())
@@ -191,35 +197,30 @@ void edit::MapViewport2D::DrawChunk(ImDrawList& draw_list, const glm::ivec2& coo
 
     const auto& chunk = it->second;
 
-    if (properties.draw_chunk_state)
-    {
-        DrawChunkState(draw_list, coord, chunk.state);
-    }
-
     if (properties.draw_chunk_mesh)
     {
         DrawChunkMesh(draw_list, coord, chunk);
     }
 }
 
-void edit::MapViewport2D::DrawChunkState(ImDrawList& draw_list, const glm::ivec2& coord, ChunkState state)
+void edit::MapViewport2D::DrawChunkState(ImDrawList& draw_list, const glm::ivec2& coord, mg::ChunkState state)
 {
-    if (state == CHUNK_STATE_READY)
+    if (state == mg::CHUNK_STATE_NONE)
         return;
 
+    uint32_t color = state == mg::CHUNK_STATE_READY         ? IM_COL32(0, 255, 0, 64)
+                     : state == mg::CHUNK_STATE_IN_PROGRESS ? IM_COL32(255, 165, 0, 64)
+                                                            : IM_COL32(255, 0, 0, 64);
+
     auto chunk_size_m = GetContext().project->GetMapConfig().chunk_size_m;
-    uint32_t color = state == CHUNK_STATE_INVALID ? IM_COL32(255, 0, 0, 64) : IM_COL32(255, 255, 0, 64);
 
     draw_list.AddRectFilled(
-        im::VecToImGui(controls_.WsToCanvas(
-            glm::vec2(coord.x * chunk_size_m, coord.y * chunk_size_m))),
-        im::VecToImGui(controls_.WsToCanvas(glm::vec2((coord.x + 1) * chunk_size_m,
-                                                      (coord.y + 1) * chunk_size_m))),
+        im::VecToImGui(controls_.WsToCanvas(glm::vec2(coord.x * chunk_size_m, coord.y * chunk_size_m))),
+        im::VecToImGui(controls_.WsToCanvas(glm::vec2((coord.x + 1) * chunk_size_m, (coord.y + 1) * chunk_size_m))),
         color);
-
 }
 
-void edit::MapViewport2D::DrawChunkMesh(ImDrawList& draw_list, const glm::ivec2& coord, const Chunk& chunk)
+void edit::MapViewport2D::DrawChunkMesh(ImDrawList& draw_list, const glm::ivec2& coord, const ProjectChunkData& chunk)
 {
     auto color = (coord.x + coord.y) % 2 == 0 ? IM_COL32(128, 0, 0, 255) : IM_COL32(0, 0, 128, 255);
     auto color2 = (coord.x + coord.y) % 2 == 0 ? IM_COL32(128, 0, 0, 32) : IM_COL32(0, 0, 128, 32);

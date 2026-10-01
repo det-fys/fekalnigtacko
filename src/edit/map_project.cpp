@@ -9,9 +9,11 @@
 
 #include "assets/asset_manager.hpp"
 #include "im/utils.hpp"
+#include "gameview/chunk_manager_client.hpp"
 #include "map_viewport.hpp"
 #include "object.hpp"
 #include "static_object.hpp"
+
 
 edit::Project::Project(MapEditProperties& properties) : properties_(properties), static_models_root_("root")
 {
@@ -19,7 +21,7 @@ edit::Project::Project(MapEditProperties& properties) : properties_(properties),
     InitStaticModels();
 
     height_sampler_.emplace(map_config_.seed);
-    SetupChunks(16);
+    SetupChunks(128);
 }
 
 void edit::Project::Update()
@@ -37,25 +39,8 @@ void edit::Project::Draw(const gfx::DrawContext& ctx)
         obj->Draw(ctx);
     }
 
-    static glm::mat4 identity(1.0f);
-
-    for (auto& [chunk_pos, chunk] : chunks_)
-    {
-        if (!ctx.frustum.IsAABBVisible(chunk.mgchunk.aabb))
-            continue;
-
-        if (ctx.pass == gfx::DRAW_PASS_MAIN && chunk.model)
-            chunk.model->Draw(ctx, identity, {});
-
-        // draw chunks objs
-        for (auto& obj : chunk.objs)
-        {
-            if (!ctx.frustum.IsAABBVisible(obj.aabb))
-                continue;
-
-            obj.model->Draw(ctx, obj.trans, {});
-        }
-    }
+    if (chunk_manager_)
+        chunk_manager_->Draw(ctx);
 
     world_env_.SetDayTime(properties_.day_time);
 
@@ -253,14 +238,54 @@ void edit::Project::DeleteSelection()
 
 void edit::Project::InvalidateChunk(const glm::ivec2& chunk_pos)
 {
-    invalid_chunks_.insert(chunk_pos);
-    chunks_[chunk_pos].state = CHUNK_STATE_INVALID;
-    // DelayChunkUpdates();
+    if (chunk_manager_)
+        chunk_manager_->InvalidateChunk(chunk_pos);
 }
 
-void edit::Project::DelayChunkUpdates()
+void edit::Project::GetChunkParams(mg::ChunkParams& params)
 {
-    chunk_update_time_ = ImGui::GetTime() + 0.1f;
+    AABB2 chunk_aabb = mg::GetChunkAABB(map_config_, params.coord, true);
+
+    // collect relevant objs
+    for (const auto& obj : static_objs_)
+    {
+        // auto pos2d = glm::vec2(obj.GetPosition());
+        const auto& obj_aabb = obj.GetAABB();
+        AABB2 obj_aabb_2d(glm::vec2(obj_aabb.min), glm::vec2(obj_aabb.max));
+
+        if (!chunk_aabb.CollidesWith(obj_aabb_2d))
+            continue;
+
+        auto& mgobj = params.objs.emplace_back();
+        mgobj.trans = obj.GetTransform();
+        mgobj.model_name = obj.GetModelName();
+        mgobj.heightmesh = obj.GetHeightMesh();
+    }
+    
+    // collect splines
+    for (const auto& [id, waypoint] : waypoints_)
+    {
+        mg::ChunkSplineNode node{};
+        node.pos = waypoint.GetPosition();
+        
+        uint32_t link_count = 0;
+        for (uint32_t i = 0; i < 4; ++i)
+        {
+            auto link_id = waypoint.GetLink(i);
+            node.links[i] = link_id;
+
+            if (link_id != 0)
+                ++link_count;
+        }
+
+        if (link_count == 0)
+            continue; // skip unlinked waypoints
+
+        node.type = link_count == 2 ? mg::CHUNK_SPLINE_NODE_NORMAL : mg::CHUNK_SPLINE_NODE_JUNCTION;
+        node.res_id = mg_res_->GetMeshes().GetIndexByName(link_count < 2 ? "deadend1" : "intersection1");
+
+        params.nodes[id] = node;
+    }
 }
 
 void edit::Project::InitStaticModels()
@@ -460,207 +485,16 @@ void edit::Project::SetupChunks(uint32_t size)
     map_config_.chunk_size_m = 128.0f;
     map_config_.chunk_tiles = 128;
 
-    chunks_.clear();
-
-    int half_size = static_cast<int>(size) / 2;
-
-    for (int y = -half_size; y < half_size; ++y)
-    {
-        for (int x = -half_size; x < half_size; ++x)
-        {
-            glm::ivec2 chunk_pos(x, y);
-            InvalidateChunk(chunk_pos);
-            chunks_[chunk_pos];
-        }
-    }
+    chunk_manager_.emplace(mg_res_, map_config_, *this);
 }
 
 void edit::Project::UpdateChunks()
 {
-    // check if there is a chunk being generated
-    if (future_chunk_.valid())
-    {
-        // done yet?
-        if (future_chunk_.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
-            return;
+    constexpr std::array<float, 3> lod_distances = { 150.0f, 750.0f, 900.0f };
 
-        // done - make model and stuff
-        auto chunk = future_chunk_.get();
-        FinalizeChunk(std::move(chunk));    
-    }
+    chunk_manager_->BeginFrame(chunk_gen_time_);
+    chunk_manager_->RequestArea(properties_.cam_pos_3d, lod_distances);
+    chunk_manager_->EndFrame();
 
-    // no invalid chunks to update
-    if (invalid_chunks_.empty())
-        return;
-
-    // debounce
-    if (chunk_update_time_ > ImGui::GetTime())
-        return;
-
-    // pick one chunk to update
-    float nearest_dist = std::numeric_limits<float>().max();
-    glm::ivec2 chunk_coord{0, 0};
-
-    glm::vec2 priority_pos = properties_.cam_pos_3d;
-
-    for (const auto& chunk_pos : invalid_chunks_)
-    {
-        auto chunk_center = (glm::vec2(chunk_pos) + 0.5f) * map_config_.chunk_size_m;
-        auto dist = glm::distance(priority_pos, chunk_center);
-
-        // add some randomness to avoid always picking the same chunk when repeatedly invalid
-        float f = static_cast<float>(rand() % 1000) / 1000.0f;
-        dist += map_config_.chunk_size_m * 5.0f * f;
-
-        if (dist < nearest_dist)
-        {
-            nearest_dist = dist;
-            chunk_coord = chunk_pos;
-        }
-    }
-
-    // auto random_idx = rand() % invalid_chunks_.size();
-    // auto chunk_coord = *std::next(invalid_chunks_.begin(), random_idx);
-
-    invalid_chunks_.erase(chunk_coord);
-    // std::cout << "Scheduling chunk update for " << glm::to_string(chunk_coord) << std::endl;
-    ScheduleChunkUpdate(chunk_coord);
-}
-
-void edit::Project::ScheduleChunkUpdate(const glm::ivec2& chunk_pos)
-{
-    AABB2 chunk_aabb = mg::GetChunkAABB(map_config_, chunk_pos, true);
-
-    mg::ChunkParams params{};
-    params.coord = chunk_pos;
-    params.heightmap_seed = map_config_.seed;
-
-    // collect relevant objs
-    for (const auto& obj : static_objs_)
-    {
-        // auto pos2d = glm::vec2(obj.GetPosition());
-        const auto& obj_aabb = obj.GetAABB();
-        AABB2 obj_aabb_2d(glm::vec2(obj_aabb.min), glm::vec2(obj_aabb.max));
-
-        if (!chunk_aabb.CollidesWith(obj_aabb_2d))
-            continue;
-
-        auto& mgobj = params.objs.emplace_back();
-        mgobj.trans = obj.GetTransform();
-        mgobj.model_name = obj.GetModelName();
-        mgobj.heightmesh = obj.GetHeightMesh();
-    }
-    
-    // collect splines
-    for (const auto& [id, waypoint] : waypoints_)
-    {
-        mg::ChunkSplineNode node{};
-        node.pos = waypoint.GetPosition();
-        
-        uint32_t link_count = 0;
-        for (uint32_t i = 0; i < 4; ++i)
-        {
-            auto link_id = waypoint.GetLink(i);
-            node.links[i] = link_id;
-
-            if (link_id != 0)
-                ++link_count;
-        }
-
-        if (link_count == 0)
-            continue; // skip unlinked waypoints
-
-        node.type = link_count == 2 ? mg::CHUNK_SPLINE_NODE_NORMAL : mg::CHUNK_SPLINE_NODE_JUNCTION;
-        node.res_id = mg_res_->GetMeshes().GetIndexByName(link_count < 2 ? "deadend1" : "intersection1");
-
-        params.nodes[id] = node;
-    }
-
-    auto func = [this, params = std::move(params)]() mutable {
-        return mg::GenerateChunk(*mg_res_, map_config_, params);
-    };
-
-    // future_chunk_ = std::async(std::launch::async, func);
-    future_chunk_ = worker_.Schedule(std::move(func));
-
-    chunks_[chunk_pos].state = CHUNK_STATE_UPDATING;
-}
-
-void edit::Project::FinalizeChunk(mg::Chunk&& mgchunk)
-{
-    Chunk& chunk = chunks_[mgchunk.coord];
-    chunk.mgchunk = std::move(mgchunk);
-    chunk.state = CHUNK_STATE_READY;
-
-    chunk.vis_verts.clear();
-    chunk.vis_edges.clear();
-    chunk.vis_tris.clear();
-
-    chunk.model.reset();
-    chunk.objs.clear();
-
-    // append chunk objs
-    for (const auto& mgobj : chunk.mgchunk.objs)
-    {
-        auto& obj_model = mg_res_->GetModels().GetByIndex(mgobj.model_id);
-        
-        auto& obj = chunk.objs.emplace_back();
-        obj.trans = mgobj.trans;
-        obj.model = assets::AssetManager::GetInstance().Get<ModelView>(obj_model.name);
-        obj.aabb = TransformAABB(obj_model.model->GetAABB(), obj.trans);
-    }
-
-    if (chunk.mgchunk.mesh.tris.empty())
-        return;
-
-    // generate verts & edges for vis
-    for (const auto& vert : chunk.mgchunk.mesh.verts)
-    {
-        chunk.vis_verts.push_back(vert.pos);
-    }
-
-    std::set<std::tuple<uint32_t, uint32_t>> edges_set;
-    for (const auto& tri : chunk.mgchunk.mesh.tris)
-    {
-        chunk.vis_tris.emplace_back(tri[0], tri[1], tri[2]);
-
-        edges_set.emplace(std::min(tri[0], tri[1]), std::max(tri[0], tri[1]));
-        edges_set.emplace(std::min(tri[1], tri[2]), std::max(tri[1], tri[2]));
-        edges_set.emplace(std::min(tri[2], tri[0]), std::max(tri[2], tri[0]));
-    }
-
-    for (const auto& edge : edges_set)
-    {
-        chunk.vis_edges.push_back(edge);
-    }
-
-    assets::ModelDescriptor model_desc{};
-    // model_desc.make_triangle_mesh = true;
-
-    for (const auto& vert : chunk.mgchunk.mesh.verts)
-    {
-        model_desc.verts.positions.push_back(vert.pos);
-        model_desc.verts.normals.push_back(vert.normal);
-        model_desc.verts.uvs.push_back(vert.uv);
-        model_desc.verts.colors.push_back(vert.color);
-    }
-
-    for (const auto& tri : chunk.mgchunk.mesh.tris)
-    {
-        model_desc.tris.emplace_back(tri[0], tri[1], tri[2]);
-    }
-
-    for (const auto& surface : chunk.mgchunk.mesh.surfaces)
-    {
-        const auto& mg_material = mg_res_->GetMaterials().GetByIndex(surface.material_id);
-        
-        auto& model_surface = model_desc.surfaces.emplace_back();
-        model_surface.name = mg_material.name;
-        model_surface.tri_offset = surface.tri_offset;
-        model_surface.tri_count = surface.tri_count;
-        model_surface.material = mg_material;
-    }
-
-    auto model = std::make_shared<assets::Model>(std::move(model_desc));
-    chunk.model = std::make_shared<ModelView>(model);
+    chunk_gen_time_ += 1000; // TODO
 }

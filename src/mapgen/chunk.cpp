@@ -191,6 +191,7 @@ struct ChunkGenerator
     const mg::ResourceSet& res;
     const mg::MapConfig& map_cfg;
     glm::ivec2 chunk_coord;
+    uint32_t lod;
     std::span<const mg::ChunkStaticObject> objs;
     mg::Chunk& chunk;
     AABB2 bounds;
@@ -229,12 +230,12 @@ struct ChunkGenerator
 
     ChunkGenerator(const mg::ResourceSet& res, const mg::MapConfig& cfg, const mg::ChunkParams& params,
                    mg::Chunk& chunk)
-        : res(res), map_cfg(cfg), spline_nodes(&params.nodes), chunk_coord(params.coord), objs(params.objs),
-          chunk(chunk), bounds(GetChunkAABB(cfg, params.coord)), extended_bounds(GetChunkAABB(cfg, params.coord, true)),
-          heightmap_seed(params.heightmap_seed), height_sampler(heightmap_seed), forest_sampler(heightmap_seed),
-          color_sampler(heightmap_seed), tiles_border(cfg.chunk_border),
-          tiles_stride(cfg.chunk_tiles + cfg.chunk_border * 2), tiles(tiles_stride * tiles_stride),
-          tile_size_m(cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles)),
+        : res(res), map_cfg(cfg), spline_nodes(&params.nodes), chunk_coord(params.coord), lod(params.lod),
+          objs(params.objs), chunk(chunk), bounds(GetChunkAABB(cfg, params.coord)),
+          extended_bounds(GetChunkAABB(cfg, params.coord, true)), heightmap_seed(params.heightmap_seed),
+          height_sampler(heightmap_seed), forest_sampler(heightmap_seed), color_sampler(heightmap_seed),
+          tiles_border(cfg.chunk_border), tiles_stride(cfg.chunk_tiles + cfg.chunk_border * 2),
+          tiles(tiles_stride * tiles_stride), tile_size_m(cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles)),
           tiles_aabb(bounds.min - glm::vec2(cfg.chunk_border) * tile_size_m,
                      bounds.max + glm::vec2(cfg.chunk_border) * tile_size_m)
     {
@@ -1002,6 +1003,9 @@ struct ChunkGenerator
             }
         }
 
+        if (lod > 1)
+            return; // trees only LOD0 and LOD1
+
         // place trees
         std::vector<glm::vec2> tree_positions;
 
@@ -1137,7 +1141,10 @@ struct ChunkGenerator
 
     void GenerateGrass()
     {
-        constexpr float grass_radius = 1.0f; // meters
+        if (lod > 2)
+            return;
+
+        constexpr float grass_radius = 1.5f; // meters
         std::vector<glm::vec2> grass_positions;
 
         auto grass_seed = map_cfg.seed ^ 0x62455000;
@@ -1159,6 +1166,8 @@ struct ChunkGenerator
         std::mt19937 rng(grass_seed + chunk_coord.x * 73856093 + chunk_coord.y * 19349663);
         std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
+        auto cull_chance = lod == 0 ? 0.0f : lod == 1 ? 0.5f : 0.8f;
+
         for (const auto& pos : grass_positions)
         {
             if (!bounds.Contains(pos))
@@ -1169,11 +1178,12 @@ struct ChunkGenerator
                 continue;
 
             // random vals
+            auto cull = dist(rng);
             auto mesh_idx = grass_mesh_ids[static_cast<size_t>(rng() % grass_mesh_ids.size())];
             auto scale = glm::mix(1.1f, 2.5f, dist(rng));
             auto angle_z = glm::mix(0.0f, glm::two_pi<float>(), dist(rng));
 
-            if (tile->forest_level > 200 || tile->obstruction_level > 30)
+            if (cull < cull_chance || tile->forest_level > 200 || tile->obstruction_level > 30)
                 continue; // skip grass in forest or obstruction
             
             auto height = tile->height;
@@ -1496,6 +1506,7 @@ mg::Chunk mg::GenerateChunk(const ResourceSet& res, const MapConfig& cfg, const 
 {
     mg::Chunk chunk{};
     chunk.coord = params.coord;
+    chunk.lod = params.lod;
 
     ChunkGenerator ctx(res, cfg, params, chunk);
     ctx.Generate();

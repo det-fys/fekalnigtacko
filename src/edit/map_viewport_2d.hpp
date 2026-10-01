@@ -23,8 +23,8 @@ protected:
 private:
     void DrawChunks(ImDrawList& draw_list);
     void DrawChunk(ImDrawList& draw_list, const glm::ivec2& coord);
-    void DrawChunkState(ImDrawList& draw_list, const glm::ivec2& coord, ChunkState state);
-    void DrawChunkMesh(ImDrawList& draw_list, const glm::ivec2& coord, const Chunk& chunk);
+    void DrawChunkState(ImDrawList& draw_list, const glm::ivec2& coord, mg::ChunkState state);
+    void DrawChunkMesh(ImDrawList& draw_list, const glm::ivec2& coord, const ProjectChunkData& chunk);
 
 private:
     im::Viewport2DControls controls_;

@@ -76,6 +76,7 @@ struct ChunkSplineNode
 struct ChunkParams
 {
     glm::ivec2 coord;
+    uint32_t lod = 0;
     std::vector<ChunkStaticObject> objs;
     uint32_t heightmap_seed = 420;
     std::map<uint32_t, ChunkSplineNode> nodes;
@@ -90,6 +91,7 @@ struct ChunkOutputObject
 struct Chunk
 {
     glm::ivec2 coord;
+    uint32_t lod = 0;
     ChunkMesh mesh{};
     std::vector<ChunkOutputObject> objs;
     AABB3 aabb;
