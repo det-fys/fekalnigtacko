@@ -1521,6 +1521,7 @@ struct ChunkGenerator
 
                 // copy position
                 out_vert.pos = vert.pos;
+                chunk.aabb.AddPoint(out_vert.pos);
 
                 // normalize normal
                 out_vert.normal = glm::dot(vert.normal, vert.normal) > 0.0001f ? glm::normalize(vert.normal)
