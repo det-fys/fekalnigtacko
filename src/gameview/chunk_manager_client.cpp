@@ -41,7 +41,7 @@ void game::view::ClientChunkManager::OnChunkGenerated(const mg::ChunkGenData& ge
         ChunkObjView obj_view{};
         obj_view.trans = obj.trans;
         obj_view.aabb = obj.aabb;
-        obj_view.model = std::make_shared<ModelView>(obj.model);
+        obj_view.model = assets::AssetManager::GetInstance().Get<ModelView>(obj.model->GetAssetName());
 
         chunk.objs.push_back(std::move(obj_view));
     }
