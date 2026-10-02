@@ -11,7 +11,7 @@ void mg::ChunkManager::BeginFrame(int64_t time)
     time_ = time;
 }
 
-void mg::ChunkManager::RequestChunk(const glm::ivec2& coord, uint32_t lod)
+void mg::ChunkManager::RequestChunk(const glm::ivec2& coord, uint32_t lod, float priority)
 {
     if (lod == LOD_INVALID)
         return;
@@ -22,12 +22,14 @@ void mg::ChunkManager::RequestChunk(const glm::ivec2& coord, uint32_t lod)
     {
         // also just requested this frame - max the lod
         chunk_data.request_lod = glm::max(chunk_data.request_lod, lod);
+        chunk_data.request_priority = glm::max(chunk_data.request_priority, priority);
     }
     else
     {
         // not requested this frame yet - set the lod
         chunk_data.request_time = time_;
         chunk_data.request_lod = lod;
+        chunk_data.request_priority = priority;
     }
 }
 
@@ -83,7 +85,7 @@ void mg::ChunkManager::RequestArea(const glm::vec2& center, std::span<const floa
             if (lod == LOD_INVALID)
                 continue;
 
-            RequestChunk(chunk_coord, lod);
+            RequestChunk(chunk_coord, lod, -dist2);
         }
     }
 }
@@ -115,6 +117,7 @@ void mg::ChunkManager::UpdateChunks()
 {
     glm::ivec2 update_coord{0};
     uint32_t update_lod = LOD_INVALID;
+    float update_priority = std::numeric_limits<float>::lowest();
 
     for (auto it = chunks_.begin(); it != chunks_.end();)
     {
@@ -130,10 +133,11 @@ void mg::ChunkManager::UpdateChunks()
         }
 
         // check if chunk needs update
-        if (chunk_data.request_lod != chunk_data.valid_lod && chunk_data.request_lod < update_lod)
+        if (chunk_data.request_lod != chunk_data.valid_lod && chunk_data.request_priority > update_priority)
         {
             update_coord = it->first;
             update_lod = chunk_data.request_lod;
+            update_priority = chunk_data.request_priority;
         }
 
         ++it;

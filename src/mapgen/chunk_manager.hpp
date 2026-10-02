@@ -35,6 +35,7 @@ struct ChunkData
 {
     int64_t request_time = 0;
     uint32_t request_lod = LOD_INVALID;
+    float request_priority = 0.0f;
 
     uint32_t valid_lod = LOD_INVALID; // queued or generated
     bool in_progress = false;
@@ -56,7 +57,7 @@ public:
     ChunkManager(std::shared_ptr<const ResourceSet> res, const MapConfig& map_cfg);
 
     void BeginFrame(int64_t time);
-    void RequestChunk(const glm::ivec2& coord, uint32_t lod);
+    void RequestChunk(const glm::ivec2& coord, uint32_t lod, float priority);
     void InvalidateChunk(const glm::ivec2& coord);
     void InvalidateAllChunks();
     void RequestArea(const glm::vec2& center, std::span<const float> lod_distances);
