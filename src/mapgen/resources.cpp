@@ -480,6 +480,14 @@ static mg::StaticObjectModel LoadStaticObjectModel(const mg::ResourceSet& res, C
     }
 
     obj_model.model = model;
+
+    if (!iss.Eol())
+    {
+        std::string cross_mesh_name;
+        iss >> cross_mesh_name;
+        obj_model.cross_mesh_id = res.GetMeshes().GetIndexByName(cross_mesh_name);
+    }
+
     return obj_model;
 }
 

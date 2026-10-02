@@ -106,6 +106,7 @@ struct StaticObjectModel
 {
     std::string name;
     std::shared_ptr<const assets::Model> model;
+    uint32_t cross_mesh_id = 0xFFFFFFFF;
     // TODO: info about coloring, billboarding etc.
 };
 

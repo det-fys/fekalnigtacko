@@ -490,7 +490,7 @@ void edit::Project::SetupChunks(uint32_t size)
 
 void edit::Project::UpdateChunks()
 {
-    constexpr std::array<float, 3> lod_distances = { 150.0f, 750.0f, 900.0f };
+    constexpr std::array<float, 4> lod_distances = { 250.0f, 500.0f, 1000.0f, 2000.0f };
 
     chunk_manager_->BeginFrame(chunk_gen_time_);
     chunk_manager_->RequestArea(properties_.cam_pos_3d, lod_distances);

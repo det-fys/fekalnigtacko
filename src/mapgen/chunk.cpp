@@ -191,7 +191,6 @@ struct ChunkGenerator
     const mg::ResourceSet& res;
     const mg::MapConfig& map_cfg;
     glm::ivec2 chunk_coord;
-    uint32_t lod;
     std::span<const mg::ChunkStaticObject> objs;
     mg::Chunk& chunk;
     AABB2 bounds;
@@ -199,6 +198,15 @@ struct ChunkGenerator
 
     // seeds
     uint32_t heightmap_seed;
+
+    // lod
+    uint32_t lod;
+    bool gen_tree_objs = false;
+    bool gen_tree_billboards = false;
+    bool gen_grass = false;
+    float grass_cull_chance = 0.0f;
+    float terrain_density_scale = 1.0f;
+    float path_segment_length_scale = 1.0f;
 
     // samplers
     mg::TerrainHeightSampler height_sampler;
@@ -243,6 +251,7 @@ struct ChunkGenerator
 
     void Generate()
     {
+        SetupLod();
         InitHeightmap();
         MakeJunctionsAndPaths();
         GenerateJunctionAndPathMeshes();
@@ -253,6 +262,16 @@ struct ChunkGenerator
         GenerateGrass();
         TriangulateTerrain();
         GenerateOutputMesh();
+    }
+
+    void SetupLod()
+    {
+        gen_tree_objs = lod <= 1;
+        gen_tree_billboards = lod <= 3;
+        gen_grass = lod <= 2;
+        grass_cull_chance = lod == 0 ? 0.0f : lod == 1 ? 0.5f : 0.75f;
+        terrain_density_scale = lod <= 1 ? 1.0f : (lod <= 2 ? 0.5f : 0.25f);
+        path_segment_length_scale = 1.0f / terrain_density_scale;
     }
 
     uint32_t GetTileIndexAtPos(const glm::vec2& pos) const
@@ -646,8 +665,8 @@ struct ChunkGenerator
             have_start_verts = true;
         }
 
-        constexpr float step_size = 3.0f; // meters
-        constexpr float min_step = step_size * 0.5f;
+        const auto step_size = 3.0f * path_segment_length_scale; // meters
+        const auto min_step = step_size * 0.5f;
         const auto start_margin = start_junction.links[start_endpoint.link_idx].margin;
         const auto start_t = start_margin + step_size;
         const auto end_margin = end_junction.links[end_endpoint.link_idx].margin;
@@ -1003,8 +1022,8 @@ struct ChunkGenerator
             }
         }
 
-        if (lod > 1)
-            return; // trees only LOD0 and LOD1
+        if (!gen_tree_objs && !gen_tree_billboards)
+            return;
 
         // place trees
         std::vector<glm::vec2> tree_positions;
@@ -1106,13 +1125,22 @@ struct ChunkGenerator
                          glm::rotate(glm::mat4(1.0f), angle_z, glm::vec3(0.0f, 0.0f, 1.0f)) *
                          glm::scale(glm::mat4(1.0f), glm::vec3(scale));
 
-            auto& obj = chunk.objs.emplace_back();
-            obj.model_id = model_idx;
-            obj.trans = trans;
+
+            if (gen_tree_objs)
+            {
+                auto& obj = chunk.objs.emplace_back();
+                obj.model_id = model_idx;
+                obj.trans = trans;
+            }
+            else
+            {
+                auto& obj_model = res.GetModels().GetByIndex(model_idx);
+                AddMesh(obj_pos, obj_model.cross_mesh_id, scale, angle_z);
+            }
         }
     }
 
-    void AddGrassMesh(const glm::vec3& pos, uint32_t mesh_id, float scale, float angle_z)
+    void AddMesh(const glm::vec3& pos, uint32_t mesh_id, float scale, float angle_z)
     {
         auto trans = glm::translate(glm::mat4(1.0f), pos) *
                      glm::rotate(glm::mat4(1.0f), angle_z, glm::vec3(0.0f, 0.0f, 1.0f)) *
@@ -1141,7 +1169,7 @@ struct ChunkGenerator
 
     void GenerateGrass()
     {
-        if (lod > 2)
+        if (!gen_grass)
             return;
 
         constexpr float grass_radius = 1.5f; // meters
@@ -1166,8 +1194,6 @@ struct ChunkGenerator
         std::mt19937 rng(grass_seed + chunk_coord.x * 73856093 + chunk_coord.y * 19349663);
         std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
-        auto cull_chance = lod == 0 ? 0.0f : lod == 1 ? 0.5f : 0.8f;
-
         for (const auto& pos : grass_positions)
         {
             if (!bounds.Contains(pos))
@@ -1182,6 +1208,9 @@ struct ChunkGenerator
             auto mesh_idx = grass_mesh_ids[static_cast<size_t>(rng() % grass_mesh_ids.size())];
             auto scale = glm::mix(1.1f, 2.5f, dist(rng));
             auto angle_z = glm::mix(0.0f, glm::two_pi<float>(), dist(rng));
+            
+            auto cull_chance = grass_cull_chance;
+            // TODO: reduce density by noise & forest level etc
 
             if (cull < cull_chance || tile->forest_level > 200 || tile->obstruction_level > 30)
                 continue; // skip grass in forest or obstruction
@@ -1191,7 +1220,7 @@ struct ChunkGenerator
 
             auto obj_pos = glm::vec3(pos, height);
 
-            AddGrassMesh(obj_pos, mesh_idx, scale, angle_z);
+            AddMesh(obj_pos, mesh_idx, scale, angle_z);
         }
     }
 
@@ -1200,9 +1229,9 @@ struct ChunkGenerator
         auto terrain_points_offset = hm_verts.size();
         std::vector<glm::vec2> terrain_points;
 
-        const float r = 3.0f;
-        const float r_min = 2.0f;
-        const float r_border = r * 5.0f;
+        const float r = 3.0f / terrain_density_scale;
+        const float r_min = 2.0f / terrain_density_scale;
+        const float r_border = r * 5.0f / terrain_density_scale;
 
         // append corners
         const auto terrain_points_margin = map_cfg.chunk_size_m;
@@ -1287,9 +1316,12 @@ struct ChunkGenerator
 
         delaunay.Triangulate();
 
-        std::map<uint32_t, uint32_t> vertex_map; // maps delaunay vertex index to raw vertex index
+        const bool sink_border = terrain_density_scale < 1.0f;
+        const float sink_amount = r * 0.75f / terrain_density_scale;
 
+        std::map<uint32_t, uint32_t> vertex_map; // maps delaunay vertex index to raw vertex index
         std::vector<glm::vec3> normals(terrain_points_offset + terrain_points.size(), glm::vec3(0.0f));
+        std::set<std::tuple<uint32_t, uint32_t>> sink_edges;
 
         for (const auto& face : delaunay.faces())
         {
@@ -1333,8 +1365,23 @@ struct ChunkGenerator
 
             auto centroid = (vert_pos[0] + vert_pos[1] + vert_pos[2]) / 3.0f;
 
+            // check if out of bounds
             if (!bounds.Contains(centroid))
             {
+                
+                if (sink_border)
+                {
+                    // record edges for border sinking
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        uint32_t v0 = v[i];
+                        uint32_t v1 = v[(i + 1) % 3];
+                        if (v0 > v1)
+                            std::swap(v0, v1);
+                        sink_edges.emplace(v0, v1);
+                    }
+                }
+
                 continue;
             }
 
@@ -1373,6 +1420,32 @@ struct ChunkGenerator
         {
             auto& vert = raw_verts[c_idx];
             vert.normal = glm::normalize(normals[v_idx]);
+        }
+
+        // sink border vertices
+        if (sink_border)
+        {
+            auto chunk_center = glm::vec2(bounds.min + bounds.max) * 0.5f;
+
+            std::set<uint32_t> raw_verts_to_sink;
+            for (const auto& [v0, v1] : sink_edges)
+            {
+                auto it0 = vertex_map.find(v0);
+                auto it1 = vertex_map.find(v1);
+
+                if (it0 != vertex_map.end())
+                    raw_verts_to_sink.insert(it0->second);
+
+                if (it1 != vertex_map.end())
+                    raw_verts_to_sink.insert(it1->second);
+            }
+
+            for (const auto& v : raw_verts_to_sink)
+            {
+                auto& rv = raw_verts[v];
+                auto sink_offset = glm::vec3(glm::sign(glm::vec2(rv.pos) - chunk_center) * sink_amount, -sink_amount * 0.5f);
+                rv.pos += sink_offset;
+            }
         }
     }
 
