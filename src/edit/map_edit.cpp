@@ -119,6 +119,9 @@ void edit::MapEdit::ShowPropertiesWindow(bool* open)
 
     if (ImGui::Begin("Properties", open))
     {
+        // show fps
+        ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+
         // 2D camera widgets
         ImGui::Text("2D Camera");
         ImGui::PushID("2D Camera Properties");
