@@ -14,14 +14,12 @@
 #include "object.hpp"
 #include "static_object.hpp"
 
-
 edit::Project::Project(MapEditProperties& properties) : properties_(properties), static_models_root_("root")
 {
     mg_res_ = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
     InitStaticModels();
 
-    height_sampler_.emplace(map_config_.seed);
-    SetupChunks(128);
+    SetupChunks();
 }
 
 void edit::Project::Update()
@@ -305,6 +303,11 @@ void edit::Project::InitStaticModels()
     natural.children.emplace_back("commontree", "commontree");
     natural.children.emplace_back("pine", "pine");
     natural.children.emplace_back("spruce", "spruce");
+
+    auto& misc = root.children.emplace_back("misc");
+    misc.children.emplace_back("lightpole", "lightpole");
+    misc.children.emplace_back("woodfence", "woodfence");
+    misc.children.emplace_back("woodfencepole", "woodfencepole");
 }
 
 void edit::Project::Select(Object& obj)
@@ -479,12 +482,14 @@ edit::Object* edit::Project::ObjectRaycast(const glm::vec3& start, const glm::ve
     return nearest_obj;
 }
 
-void edit::Project::SetupChunks(uint32_t size)
+void edit::Project::SetupChunks()
 {
-    map_config_.chunks = size;
+    map_config_.seed = 0;
+    map_config_.chunks = 128;
     map_config_.chunk_size_m = 128.0f;
     map_config_.chunk_tiles = 128;
 
+    height_sampler_.emplace(map_config_);
     chunk_manager_.emplace(mg_res_, map_config_, *this);
 }
 

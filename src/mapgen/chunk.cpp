@@ -10,6 +10,7 @@
 #include <tpp_interface.hpp>
 
 #include "utils/spline.hpp"
+#include "utils/math.hpp"
 
 namespace
 {
@@ -212,6 +213,7 @@ struct ChunkGenerator
     mg::TerrainHeightSampler height_sampler;
     mg::ForestSampler forest_sampler;
     mg::TerrainColorSampler color_sampler;
+    mg::GrassSampler grass_sampler;
 
     // tiles
     float tile_size_m;
@@ -241,9 +243,10 @@ struct ChunkGenerator
         : res(res), map_cfg(cfg), spline_nodes(&params.nodes), chunk_coord(params.coord), lod(params.lod),
           objs(params.objs), chunk(chunk), bounds(GetChunkAABB(cfg, params.coord)),
           extended_bounds(GetChunkAABB(cfg, params.coord, true)), heightmap_seed(params.heightmap_seed),
-          height_sampler(heightmap_seed), forest_sampler(heightmap_seed), color_sampler(heightmap_seed),
-          tiles_border(cfg.chunk_border), tiles_stride(cfg.chunk_tiles + cfg.chunk_border * 2),
-          tiles(tiles_stride * tiles_stride), tile_size_m(cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles)),
+          height_sampler(cfg), forest_sampler(heightmap_seed), color_sampler(heightmap_seed),
+          grass_sampler(heightmap_seed), tiles_border(cfg.chunk_border),
+          tiles_stride(cfg.chunk_tiles + cfg.chunk_border * 2), tiles(tiles_stride * tiles_stride),
+          tile_size_m(cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles)),
           tiles_aabb(bounds.min - glm::vec2(cfg.chunk_border) * tile_size_m,
                      bounds.max + glm::vec2(cfg.chunk_border) * tile_size_m)
     {
@@ -258,6 +261,7 @@ struct ChunkGenerator
         GenerateHeightmesh();
         AppendObjectsHeightmeshes();
         RasterizeHeightmesh();
+        SetupLevels();
         GenerateForest();
         GenerateGrass();
         TriangulateTerrain();
@@ -997,7 +1001,7 @@ struct ChunkGenerator
         }
     }
 
-    void GenerateForest()
+    void SetupLevels()
     {
         for (uint32_t y = 0; y < tiles_stride; ++y)
         {
@@ -1005,7 +1009,7 @@ struct ChunkGenerator
             {
                 auto& tile = tiles[y * tiles_stride + x];
                 auto pos = tiles_aabb.min + glm::vec2(x, y) * tile_size_m;
-                
+
                 auto forest = forest_sampler.Get(pos);
                 tile.forest_level = static_cast<uint8_t>(forest.intensity * 255.0f);
                 if (tile.obstruction_level > 0)
@@ -1016,12 +1020,15 @@ struct ChunkGenerator
                 // TODO: store density/type
 
                 // TODO: reduce forest intensity by obstruction level
-                //int deforestation = static_cast<int>(tile.obstruction_level);
-                //tile.forest_level =
+                // int deforestation = static_cast<int>(tile.obstruction_level);
+                // tile.forest_level =
                 //    static_cast<uint8_t>(glm::clamp(static_cast<int>(tile.forest_level) - deforestation, 0, 255));
             }
         }
+    }
 
+    void GenerateForest()
+    {
         if (!gen_tree_objs && !gen_tree_billboards)
             return;
 
@@ -1043,11 +1050,12 @@ struct ChunkGenerator
                 return tree_radius; // fixed radius for now
             },
             [&](glm::vec2 pos) {
-                auto tile = GetTileAtPos(pos);
-                if (!tile)
-                    return false;
+                //auto tile = GetTileAtPos(pos);
+                //if (!tile)
+                //    return false;
 
-                return tile->forest_level > 0 && tile->obstruction_level < 127;
+                //return tile->forest_level > 0 && tile->obstruction_level < 127;
+                return true;
             });
 
         std::array<uint32_t, 2> conifer_model_indices = {res.GetModels().GetIndexByName("spruce"),
@@ -1078,6 +1086,12 @@ struct ChunkGenerator
             auto type_vals = glm::vec3(dist(rng), dist(rng), dist(rng));
             auto scale = glm::mix(0.8f, 1.2f, dist(rng));
             auto angle_z = glm::mix(0.0f, glm::two_pi<float>(), dist(rng));
+
+            if (tile->forest_level == 0 || tile->obstruction_level >= 127)
+                continue;
+
+            if (tile->height < 12.0f)
+                continue;
 
             if (type_vals[0] < 0.15f)
                 continue; // skip some for variety
@@ -1135,18 +1149,17 @@ struct ChunkGenerator
             else
             {
                 auto& obj_model = res.GetModels().GetByIndex(model_idx);
-                AddMesh(obj_pos, obj_model.cross_mesh_id, scale, angle_z);
+                AddMesh(obj_pos, obj_model.cross_mesh_id, scale, angle_z, 0xFFFFFFFF);
             }
         }
     }
 
-    void AddMesh(const glm::vec3& pos, uint32_t mesh_id, float scale, float angle_z)
+    void AddMesh(const glm::vec3& pos, uint32_t mesh_id, float scale, float angle_z,
+                 uint32_t color, float offset_intensity = 0.0f)
     {
         auto trans = glm::translate(glm::mat4(1.0f), pos) *
                      glm::rotate(glm::mat4(1.0f), angle_z, glm::vec3(0.0f, 0.0f, 1.0f)) *
                      glm::scale(glm::mat4(1.0f), glm::vec3(scale));
-
-        auto color = glm::packUnorm4x8(glm::vec4(color_sampler.GetGrassColor(pos), 1.0f));
 
         auto& mesh = res.GetMeshes().GetByIndex(mesh_id);
 
@@ -1158,6 +1171,11 @@ struct ChunkGenerator
             vert.normal = glm::vec3(trans * glm::vec4(mesh_vert.normal, 0.0f));
             vert.uv = mesh_vert.uv;
             vert.color = color;
+
+            if (offset_intensity > 0.0f)
+            {
+                vert.pos += glm::vec3(grass_sampler.GetOffset(vert.pos) * (offset_intensity * mesh_vert.pos.z), 0.0f);
+            }
         }
 
         for (const auto& mesh_tri : mesh.tris)
@@ -1172,7 +1190,7 @@ struct ChunkGenerator
         if (!gen_grass)
             return;
 
-        constexpr float grass_radius = 1.5f; // meters
+        constexpr float grass_radius = 1.2f; // meters
         std::vector<glm::vec2> grass_positions;
 
         auto grass_seed = map_cfg.seed ^ 0x62455000;
@@ -1209,18 +1227,39 @@ struct ChunkGenerator
             auto scale = glm::mix(1.1f, 2.5f, dist(rng));
             auto angle_z = glm::mix(0.0f, glm::two_pi<float>(), dist(rng));
             
-            auto cull_chance = grass_cull_chance;
+            auto density = grass_sampler.GetDensity(pos);
+            auto keep_chance = glm::mix(0.1f, 1.0f, density);
+
+            if (tile->forest_level > 0)
+            {
+                // more grass around forests
+                auto forest_factor = static_cast<float>(tile->forest_level) / 255.0f;
+                forest_factor = glm::clamp(UnMix(0.0f, 0.1f, forest_factor), 0.0f, 1.0f);
+                keep_chance = glm::max(keep_chance, forest_factor * 2.0f);
+                scale *= glm::mix(1.0f, 1.5f, forest_factor);
+            }
+            else
+            {
+                scale *= glm::mix(0.5f, 1.0f, density);
+            }
+
+            keep_chance = glm::clamp(keep_chance, 0.0f, 1.0f) * (1.0f - grass_cull_chance);
+
             // TODO: reduce density by noise & forest level etc
 
-            if (cull < cull_chance || tile->forest_level > 200 || tile->obstruction_level > 30)
+            if (cull > keep_chance || tile->forest_level > 200 || tile->obstruction_level > 50)
                 continue; // skip grass in forest or obstruction
+            
+            auto color = color_sampler.GetGrassColor(pos);
+            color *= grass_sampler.GetBrightness(pos);
+            auto color_packed = glm::packUnorm4x8(glm::vec4(color, 1.0f));
             
             auto height = tile->height;
             height -= 0.2f;
 
             auto obj_pos = glm::vec3(pos, height);
 
-            AddMesh(obj_pos, mesh_idx, scale, angle_z);
+            AddMesh(obj_pos, mesh_idx, scale, angle_z, color_packed, 1.0f);
         }
     }
 
@@ -1456,7 +1495,9 @@ struct ChunkGenerator
         mg::ForestSample forest{};
         forest.intensity = tile ? static_cast<float>(tile->forest_level) / 255.0f : 0.0f;
 
-        auto color = color_sampler.Get(pos, forest);
+        auto sea_level = tile ? tile->height : -100.0f;
+
+        auto color = color_sampler.Get(pos, forest, sea_level);
         return glm::packUnorm4x8(glm::vec4(color, 1.0f));
     }
 

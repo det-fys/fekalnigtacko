@@ -114,7 +114,7 @@ private:
     Object* ObjectRaycast(const glm::vec3& start, const glm::vec3& end);
 
     // generation
-    void SetupChunks(uint32_t size);
+    void SetupChunks();
     void UpdateChunks();
 
 private:
