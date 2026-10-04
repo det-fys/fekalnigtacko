@@ -9,22 +9,57 @@ void game::view::ClientChunkManager::Draw(const gfx::DrawContext& ctx) const
 {
     static glm::mat4 identity{1.0f};
 
-    for (const auto& [coord, chunk] : chunks_)
+    AABB2 frustum_aabb(ctx.frustum.GetAABB().min, ctx.frustum.GetAABB().max);
+
+    auto [min_coord, max_coord] = mg::GetChunkRange(GetMapConfig(), frustum_aabb, false);
+    auto [loaded_min, loaded_max] = GetLoadedChunkRange();
+
+    min_coord = glm::max(min_coord, loaded_min);
+    max_coord = glm::min(max_coord, loaded_max);
+
+    for (int y = min_coord.y; y <= max_coord.y; ++y)
     {
-        if (!ctx.frustum.IsAABBVisible(chunk.aabb))
-            continue;
-
-        if (ctx.pass == gfx::DRAW_PASS_MAIN && chunk.model)
-            chunk.model->Draw(ctx, identity, {});
-
-        for (const auto& obj : chunk.objs)
+        for (int x = min_coord.x; x <= max_coord.x; ++x)
         {
-            if (!ctx.frustum.IsAABBVisible(obj.aabb))
+            glm::ivec2 coord(x, y);
+            auto it = chunks_.find(coord);
+            if (it == chunks_.end())
                 continue;
 
-            obj.model->Draw(ctx, obj.trans, {});
+            const ChunkView& chunk = it->second;
+
+            if (!ctx.frustum.IsAABBVisible(chunk.aabb))
+                continue;
+
+            if (ctx.pass == gfx::DRAW_PASS_MAIN && chunk.model)
+                chunk.model->Draw(ctx, identity, {});
+
+            for (const auto& obj : chunk.objs)
+            {
+                if (!ctx.frustum.IsAABBVisible(obj.aabb))
+                    continue;
+
+                obj.model->Draw(ctx, obj.trans, {});
+            }
         }
     }
+
+    // for (const auto& [coord, chunk] : chunks_)
+    // {
+    //     if (!ctx.frustum.IsAABBVisible(chunk.aabb))
+    //         continue;
+
+    //     if (ctx.pass == gfx::DRAW_PASS_MAIN && chunk.model)
+    //         chunk.model->Draw(ctx, identity, {});
+
+    //     for (const auto& obj : chunk.objs)
+    //     {
+    //         if (!ctx.frustum.IsAABBVisible(obj.aabb))
+    //             continue;
+
+    //         obj.model->Draw(ctx, obj.trans, {});
+    //     }
+    // }
 }
 
 void game::view::ClientChunkManager::OnChunkGenerated(const mg::ChunkGenData& gen_data)

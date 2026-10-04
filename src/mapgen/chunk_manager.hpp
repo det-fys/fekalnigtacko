@@ -66,6 +66,9 @@ public:
     void EndFrame();
 
     ChunkState GetChunkState(const glm::ivec2& coord) const;
+    std::tuple<glm::ivec2, glm::ivec2> GetLoadedChunkRange() const { return {min_chunk_, max_chunk_}; }
+    
+    const MapConfig& GetMapConfig() const { return map_cfg_; }
 
     virtual ~ChunkManager() = default;
 
@@ -90,6 +93,8 @@ private:
     WorkerThread worker_;
     std::future<ChunkGenData> future_chunk_;
     std::unordered_map<glm::ivec2, ChunkData> chunks_;
+    glm::ivec2 min_chunk_{0};
+    glm::ivec2 max_chunk_{0};
 };
 
 } // namespace mg

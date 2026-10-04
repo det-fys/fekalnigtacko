@@ -115,6 +115,9 @@ mg::ChunkState mg::ChunkManager::GetChunkState(const glm::ivec2& coord) const
 
 void mg::ChunkManager::UpdateChunks()
 {
+    min_chunk_ = glm::ivec2(std::numeric_limits<int32_t>::max());
+    max_chunk_ = glm::ivec2(std::numeric_limits<int32_t>::lowest());
+
     glm::ivec2 update_coord{0};
     uint32_t update_lod = LOD_INVALID;
     float update_priority = std::numeric_limits<float>::lowest();
@@ -139,6 +142,10 @@ void mg::ChunkManager::UpdateChunks()
             update_lod = chunk_data.request_lod;
             update_priority = chunk_data.request_priority;
         }
+
+        // update range
+        min_chunk_ = glm::min(min_chunk_, it->first);
+        max_chunk_ = glm::max(max_chunk_, it->first);
 
         ++it;
     }
