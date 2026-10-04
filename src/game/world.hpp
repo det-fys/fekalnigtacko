@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include <set>
+#include <optional>
 
 #include "mapinstance.hpp"
 #include "collision/dynamicsworld.hpp"
@@ -10,6 +11,9 @@
 #include "player_input.hpp"
 #include "usable.hpp"
 #include "item_instance.hpp"
+#include "chunk_manager_server.hpp"
+#include "world_info.hpp"
+#include "mapgen/samplers.hpp"
 
 namespace game
 {
@@ -56,10 +60,16 @@ struct ExplosionInfo
     collision::ObjectCallback* direct_hit;
 };
 
+struct WorldInfo
+{
+    WorldType type = WORLD_TYPE_MAP;
+    std::string mapname;
+};
+
 class World : public collision::DynamicsWorld, public net::MsgProducer, public net::LocalMsgProducer, public Scheduler
 {
 public:
-    World(const collision::DynamicsWorldInfo& info, std::string mapname);
+    World(const collision::DynamicsWorldInfo& col_info, const WorldInfo& world_info);
     DELETE_COPY_MOVE(World)
 
     void SendInitData(Player& player, net::OutMessage& msg);
@@ -88,9 +98,9 @@ public:
 
     const UseTarget* GetBestUseTarget(PlayerCharacter& character, UseTargetQueryResult& res);
 
-    const assets::Map& GetMap() const { return map_.GetMap(); }
-    const std::string& GetMapName() const { return map_.GetName(); }
-    const assets::MapNavMeshSet& GetNavMeshSet() const { return map_.GetNavMeshSet(); }
+    const assets::Map* GetMap() const { return map_ ? &map_->GetMap() : nullptr; }
+    const std::string* GetMapName() const { return map_ ? &map_->GetName() : nullptr; }
+    const assets::MapNavMeshSet* GetNavMeshSet() const { return map_ ? &map_->GetNavMeshSet() : nullptr; }
     const std::map<net::EntNum, std::unique_ptr<Entity>>& GetEntities() const { return ents_; }
     const int64_t& GetTime() const { return time_ms_; }
     float GetDayTime() const { return daytime_; }
@@ -114,7 +124,15 @@ public:
 
     void CreateCashPickup(const glm::vec3& position, int64_t amount, int64_t despawn_time, int64_t respawn_time);
 
+    void RequestChunkArea(const glm::vec3& center, float radius);
+    
+    float GetTerrainHeight(const glm::vec3& pos);
+    glm::vec3 GetTerrainPos(const glm::vec3& pos);
+
     virtual ~World() = default;
+
+protected:
+    virtual void QueryChunkGenCenters(std::vector<glm::vec3>& out_centers) {}
 
 private:
     void HandleContacts();
@@ -131,9 +149,20 @@ private:
 
     glm::vec3 GetGroundPosition(const glm::vec3& pos);
 
+    void UpdateChunks();
+
 private:
-    MapInstance map_;
+    WorldType type_;
+
+    // map type
+    std::optional<MapInstance> map_;
     std::set<net::ObjNum> destroyed_objs_;
+
+    // procedural type
+    mg::MapConfig map_cfg_;
+    std::optional<ServerChunkManager> chunk_manager_;
+    std::optional<mg::TerrainHeightSampler> terrain_sampler_;
+    std::vector<std::tuple<glm::vec3, float>> requested_areas_;
 
     std::map<net::EntNum, std::unique_ptr<Entity>> ents_;
     net::EntNum last_entnum_ = 0;

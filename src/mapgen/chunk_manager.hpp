@@ -9,6 +9,7 @@
 #include "mapgen/resources.hpp"
 #include "mapgen/map_config.hpp"
 #include "utils/worker.hpp"
+#include "utils/defs.hpp"
 
 namespace mg
 {
@@ -55,6 +56,7 @@ class ChunkManager
 {
 public:
     ChunkManager(std::shared_ptr<const ResourceSet> res, const MapConfig& map_cfg);
+    DELETE_COPY_MOVE(ChunkManager)
 
     void BeginFrame(int64_t time);
     void RequestChunk(const glm::ivec2& coord, uint32_t lod, float priority);
@@ -84,7 +86,7 @@ private:
     MapConfig map_cfg_;
     
     int64_t time_ = 0;
-    int64_t timeout_ = 1000;
+    int64_t timeout_ = 1;
     WorkerThread worker_;
     std::future<ChunkGenData> future_chunk_;
     std::unordered_map<glm::ivec2, ChunkData> chunks_;

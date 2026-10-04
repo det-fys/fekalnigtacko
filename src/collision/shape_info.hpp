@@ -20,6 +20,32 @@ enum Material : uint8_t
     PM_FLESH,
 };
 
+inline Material GetMaterialByName(const std::string& name)
+{
+    if (name == "stone")
+        return collision::PM_STONE;
+    else if (name == "dirt")
+        return collision::PM_DIRT;
+    else if (name == "grass")
+        return collision::PM_GRASS;
+    else if (name == "wood")
+        return collision::PM_WOOD;
+    else if (name == "metal")
+        return collision::PM_METAL;
+    else if (name == "glass")
+        return collision::PM_GLASS;
+    else if (name == "flesh")
+        return collision::PM_FLESH;
+    else if (name == "car") // TODO: make new material for cars
+        return collision::PM_METAL;
+    else if (name == "carwindow")
+        return collision::PM_NONE;
+    else if (name == "none")
+        return collision::PM_NONE;
+    else
+        return collision::PM_STONE;
+}
+
 struct ShapeInfo
 {
     std::span<Material> triangle_materials; 

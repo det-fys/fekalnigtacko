@@ -183,7 +183,7 @@ mg::ChunkGenData mg::ChunkManager::FinalizeChunk(const mg::ResourceSet& res, mg:
 
     // make chunk model
     assets::ModelDescriptor model_desc{};
-    // model_desc.make_triangle_mesh = true;
+    model_desc.make_triangle_mesh = chunk.lod == 0; 
 
     for (const auto& vert : chunk.mesh.verts)
     {
@@ -206,7 +206,15 @@ mg::ChunkGenData mg::ChunkManager::FinalizeChunk(const mg::ResourceSet& res, mg:
         model_surface.name = mg_material.name;
         model_surface.tri_offset = surface.tri_offset;
         model_surface.tri_count = surface.tri_count;
-        model_surface.material = mg_material;
+        model_surface.material = mg_material.material;
+
+        if (mg_material.col_material != collision::PM_NONE)
+        {
+            auto& col_surface = model_desc.col_surfaces.emplace_back();
+            col_surface.tri_offset = surface.tri_offset;
+            col_surface.tri_count = surface.tri_count;
+            col_surface.material = mg_material.col_material;
+        }
     }
 
     gen_data.model = std::make_shared<assets::Model>(std::move(model_desc));

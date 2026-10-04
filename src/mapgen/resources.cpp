@@ -28,6 +28,19 @@ static mg::TemplateMaterialRef GetMaterialRef(const mg::ResourceSet& res, const 
     return ref;
 }
 
+static mg::TemplateMaterial LoadMaterial(CmdLineStream& iss)
+{
+    mg::TemplateMaterial material{};
+    std::string col_mat_str;
+    iss >> col_mat_str;
+    material.col_material = collision::GetMaterialByName(col_mat_str);
+
+    material.material = assets::ParseMaterial(iss);
+    material.name = material.material.name;
+
+    return material;
+}
+
 static mg::TemplateProfile LoadTemplateProfile(const mg::ResourceSet& res, CmdLineStream& iss)
 {
     mg::TemplateProfile profile;
@@ -498,7 +511,7 @@ std::shared_ptr<mg::ResourceSet> mg::ResourceSet::LoadFromFile(const std::string
     assets::LoadCMDFile(path, [&](const std::string& command, CmdLineStream& iss) {
         if (command == "mat")
         {
-            auto material = assets::ParseMaterial(iss);
+            auto material = LoadMaterial(iss);
             auto name = material.name;
             res->materials_.Add(name, std::move(material));
         }

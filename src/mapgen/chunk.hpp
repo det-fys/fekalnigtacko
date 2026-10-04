@@ -77,6 +77,7 @@ struct ChunkParams
 {
     glm::ivec2 coord;
     uint32_t lod = 0;
+    bool collision_only = false;
     std::vector<ChunkStaticObject> objs;
     uint32_t heightmap_seed = 420;
     std::map<uint32_t, ChunkSplineNode> nodes;

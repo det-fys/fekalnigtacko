@@ -74,6 +74,7 @@ set(COMMON_SOURCES
     "src/fs/zip_archive_kubazip.cpp"
     "src/game/animal.cpp"
     "src/game/character.cpp"
+    "src/game/chunk_manager_server.cpp"
     "src/game/commands.cpp"
     "src/game/cow.cpp"
     "src/game/destroyed_object.cpp"

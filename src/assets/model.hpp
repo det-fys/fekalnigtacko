@@ -85,6 +85,7 @@ public:
 
     const glm::vec3& GetColOffset() const { return col_offset_; }
     const collision::TriangleMesh* GetColMesh() const { return cmesh_.get(); }
+    std::shared_ptr<const collision::TriangleMesh> GetColMeshShared() const { return cmesh_; }
     btCollisionShape* GetColShape() const { return cshape_.get(); }
     bool IsColShapeBulletTarget() const { return cshape_is_bullet_target_; }
 
@@ -106,7 +107,7 @@ private:
     std::map<std::string, size_t> surface_indices_;
     
     glm::vec3 col_offset_ = glm::vec3(0.0f);
-    std::unique_ptr<collision::TriangleMesh> cmesh_;
+    std::shared_ptr<const collision::TriangleMesh> cmesh_;
     // std::vector<ModelCollisionShape> cshapes_;
     std::vector<std::unique_ptr<btCollisionShape>> subshapes_;
     std::unique_ptr<btCollisionShape> cshape_;

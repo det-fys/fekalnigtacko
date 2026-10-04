@@ -13,7 +13,7 @@ class DrivableVehicle;
 class EnterableWorld : public World
 {
 public:
-    EnterableWorld(const collision::DynamicsWorldInfo& info, std::string mapname);
+    EnterableWorld(const collision::DynamicsWorldInfo& col_info, const WorldInfo& world_info);
 
     virtual void Update(int64_t delta_time) override;
 

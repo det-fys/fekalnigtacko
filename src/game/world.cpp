@@ -14,14 +14,44 @@
 #include "utils/format.hpp"
 #include "utils/random.hpp"
 
-game::World::World(const collision::DynamicsWorldInfo& info, std::string mapname)
-    : DynamicsWorld(info), Scheduler(time_ms_), map_(*this, std::move(mapname))
+game::World::World(const collision::DynamicsWorldInfo& col_info, const WorldInfo& world_info)
+    : DynamicsWorld(col_info), Scheduler(time_ms_), type_(world_info.type)
 {
+    if (world_info.type == WORLD_TYPE_MAP)
+    {
+        map_.emplace(*this, world_info.mapname);
+    }
+    else if (world_info.type == WORLD_TYPE_PROCEDURAL)
+    {
+        auto res = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
+
+        map_cfg_.seed = 67;
+        map_cfg_.chunks = 128;
+        map_cfg_.chunk_tiles = 128;
+        map_cfg_.chunk_size_m = 128.0f;
+
+        chunk_manager_.emplace(res, map_cfg_, *this);
+        terrain_sampler_.emplace(map_cfg_);
+    }
+    else
+    {
+        throw std::runtime_error("Invalid world type");
+    }
 }
 
 void game::World::SendInitData(Player& player, net::OutMessage& msg)
 {
-    msg.Write(net::MapName(map_.GetName()));
+    msg.Write(type_);
+
+    if (type_ == WORLD_TYPE_MAP)
+    {
+        msg.Write(net::MapName(map_->GetName()));
+    }
+    else
+    {
+        msg.Write(map_cfg_.seed);
+        msg.Write(map_cfg_.chunks);
+    }
 
     msg.Write<net::ObjCount>(destroyed_objs_.size());
     for (auto objnum : destroyed_objs_)
@@ -71,6 +101,8 @@ void game::World::Update(int64_t delta_time)
         else
             ++it;
     }
+
+    UpdateChunks();
 }
 
 void game::World::FinishFrame()
@@ -105,7 +137,8 @@ void game::World::RespawnObj(net::ObjNum objnum)
 {
     if (destroyed_objs_.erase(objnum) > 0)
     {
-        map_.SpawnObj(objnum);
+        if (map_)
+            map_->SpawnObj(objnum);
         SendObjRespawnedMsg(objnum);
     }
 }
@@ -553,6 +586,27 @@ void game::World::CreateCashPickup(const glm::vec3& position, int64_t amount, in
     }
 }
 
+void game::World::RequestChunkArea(const glm::vec3& center, float radius)
+{
+    if (!chunk_manager_)
+        return; // not procedural world
+
+    requested_areas_.emplace_back(center, radius);
+}
+
+float game::World::GetTerrainHeight(const glm::vec3& pos)
+{
+    if (!terrain_sampler_)
+        return 0.0f;
+
+    return terrain_sampler_->Get(pos);
+}
+
+glm::vec3 game::World::GetTerrainPos(const glm::vec3& pos)
+{
+    return glm::vec3(glm::vec2(pos), GetTerrainHeight(pos) + pos.z);
+}
+
 static void ApplyCrashDamage(collision::ObjectCallback& obj_cb, collision::ObjectCallback* other_obj_cb, float impulse, const glm::vec3& normal, const glm::vec3& velocity)
 {
     if (glm::length(impulse) < 1000.0f)
@@ -672,7 +726,7 @@ void game::World::DestroyObject(net::ObjNum objnum, const MapObjectBreakInfo& in
     SendObjDestroyedMsg(objnum);
     destroyed_objs_.insert(objnum);
 
-    auto col = map_.DestroyObj(objnum, info);
+    auto col = map_ ? map_->DestroyObj(objnum, info) : nullptr;
     if (col)
     {
         DestructibleDestroyed(objnum, std::move(col));
@@ -826,4 +880,19 @@ glm::vec3 game::World::GetGroundPosition(const glm::vec3& pos)
     }
 
     return glm::vec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
+}
+
+void game::World::UpdateChunks()
+{
+    if (!chunk_manager_)
+        return;
+
+    chunk_manager_->BeginFrame(time_ms_);
+    for (const auto& [center, radius] : requested_areas_)
+    {
+        chunk_manager_->RequestArea(center, {&radius, 1});
+    }
+    chunk_manager_->EndFrame();
+
+    requested_areas_.clear();
 }

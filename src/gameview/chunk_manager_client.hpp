@@ -29,6 +29,8 @@ public:
     void Draw(const gfx::DrawContext& ctx) const;
 
 protected:
+    virtual void GetChunkParams(mg::ChunkParams& out_params) override {}
+
     virtual void OnChunkGenerated(const mg::ChunkGenData& gen_data) override;
     virtual void OnChunkRemoved(const glm::ivec2& coord) override;
 

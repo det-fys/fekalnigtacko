@@ -4,30 +4,6 @@
 
 #include <BulletCollision/CollisionShapes/btShapeHull.h>
 
-static collision::Material GetMaterialByName(const std::string& name)
-{
-    if (name == "stone")
-        return collision::PM_STONE;
-    else if (name == "dirt")
-        return collision::PM_DIRT;
-    else if (name == "grass")
-        return collision::PM_GRASS;
-    else if (name == "wood")
-        return collision::PM_WOOD;
-    else if (name == "metal")
-        return collision::PM_METAL;
-    else if (name == "glass")
-        return collision::PM_GLASS;
-    else if (name == "flesh")
-        return collision::PM_FLESH;
-    else if (name == "car") // TODO: make new material for cars
-        return collision::PM_METAL;
-    else if (name == "carwindow")
-        return collision::PM_NONE;
-    else
-        return collision::PM_STONE;
-}
-
 assets::Model::Model(ModelDescriptor desc)
     : skeleton_(std::move(desc.skeleton)), vertices_(std::move(desc.verts)), tris_(std::move(desc.tris)),
       surfaces_(std::move(desc.surfaces)), col_offset_(desc.col_offset), params_(std::move(desc.params)),
@@ -48,7 +24,8 @@ assets::Model::Model(ModelDescriptor desc)
     // tri mesh
     if (desc.make_triangle_mesh)
     {
-        cmesh_ = std::make_unique<collision::TriangleMesh>();
+        auto cmesh = std::make_shared<collision::TriangleMesh>();
+        uint32_t tri_count = 0;
         for (const auto& col_surface : desc.col_surfaces)
         {
             if (col_surface.material == collision::PM_NONE)
@@ -57,7 +34,7 @@ assets::Model::Model(ModelDescriptor desc)
             if (col_surface.tri_count == 0)
                 continue;
 
-            cmesh_->BeginMaterial(col_surface.material);
+            cmesh->BeginMaterial(col_surface.material);
 
             for (size_t i = 0; i < col_surface.tri_count; ++i)
             {
@@ -70,11 +47,16 @@ assets::Model::Model(ModelDescriptor desc)
                         throw std::runtime_error("Vertex index out of bounds in model");
                     p[j] = vertices_.positions[index] - col_offset_;
                 }
-                cmesh_->AddTriangle(p[0], p[1], p[2]);
+                cmesh->AddTriangle(p[0], p[1], p[2]);
+                ++tri_count;
             }
         }
 
-        cmesh_->Build();
+        if (tri_count > 0)
+        {
+            cmesh->Build();
+            cmesh_ = std::move(cmesh);
+        }
     }
 
     // convex hull
@@ -285,7 +267,7 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
             iss >> pm_name;
 
             ModelCollisionSurface col_surface{};
-            col_surface.material = GetMaterialByName(pm_name);
+            col_surface.material = collision::GetMaterialByName(pm_name);
 
             if (!desc.col_surfaces.empty())
             {
@@ -298,7 +280,7 @@ std::shared_ptr<assets::Model> assets::Model::LoadFromFile(const std::string& fi
         {
             std::string pm_name;
             iss >> pm_name;
-            desc.col_material = GetMaterialByName(pm_name);
+            desc.col_material = collision::GetMaterialByName(pm_name);
         }
         else if (command == "loc")
         {

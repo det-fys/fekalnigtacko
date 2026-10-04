@@ -27,7 +27,7 @@ static constexpr size_t PATH_NEXT_WAYPOINTS = 16;
 
 game::NpcCharacter::NpcCharacter(World& world, const HumanCharacterTuning& tuning) : Super(world, tuning)
 {
-    roads_ = world_.GetMap().GetGraph("roads");
+    roads_ = world_.GetMap()->GetGraph("roads");
 
     EnterThinkState(THINKSTATE_IDLE);
     EnterDriverThinkState(DRIVERSTATE_NONE);
@@ -379,10 +379,8 @@ void game::NpcCharacter::FindVehiclePathToTarget(const glm::vec3& position)
     path_.clear();
 
     //auto time_start = std::chrono::high_resolution_clock::now();
-    bool found = GetWorld().GetNavMeshSet().GetVehicleNavMesh().FindPath(position, target_pos,
-                                                                         [this](const glm::vec3& waypoint) {
-                                                                             path_.emplace_back(waypoint);
-                                                                         });
+    bool found = GetWorld().GetNavMeshSet()->GetVehicleNavMesh().FindPath(
+        position, target_pos, [this](const glm::vec3& waypoint) { path_.emplace_back(waypoint); });
     //auto time_end = std::chrono::high_resolution_clock::now();
 
     //std::cout << "pathfind: found: " << (found ? "yes" : "no") << ", waypoints: " << path_.size()

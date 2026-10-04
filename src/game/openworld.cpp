@@ -122,6 +122,13 @@ static collision::DynamicsWorldInfo GetOpenWorldDynamicsInfo()
     return info;
 }
 
+static game::WorldInfo GetOpenWorldInfo()
+{
+    game::WorldInfo info{};
+    info.type = game::WORLD_TYPE_PROCEDURAL;
+    return info;
+}
+
 std::string GetSpzText(size_t num)
 {
     num %= 900000;
@@ -131,9 +138,9 @@ std::string GetSpzText(size_t num)
     return num_str.substr(0, 1) + "F" + num_str.substr(1, 5);
 }
 
-game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo(), "openworld"), game_(game)
+game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo(), GetOpenWorldInfo()), game_(game)
 {
-    SetSpawnPoint(glm::vec3(100.0f, 100.0f, 1.0f));
+    SetSpawnPoint(GetTerrainPos(glm::vec3(0.0f, 0.0f, 5.0f)));
 
     // initial twingo
     VehicleSpawnInfo twingo_info{};
@@ -142,7 +149,7 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo
     // twingo_tuning.primary_color = 0x0077FF;
     // twingo_tuning.wheels_idx = 1; // enkei
     // twingo_tuning.wheel_color = 0x00FF00;
-    twingo_info.position = glm::vec3{110.0f, 100.0f, 5.0f};
+    twingo_info.position = GetTerrainPos(glm::vec3{110.0f, 100.0f, 5.0f});
 
     auto& veh = Spawn<game::DrivableVehicle>(twingo_info);
 
@@ -154,41 +161,41 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo
             glm::vec3 pos(62.0f + static_cast<float>(col) * ow_vehicle_distance_x.Get(),
                           165.0f + static_cast<float>(row) * ow_vehicle_distance_y.Get(), 4.0f);
 
-            SpawnRandomVehicle(pos, 0.0f);
+            SpawnRandomVehicle(GetTerrainPos(pos), 0.0f);
         });
     }
 
-    for (auto locs = GetMap().GetLocations("tuning"); const auto& loc : locs)
-    {
-        CreateTuningGarage(loc.transform.position, glm::eulerAngles(loc.transform.rotation).x);
-    }
+    //for (auto locs = GetMap().GetLocations("tuning"); const auto& loc : locs)
+    //{
+    //    CreateTuningGarage(loc.transform.position, glm::eulerAngles(loc.transform.rotation).x);
+    //}
 
-    CreatePermaItemPickups("airrifle");
-    CreatePermaItemPickups("airsniper");
-    CreatePermaItemPickups("ak47");
-    CreatePermaItemPickups("uzi");
-    CreatePermaItemPickups("panzerschreck");
+    //CreatePermaItemPickups("airrifle");
+    //CreatePermaItemPickups("airsniper");
+    //CreatePermaItemPickups("ak47");
+    //CreatePermaItemPickups("uzi");
+    //CreatePermaItemPickups("panzerschreck");
 
-    SpawnNpcs();
+    //SpawnNpcs();
 
-    // cow
-    auto& cow = Spawn<Cow>(glm::vec3(0.0f, 0.0f, 2.0f), 0.0f);
-    cow.SetNametag("no ty krávo");
+    //// cow
+    //auto& cow = Spawn<Cow>(glm::vec3(0.0f, 0.0f, 2.0f), 0.0f);
+    //cow.SetNametag("no ty krávo");
 
-    // hit target npc
-    auto& npc = SpawnRandomNpc();
-    npc.SetPosition({90.0f, 100.0f, 5.0f});
-    npc.SetWeapon(std::make_shared<ItemInstance>("ak47"));
+    //// hit target npc
+    //auto& npc = SpawnRandomNpc();
+    //npc.SetPosition({90.0f, 100.0f, 5.0f});
+    //npc.SetWeapon(std::make_shared<ItemInstance>("ak47"));
 
-    // hit target npc 2
-    auto& npc2 = SpawnRandomNpc();
-    npc2.SetPosition({80.0f, 100.0f, 5.0f});
-    npc2.SetWeapon(std::make_shared<ItemInstance>("airsniper"));
+    //// hit target npc 2
+    //auto& npc2 = SpawnRandomNpc();
+    //npc2.SetPosition({80.0f, 100.0f, 5.0f});
+    //npc2.SetWeapon(std::make_shared<ItemInstance>("airsniper"));
 
-    // hit target npc 3
-    auto& npc3 = SpawnRandomNpc();
-    npc3.SetPosition({70.0f, 100.0f, 5.0f});
-    npc3.SetWeapon(std::make_shared<ItemInstance>("panzerschreck"));
+    //// hit target npc 3
+    //auto& npc3 = SpawnRandomNpc();
+    //npc3.SetPosition({70.0f, 100.0f, 5.0f});
+    //npc3.SetWeapon(std::make_shared<ItemInstance>("panzerschreck"));
 }
 
 void game::OpenWorld::Update(int64_t delta_time)
@@ -365,7 +372,7 @@ static std::tuple<glm::vec3, float> GetRandomNodeAndRotation(const assets::MapGr
 
 void game::OpenWorld::SpawnNpcVehicleWithPassengers()
 {
-    auto roads = GetMap().GetGraph("roads");
+    auto roads = GetMap()->GetGraph("roads");
 
     if (!roads)
     {
@@ -457,13 +464,13 @@ void game::OpenWorld::CreateTuningGarage(const glm::vec3& position, float yaw)
 
 void game::OpenWorld::CreatePermaItemPickups(const std::string& item_name)
 {
-    for (auto locs = GetMap().GetLocations("pickup_" + item_name); const auto& loc : locs)
+    for (auto locs = GetMap()->GetLocations("pickup_" + item_name); const auto& loc : locs)
     {
         CreatePermaItemPickup(loc.transform.position, item_name);
     }
 
 #ifndef NDEBUG
-    for (auto locs = GetMap().GetLocations("pickup_" + item_name + "_debug"); const auto& loc : locs)
+    for (auto locs = GetMap()->GetLocations("pickup_" + item_name + "_debug"); const auto& loc : locs)
     {
         CreatePermaItemPickup(loc.transform.position, item_name);
     }
@@ -534,12 +541,14 @@ bool game::OpenWorld::GetRecoveryPosition(const glm::vec3& current, glm::vec3& r
     start = glm::max(start, glm::vec3(-2500.0f, -2500.0f, -1000.0f));
     start = glm::min(start, glm::vec3(3400.0f, 3100.0f, 1000.0f));
 
-    if (!RecoveryRaycast(GetBtWorld(), start, recovery))
-    {
-        recovery = glm::vec3(0.0f, 0.0f, 5.0f);
-        return true;
+    recovery = GetTerrainPos(start);
 
-    }
+    //if (!RecoveryRaycast(GetBtWorld(), start, recovery))
+    //{
+    //    recovery = glm::vec3(0.0f, 0.0f, 5.0f);
+    //    return true;
+
+    //}
 
     if (recovery.z - 5.0f < current.z)
     {

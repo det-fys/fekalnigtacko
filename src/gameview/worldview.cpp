@@ -1,5 +1,7 @@
 #include "worldview.hpp"
 
+#include <array>
+
 #include "assets/asset_manager.hpp"
 
 #include "simple_entity_view.hpp"
@@ -14,11 +16,33 @@
 game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) : 
     session_(session), audiomaster_(session_.GetAudioMaster()), audioplayer_(audiomaster_), emitter_(&audioplayer_)
 {
-    net::MapName mapname;
-    if (!msg.Read(mapname))
+    if (!msg.Read(type_))
         throw EntityInitError();
 
-    map_ = std::make_unique<MapInstanceView>(*this, std::string(mapname));
+    if (type_ == WORLD_TYPE_MAP)
+    {
+        net::MapName mapname;
+        if (!msg.Read(mapname))
+            throw EntityInitError();
+
+        map_ = std::make_unique<MapInstanceView>(*this, std::string(mapname));
+    }
+    else if (type_ == WORLD_TYPE_PROCEDURAL)
+    {
+        if (!msg.Read(map_cfg_.seed) || !msg.Read(map_cfg_.chunks))
+            throw EntityInitError();
+
+        map_cfg_.chunk_size_m = 128.0f;
+        map_cfg_.chunk_tiles = 128;
+
+        auto res = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
+        chunk_manager_.emplace(res, map_cfg_);
+    }
+    else
+    {
+        throw EntityInitError();
+    }
+
 
     // init destroyed objs
     net::ObjCount objcount;
@@ -80,15 +104,20 @@ void game::view::WorldView::Update(const UpdateInfo& info)
 
     daytime_ = glm::mix(daytime0_, daytime1_, glm::clamp(GetTime() - env_msg_time_, 0.0f, 1.0f));
 
-    if (!map_->IsLoaded())
+    if (map_)
     {
-        map_->LoadNext();
+        if (!map_->IsLoaded())
+        {
+            map_->LoadNext();
+        }
+        else
+        {
+            map_->SetDayTime(daytime_);
+            map_->Update();
+        }
     }
-    else
-    {
-        map_->SetDayTime(daytime_);
-        map_->Update();
-    }
+
+    UpdateChunks();
 
     for (const auto& [entnum, ent] : ents_)
     {
@@ -103,7 +132,7 @@ void game::view::WorldView::Update(const UpdateInfo& info)
 
 void game::view::WorldView::Draw(const DrawArgs& args)
 {
-    if (!map_->IsLoaded())
+    if (map_ && !map_->IsLoaded())
     {
         gui::DrawLoadingScreen(args.gui, map_->GetLoadingPercent());
         return;
@@ -111,7 +140,11 @@ void game::view::WorldView::Draw(const DrawArgs& args)
 
     DrawEnv(args);
 
-    map_->Draw(args.ctx);
+    if (map_)
+        map_->Draw(args.ctx);
+
+    if (chunk_manager_)
+        chunk_manager_->Draw(args.ctx);
 
     const auto& frustum = args.ctx.frustum;
 
@@ -161,7 +194,7 @@ game::view::EntityView* game::view::WorldView::GetEntity(net::EntNum entnum)
 
 bool game::view::WorldView::IsLoaded() const
 {
-    return map_ && map_->IsLoaded();
+    return !map_ || map_->IsLoaded();
 }
 
 void game::view::WorldView::UpdateEnv()
@@ -325,7 +358,9 @@ bool game::view::WorldView::ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, b
     if (!msg.Read(objnum))
         return false;
 
-    map_->EnableObj(objnum, enable);
+    if (map_)
+        map_->EnableObj(objnum, enable);
+
     return true;
 }
 
@@ -376,4 +411,18 @@ void game::view::WorldView::DrawBeams(const DrawArgs& args) const
     {
         dlist.AddBeam(beam.start, beam.end, beam.color | 0xFF000000, beam.width);
     }
+}
+
+void game::view::WorldView::UpdateChunks()
+{
+    if (!chunk_manager_)
+        return;
+
+    const auto& cam_pos = session_.GetCameraParams().eye;
+
+    constexpr std::array<float, 4> lod_distances = {250.0f, 500.0f, 1000.0f, 2000.0f};
+
+    chunk_manager_->BeginFrame(++chunk_time_);
+    chunk_manager_->RequestArea(cam_pos, lod_distances);
+    chunk_manager_->EndFrame();
 }

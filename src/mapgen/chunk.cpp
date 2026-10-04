@@ -202,6 +202,7 @@ struct ChunkGenerator
 
     // lod
     uint32_t lod;
+    bool collision_only = false;
     bool gen_tree_objs = false;
     bool gen_tree_billboards = false;
     bool gen_grass = false;
@@ -241,10 +242,10 @@ struct ChunkGenerator
     ChunkGenerator(const mg::ResourceSet& res, const mg::MapConfig& cfg, const mg::ChunkParams& params,
                    mg::Chunk& chunk)
         : res(res), map_cfg(cfg), spline_nodes(&params.nodes), chunk_coord(params.coord), lod(params.lod),
-          objs(params.objs), chunk(chunk), bounds(GetChunkAABB(cfg, params.coord)),
-          extended_bounds(GetChunkAABB(cfg, params.coord, true)), heightmap_seed(params.heightmap_seed),
-          height_sampler(cfg), forest_sampler(heightmap_seed), color_sampler(heightmap_seed),
-          grass_sampler(heightmap_seed), tiles_border(cfg.chunk_border),
+          collision_only(params.collision_only), objs(params.objs), chunk(chunk),
+          bounds(GetChunkAABB(cfg, params.coord)), extended_bounds(GetChunkAABB(cfg, params.coord, true)),
+          heightmap_seed(params.heightmap_seed), height_sampler(cfg), forest_sampler(heightmap_seed),
+          color_sampler(heightmap_seed), grass_sampler(heightmap_seed), tiles_border(cfg.chunk_border),
           tiles_stride(cfg.chunk_tiles + cfg.chunk_border * 2), tiles(tiles_stride * tiles_stride),
           tile_size_m(cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles)),
           tiles_aabb(bounds.min - glm::vec2(cfg.chunk_border) * tile_size_m,
@@ -271,8 +272,8 @@ struct ChunkGenerator
     void SetupLod()
     {
         gen_tree_objs = lod <= 1;
-        gen_tree_billboards = lod <= 3;
-        gen_grass = lod <= 2;
+        gen_tree_billboards = (lod <= 3) && !collision_only;
+        gen_grass = (lod <= 2) && !collision_only;
         grass_cull_chance = lod == 0 ? 0.0f : lod == 1 ? 0.5f : 0.75f;
         terrain_density_scale = lod <= 1 ? 1.0f : (lod <= 2 ? 0.5f : 0.25f);
         path_segment_length_scale = 1.0f / terrain_density_scale;

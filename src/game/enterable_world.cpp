@@ -7,8 +7,8 @@
 
 CVAR(std::string, ew_navmesh_beams, CV_NONE, "", 0, 16);
 
-game::EnterableWorld::EnterableWorld(const collision::DynamicsWorldInfo& info, std::string mapname)
-    : World(info, std::move(mapname))
+game::EnterableWorld::EnterableWorld(const collision::DynamicsWorldInfo& col_info, const WorldInfo& world_info)
+    : World(col_info, world_info)
 {
 }
 
@@ -126,8 +126,11 @@ void game::EnterableWorld::DrawNavMeshBeams()
 {
     const auto& navmesh_id = ew_navmesh_beams.Get();
 
-    auto& navmesh_set = GetNavMeshSet();
-    auto& navmesh = (navmesh_id == "vehicle") ? navmesh_set.GetVehicleNavMesh() : navmesh_set.GetPawnNavMesh();
+    auto navmesh_set = GetNavMeshSet();
+    if (!navmesh_set)
+        return;
+
+    auto& navmesh = (navmesh_id == "vehicle") ? navmesh_set->GetVehicleNavMesh() : navmesh_set->GetPawnNavMesh();
 
     for (auto& [player, character] : player_characters_)
     {

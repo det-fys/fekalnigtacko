@@ -11,6 +11,8 @@
 #include "mapinstanceview.hpp"
 #include "worldenv.hpp"
 #include "particle_emitter.hpp"
+#include "game/world_info.hpp"
+#include "chunk_manager_client.hpp"
 
 namespace game::view
 {
@@ -64,10 +66,21 @@ private:
     void UpdateBeams();
     void DrawBeams(const DrawArgs& args) const;
 
+    void UpdateChunks();
+
 private:
     ClientSession& session_;
     
+    WorldType type_;
+
+    // map type
     std::unique_ptr<MapInstanceView> map_;
+
+    // procedural type
+    mg::MapConfig map_cfg_;
+    std::optional<ClientChunkManager> chunk_manager_;
+    int64_t chunk_time_ = 0;
+
     std::map<net::EntNum, std::unique_ptr<EntityView>> ents_;
     std::unique_ptr<WorldEnv> env_;
 

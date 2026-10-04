@@ -33,6 +33,13 @@ struct TemplateMaterialRef
     bool operator==(const TemplateMaterialRef& other) const { return type == other.type && id == other.id; }
 };
 
+struct TemplateMaterial
+{
+    std::string name;
+    assets::ModelMaterial material;
+    collision::Material col_material = collision::PM_NONE;
+};
+
 // profile
 
 struct TemplateProfileVertex
@@ -163,13 +170,13 @@ public:
     static std::shared_ptr<ResourceSet> Load(const std::string& path);
     static std::shared_ptr<ResourceSet> LoadFromFile(const std::string& path);
 
-    const ResourceArray<assets::ModelMaterial>& GetMaterials() const { return materials_; }
+    const ResourceArray<TemplateMaterial>& GetMaterials() const { return materials_; }
     const ResourceArray<TemplateProfile>& GetProfiles() const { return profiles_; }
     const ResourceArray<TemplateMesh>& GetMeshes() const { return meshes_; }
     const ResourceArray<StaticObjectModel>& GetModels() const { return models_; }
 
 private:
-    ResourceArray<assets::ModelMaterial> materials_;
+    ResourceArray<TemplateMaterial> materials_;
     ResourceArray<TemplateProfile> profiles_;
     ResourceArray<TemplateMesh> meshes_;
     ResourceArray<StaticObjectModel> models_;

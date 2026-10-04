@@ -39,6 +39,9 @@ void game::Entity::Update()
     // update transform parent
     root_.parent = parent_ ? &parent_->GetRoot() : nullptr;
 
+    // load chunks under me
+    world_.RequestChunkArea(root_.GetGlobalPosition(), 150.0f);
+
     RunTasks();
 }
 
