@@ -1136,16 +1136,17 @@ struct ChunkGenerator
             auto model_idx = model_group[static_cast<size_t>(type_vals[2] * 1000000.0f) % model_group.size()];
 
             auto obj_pos = glm::vec3(pos, height);
-            auto trans = glm::translate(glm::mat4(1.0f), obj_pos) *
-                         glm::rotate(glm::mat4(1.0f), angle_z, glm::vec3(0.0f, 0.0f, 1.0f)) *
-                         glm::scale(glm::mat4(1.0f), glm::vec3(scale));
 
+            FarTransform obj_trans{};
+            obj_trans.position = obj_pos;
+            obj_trans.rotation = glm::angleAxis(angle_z, glm::vec3(0.0f, 0.0f, 1.0f));
+            obj_trans.scale = scale;
 
             if (gen_tree_objs)
             {
                 auto& obj = chunk.objs.emplace_back();
                 obj.model_id = model_idx;
-                obj.trans = trans;
+                obj.trans = obj_trans.ToFarMatrix();
             }
             else
             {

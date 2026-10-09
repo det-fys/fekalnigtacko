@@ -4,7 +4,7 @@
 #include "input_mapping.hpp"
 #include "utils/random.hpp"
 
-game::Animal::Animal(World& world, const CharacterTuning& tuning, const glm::vec3& position, float yaw)
+game::Animal::Animal(World& world, const CharacterTuning& tuning, const glm::dvec3& position, float yaw)
     : Character(world, tuning), Usable(root_.matrix), Rideable(*this, RIDEABLE_ANIMAL)
 {
     SetPosition(position);

@@ -131,6 +131,12 @@ struct PositionQ
     PositionElemQ x, y, z;
 };
 
+using FarPositionElemQ = Quantized64<uint32_t, -10000, 10000, 1>;
+struct FarPositionQ
+{
+    FarPositionElemQ x, y, z;
+};
+
 using AngleQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
 using PositiveAngleQ = Quantized<uint16_t, 0, PI_N * 2, PI_D>;
 

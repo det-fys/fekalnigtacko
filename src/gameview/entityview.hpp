@@ -43,7 +43,7 @@ public:
     virtual void Draw(const DrawArgs& args);
 
     Sphere GetBoundingSphere() const { return Sphere{root_.GetGlobalPosition(), radius_}; }
-    const TransformNode& GetRoot() const { return root_; }
+    const FarTransformNode& GetRoot() const { return root_; }
 
     void SetVisible(bool visible) { visible_ = visible; }
     bool IsVisible() const { return visible_; }
@@ -64,7 +64,7 @@ private:
 protected:
     WorldView& world_;
 
-    TransformNode root_;
+    FarTransformNode root_;
 
     EntityView* parent_ = nullptr;
 

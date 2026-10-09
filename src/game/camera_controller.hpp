@@ -2,6 +2,8 @@
 
 #include "collision/dynamicsworld.hpp"
 
+#include "utils/transform.hpp"
+
 namespace game
 {
 
@@ -10,8 +12,8 @@ class CameraController
 public:
     CameraController() = default;
 
-    void SetCharacterTransform(const glm::mat4* transform) { character_transform_ = transform; }
-    void SetRideableTransform(const glm::mat4* transform) { rideable_transform_ = transform; }
+    void SetCharacterTransform(const FarMatrix* transform) { character_transform_ = transform; }
+    void SetRideableTransform(const FarMatrix* transform) { rideable_transform_ = transform; }
 
     void SetViewAngles(float yaw, float pitch);
     float GetYaw() const { return yaw_; }
@@ -23,9 +25,9 @@ public:
     void Update(float time);
     void Recalculate(collision::DynamicsWorld* world);
 
-    const glm::vec3& GetEye() const { return eye_; }
+    const glm::dvec3& GetEye() const { return eye_; }
     const glm::vec3& GetForward() const { return forward_; }
-    glm::mat4 GetViewMatrix() const;
+    // glm::mat4 GetViewMatrix() const;
     float GetAimFactor() const { return aim_factor_; }
 
     bool ShouldDrawCrosshair() const;
@@ -34,8 +36,8 @@ public:
     float GetFov() const;
 
 private:
-    const glm::mat4* character_transform_ = nullptr;
-    const glm::mat4* rideable_transform_ = nullptr;
+    const FarMatrix* character_transform_ = nullptr;
+    const FarMatrix* rideable_transform_ = nullptr;
 
     float yaw_ = 0.0f;
     float pitch_ = 0.0f;
@@ -46,7 +48,7 @@ private:
     bool aim_crosshair_ = false;
     bool aim_scope_ = false;
 
-    glm::vec3 eye_;
+    glm::dvec3 eye_;
     glm::vec3 forward_;
 
 };

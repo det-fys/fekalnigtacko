@@ -15,9 +15,10 @@ class TuningWorld : public EnterableWorld
 public:
     using Super = EnterableWorld;
 
-    TuningWorld(Game& game, EnterableWorld& exit_world, const glm::vec3& exit_pos, float exit_yaw, std::string mapname);
+    TuningWorld(Game& game, EnterableWorld& exit_world, const glm::dvec3& exit_pos, float exit_yaw, std::string mapname);
 
-    virtual PlayerCharacter& InsertPlayer(Player& player, const HumanCharacterTuning& tuning, const glm::vec3& pos, float yaw) override;
+    virtual PlayerCharacter& InsertPlayer(Player& player, const HumanCharacterTuning& tuning, const glm::dvec3& pos,
+                                          float yaw) override;
     virtual void PlayerInput(Player& player, PlayerInputType type, bool enabled) override;
     virtual void OnVehicleJoined(DrivableVehicle& vehicle) override;
     virtual void OnPlayerLeaving(Player& player) override;
@@ -41,7 +42,7 @@ private:
 private:
     Game& game_;
     EnterableWorld& exit_world_;
-    glm::vec3 exit_pos_;
+    glm::dvec3 exit_pos_;
     float exit_yaw_;
 
      // active player

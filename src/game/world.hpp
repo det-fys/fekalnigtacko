@@ -33,8 +33,8 @@ struct DamageInfo
     DamageType type = DAMAGE_OTHER;
     float damage = 0.0f;
     float impulse = 0.0f;
-    glm::vec3 from_pos{};
-    glm::vec3 impact_pos{};
+    glm::dvec3 from_pos{};
+    glm::dvec3 impact_pos{};
     glm::vec3 normal{};
     HumanCharacter* inflictor = nullptr;
     const btCollisionObject* hit_object = nullptr;
@@ -44,8 +44,8 @@ struct DamageInfo
 struct BulletInfo
 {
     HumanCharacter* shooter;
-    glm::vec3 start;
-    glm::vec3 end;
+    glm::dvec3 start;
+    glm::dvec3 end;
     float damage;
     float impulse;
 };
@@ -53,7 +53,7 @@ struct BulletInfo
 struct ExplosionInfo
 {
     HumanCharacter* inflictor;
-    glm::vec3 center;
+    glm::dvec3 center;
     float radius;
     float damage;
     float impulse;
@@ -106,33 +106,33 @@ public:
     float GetDayTime() const { return daytime_; }
     void SetDayTime(float daytime) { daytime_ = glm::mod(daytime, 24.0f); }
 
-    bool TraceBullet(const glm::vec3& start, const glm::vec3& end, HumanCharacter* shooter, glm::vec3& out_hit_pos,
+    bool TraceBullet(const glm::dvec3& start, const glm::dvec3& end, HumanCharacter* shooter, glm::dvec3& out_hit_pos,
                      collision::ObjectCallback** out_hit_obj_cb = nullptr);
     void FireBullet(const BulletInfo& bullet);
 
     void MakeExplosion(const ExplosionInfo& explo);
 
-    void Beam(const glm::vec3& start, const glm::vec3& end, uint32_t color, float time);
-    void BeamBox(const glm::vec3& min, const glm::vec3& max, uint32_t color, float time);
+    void Beam(const glm::dvec3& start, const glm::dvec3& end, uint32_t color, float time);
+    void BeamBox(const glm::dvec3& min, const glm::dvec3& max, uint32_t color, float time);
 
-    void Effect(const std::string& name, const glm::vec3& pos, const glm::vec3& dir);
+    void Effect(const std::string& name, const glm::dvec3& pos, const glm::vec3& dir);
 
     void SendChat(const std::string& text);
 
-    void CreateItemPickup(const glm::vec3& position, std::shared_ptr<ItemInstance> item, int64_t despawn_time,
+    void CreateItemPickup(const glm::dvec3& position, std::shared_ptr<ItemInstance> item, int64_t despawn_time,
                           int64_t respawn_time, size_t ammo_count);
 
-    void CreateCashPickup(const glm::vec3& position, int64_t amount, int64_t despawn_time, int64_t respawn_time);
+    void CreateCashPickup(const glm::dvec3& position, int64_t amount, int64_t despawn_time, int64_t respawn_time);
 
-    void RequestChunkArea(const glm::vec3& center, float radius);
+    void RequestChunkArea(const glm::dvec3& center, float radius);
     
-    float GetTerrainHeight(const glm::vec3& pos);
-    glm::vec3 GetTerrainPos(const glm::vec3& pos);
+    float GetTerrainHeight(const glm::dvec3& pos);
+    glm::dvec3 GetTerrainPos(const glm::dvec3& pos);
 
     virtual ~World() = default;
 
 protected:
-    virtual void QueryChunkGenCenters(std::vector<glm::vec3>& out_centers) {}
+    virtual void QueryChunkGenCenters(std::vector<glm::dvec3>& out_centers) {}
 
 private:
     void HandleContacts();
@@ -142,12 +142,12 @@ private:
     void SendObjDestroyedMsg(net::ObjNum objnum);
     void SendObjRespawnedMsg(net::ObjNum objnum);
 
-    const btCollisionObject* TraceBulletInternal(const glm::vec3& start, const glm::vec3& end,
-                                                 game::HumanCharacter* shooter, glm::vec3& out_hit_pos,
+    const btCollisionObject* TraceBulletInternal(const glm::dvec3& start, const glm::dvec3& end,
+                                                 game::HumanCharacter* shooter, glm::dvec3& out_hit_pos,
                                                  glm::vec3* out_hit_normal = nullptr,
                                                  collision::Material* out_hit_material = nullptr);
 
-    glm::vec3 GetGroundPosition(const glm::vec3& pos);
+    glm::dvec3 GetGroundPosition(const glm::dvec3& pos);
 
     void UpdateChunks();
 
@@ -162,7 +162,7 @@ private:
     mg::MapConfig map_cfg_;
     std::optional<ServerChunkManager> chunk_manager_;
     std::optional<mg::TerrainHeightSampler> terrain_sampler_;
-    std::vector<std::tuple<glm::vec3, float>> requested_areas_;
+    std::vector<std::tuple<glm::dvec3, float>> requested_areas_;
 
     std::map<net::EntNum, std::unique_ptr<Entity>> ents_;
     net::EntNum last_entnum_ = 0;

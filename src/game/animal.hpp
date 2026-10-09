@@ -21,7 +21,7 @@ class Animal : public Character, public Usable, public Rideable
 public:
     using Super = Character;
 
-    Animal(World& world, const CharacterTuning& tuning, const glm::vec3& position, float yaw);
+    Animal(World& world, const CharacterTuning& tuning, const glm::dvec3& position, float yaw);
 
     virtual void Update() override;
 

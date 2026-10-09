@@ -56,15 +56,28 @@ void game::view::ParticleEmitter::Draw(const DrawArgs& args)
         auto dir = args.ctx.eye - particle.position;
         auto basis = BasisFromDir(dir);
 
-        particle.matrix = glm::rotate(glm::mat4(
-            glm::vec4(basis[0] * particle.size, 0.0f),
-            glm::vec4(basis[1], 0.0f),
-            glm::vec4(basis[2] * particle.size, 0.0f),
-            glm::vec4(particle.position, 1.0f)
-        ), particle.rotation, glm::vec3(0.0f, 1.0f, 0.0f));
+        // scale
+        basis = glm::mat3(
+            basis[0] * particle.size,
+            basis[1],
+            basis[2] * particle.size
+        );
 
+        // rotate around Y
+        float c = glm::cos(particle.rotation);
+        float s = glm::sin(particle.rotation);
+
+        glm::mat3 rotation(
+            glm::vec3( c, 0.0f, -s),
+            glm::vec3(0.0f, 1.0f, 0.0f),
+            glm::vec3( s, 0.0f,  c)
+        );
+
+        particle.matrix.basis = rotation * basis;
+        particle.matrix.position = particle.position;
+        
         cmd.material = particle.material;
-        cmd.matrix = &particle.matrix;
+        cmd.transform = &particle.matrix;
         cmd.colors = {&particle.color, 1};
         cmd.dist = glm::dot(dir, dir);
 
@@ -77,7 +90,7 @@ void game::view::ParticleEmitter::Draw(const DrawArgs& args)
     }
 }
 
-void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effect>& fx, const glm::vec3& pos,
+void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effect>& fx, const glm::dvec3& pos,
                                        const glm::vec3& dir)
 {
     // spawn particles
@@ -106,7 +119,7 @@ void game::view::ParticleEmitter::Emit(const std::shared_ptr<const assets::Effec
                                 RandomFloat(def.offset_min.y, def.offset_max.y),
                                 RandomFloat(def.offset_min.z, def.offset_max.z));
 
-            particle.position = pos + BasisFromDir(dir) * offset_ps;
+            particle.position = pos + glm::dvec3(BasisFromDir(dir) * offset_ps);
             particle.rotation = RandomFloat(0.0f, glm::two_pi<float>());
             particle.rotation_speed = RandomFloat(def.rotation_speed_min, def.rotation_speed_max);
             particle.size = RandomFloat(def.size_min, def.size_max);

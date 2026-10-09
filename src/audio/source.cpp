@@ -47,7 +47,7 @@ void audio::Source::SetVelocity(const glm::vec3& velocity)
     alSource3f(source_, AL_VELOCITY, velocity.x, velocity.y, velocity.z);
 }
 
-void audio::Source::AttachToNode(const game::TransformNode* node)
+void audio::Source::AttachToNode(const game::FarTransformNode* node)
 {
     attach_node_ = node;
     if (attach_node_)
@@ -71,7 +71,7 @@ void audio::Source::SetRelativeToListener(bool relative)
 void audio::Source::Update()
 {
     if (attach_node_)
-        SetPosition(attach_node_->GetGlobalPosition());
+        SetPosition(attach_node_->GetGlobalPosition()); // TODO: double?
 }
 
 void audio::Source::Delete()

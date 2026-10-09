@@ -25,6 +25,13 @@ inline void ParseTransform(CmdLineStream& iss, Transform& trans)
     iss >> trans.scale;
 }
 
+inline void ParseTransform(CmdLineStream& iss, FarTransform& trans)
+{
+    iss >> trans.position.x >> trans.position.y >> trans.position.z;
+    iss >> trans.rotation.x >> trans.rotation.y >> trans.rotation.z >> trans.rotation.w;
+    iss >> trans.scale;
+}
+
 std::string ParseString(CmdLineStream& iss);
 
 } // namespace assets

@@ -13,18 +13,18 @@ std::shared_ptr<game::view::ModelView> game::view::ModelView::Load(const std::st
     return std::make_shared<ModelView>(assets::AssetManager::GetInstance().Get<assets::Model>(name));
 }
 
-void game::view::ModelView::Draw(const gfx::DrawContext& ctx, const glm::mat4& matrix,
+void game::view::ModelView::Draw(const gfx::DrawContext& ctx, const FarMatrix& matrix,
                                  std::span<const glm::vec4> colors, gfx::SkeletonPoseID pose_id,
                                  gfx::DeformTextureID deform_id, uint32_t surface_mask) const
 {
-    auto d = ctx.eye - glm::vec3(matrix[3]);
+    auto d = ctx.eye - matrix.position;
 
     gfx::DrawSurfaceCmd cmd{};
-    cmd.matrix = &matrix;
+    cmd.transform = &matrix;
     cmd.colors = colors;
     cmd.pose = pose_id;
     cmd.deform_tex = deform_id;
-    cmd.dist = glm::dot(d, d);
+    cmd.dist = static_cast<float>(glm::dot(d, d));
 
     auto& dlist = ctx.dlist;
 

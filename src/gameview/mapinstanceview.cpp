@@ -63,7 +63,7 @@ void game::view::MapInstanceView::Draw(const gfx::DrawContext& ctx)
         const auto& chunk = chunks[chunk_idx];
         
         glm::vec3 center = (chunk.aabb.min + chunk.aabb.max) * 0.5f;
-        auto dist2 = glm::distance2(ctx.eye, center);
+        auto dist2 = glm::distance2(glm::vec3(ctx.eye), center);
 
         if (dist2 < min_dist2 || dist2 > max_dist2)
             continue;
@@ -218,7 +218,7 @@ void game::view::MapInstanceView::DrawChunk(const gfx::DrawContext& ctx, const a
     }
 }
 
-void game::view::MapInstanceView::DrawObj(const gfx::DrawContext& ctx, MapModel& mapmodel, const glm::mat4& matrix)
+void game::view::MapInstanceView::DrawObj(const gfx::DrawContext& ctx, MapModel& mapmodel, const FarMatrix& matrix)
 {
     if (mapmodel.special == MMS_NONE)
     {
@@ -235,13 +235,13 @@ void game::view::MapInstanceView::DrawObj(const gfx::DrawContext& ctx, MapModel&
 
         if (mapmodel.light_on)
         {
-            glm::vec3 light_pos = matrix * glm::vec4(mapmodel.light.position, 1.0f);
-            glm::vec3 light_dir = glm::mat3(matrix) * mapmodel.light.dir;
+            // glm::vec3 light_pos = matrix * glm::vec4(mapmodel.light.position, 1.0f);
+            // glm::vec3 light_dir = glm::mat3(matrix) * mapmodel.light.dir;
 
-            ctx.dlist.AddSpotLight(light_pos, mapmodel.light.color, mapmodel.light.radius, light_dir,
-                                   mapmodel.light.cos_inner, mapmodel.light.cos_outer, gfx::LF_SHADOWS);
+            // ctx.dlist.AddSpotLight(light_pos, mapmodel.light.color, mapmodel.light.radius, light_dir,
+            //                        mapmodel.light.cos_inner, mapmodel.light.cos_outer, gfx::LF_SHADOWS);
 
-            ctx.dlist.AddCorona(light_pos, light_dir, mapmodel.light.color, 1.0f);
+            // ctx.dlist.AddCorona(light_pos, light_dir, mapmodel.light.color, 1.0f);
         }
     }
 }

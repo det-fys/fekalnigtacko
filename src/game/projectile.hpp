@@ -9,7 +9,7 @@ namespace game
 struct ProjectileInfo
 {
     std::string model_name;
-    glm::vec3 start_pos;
+    glm::dvec3 start_pos;
     glm::vec3 velocity;
     float gravity;
     net::EntNum shooter_num;

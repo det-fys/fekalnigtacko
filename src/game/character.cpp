@@ -15,7 +15,7 @@ game::Character::Character(World& world, const CharacterTuning& tuning)
 {
     z_offset_ = tuning_.shape.height * 0.5f + tuning_.shape.radius - 0.05f;
 
-    sk_ = SkeletonInstance(assets::AssetManager::GetInstance().Get<assets::Skeleton>(tuning.model_name), &root_);
+    sk_ = SkeletonInstance(assets::AssetManager::GetInstance().Get<assets::Skeleton>(tuning.model_name));
     SetupHitBones();
 }
 
@@ -179,7 +179,7 @@ void game::Character::SetViewAngles(float yaw, float pitch)
     view_pitch_ = pitch;
 }
 
-void game::Character::SetPosition(const glm::vec3& position)
+void game::Character::SetPosition(const glm::dvec3& position)
 {
     root_.local.position = position;
     SyncControllerTransform();
@@ -442,10 +442,9 @@ void game::Character::UpdateAiming()
 
     if (parent_)
     {
-        auto inv_parent =  glm::inverse(parent_->GetRoot().matrix);
+        auto inv_parent =  glm::inverse(parent_->GetRoot().matrix.ToDMat4());
 
-        // glm::vec3 character_pos_in_parent = inv_parent * glm::vec4(GetRoot().local.position, 1.0f);
-        glm::vec3 aim_target_in_parent = inv_parent * glm::vec4(aim_target_, 1.0f);
+        glm::dvec3 aim_target_in_parent = inv_parent * glm::dvec4(aim_target_, 1.0);
         dir = aim_target_in_parent - GetRoot().local.position;
     }
 
@@ -485,7 +484,7 @@ void game::Character::UpdateAiming()
 
 void game::Character::UpdateAimDirection()
 {
-    eye_pos_ = GetRoot().matrix * glm::vec4(0.0f, 0.0f, aim_z_offset_, 1.0f);
+    eye_pos_ = GetRoot().matrix.TransformPoint(glm::dvec3(0.0, 0.0, aim_z_offset_));
 
     auto pitch = aim_pitch_;
     auto yaw = yaw_ + aim_yaw_;
@@ -493,12 +492,12 @@ void game::Character::UpdateAimDirection()
 
     if (parent_)
     {
-        aim_dir_ = glm::normalize(parent_->GetRoot().matrix * glm::vec4(aim_dir_, 0.0f));
+        aim_dir_ = parent_->GetRoot().matrix.TransformDir(aim_dir_);
     }
 
     if (ch_aim_beams.Get() > 0)
     {
-        GetWorld().Beam(eye_pos_, eye_pos_ + aim_dir_ * 100.0f, 0x0000FF, 1.0f / 25.0f);
+        GetWorld().Beam(eye_pos_, eye_pos_ + glm::dvec3(aim_dir_ * 100.0f), 0x0000FF, 1.0f / 25.0f);
     }
 }
 
@@ -520,7 +519,7 @@ void game::Character::UpdateSyncState()
     auto& state = sync_[sync_current_];
 
     // transform
-    net::EncodePosition(root_.local.position, state.pos);
+    net::EncodeFarPosition(root_.local.position, state.pos);
     state.yaw.Encode(yaw_);
 
     // idle
@@ -645,8 +644,9 @@ void game::Character::SetupHitBones()
         auto& sk_hitbone = sk_hitbones[i];
 
         // setup node
-        hitbone.node.parent = &sk_.GetBoneNode(sk_hitbone.bone_idx);
-        hitbone.node.local = sk_hitbone.offset;
+        hitbone.node.parent = &GetRoot();
+        hitbone.node.near_parent = &sk_.GetBoneNode(sk_hitbone.bone_idx);
+        hitbone.node.local = FarTransform::FromNearTransform(sk_hitbone.offset);
 
         // setup object
         auto& col_obj = hitbone.col_obj;
@@ -700,7 +700,7 @@ void game::Character::EnableHitBones(bool enable)
 void game::Character::UpdateHitBones()
 {
     // update proxy transform
-    glm::vec3 center = GetRoot().matrix * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
+    glm::dvec3 center = GetRoot().matrix.TransformPoint(glm::dvec3(0.0, 0.0, 1.0));
     btTransform trans;
     trans.setIdentity();
     trans.setOrigin(btVector3(center.x, center.y, center.z));
@@ -717,19 +717,15 @@ void game::Character::UpdateHitBones()
     UpdateHitBoneTransforms();
 }
 
-static btTransform BtTransformFromMat4(const glm::mat4& m)
+static btTransform BtTransformFromFarMatrix(const FarMatrix& m)
 {
     btMatrix3x3 basis(
-        m[0][0], m[1][0], m[2][0],
-        m[0][1], m[1][1], m[2][1],
-        m[0][2], m[1][2], m[2][2]
+        m.basis[0][0], m.basis[1][0], m.basis[2][0],
+        m.basis[0][1], m.basis[1][1], m.basis[2][1],
+        m.basis[0][2], m.basis[1][2], m.basis[2][2]
     );
 
-    btVector3 origin(
-        m[3][0],
-        m[3][1],
-        m[3][2]
-    );
+    btVector3 origin(m.position[0], m.position[1], m.position[2]);
 
     btTransform trans;
     trans.setBasis(basis);
@@ -747,13 +743,13 @@ void game::Character::UpdateHitBoneTransforms()
     for (auto& hitbone : hitbones_)
     {
         hitbone.node.UpdateMatrix();
-        hitbone.col_obj.setWorldTransform(BtTransformFromMat4(hitbone.node.matrix));
+        hitbone.col_obj.setWorldTransform(BtTransformFromFarMatrix(hitbone.node.matrix));
 
         // debug boxes
         if (ch_hitbone_beams.Get() > 0)
         {
-            GetWorld().BeamBox(hitbone.node.GetGlobalPosition() - 0.05f, hitbone.node.GetGlobalPosition() + 0.05f, 0xFFFF00,
-                               1.5f / 25.0f);
+            GetWorld().BeamBox(hitbone.node.GetGlobalPosition() - 0.05, hitbone.node.GetGlobalPosition() + 0.05,
+                               0xFFFF00, 1.5f / 25.0f);
         }
     }
 }

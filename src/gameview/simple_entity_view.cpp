@@ -49,7 +49,7 @@ void game::view::SimpleEntityView::Update(const UpdateInfo& info)
     float t = (info.time - update_time_) * tps * 0.8f; // assume some jitter, interpolate for longer
     t = glm::clamp(t, 0.0f, 2.0f);
 
-    root_.local = Transform::Lerp(states_[0].trans, states_[1].trans, t);
+    root_.local = FarTransform::Lerp(states_[0].trans, states_[1].trans, t);
     root_.UpdateMatrix();
 }
 
@@ -85,7 +85,7 @@ bool game::view::SimpleEntityView::ReadState(net::InMessage* msg)
             if (!net::ReadDelta(*msg, sync_.pos.x) || !net::ReadDelta(*msg, sync_.pos.y) || !net::ReadDelta(*msg, sync_.pos.z))
                 return false;
 
-            net::DecodePosition(sync_.pos, new_state.trans.position);
+            net::DecodeFarPosition(sync_.pos, new_state.trans.position);
         }
 
         // rot

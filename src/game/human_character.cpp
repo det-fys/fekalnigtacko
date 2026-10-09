@@ -50,7 +50,7 @@ void game::HumanCharacter::SetRideable(Rideable* rideable, size_t seat_idx)
         glm::vec3 seat_loc = rideable_->GetSeatOffset(seat_idx_);
         seat_loc.x += glm::sign(seat_loc.x) * 0.5f; // to the side
 
-        glm::vec3 pos = rideable_->GetEntity().GetRoot().matrix * glm::vec4(seat_loc, 1.0f);
+        glm::dvec3 pos = rideable_->GetEntity().GetRoot().matrix.TransformPoint(seat_loc);
         pos.z += 0.5f;
 
         rideable_exit_pos_ = pos;
@@ -96,39 +96,28 @@ game::HumanCharacter::~HumanCharacter()
     Ride(nullptr, 0); // exit rideable
 }
 
-
-static bool CalculateAimPoint(
-    const glm::vec3& shellPosition,
-    float shellSpeed,
-    const glm::vec3& targetPosition,
-    const glm::vec3& targetVelocity,
-    float gravity, // negative, e.g. -9.81
-    glm::vec3& outAimPoint
-)
+static bool CalculateAimPoint(const glm::dvec3& shellPosition, double shellSpeed, const glm::dvec3& targetPosition,
+                              const glm::dvec3& targetVelocity, double gravity, glm::dvec3& outAimPoint)
 {
     constexpr int iterations = 50;
 
-    float low = 0.01f;
-    float high = 10.0f;
+    double low = 0.01;
+    double high = 10.0;
 
-    float impactTime = -1.0f;
+    double impactTime = -1.0;
 
     // Find a time where the required velocity matches shell speed
     for (int i = 0; i < iterations; i++)
     {
-        float t = (low + high) * 0.5f;
+        auto t = (low + high) * 0.5f;
 
-        glm::vec3 targetAtImpact =
-            targetPosition + targetVelocity * t;
-
-        glm::vec3 displacement =
-            targetAtImpact - shellPosition;
+        auto targetAtImpact = targetPosition + targetVelocity * t;
+        auto displacement = targetAtImpact - shellPosition;
 
         // compensate for gravity over flight time
-        displacement.z -= 0.5f * gravity * t * t;
+        displacement.z -= 0.5 * gravity * t * t;
 
-        float requiredSpeed =
-            glm::length(displacement) / t;
+        double requiredSpeed = glm::length(displacement) / t;
 
         if (requiredSpeed > shellSpeed)
         {
@@ -142,21 +131,20 @@ static bool CalculateAimPoint(
         impactTime = t;
     }
 
-    if (impactTime <= 0.0f)
+    if (impactTime <= 0.0)
         return false;
 
     // Where target will be when hit
-    glm::vec3 targetAtImpact =
-        targetPosition + targetVelocity * impactTime;
+    auto targetAtImpact = targetPosition + targetVelocity * impactTime;
 
     // Offset aim point upward to compensate for gravity drop
     outAimPoint = targetAtImpact;
-    outAimPoint.z -= 0.5f * gravity * impactTime * impactTime;
+    outAimPoint.z -= 0.5 * gravity * impactTime * impactTime;
 
     return true;
 }
 
-void game::HumanCharacter::SetAimTargetSmart(const glm::vec3& target_position, const glm::vec3& target_velocity)
+void game::HumanCharacter::SetAimTargetSmart(const glm::dvec3& target_position, const glm::vec3& target_velocity)
 {
     if (!GetAiming() || !item_ || item_->def->fire_type != assets::FIRETYPE_PROJECTILE)
     {
@@ -164,7 +152,7 @@ void game::HumanCharacter::SetAimTargetSmart(const glm::vec3& target_position, c
         return;
     }
 
-    glm::vec3 aim_point = target_position;
+    glm::dvec3 aim_point = target_position;
 
     // CalculateAimPos(GetEyePosition(), held_item->def->projectile_speed, aim_target, velocity, aim_target);
     CalculateAimPoint(GetEyePosition(), item_->def->projectile_speed, target_position, target_velocity,
@@ -232,7 +220,7 @@ void game::HumanCharacter::Fire()
     {
         BulletInfo bullet{};
         bullet.start = start;
-        bullet.end = start + dir * range;
+        bullet.end = start + glm::dvec3(dir * range);
         bullet.damage = item_->def->damage;
         bullet.shooter = this;
         bullet.impulse = 60.0f;

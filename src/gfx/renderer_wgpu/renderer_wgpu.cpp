@@ -3134,7 +3134,7 @@ void gfx::RendererWGPU::Render(ViewportWGPU& viewport, Scene& scene, const Camer
     const float farplane = max_distance * 2.0f + 500.0f;
 
     auto proj = glm::perspectiveRH_ZO(glm::radians(camera.fov * 0.5f), aspect, 0.1f, farplane);
-    auto view = glm::lookAt(camera.eye, camera.eye + camera.dir, camera.up);
+    auto view = glm::lookAt(glm::vec3(0.0f), camera.dir, camera.up);
 
     // main capture
     main_dlist_.Clear();
@@ -3224,7 +3224,8 @@ void gfx::RendererWGPU::Render(ViewportWGPU& viewport, Scene& scene, const Camer
             wgpu::RenderPassDescriptor pass_desc{};
             pass_desc.depthStencilAttachment = &depth_attachment;
             auto pass = encoder.BeginRenderPass(&pass_desc);
-            EncodePreparedCmds(viewport, pass, cascade.pcmds, globals, pass_index++, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
+            EncodePreparedCmds(viewport, pass, cascade.pcmds, camera.eye, globals, pass_index++,
+                               SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
             pass.End();
         }
 
@@ -3248,7 +3249,8 @@ void gfx::RendererWGPU::Render(ViewportWGPU& viewport, Scene& scene, const Camer
             wgpu::RenderPassDescriptor pass_desc{};
             pass_desc.depthStencilAttachment = &depth_attachment;
             auto pass = encoder.BeginRenderPass(&pass_desc);
-            EncodePreparedCmds(viewport, pass, shadowmap.pcmds, globals, pass_index++, SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
+            EncodePreparedCmds(viewport, pass, shadowmap.pcmds, camera.eye, globals, pass_index++,
+                               SPF_DEPTH_ONLY | SPF_SHADOW_MAP);
             pass.End();
         }
 
@@ -3298,7 +3300,7 @@ void gfx::RendererWGPU::Render(ViewportWGPU& viewport, Scene& scene, const Camer
             }
 
             auto pass = encoder.BeginRenderPass(&pass_desc);
-            EncodePreparedCmds(viewport, pass, pcmds_prepass_, globals, pass_index++, SPF_DEPTH_ONLY);
+            EncodePreparedCmds(viewport, pass, pcmds_prepass_, camera.eye, globals, pass_index++, SPF_DEPTH_ONLY);
             pass.End();
         }
 
@@ -3351,7 +3353,7 @@ void gfx::RendererWGPU::Render(ViewportWGPU& viewport, Scene& scene, const Camer
         // draw surfaces
         if (has_surfaces)
         {
-            EncodePreparedCmds(viewport, pass, pcmds_main_, globals, pass_index++, 0);
+            EncodePreparedCmds(viewport, pass, pcmds_main_, camera.eye, globals, pass_index++, 0);
         }
 
         // also draw coronas in this pass
@@ -3619,8 +3621,9 @@ void gfx::RendererWGPU::PrepareSurfaceCmds(std::span<DrawSurfaceCmd> cmds, std::
 }
 
 void gfx::RendererWGPU::EncodePreparedCmds(ViewportWGPU& viewport, wgpu::RenderPassEncoder& pass,
-                                           std::span<PreparedCmd> pcmds, const GlobalUniformData& globals,
-                                           uint32_t globals_index, SurfacePipelineFlags pflags)
+                                           std::span<PreparedCmd> pcmds, const glm::dvec3& eye,
+                                           const GlobalUniformData& globals, uint32_t globals_index,
+                                           SurfacePipelineFlags pflags)
 {
     if (pcmds.empty())
         return;
@@ -3734,7 +3737,7 @@ void gfx::RendererWGPU::EncodePreparedCmds(ViewportWGPU& viewport, wgpu::RenderP
         }
 
         auto& instance_data = instances_.emplace_back();
-        instance_data.matrix = cmd.matrix ? *cmd.matrix : glm::mat4(1.0f);
+        instance_data.matrix = cmd.transform ? cmd.transform->ToNearMatrix(eye) : glm::mat4(1.0f);
 
         if (!depth_only && (pcmd.pflags & (SPF_OBJECT_COLOR | SPF_MULTICOLOR)))
         {
@@ -3761,8 +3764,8 @@ void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawCo
     // calc distance
     for (auto& cmd : cmds)
     {
-        auto d = cmd.light.position - ctx.eye;
-        cmd.dist2 = glm::dot(d, d);
+        auto d = cmd.position - ctx.eye;
+        cmd.dist2 = static_cast<float>(glm::dot(d, d));
     }
 
     std::ranges::sort(cmds, [](const DrawLightCmd& a, const DrawLightCmd& b) { return a.dist2 < b.dist2; });
@@ -3772,33 +3775,34 @@ void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawCo
     for (size_t i = 0; i < num_lights; ++i)
     {
         auto& cmd = cmds[i];
-        auto& light = cmd.light;
+
+        auto near_pos = glm::vec3(cmd.position - ctx.eye);
 
         auto& entry = lights_.emplace_back();
-        entry.view_pos = ctx.view * glm::vec4(light.position, 1.0f);
-        entry.radius = light.radius;
-        entry.color = light.color;
-        entry.cos_inner = light.cos_inner;
-        entry.cos_outer = light.cos_outer;
+        entry.view_pos = ctx.view * glm::vec4(near_pos, 1.0f);
+        entry.radius = cmd.radius;
+        entry.color = cmd.color;
+        entry.cos_inner = cmd.cos_inner;
+        entry.cos_outer = cmd.cos_outer;
         entry.shadow_idx = 0xFFFFFFFF;
 
-        if (light.cos_inner > light.cos_outer)
+        if (cmd.cos_inner > cmd.cos_outer)
         {
             // spotlight
-            entry.view_dir = glm::mat3(ctx.view) * light.dir;
+            entry.view_dir = glm::mat3(ctx.view) * cmd.dir;
 
-            if (light.cos_outer > 0.70710678f)
+            if (cmd.cos_outer > 0.70710678f)
             {
                 // narrow
-                entry.bounding_radius = light.radius / (2.0f * light.cos_outer);
+                entry.bounding_radius = cmd.radius / (2.0f * cmd.cos_outer);
                 entry.view_bounding_pos = entry.view_pos + entry.view_dir * entry.bounding_radius;
             }
             else
             {
                 //wide
-                float sin_outer = glm::sqrt(1.0f - light.cos_outer * light.cos_outer);
-                entry.bounding_radius = light.radius * sin_outer;
-                entry.view_bounding_pos = entry.view_pos + entry.view_dir * (entry.radius * light.cos_outer);
+                float sin_outer = glm::sqrt(1.0f - cmd.cos_outer * cmd.cos_outer);
+                entry.bounding_radius = cmd.radius * sin_outer;
+                entry.view_bounding_pos = entry.view_pos + entry.view_dir * (entry.radius * cmd.cos_outer);
             }
 
             // shadow map candidate
@@ -3810,10 +3814,10 @@ void gfx::RendererWGPU::PrepareLights(std::span<DrawLightCmd> cmds, const DrawCo
 
                 // setup matrices
                 auto& shadowmap = spotlight_shadows_[i];
-                shadowmap.proj = glm::perspectiveRH_ZO(2.0f * glm::acos(light.cos_outer), 1.0f, 0.2f, light.radius + 0.1f);
+                shadowmap.proj = glm::perspectiveRH_ZO(2.0f * glm::acos(cmd.cos_outer), 1.0f, 0.2f, cmd.radius + 0.1f);
                 glm::vec3 up =
-                    (std::abs(light.dir.z) < 0.99f) ? glm::vec3(0.0f, 0.0f, 1.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
-                shadowmap.view = glm::lookAt(light.position, light.position + light.dir, glm::vec3(0.0f, 0.0f, 1.0f));
+                    (std::abs(cmd.dir.z) < 0.99f) ? glm::vec3(0.0f, 0.0f, 1.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
+                shadowmap.view = glm::lookAt(near_pos, near_pos + cmd.dir, glm::vec3(0.0f, 0.0f, 1.0f));
                 shadowmap.view_proj = shadowmap.proj * shadowmap.view;
 
                 entry.shadow_idx = i;

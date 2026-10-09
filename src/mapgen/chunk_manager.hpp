@@ -18,7 +18,7 @@ constexpr uint32_t LOD_INVALID = 0xFFFFFFFF;
 
 struct ChunkObj
 {
-    glm::mat4 trans{1.0f};
+    FarMatrix trans{1.0f};
     AABB3 aabb{};
     std::shared_ptr<const assets::Model> model;
 };

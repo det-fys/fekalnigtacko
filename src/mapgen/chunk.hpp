@@ -6,6 +6,7 @@
 #include <tuple>
 
 #include "utils/aabb.hpp"
+#include "utils/transform.hpp"
 #include "map_config.hpp"
 #include "defs.hpp"
 #include "heightmesh.hpp"
@@ -85,7 +86,7 @@ struct ChunkParams
 
 struct ChunkOutputObject
 {
-    glm::mat4 trans{1.0f};
+    FarMatrix trans{1.0f};
     uint32_t model_id = 0;
 };
 

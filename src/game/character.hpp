@@ -55,7 +55,7 @@ enum CharacterMovementType
 struct CharacterHitBoneInstance
 {
     btCollisionObject col_obj;
-    TransformNode node;
+    FarTransformNode node;
 };
 
 class Character : public Entity
@@ -87,12 +87,12 @@ public:
     float GetViewYaw() const { return view_yaw_; }
     float GetViewPitch() const { return view_pitch_; }
 
-    const glm::vec3& GetEyePosition() const { return eye_pos_; }
+    const glm::dvec3& GetEyePosition() const { return eye_pos_; }
     const glm::vec3& GetAimDirection() const { return aim_dir_; }
 
     void SetYaw(float yaw) { yaw_ = yaw; }
 
-    void SetPosition(const glm::vec3& position);
+    void SetPosition(const glm::dvec3& position);
 
     void SetWeightSpeedMult(float mult) { weight_speed_mult_ = mult; }
 
@@ -125,7 +125,7 @@ protected:
     bool IsActionAnimDone() const { return action_anim_done_; }
     void SetAiming(bool aiming) { aiming_ = aiming; }
     bool GetAiming() const { return aiming_; }
-    void SetAimTarget(const glm::vec3& target);
+    void SetAimTarget(const glm::dvec3& target);
     void SetViewItem(const std::string& item_name);
     void SendFire();
     void ApplyPain();
@@ -203,9 +203,9 @@ private:
     bool action_anim_done_ = true;
 
     bool aiming_ = false;
-    glm::vec3 aim_target_ = glm::vec3(0.0f);
+    glm::dvec3 aim_target_{0.0};
     float aim_z_offset_ = 1.6f;
-    glm::vec3 eye_pos_ = glm::vec3(0.0f);
+    glm::dvec3 eye_pos_{0.0};
     glm::vec3 aim_dir_ = glm::vec3(0.0f);
 
     std::string item_;

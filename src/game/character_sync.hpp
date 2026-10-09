@@ -11,7 +11,7 @@ namespace game
 struct CharacterSyncState
 {
     // transform
-    net::PositionQ pos;
+    net::FarPositionQ pos;
     net::PositiveAngleQ yaw;
 
     // idle

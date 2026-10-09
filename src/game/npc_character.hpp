@@ -67,10 +67,10 @@ private:
     bool IsVehicleDriver() const;
     void ResetVehiclePath();
     void SetPathMode(bool to_target);
-    void FindVehiclePath(const glm::vec3& position);
-    void FindVehiclePathRoads(const glm::vec3& position);
-    void FindVehiclePathToTarget(const glm::vec3& position);
-    void UpdateVehicleInput(std::span<glm::vec3> path);
+    void FindVehiclePath(const glm::dvec3& position);
+    void FindVehiclePathRoads(const glm::dvec3& position);
+    void FindVehiclePathToTarget(const glm::dvec3& position);
+    void UpdateVehicleInput(std::span<glm::dvec3> path);
     void UpdateVehicleInputToFollowPath();
     void UpdateVehicleInputToFollowEnemy();
     bool CheckStuck();
@@ -103,9 +103,9 @@ private:
     int64_t driver_state_time_ = 0;
     DriverThinkState prev_driver_state_ = DRIVERSTATE_NONE;
     
-    std::deque<glm::vec3> path_;
+    std::deque<glm::dvec3> path_;
     size_t last_waypoint_idx_ = INVALID_WAYPOINT_IDX;
-    glm::vec3 last_pos_ = glm::vec3(0.0f);
+    glm::dvec3 last_pos_{0.0};
     size_t stuck_counter_ = 0;
     
     VehicleInputFlags vehicle_in_ = 0;
@@ -125,7 +125,7 @@ private:
     net::EntNum enemy_num_ = 0;
     HumanCharacter* enemy_ = nullptr;
     int64_t enemy_time_ = 0;
-    glm::vec3 last_enemy_pos_{};
+    glm::dvec3 last_enemy_pos_{0.0};
 
     bool follow_enemy_ = false;
 

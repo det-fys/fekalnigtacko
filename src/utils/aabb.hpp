@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <limits>
 
+#include "transform.hpp"
+
 template <size_t dim>
 struct AABB
 {
@@ -77,4 +79,9 @@ inline AABB3 TransformAABB(const AABB3& aabb, const glm::mat4& mat)
     }
     
     return new_aabb;
+}
+
+inline AABB3 TransformAABB(const AABB3& aabb, const FarMatrix& mat)
+{
+    return TransformAABB(aabb, mat.ToNearMatrix(glm::dvec3(0.0)));
 }

@@ -1,8 +1,7 @@
 #include "skeletoninstance.hpp"
 
-game::SkeletonInstance::SkeletonInstance(std::shared_ptr<const assets::Skeleton> skeleton,
-                                         const TransformNode* root_node)
-    : skeleton_(std::move(skeleton)), root_node_(root_node)
+game::SkeletonInstance::SkeletonInstance(std::shared_ptr<const assets::Skeleton> skeleton)
+    : skeleton_(std::move(skeleton))
 {
     SetupBoneNodes();
 }
@@ -125,7 +124,7 @@ void game::SkeletonInstance::SetupBoneNodes()
         }
         else
         {
-            node.parent = root_node_;
+            node.parent = nullptr;
         }
     }
 

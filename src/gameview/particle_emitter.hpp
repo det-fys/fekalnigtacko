@@ -15,7 +15,7 @@ struct Particle
 
     // instance specific
     float time;
-    glm::vec3 position;
+    glm::dvec3 position;
     float rotation;
     float rotation_speed;
     float size;
@@ -26,7 +26,7 @@ struct Particle
     float fade_start;
 
     // for drawing
-    glm::mat4 matrix;
+    FarMatrix matrix;
     glm::vec4 color;
     glm::vec4 lightcolor;
 };
@@ -39,7 +39,7 @@ public:
     void Update(float delta_time);
     void Draw(const DrawArgs& args);
 
-    void Emit(const std::shared_ptr<const assets::Effect>& fx, const glm::vec3& pos, const glm::vec3& dir);
+    void Emit(const std::shared_ptr<const assets::Effect>& fx, const glm::dvec3& pos, const glm::vec3& dir);
 
 private:
     audio::Player* audioplayer_;

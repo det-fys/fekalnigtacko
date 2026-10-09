@@ -71,7 +71,7 @@ public:
     // }
 
     template <AnyQuantized T>
-    void Write(float f)
+    void Write(T::ScalarType f)
     {
         T q;
         q.Encode(f);

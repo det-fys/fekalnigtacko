@@ -150,7 +150,7 @@ const game::UseTarget* game::World::GetBestUseTarget(PlayerCharacter& character,
     struct UseTargetAabbCallback : public btBroadphaseAabbCallback
     {
         PlayerCharacter& character;
-        glm::vec3 pos;
+        glm::dvec3 pos;
         const UseTarget* best_target = nullptr;
         float best_dist = std::numeric_limits<float>::max();
         UseTargetQueryResult& best_res;
@@ -186,9 +186,9 @@ const game::UseTarget* game::World::GetBestUseTarget(PlayerCharacter& character,
 
             for (const auto& target : usable->GetUseTargets())
             {
-                glm::vec3 pos_world = matrix * glm::vec4(target.position, 1.0f);
+                auto pos_world = matrix.TransformPoint(target.position);
 
-                float dist = glm::distance(pos, pos_world);
+                auto dist = glm::length(glm::vec3(pos - pos_world));
                 if (dist < radius && dist < best_dist)
                 {
                     UseTargetQueryResult res{};
@@ -213,8 +213,8 @@ const game::UseTarget* game::World::GetBestUseTarget(PlayerCharacter& character,
     return cb.best_target;
 }
 
-bool game::World::TraceBullet(const glm::vec3& start, const glm::vec3& end, HumanCharacter* shooter,
-                              glm::vec3& out_hit_pos, collision::ObjectCallback** out_hit_obj_cb)
+bool game::World::TraceBullet(const glm::dvec3& start, const glm::dvec3& end, HumanCharacter* shooter,
+                              glm::dvec3& out_hit_pos, collision::ObjectCallback** out_hit_obj_cb)
 {
     auto hit_obj = TraceBulletInternal(start, end, shooter, out_hit_pos);
 
@@ -279,7 +279,8 @@ static std::string GetMaterialImpactFx(collision::Material material)
 
 void game::World::FireBullet(const BulletInfo& bullet)
 {
-    glm::vec3 hit_pos, hit_normal;
+    glm::dvec3 hit_pos;
+    glm::vec3 hit_normal;
     collision::Material material;
     auto hit_obj = TraceBulletInternal(bullet.start, bullet.end, bullet.shooter, hit_pos, &hit_normal, &material);
     if (!hit_obj)
@@ -347,9 +348,9 @@ void game::World::MakeExplosion(const ExplosionInfo& explo)
             auto& world_trans = obj->getWorldTransform();
             auto bt_pos = world_trans.getOrigin();
             bt_pos += world_trans.getBasis() * btVector3(0.0f, 0.0f, 0.7f);
-            glm::vec3 pos(bt_pos.x(), bt_pos.y(), bt_pos.z());
+            glm::dvec3 pos(bt_pos.x(), bt_pos.y(), bt_pos.z());
 
-            auto distance = glm::distance(explo.center, pos);
+            auto distance = glm::length(glm::vec3(explo.center - pos));
             if (distance > explo.radius && obj_cb != explo.direct_hit)
                 return true; // out of radius 
 
@@ -407,25 +408,25 @@ void game::World::MakeExplosion(const ExplosionInfo& explo)
 
 }
 
-void game::World::Beam(const glm::vec3& start, const glm::vec3& end, uint32_t color, float time)
+void game::World::Beam(const glm::dvec3& start, const glm::dvec3& end, uint32_t color, float time)
 {
     auto msg = BeginLocalMsg(start, 500.0f, net::MSG_BEAM);
-    net::WritePosition(msg, start);
-    net::WritePosition(msg, end);
+    net::WriteFarPosition(msg, start);
+    net::WriteFarPosition(msg, end);
     net::WriteRGB(msg, color);
     msg.Write<net::BeamTimeQ>(time);
 }
 
-void game::World::BeamBox(const glm::vec3& min, const glm::vec3& max, uint32_t color, float time)
+void game::World::BeamBox(const glm::dvec3& min, const glm::dvec3& max, uint32_t color, float time)
 {
-    const glm::vec3& p0 = min;
-    const glm::vec3 p1(max.x, min.y, min.z);
-    const glm::vec3 p2(max.x, max.y, min.z);
-    const glm::vec3 p3(min.x, max.y, min.z);
-    const glm::vec3 p4(min.x, min.y, max.z);
-    const glm::vec3 p5(max.x, min.y, max.z);
-    const glm::vec3& p6 = max;
-    const glm::vec3 p7(min.x, max.y, max.z);
+    const glm::dvec3& p0 = min;
+    const glm::dvec3 p1(max.x, min.y, min.z);
+    const glm::dvec3 p2(max.x, max.y, min.z);
+    const glm::dvec3 p3(min.x, max.y, min.z);
+    const glm::dvec3 p4(min.x, min.y, max.z);
+    const glm::dvec3 p5(max.x, min.y, max.z);
+    const glm::dvec3& p6 = max;
+    const glm::dvec3 p7(min.x, max.y, max.z);
 
     Beam(p0, p1, color, time);
     Beam(p1, p2, color, time);
@@ -443,11 +444,11 @@ void game::World::BeamBox(const glm::vec3& min, const glm::vec3& max, uint32_t c
     Beam(p3, p7, color, time);
 }
 
-void game::World::Effect(const std::string& name, const glm::vec3& pos, const glm::vec3& dir)
+void game::World::Effect(const std::string& name, const glm::dvec3& pos, const glm::vec3& dir)
 {
     auto msg = BeginLocalMsg(pos, 400.0f, net::MSG_FX);
     msg.Write(net::ModelName(name));
-    net::WritePosition(msg, pos);
+    net::WriteFarPosition(msg, pos);
     msg.Write<net::DirQ>(dir.x);
     msg.Write<net::DirQ>(dir.y);
     msg.Write<net::DirQ>(dir.z);
@@ -459,7 +460,7 @@ void game::World::SendChat(const std::string& text)
     msg.Write(net::ChatMessage(text));
 }
 
-void game::World::CreateItemPickup(const glm::vec3& position, std::shared_ptr<ItemInstance> item, int64_t despawn_time,
+void game::World::CreateItemPickup(const glm::dvec3& position, std::shared_ptr<ItemInstance> item, int64_t despawn_time,
                                    int64_t respawn_time, size_t ammo_count)
 {
     auto ground_pos = GetGroundPosition(position);
@@ -535,7 +536,7 @@ static std::string_view GetCashModel(int64_t amount)
         return "cash100";
 }
 
-void game::World::CreateCashPickup(const glm::vec3& position, int64_t amount, int64_t despawn_time,
+void game::World::CreateCashPickup(const glm::dvec3& position, int64_t amount, int64_t despawn_time,
                                    int64_t respawn_time)
 {
     auto ground_pos = GetGroundPosition(position);
@@ -586,7 +587,7 @@ void game::World::CreateCashPickup(const glm::vec3& position, int64_t amount, in
     }
 }
 
-void game::World::RequestChunkArea(const glm::vec3& center, float radius)
+void game::World::RequestChunkArea(const glm::dvec3& center, float radius)
 {
     if (!chunk_manager_)
         return; // not procedural world
@@ -594,7 +595,7 @@ void game::World::RequestChunkArea(const glm::vec3& center, float radius)
     requested_areas_.emplace_back(center, radius);
 }
 
-float game::World::GetTerrainHeight(const glm::vec3& pos)
+float game::World::GetTerrainHeight(const glm::dvec3& pos)
 {
     if (!terrain_sampler_)
         return 0.0f;
@@ -602,12 +603,13 @@ float game::World::GetTerrainHeight(const glm::vec3& pos)
     return terrain_sampler_->Get(pos);
 }
 
-glm::vec3 game::World::GetTerrainPos(const glm::vec3& pos)
+glm::dvec3 game::World::GetTerrainPos(const glm::dvec3& pos)
 {
-    return glm::vec3(glm::vec2(pos), GetTerrainHeight(pos) + pos.z);
+    return glm::dvec3(glm::dvec2(pos), GetTerrainHeight(pos) + pos.z);
 }
 
-static void ApplyCrashDamage(collision::ObjectCallback& obj_cb, collision::ObjectCallback* other_obj_cb, float impulse, const glm::vec3& normal, const glm::vec3& velocity)
+static void ApplyCrashDamage(collision::ObjectCallback& obj_cb, collision::ObjectCallback* other_obj_cb, float impulse,
+                             const glm::vec3& normal, const glm::vec3& velocity)
 {
     if (glm::length(impulse) < 1000.0f)
         return;
@@ -798,8 +800,8 @@ struct NotMeNotMyRideAndNotOtherPassengersOfMyRideClosestRayResultCallback : pub
     }
 };
 
-const btCollisionObject* game::World::TraceBulletInternal(const glm::vec3& start, const glm::vec3& end,
-                                                          game::HumanCharacter* shooter, glm::vec3& out_hit_pos,
+const btCollisionObject* game::World::TraceBulletInternal(const glm::dvec3& start, const glm::dvec3& end,
+                                                          game::HumanCharacter* shooter, glm::dvec3& out_hit_pos,
                                                           glm::vec3* out_hit_normal,
                                                           collision::Material* out_hit_material)
 {
@@ -831,7 +833,7 @@ const btCollisionObject* game::World::TraceBulletInternal(const glm::vec3& start
     if (!cb.hasHit())
         return nullptr;
 
-    out_hit_pos = glm::vec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
+    out_hit_pos = glm::dvec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
     
     if (out_hit_normal)
     {
@@ -862,10 +864,10 @@ const btCollisionObject* game::World::TraceBulletInternal(const glm::vec3& start
     return cb.m_collisionObject;
 }
 
-glm::vec3 game::World::GetGroundPosition(const glm::vec3& pos)
+glm::dvec3 game::World::GetGroundPosition(const glm::dvec3& pos)
 {
-    btVector3 bt_from(pos.x, pos.y, pos.z + 1.0f);
-    btVector3 bt_to(pos.x, pos.y, pos.z - 5.0f);
+    btVector3 bt_from(pos.x, pos.y, pos.z + 1.0);
+    btVector3 bt_to(pos.x, pos.y, pos.z - 5.0);
 
 
     btCollisionWorld::ClosestRayResultCallback cb(bt_from, bt_to);
@@ -879,7 +881,7 @@ glm::vec3 game::World::GetGroundPosition(const glm::vec3& pos)
         return pos;
     }
 
-    return glm::vec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
+    return glm::dvec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
 }
 
 void game::World::UpdateChunks()

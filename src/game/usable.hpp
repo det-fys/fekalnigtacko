@@ -13,10 +13,10 @@ struct UseTarget
 {
     Usable* usable;
     uint32_t id;
-    glm::vec3 position;
+    glm::dvec3 position;
     std::string desc;
 
-    UseTarget(Usable* usable, uint32_t id, const glm::vec3& position, std::string desc)
+    UseTarget(Usable* usable, uint32_t id, const glm::dvec3& position, std::string desc)
         : usable(usable), id(id), position(position), desc(std::move(desc))
     {
     }
@@ -34,10 +34,10 @@ class PlayerCharacter;
 class Usable
 {
 public:
-    Usable(const glm::mat4& ws_matrix) : matrix_(ws_matrix) {}
+    Usable(const FarMatrix& ws_matrix) : matrix_(ws_matrix) {}
 
     const std::vector<UseTarget>& GetUseTargets() const { return use_targets_; }
-    const glm::mat4& GetWSTransformMatrix() const { return matrix_; }
+    const FarMatrix& GetWSTransformMatrix() const { return matrix_; }
     
     virtual bool QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res) = 0;
     virtual void Use(PlayerCharacter& character, uint32_t target_id) = 0;
@@ -46,7 +46,7 @@ protected:
     std::vector<UseTarget> use_targets_;
 
 private:
-    const glm::mat4& matrix_;
+    const FarMatrix& matrix_;
 };
 
 } // namespace game

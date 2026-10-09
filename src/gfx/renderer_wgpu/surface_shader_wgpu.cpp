@@ -47,12 +47,13 @@ static std::string GetShaderSource(gfx::SurfacePipelineFlags flags, const gfx::S
                 }
             }
 
-            let world_pos = (bone_transform * vec4f(in.position, 1.0)).xyz;
+            let transform = instance.matrix * bone_transform;
+            let world_pos = (transform * vec4f(in.position, 1.0)).xyz;
             let world_normal = normalize(
                 mat3x3f(
-                    bone_transform[0].xyz,
-                    bone_transform[1].xyz,
-                    bone_transform[2].xyz
+                    transform[0].xyz,
+                    transform[1].xyz,
+                    transform[2].xyz
                 ) * in.normal
             );
         )WGSL";

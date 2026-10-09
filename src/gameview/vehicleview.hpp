@@ -20,7 +20,7 @@ struct VehicleWheelViewInfo
     std::shared_ptr<const ModelView> model;
     glm::vec4 color{};
 
-    TransformNode node;
+    FarTransformNode node;
     float steering = 0.0f;
     float z_offset = 0.0f;
     float speed = 0.0f;
@@ -29,7 +29,7 @@ struct VehicleWheelViewInfo
 
 struct VehicleViewState
 {
-    Transform trans;
+    FarTransform trans;
 
     float steering = 0.0f;
 };
@@ -127,7 +127,7 @@ private:
 
     size_t num_headlights_ = 0;
     std::shared_ptr<const ModelView> light_cone_mdl_;
-    TransformNode light_cone_node_[2];
+    FarTransformNode light_cone_node_[2];
     glm::vec3 headlight_pos_[2];
     glm::vec4 headlight_cone_color_;
 
@@ -147,8 +147,8 @@ private:
     float steering_ = 0.0f;
     bool has_steerw_ = false;
     std::shared_ptr<const ModelView> steerw_model_;
-    Transform steerw_transform_;
-    TransformNode steerw_node_;
+    FarTransform steerw_transform_;
+    FarTransformNode steerw_node_;
 };
 
 }

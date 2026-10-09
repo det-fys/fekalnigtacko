@@ -107,8 +107,8 @@ void game::Vehicle::ReceiveDamage(const DamageInfo& damage)
     auto& bt_body = physics_->GetBtBody();
     bt_body.activate();
     bt_body.applyImpulse(btVector3(impulse.x, impulse.y, impulse.z),
-                            btVector3(damage.impact_pos.x, damage.impact_pos.y, damage.impact_pos.z) -
-                                bt_body.getCenterOfMassPosition());
+                         btVector3(damage.impact_pos.x, damage.impact_pos.y, damage.impact_pos.z) -
+                             bt_body.getCenterOfMassPosition());
 
     auto dmg = damage.damage;
     if (damage.type == DAMAGE_BULLET)
@@ -129,7 +129,7 @@ void game::Vehicle::SetInput(VehicleInputType type, bool enable)
         in_ &= ~(1 << type);
 }
 
-void game::Vehicle::SetPosition(const glm::vec3& pos)
+void game::Vehicle::SetPosition(const glm::dvec3& pos)
 {
     auto& body = physics_->GetBtBody();
 
@@ -497,7 +497,7 @@ void game::Vehicle::UpdateSyncState()
 
     state.flags = flags_;
 
-    net::EncodePosition(root_.local.position, state.pos);
+    net::EncodeFarPosition(root_.local.position, state.pos);
     net::EncodeRotation(root_.local.rotation, state.rot);
 
     state.steering.Encode(steering_);
@@ -818,7 +818,7 @@ void game::Vehicle::Explode()
     world.Effect("carexplo", root_.local.position, glm::vec3(0.0f, 0.0f, 1.0f));
 
     ExplosionInfo explo{};
-    explo.center = root_.local.position - glm::vec3(0.0f, 0.0f, -0.1f);
+    explo.center = root_.local.position - glm::dvec3(0.0, 0.0, -0.1);
     explo.damage = 400.0f;
     explo.radius = 5.0f;
     explo.impulse = 7000.0f;
@@ -851,7 +851,7 @@ void game::Vehicle::RandomizeDeform()
 
 // PHYSICS
 
-game::VehiclePhysics::VehiclePhysics(collision::DynamicsWorld& world, Transform& transform,
+game::VehiclePhysics::VehiclePhysics(collision::DynamicsWorld& world, FarTransform& transform,
                                      collision::ObjectCallback& obj_cb, const assets::VehicleModel& model,
                                      const VehicleTuningContext& tuning)
     : world_(world), motion_(transform)

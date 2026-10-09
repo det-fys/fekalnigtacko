@@ -72,7 +72,7 @@ private:
     void InitObjsAndCollisions();
 
     void DrawChunk(const gfx::DrawContext& ctx, const assets::Chunk& chunk);
-    void DrawObj(const gfx::DrawContext& ctx, MapModel& mapmodel, const glm::mat4& matrix);
+    void DrawObj(const gfx::DrawContext& ctx, MapModel& mapmodel, const FarMatrix& matrix);
 
     void UpdateModelSpecial(MapModel& mapmodel);
 

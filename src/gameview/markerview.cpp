@@ -50,7 +50,7 @@ bool game::view::MarkerView::Init(net::InMessage& msg)
 {
     uint32_t color;
     net::ModelName model_name;
-    if (!msg.Read(marker_type_) || !net::ReadPosition(msg, root_.local.position) || !net::ReadRGB(msg, color) || !msg.Read(model_name))
+    if (!msg.Read(marker_type_) || !net::ReadFarPosition(msg, root_.local.position) || !net::ReadRGB(msg, color) || !msg.Read(model_name))
         return false;
     
     root_.UpdateMatrix();
@@ -71,7 +71,7 @@ bool game::view::MarkerView::Init(net::InMessage& msg)
     return true;
 }
 
-void game::view::MarkerView::DrawModel(const DrawArgs& args, const ModelView& model, const TransformNode& node)
+void game::view::MarkerView::DrawModel(const DrawArgs& args, const ModelView& model, const FarTransformNode& node)
 {
     model.Draw(args.ctx, node.matrix, {&color_, 1});
 }

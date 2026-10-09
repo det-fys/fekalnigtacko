@@ -9,7 +9,7 @@ namespace game::view
 
 struct ChunkObjView
 {
-    glm::mat4 trans{1.0f};
+    FarMatrix matrix{};
     AABB3 aabb{};
     std::shared_ptr<const ModelView> model;
 };

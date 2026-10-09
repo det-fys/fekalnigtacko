@@ -31,7 +31,7 @@ public:
     const gfx::Mesh& GetMesh() const { return *mesh_; }
     std::span<const ModelViewSurface> GetSurfaces() const { return surfaces_; }
 
-    void Draw(const gfx::DrawContext& ctx, const glm::mat4& matrix, std::span<const glm::vec4> colors,
+    void Draw(const gfx::DrawContext& ctx, const FarMatrix& matrix, std::span<const glm::vec4> colors,
               gfx::SkeletonPoseID pose_id = 0, gfx::DeformTextureID deform_id = 0,
               uint32_t surface_mask = 0xFFFFFFFF) const;
 

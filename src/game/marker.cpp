@@ -3,7 +3,7 @@
 #include "world.hpp"
 #include "net/utils.hpp"
 
-static const glm::mat4 identity(1.0f);
+static const FarMatrix identity(1.0f);
 
 game::Marker::Marker(World& world, const MarkerInfo& info) : Super(world, net::ET_MARKER), Usable(identity), info_(info) 
 {

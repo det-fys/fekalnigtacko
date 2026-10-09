@@ -47,7 +47,7 @@ struct Item : public Asset
     std::shared_ptr<const assets::Model> model;
     
     std::string bone;
-    Transform bone_offset;
+    FarTransform bone_offset;
 
     bool twohanded = false;
 

@@ -36,7 +36,7 @@ enum VehicleInputType
 class VehiclePhysics
 {
 public:
-    VehiclePhysics(collision::DynamicsWorld& world, Transform& transform, collision::ObjectCallback& obj_cb,
+    VehiclePhysics(collision::DynamicsWorld& world, FarTransform& transform, collision::ObjectCallback& obj_cb,
                    const assets::VehicleModel& model, const VehicleTuningContext& tuning);
 
     DELETE_COPY_MOVE(VehiclePhysics)
@@ -65,7 +65,7 @@ private:
 
 struct VehicleSpawnInfo
 {
-    glm::vec3 position;
+    glm::dvec3 position;
     float yaw;
     VehicleTuning tuning;
 };
@@ -86,7 +86,7 @@ public:
     void SetInput(VehicleInputType type, bool enable);
     void SetInputs(VehicleInputFlags inputs) { in_ = inputs; }
 
-    void SetPosition(const glm::vec3& pos);
+    void SetPosition(const glm::dvec3& pos);
 
     float GetSpeed() const;
 

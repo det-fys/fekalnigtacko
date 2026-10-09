@@ -26,7 +26,7 @@ public:
 
     void SetPosition(const glm::vec3& position);
     void SetVelocity(const glm::vec3& velocity);
-    void AttachToNode(const game::TransformNode* node);
+    void AttachToNode(const game::FarTransformNode* node);
     void SetRelativeToListener(bool relative);
 
     virtual void SetLooping(bool looping) = 0;
@@ -47,7 +47,7 @@ protected:
 
     unsigned int source_ = 0;
 
-    const game::TransformNode* attach_node_ = nullptr;
+    const game::FarTransformNode* attach_node_ = nullptr;
     bool should_play_ = true; // auto play when created
     bool finished_ = false;
     bool delete_on_finish_ = true; // auto delete when finished
