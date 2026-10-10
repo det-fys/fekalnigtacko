@@ -51,22 +51,8 @@ public:
     }
 
     template <typename T>
-        requires std::is_integral_v<T>
+        requires std::is_integral_v<T> || std::is_floating_point_v<T>
     bool Read(T& value)
-    {
-        SkipWhitespace();
-
-        auto result = std::from_chars(view_.data(), view_.data() + view_.size(), value);
-
-        if (result.ec != std::errc{})
-            return false;
-
-        view_.remove_prefix(static_cast<size_t>(result.ptr - view_.data()));
-
-        return true;
-    }
-
-    bool Read(float& value)
     {
         SkipWhitespace();
 

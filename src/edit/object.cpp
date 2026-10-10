@@ -4,7 +4,7 @@
 #include "map_viewport.hpp"
 #include "im/utils.hpp"
 
-edit::Object::Object(Project& project, const glm::mat4& trans) : project_(&project), trans_(trans) {}
+edit::Object::Object(Project& project, const FarMatrix& trans) : project_(&project), trans_(trans) {}
 
 void edit::Object::DrawOverlay(const DrawOverlayContext& ctx)
 {
@@ -19,7 +19,7 @@ void edit::Object::DrawOverlay(const DrawOverlayContext& ctx)
 void edit::Object::InvalidateChunks(const AABB3& aabb) const
 {
     auto& map_cfg = project_->GetMapConfig();
-    auto [min_chunk, max_chunk] = mg::GetChunkRange(map_cfg, AABB2(aabb.min, aabb.max), true);
+    auto [min_chunk, max_chunk] = mg::GetChunkRange(map_cfg, AABBD2(aabb.min, aabb.max), true);
 
     for (int chunk_y = min_chunk.y; chunk_y <= max_chunk.y; ++chunk_y)
     {
@@ -30,10 +30,10 @@ void edit::Object::InvalidateChunks(const AABB3& aabb) const
     }
 }
 
-bool edit::Object::GetScreenPos(const edit::MapViewport& viewport, const glm::vec3& world_pos,
+bool edit::Object::GetScreenPos(const edit::MapViewport& viewport, const glm::dvec3& world_pos,
                                 glm::vec2& out_screen_pos)
 {
-    glm::vec4 clip_pos = viewport.GetViewProj() * glm::vec4(world_pos, 1.0f);
+    glm::vec4 clip_pos = viewport.GetViewProj() * glm::vec4(glm::vec3(world_pos - viewport.GetEye()), 1.0f);
     if (clip_pos.w == 0.0f)
         return false;
 
@@ -48,7 +48,7 @@ bool edit::Object::GetScreenPos(const edit::MapViewport& viewport, const glm::ve
     return true;
 }
 
-void edit::Object::DrawLineWs(const DrawOverlayContext& ctx, const glm::vec3& p0, const glm::vec3& p1, uint32_t color,
+void edit::Object::DrawLineWs(const DrawOverlayContext& ctx, const glm::dvec3& p0, const glm::dvec3& p1, uint32_t color,
                               float thickness)
 {
     glm::vec2 sp0, sp1;
@@ -60,10 +60,9 @@ void edit::Object::DrawLineWs(const DrawOverlayContext& ctx, const glm::vec3& p0
     ctx.draw_list.AddLine(ImVec2(sp0.x, sp0.y), ImVec2(sp1.x, sp1.y), color, thickness);
 }
 
-glm::mat4 edit::Object::GetTranslationOnly(const glm::mat4& trans)
+FarMatrix edit::Object::GetTranslationOnly(const FarMatrix& trans)
 {
-    return glm::mat4{glm::vec4(1.0f, 0.0f, 0.0f, 0.0f), glm::vec4(0.0f, 1.0f, 0.0f, 0.0f),
-                     glm::vec4(0.0f, 0.0f, 1.0f, 0.0f), glm::vec4(glm::vec3(trans[3]), 1.0f)};
+    return FarMatrix(trans.position, glm::mat3(1.0));
 }
 
 void edit::Object::DrawAABBOverlay(const DrawOverlayContext& ctx, uint32_t color, float width) const
@@ -72,13 +71,13 @@ void edit::Object::DrawAABBOverlay(const DrawOverlayContext& ctx, uint32_t color
     auto& aabb = GetAABB();
 
     std::array<glm::vec2, 4> p;
-    if (!GetScreenPos(ctx.viewport, glm::vec3(aabb.min.x, aabb.min.y, aabb.min.z), p[0]))
+    if (!GetScreenPos(ctx.viewport, glm::dvec3(aabb.min.x, aabb.min.y, aabb.min.z), p[0]))
         return;
-    if (!GetScreenPos(ctx.viewport, glm::vec3(aabb.max.x, aabb.min.y, aabb.min.z), p[1]))
+    if (!GetScreenPos(ctx.viewport, glm::dvec3(aabb.max.x, aabb.min.y, aabb.min.z), p[1]))
         return;
-    if (!GetScreenPos(ctx.viewport, glm::vec3(aabb.max.x, aabb.max.y, aabb.min.z), p[2]))
+    if (!GetScreenPos(ctx.viewport, glm::dvec3(aabb.max.x, aabb.max.y, aabb.min.z), p[2]))
         return;
-    if (!GetScreenPos(ctx.viewport, glm::vec3(aabb.min.x, aabb.max.y, aabb.min.z), p[3]))
+    if (!GetScreenPos(ctx.viewport, glm::dvec3(aabb.min.x, aabb.max.y, aabb.min.z), p[3]))
         return;
 
     std::array<ImVec2, 4> imgui_points;

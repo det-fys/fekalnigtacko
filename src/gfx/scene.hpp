@@ -29,7 +29,7 @@ struct DrawContext
 
     DrawContext(DrawList& dlist, DrawPassType pass, const glm::dvec3& eye, const glm::mat4& view, const glm::mat4& proj,
                 float min_distance, float max_distance, const glm::u32vec2& viewport_size)
-        : dlist(dlist), pass(pass), eye(eye), view(view), proj(proj), view_proj(proj * view), frustum(view_proj),
+        : dlist(dlist), pass(pass), eye(eye), view(view), proj(proj), view_proj(proj * view), frustum(view_proj, eye),
           min_distance(min_distance), max_distance(max_distance), viewport_size(viewport_size)
     {
     }

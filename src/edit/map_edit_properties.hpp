@@ -11,12 +11,12 @@ namespace edit
 struct MapEditProperties
 {
     // 2D
-    glm::vec2 cam_pos_2d{0.0f, 0.0f};
+    glm::dvec2 cam_pos_2d{0.0f, 0.0f};
     float zoom_2d = 1.0f;
     float cam_fov_2d = 50.0f;
 
     // 3D
-    glm::vec3 cam_pos_3d{0.0f, 0.0f, 0.0f};
+    glm::dvec3 cam_pos_3d{0.0f, 0.0f, 0.0f};
     float cam_pitch_3d = 0.0f;
     float cam_yaw_3d = 0.0f;
 

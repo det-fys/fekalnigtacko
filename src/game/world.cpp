@@ -26,7 +26,7 @@ game::World::World(const collision::DynamicsWorldInfo& col_info, const WorldInfo
         auto res = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
 
         map_cfg_.seed = 67;
-        map_cfg_.chunks = 128;
+        map_cfg_.chunks = 256;
         map_cfg_.chunk_tiles = 128;
         map_cfg_.chunk_size_m = 128.0f;
 
@@ -892,7 +892,8 @@ void game::World::UpdateChunks()
     chunk_manager_->BeginFrame(time_ms_);
     for (const auto& [center, radius] : requested_areas_)
     {
-        chunk_manager_->RequestArea(center, {&radius, 1});
+        auto radius_d = static_cast<double>(radius);
+        chunk_manager_->RequestArea(center, {&radius_d, 1});
     }
     chunk_manager_->EndFrame();
 

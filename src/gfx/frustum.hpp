@@ -10,7 +10,7 @@ namespace gfx
 class Frustum
 {
 public:
-    Frustum(const glm::mat4& vp);
+    Frustum(const glm::mat4& vp, const glm::dvec3& eye);
 
     bool IsAABBVisible(const AABB3& aabb) const;
     bool IsSphereVisible(const Sphere& sphere) const;

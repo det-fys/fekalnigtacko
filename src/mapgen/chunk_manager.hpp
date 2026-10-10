@@ -26,6 +26,7 @@ struct ChunkObj
 struct ChunkGenData
 {
     glm::ivec2 coord{0};
+    glm::dvec3 center{0.0};
     uint32_t lod = LOD_INVALID;
     AABB3 aabb{};
     std::shared_ptr<const assets::Model> model;
@@ -62,7 +63,7 @@ public:
     void RequestChunk(const glm::ivec2& coord, uint32_t lod, float priority);
     void InvalidateChunk(const glm::ivec2& coord);
     void InvalidateAllChunks();
-    void RequestArea(const glm::vec2& center, std::span<const float> lod_distances);
+    void RequestArea(const glm::dvec2& center, std::span<const double> lod_distances);
     void EndFrame();
 
     ChunkState GetChunkState(const glm::ivec2& coord) const;

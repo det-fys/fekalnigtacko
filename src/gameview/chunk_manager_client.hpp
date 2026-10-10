@@ -17,6 +17,7 @@ struct ChunkObjView
 struct ChunkView
 {
     AABB3 aabb{};
+    FarMatrix matrix{};
     std::shared_ptr<const ModelView> model;
     std::vector<ChunkObjView> objs;
 };

@@ -5,18 +5,18 @@
 
 #include "transform.hpp"
 
-template <size_t dim>
-struct AABB
+template <size_t dim, typename T>
+struct BasicAABB
 {
-    static constexpr float C_INFINITY = std::numeric_limits<float>::infinity();
+    static constexpr T C_INFINITY = std::numeric_limits<T>::infinity();
 
-    using Vec = glm::vec<dim, float, glm::defaultp>;
+    using Vec = glm::vec<dim, T, glm::defaultp>;
 
     Vec min = Vec(C_INFINITY);
     Vec max = Vec(-C_INFINITY);
 
-    AABB() = default;
-    AABB(const Vec& min, const Vec& max) : min(min), max(max) {}
+    BasicAABB() = default;
+    BasicAABB(const Vec& min, const Vec& max) : min(min), max(max) {}
 
     void AddPoint(const Vec& point)
     {
@@ -24,42 +24,35 @@ struct AABB
         max = glm::max(max, point);
     }
 
-    void AddAABB(const AABB& other)
+    void AddAABB(const BasicAABB& other)
     {
         min = glm::min(min, other.min);
         max = glm::max(max, other.max);
     }
 
-    bool CollidesWith(const AABB<dim>& other) const;
-
-    AABB<dim> Intersection(const AABB<dim>& other) const
+    BasicAABB Intersection(const BasicAABB& other) const
     {
         Vec new_min = glm::max(min, other.min);
         Vec new_max = glm::min(max, other.max);
-        return AABB<dim>(new_min, new_max);
+        return BasicAABB(new_min, new_max);
     }
 
     bool Contains(const Vec& point) const
     {
         return glm::all(glm::greaterThanEqual(point, min)) && glm::all(glm::lessThanEqual(point, max));
     }
+
+    bool CollidesWith(const BasicAABB& other) const
+    {
+        return glm::all(glm::lessThanEqual(min, other.max)) && glm::all(glm::greaterThanEqual(max, other.min));
+    }
 };
 
-template <>
-inline bool AABB<2>::CollidesWith(const AABB<2>& other) const
-{
-    return (min.x <= other.max.x && max.x >= other.min.x) && (min.y <= other.max.y && max.y >= other.min.y);
-}
+using AABB2 = BasicAABB<2, float>;
+using AABB3 = BasicAABB<3, float>;
 
-template <>
-inline bool AABB<3>::CollidesWith(const AABB<3>& other) const
-{
-    return (min.x <= other.max.x && max.x >= other.min.x) && (min.y <= other.max.y && max.y >= other.min.y) &&
-           (min.z <= other.max.z && max.z >= other.min.z);
-}
-
-using AABB2 = AABB<2>;
-using AABB3 = AABB<3>;
+using AABBD2 = BasicAABB<2, double>;
+using AABBD3 = BasicAABB<3, double>;
 
 inline AABB3 TransformAABB(const AABB3& aabb, const glm::mat4& mat)
 {

@@ -340,7 +340,7 @@ void gfx::RendererGL::SetupSurfaceShader(SurfaceShader& sshader, const DrawInfo&
 
     if (sshader.iflags & SIF_FOG_DATA)
     {
-        glUniform3fv(shader.U(SU_CAMERA_POS), 1, &info.ctx.eye[0]);
+        //glUniform3fv(shader.U(SU_CAMERA_POS), 1, &info.ctx.eye[0]);
         glUniform4fv(shader.U(SU_FOG), 1, &info.env.fog[0]);
     }
 
@@ -372,7 +372,7 @@ void gfx::RendererGL::Render(Scene& scene, const CameraParams& camera, const glm
     const float farplane = 3000.0f;
 
     auto proj = glm::perspective(glm::radians(camera.fov * 0.5f), aspect, 0.1f, farplane);
-    auto view = glm::lookAt(camera.eye, camera.eye + camera.dir, camera.up);
+    auto view = glm::lookAt(glm::vec3(0.0f), camera.dir, camera.up);
 
     float min_distance = 0.0f;
     float max_distance = 500.0f;
@@ -419,7 +419,7 @@ void gfx::RendererGL::CreateLightGrid(std::span<DrawLightCmd> light_cmds, const 
     // calc distance
     for (auto& cmd : light_cmds)
     {
-        auto d = cmd.light.position - info.ctx.eye;
+        auto d = glm::vec3(cmd.position - info.ctx.eye);
         cmd.dist2 = glm::dot(d, d);
     }
 
@@ -433,17 +433,19 @@ void gfx::RendererGL::CreateLightGrid(std::span<DrawLightCmd> light_cmds, const 
             continue; // not drawn by this renderer due to limited light count
         }
 
-        AddLightToGrid(cmd.light, light_grid_, light_grid_size_);
-        AddLightToGrid(cmd.light, light_grid_chunks_, light_grid_chunks_size_);
+        AddLightToGrid(cmd, light_grid_, light_grid_size_, info);
+        AddLightToGrid(cmd, light_grid_chunks_, light_grid_chunks_size_, info);
     }
 }
 
-void gfx::RendererGL::AddLightToGrid(const LightData& light, LightGrid& grid, float cell_size)
+void gfx::RendererGL::AddLightToGrid(const DrawLightCmd& cmd, LightGrid& grid, float cell_size, const DrawInfo& info)
 {
-    float margin = light.radius + cell_size * 0.2f;
+    double margin = cmd.radius + cell_size * 0.2f;
 
-    auto aabb_min = GetCellCoord(light.position - margin, cell_size);
-    auto aabb_max = GetCellCoord(light.position + margin, cell_size);
+    auto aabb_min = GetCellCoord(cmd.position - margin, cell_size);
+    auto aabb_max = GetCellCoord(cmd.position + margin, cell_size);
+
+    const auto& eye = info.ctx.eye;
 
     for (int y = aabb_min.y; y <= aabb_max.y; ++y)
     {
@@ -455,7 +457,14 @@ void gfx::RendererGL::AddLightToGrid(const LightData& light, LightGrid& grid, fl
             if (cell.num_lights >= LIGHT_GRID_CELL_LIGHTS)
                 continue;
 
-            cell.lights[cell.num_lights] = light;
+            auto& cell_light = cell.lights[cell.num_lights];
+            cell_light.position = glm::vec3(cmd.position - eye);
+            cell_light.radius = cmd.radius;
+            cell_light.color = cmd.color;
+            cell_light.dir = cmd.dir;
+            cell_light.cos_inner = cmd.cos_inner;
+            cell_light.cos_outer = cmd.cos_outer;
+
             ++cell.num_lights;
         }
     }
@@ -674,16 +683,14 @@ void gfx::RendererGL::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const Draw
 
         auto shader = sshader->shader.get();
 
-        static const glm::mat4 identity(1.0f);
-        const glm::mat4* model = &identity;
-
+        auto model = glm::mat4(1.0f);
         // set model matrix
-        if (cmd.matrix)
+        if (cmd.transform)
         {
-            model = cmd.matrix;
+            model = cmd.transform->ToNearMatrix(info.ctx.eye);
         }
 
-        glUniformMatrix4fv(shader->U(SU_MODEL), 1, GL_FALSE, &(*model)[0][0]);
+        glUniformMatrix4fv(shader->U(SU_MODEL), 1, GL_FALSE, &model[0][0]);
 
         // sync color
         if (sshader->iflags & SIF_OBJECT_COLOR)
@@ -760,7 +767,7 @@ void gfx::RendererGL::DrawSurfaceList(std::span<DrawSurfaceCmd> list, const Draw
             }
             else
             {
-                auto center = glm::vec3((*model)[3]);
+                auto center = glm::vec3(model[3]);
                 // std::cerr << center.x << ' ' << center.y << ' ' << center.z << std::endl;
                 auto it = light_grid_.find(HashCellCoord(GetCellCoord(center, light_grid_size_)));
                 if (it != light_grid_.end())
@@ -846,8 +853,8 @@ void gfx::RendererGL::DrawBeamList(std::span<DrawBeamCmd> queue, const DrawInfo&
 
         points.resize(cmd.num_segments + 1);
 
-        const glm::vec3 seg_step = (cmd.end - cmd.start) / static_cast<float>(cmd.num_segments);
-        glm::vec3 pos = cmd.start;
+        const glm::vec3 seg_step = glm::vec3(cmd.end - cmd.start) / static_cast<float>(cmd.num_segments);
+        glm::vec3 pos = cmd.start - info.ctx.eye;
         for (size_t i = 0; i <= cmd.num_segments; ++i)
         {
             points[i] = pos;
@@ -893,7 +900,7 @@ void gfx::RendererGL::DrawBeamList(std::span<DrawBeamCmd> queue, const DrawInfo&
     glBlendFunc(GL_SRC_ALPHA, GL_ONE); // ADDITIVE blend
 
     glUniformMatrix4fv(shader->U(gfx::SU_VIEW_PROJ), 1, GL_FALSE, &info.ctx.view_proj[0][0]);
-    glUniform3fv(shader->U(gfx::SU_CAMERA), 1, &info.ctx.eye[0]);
+    //glUniform3fv(shader->U(gfx::SU_CAMERA), 1, &info.ctx.eye[0]);
 
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, segments.size());
 
@@ -918,14 +925,15 @@ void gfx::RendererGL::DrawCoronaList(std::span<DrawCoronaCmd> queue, const DrawI
 
     for (const auto& corona : queue)
     {
-        auto to_cam = info.ctx.eye - corona.pos;
-        auto dist = glm::length(to_cam);
+        auto local_pos = glm::vec3(corona.pos - info.ctx.eye);
+     
+        auto dist = glm::length(local_pos);
         if (dist < 0.001f)
             continue;
 
-        to_cam /= dist;
+        auto to_cam = -local_pos / dist;
 
-        glm::vec4 clip_pos = info.ctx.view_proj * glm::vec4(corona.pos + to_cam * 0.1f, 1.0f);
+        glm::vec4 clip_pos = info.ctx.view_proj * glm::vec4(local_pos + to_cam * 0.1f, 1.0f);
         if (clip_pos.w == 0.0f)
             continue;
 

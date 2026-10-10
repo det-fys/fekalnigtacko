@@ -125,14 +125,14 @@ void edit::MapEdit::ShowPropertiesWindow(bool* open)
         // 2D camera widgets
         ImGui::Text("2D Camera");
         ImGui::PushID("2D Camera Properties");
-        ImGui::DragFloat2("Position", &properties.cam_pos_2d.x, 0.1f);
+        ImGui::DragScalarN("Position", ImGuiDataType_Double, &properties.cam_pos_2d.x, 2, 0.1f);
         ImGui::DragFloat("FOV", &properties.cam_fov_2d, 0.1f, 1.0f, 179.0f);
         ImGui::PopID();
 
         // 3D camera widgets
         ImGui::Text("3D Camera");
         ImGui::PushID("3D Camera Properties");
-        ImGui::DragFloat3("Position", &properties.cam_pos_3d.x, 0.1f);
+        ImGui::DragScalarN("Position", ImGuiDataType_Double, &properties.cam_pos_3d.x, 3, 0.1f);
         ImGui::DragFloat("Pitch", &properties.cam_pitch_3d, 0.01f);
         ImGui::DragFloat("Yaw", &properties.cam_yaw_3d, 0.01f);
         ImGui::PopID();

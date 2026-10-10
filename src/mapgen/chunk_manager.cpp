@@ -51,23 +51,22 @@ void mg::ChunkManager::InvalidateAllChunks()
     }
 }
 
-void mg::ChunkManager::RequestArea(const glm::vec2& center, std::span<const float> lod_distances)
+void mg::ChunkManager::RequestArea(const glm::dvec2& center, std::span<const double> lod_distances)
 {
     // |     LOD0     |     LOD1     |     LOD2     |     LOD3     |
     //             dist[0]        dist[1]        dist[2]        dist[3]
 
     auto max_dist = lod_distances.back();
+    auto [min_chunk, max_chunk] = mg::GetChunkRange(map_cfg_, AABBD2(center - max_dist, center + max_dist));
 
-    auto [min_chunk, max_chunk] =
-        mg::GetChunkRange(map_cfg_, AABB2(center - glm::vec2(max_dist), center + glm::vec2(max_dist)));
-
+    auto chunk_size_m = static_cast<double>(map_cfg_.chunk_size_m);
 
     for (int chunk_y = min_chunk.y; chunk_y <= max_chunk.y; ++chunk_y)
     {
         for (int chunk_x = min_chunk.x; chunk_x <= max_chunk.x; ++chunk_x)
         {
             glm::ivec2 chunk_coord(chunk_x, chunk_y);
-            auto chunk_center = (glm::vec2(chunk_coord) + 0.5f) * map_cfg_.chunk_size_m;
+            auto chunk_center = (glm::dvec2(chunk_coord) + 0.5) * chunk_size_m;
 
             auto dist2 = glm::distance2(center, chunk_center);
 
@@ -186,6 +185,7 @@ mg::ChunkGenData mg::ChunkManager::FinalizeChunk(const mg::ResourceSet& res, mg:
     ChunkGenData gen_data{};
     gen_data.coord = chunk.coord;
     // gen_data.lod = chunk.mgchunk.lod;
+    gen_data.center = chunk.center;
     gen_data.aabb = chunk.aabb;
 
     // make chunk model

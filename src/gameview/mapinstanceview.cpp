@@ -157,7 +157,7 @@ void game::view::MapInstanceView::InitObjsAndCollisions()
     const auto& basemodel = map_->GetBaseModel();
     if (basemodel)
     {
-        Transform identity;
+        FarTransform identity;
         basemodel_col_ = std::make_unique<MapObjectCollisionView>(world_, basemodel, identity);
         basemodel_col_->SetEnabled(true);
     }
@@ -274,8 +274,8 @@ void game::view::MapInstanceView::UpdateModelSpecial(MapModel& mapmodel)
 
 game::view::MapObjectCollisionView::MapObjectCollisionView(collision::DynamicsWorld& world,
                                                            std::shared_ptr<const assets::Model> model,
-                                                           const Transform& trans) :
-    world_(world), model_(std::move(model))
+                                                           const FarTransform& trans)
+    : world_(world), model_(std::move(model))
 {
     auto cshape = model_->GetColShape();
     auto cmesh = model_->GetColMesh();

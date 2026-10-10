@@ -3261,7 +3261,7 @@ void gfx::RendererWGPU::Render(ViewportWGPU& viewport, Scene& scene, const Camer
         globals.ambient_color = LinearizeColor(env.ambient_light);
         globals.sun_color = LinearizeColor(env.sun_color) * 1.5f;
         globals.sun_direction = glm::mat3(main_ctx.view) * env.sun_direction;
-        globals.camera_pos = main_ctx.eye;
+        globals.camera_pos = glm::vec3(0.0f); // main_ctx.eye;
         globals.fog = glm::vec4(LinearizeColor(env.fog), env.fog.a);
         globals.tile_count_x = viewport.light_tiles.x;
 
@@ -3944,7 +3944,8 @@ void gfx::RendererWGPU::EncodeCoronaCmds(wgpu::RenderPassEncoder& pass, std::spa
 
         corona.view_dir = glm::normalize(corona.view_dir);
 
-        corona.view_pos = ctx.view * glm::vec4(cmd.pos, 1.0f);
+        auto local_pos = glm::vec3(cmd.pos - ctx.eye);
+        corona.view_pos = ctx.view * glm::vec4(local_pos, 1.0f);
 
         if (corona.view_pos.z > 0.0f)
         {

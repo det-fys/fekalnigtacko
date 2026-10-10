@@ -250,8 +250,8 @@ std::unique_ptr<gfx::Shader> gfx::CreateSurfaceShader(SurfaceRenderFlags flags, 
                 }
             }
 
-            vec4 world_pos = bone_transform * vec4(a_pos, 1.0);
-            vec3 world_normal = normalize(mat3(bone_transform) * a_normal);
+            vec4 world_pos = u_model * bone_transform * vec4(a_pos, 1.0);
+            vec3 world_normal = normalize(mat3(u_model) * mat3(bone_transform) * a_normal);
         )GLSL";
 
         input_flags |= SIF_SKELETAL_DATA;

@@ -14,7 +14,7 @@ game::MapInstance::MapInstance(collision::DynamicsWorld& world, std::string mapn
     const auto& basemodel = map_->GetBaseModel();
     if (basemodel)
     {
-        Transform identity;
+        FarTransform identity;
         basemodel_col_ = std::make_unique<MapObjectCollision>(world_, basemodel, 0, identity, 0);
     }
 

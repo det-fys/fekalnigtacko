@@ -86,7 +86,7 @@ struct FarMatrix
     glm::mat3 basis;
 
     FarMatrix() = default;
-    FarMatrix(const glm::dvec3& pos, const glm::mat3& basis) : position(pos), basis(basis) {}
+    FarMatrix(const glm::dvec3& pos, const glm::mat3& basis = glm::mat3(1.0f)) : position(pos), basis(basis) {}
     FarMatrix(float v) : position(0.0f), basis(glm::mat3(v)) {}
 
     static FarMatrix FromNearMatrix(const glm::mat4& near_matrix, const glm::dvec3& eye)
@@ -101,6 +101,14 @@ struct FarMatrix
         FarMatrix result;
         result.basis = basis * other.basis;
         result.position = position + glm::dmat3(basis) * other.position; // TODO: optimize
+        return result;
+    }
+
+    FarMatrix Invert() const
+    {
+        FarMatrix result;
+        result.basis = glm::transpose(basis);
+        result.position = -glm::dmat3(result.basis) * position; // TODO: optimize
         return result;
     }
 
@@ -145,6 +153,20 @@ struct FarMatrix
             glm::dvec4(basis[2], 0.0),
             glm::dvec4(position, 1.0)
         );
+    }
+
+    void NormalizeBasis()
+    {
+        // Gram-Schmidt orthogonalization
+        glm::dvec3 x = basis[0];
+        glm::dvec3 y = basis[1];
+        glm::dvec3 z = basis[2];
+        x = glm::normalize(x);
+        y = glm::normalize(y - glm::dot(y, x) * x);
+        z = glm::normalize(z - glm::dot(z, x) * x - glm::dot(z, y) * y);
+        basis[0] = x;
+        basis[1] = y;
+        basis[2] = z;
     }
 };
 

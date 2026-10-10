@@ -7,7 +7,7 @@
 #include "map_viewport.hpp"
 #include "utils/spline.hpp"
 
-edit::Waypoint::Waypoint(Project& project, const glm::mat4& trans, WaypointID id) : Super(project, trans), id_(id)
+edit::Waypoint::Waypoint(Project& project, const FarMatrix& trans, WaypointID id) : Super(project, trans), id_(id)
 {
     UpdateAABB();
 }
@@ -33,7 +33,7 @@ void edit::Waypoint::DrawOverlay(const DrawOverlayContext& ctx)
     }
 }
 
-void edit::Waypoint::SetTransform(const glm::mat4& trans)
+void edit::Waypoint::SetTransform(const FarMatrix& trans)
 {
     Super::SetTransform(GetTranslationOnly(trans));
     InvalidateChunks(GetAABB());
@@ -42,7 +42,7 @@ void edit::Waypoint::SetTransform(const glm::mat4& trans)
     InvalidatePathsChunks();
 }
 
-void edit::Waypoint::Clone(const glm::mat4& trans)
+void edit::Waypoint::Clone(const FarMatrix& trans)
 {
     auto& project = GetProject();
     auto my_id = id_;
@@ -111,7 +111,7 @@ void edit::Waypoint::Delete()
 void edit::Waypoint::UpdateAABB()
 {
     constexpr float half_extent = 1.5f;
-    const auto& pos = GetPosition();
+    const auto pos = glm::vec3(GetPosition());
     SetAABB(AABB3(pos - half_extent, pos + half_extent));
 }
 
@@ -148,13 +148,13 @@ void edit::Waypoint::DrawLinksOverlay(const DrawOverlayContext& ctx) const
 
 }
 
-void edit::Waypoint::GetPath(const Waypoint& wp0, const Waypoint& wp1, std::span<glm::vec3> out_positions)
+void edit::Waypoint::GetPath(const Waypoint& wp0, const Waypoint& wp1, std::span<glm::dvec3> out_positions)
 {
-    glm::vec3 b = wp0.GetPosition();
-    glm::vec3 c = wp1.GetPosition();
+    glm::dvec3 b = wp0.GetPosition();
+    glm::dvec3 c = wp1.GetPosition();
 
     // get
-    glm::vec3 a = b;
+    glm::dvec3 a = b;
     auto wp_a_id = wp0.GetMainPathContinuation(wp1.id_);
     if (wp_a_id != 0)
     {
@@ -163,7 +163,7 @@ void edit::Waypoint::GetPath(const Waypoint& wp0, const Waypoint& wp1, std::span
             a = wp_a->GetPosition();
     }
 
-    glm::vec3 d = c;
+    glm::dvec3 d = c;
     auto wp_d_id = wp1.GetMainPathContinuation(wp0.id_);
     if (wp_d_id != 0)
     {
@@ -176,7 +176,7 @@ void edit::Waypoint::GetPath(const Waypoint& wp0, const Waypoint& wp1, std::span
 
     for (size_t i = 0; i < out_positions.size(); ++i)
     {
-        auto t = static_cast<float>(i) / static_cast<float>(out_positions.size() - 1);
+        auto t = static_cast<double>(i) / static_cast<double>(out_positions.size() - 1);
         out_positions[i] = spline.Get(t);
     }
 }
@@ -186,7 +186,7 @@ void edit::Waypoint::DrawPath(const DrawOverlayContext& ctx, const Waypoint& wp0
 {
     constexpr uint32_t MAX_SEGMENTS = 16;
     
-    std::array<glm::vec3, MAX_SEGMENTS + 1> positions;
+    std::array<glm::dvec3, MAX_SEGMENTS + 1> positions;
     GetPath(wp0, wp1, positions);
 
     std::array<std::optional<ImVec2>, MAX_SEGMENTS + 1> positions_2d;
@@ -232,7 +232,7 @@ void edit::Waypoint::DrawPath(const DrawOverlayContext& ctx, const Waypoint& wp0
 
 }
 
-void edit::Waypoint::DrawPathTypeMarker(const DrawOverlayContext& ctx, std::span<const glm::vec3> positions,
+void edit::Waypoint::DrawPathTypeMarker(const DrawOverlayContext& ctx, std::span<const glm::dvec3> positions,
                                         std::span<const std::optional<ImVec2>> positions_2d, bool from_end,
                                         uint32_t color, float length)
 {
@@ -277,7 +277,7 @@ void edit::Waypoint::DrawPathTypeMarker(const DrawOverlayContext& ctx, std::span
             float remaining_length = length - dist;
             float t = remaining_length / segment_length;
 
-            glm::vec3 end_pos = glm::mix(p0, p1, t);
+            glm::dvec3 end_pos = glm::mix(p0, p1, t);
             glm::vec2 end_pos_2d;
 
             if (positions_2d[i].has_value() && GetScreenPos(ctx.viewport, end_pos, end_pos_2d))
@@ -370,7 +370,7 @@ void edit::Waypoint::InvalidatePathChunks(WaypointID next_id) const
         
         // Trace the path from current_wp to next_wp and invalidate chunks along the way
         constexpr uint32_t NUM_SEGMENTS = 16;
-        std::array<glm::vec3, NUM_SEGMENTS + 1> path_positions; // 16 segments + 1
+        std::array<glm::dvec3, NUM_SEGMENTS + 1> path_positions; // 16 segments + 1
         GetPath(*current_wp, *next_wp, path_positions);
         for (uint32_t i = 0; i < NUM_SEGMENTS; ++i)
         {

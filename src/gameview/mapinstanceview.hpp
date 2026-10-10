@@ -14,7 +14,8 @@ namespace game::view
 class MapObjectCollisionView
 {
 public:
-    MapObjectCollisionView(collision::DynamicsWorld& world, std::shared_ptr<const assets::Model> model, const Transform& trans);
+    MapObjectCollisionView(collision::DynamicsWorld& world, std::shared_ptr<const assets::Model> model,
+                           const FarTransform& trans);
     DELETE_COPY_MOVE(MapObjectCollisionView)
 
     void SetEnabled(bool enabled);

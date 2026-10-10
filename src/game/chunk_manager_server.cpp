@@ -28,6 +28,8 @@ void game::ServerChunkManager::GetChunkParams(mg::ChunkParams& out_params)
 void game::ServerChunkManager::OnChunkGenerated(const mg::ChunkGenData& gen_data)
 {
     auto& chunk_data = chunks_[gen_data.coord];
+    chunk_data.coord = gen_data.coord;
+    chunk_data.center = gen_data.center;
 
     RemoveChunkCollision(chunk_data); // ensure old one is removed first
     chunk_data.col_mesh = gen_data.model->GetColMeshShared();
@@ -55,6 +57,12 @@ void game::ServerChunkManager::CreateChunkCollision(ServerChunkData& chunk_data)
 
     chunk_data.col_body = std::make_unique<btRigidBody>(
         btRigidBody::btRigidBodyConstructionInfo(0.0f, nullptr, chunk_data.col_mesh->GetShape(), local_inertia));
+
+    // trans
+    FarTransform trans{};
+    trans.position = chunk_data.center;
+
+    chunk_data.col_body->setWorldTransform(trans.ToBtTransform());
 
     int col_mask = ~collision::OG_STATIC;
 

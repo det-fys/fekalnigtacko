@@ -16,13 +16,13 @@ class StaticObject : public Object
 public:
     using Super = Object;
 
-    StaticObject(Project& project, const glm::mat4& trans, const std::string& model_name);
+    StaticObject(Project& project, const FarMatrix& trans, const std::string& model_name);
 
     virtual void Draw(const gfx::DrawContext& ctx) override;
     virtual void DrawOverlay(const DrawOverlayContext& ctx) override;
 
-    virtual void SetTransform(const glm::mat4& trans) override;
-    virtual void Clone(const glm::mat4& trans) override;
+    virtual void SetTransform(const FarMatrix& trans) override;
+    virtual void Clone(const FarMatrix& trans) override;
     virtual void Delete() override;
 
     const std::string& GetModelName() const { return model_name_; }

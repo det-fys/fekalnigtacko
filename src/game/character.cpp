@@ -275,7 +275,7 @@ void game::Character::ClearActionAnim()
     PlayActionAnim(assets::NO_ANIM, 0.0f);
 }
 
-void game::Character::SetAimTarget(const glm::vec3& target)
+void game::Character::SetAimTarget(const glm::dvec3& target)
 {
     aim_target_ = target;
 }

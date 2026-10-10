@@ -2,7 +2,7 @@
 
 #include "utils.hpp"
 
-im::Viewport2DControls::Viewport2DControls(Viewport& viewport, glm::vec2& center_ws, float& zoom_ws_to_px)
+im::Viewport2DControls::Viewport2DControls(Viewport& viewport, glm::dvec2& center_ws, float& zoom_ws_to_px)
     : viewport_(viewport), center_ws_(center_ws), zoom_ws_to_px_(zoom_ws_to_px)
 {
 }
@@ -40,8 +40,8 @@ void im::Viewport2DControls::Update()
     size_ws_ = viewport_.GetCanvasSize() / zoom_ws_to_px_;
 
     // p0 is top-left canvas corner -> (-X, +Y) in world space relative to center
-    pos_ws_p0_ = center_ws_ + glm::vec2(-size_ws_.x, size_ws_.y) * 0.5f;
+    pos_ws_p0_ = center_ws_ + glm::dvec2(-size_ws_.x, size_ws_.y) * 0.5;
     // p1 is bottom-right canvas corner -> (+X, -Y) in world space relative to center
-    pos_ws_p1_ = center_ws_ + glm::vec2(size_ws_.x, -size_ws_.y) * 0.5f;
+    pos_ws_p1_ = center_ws_ + glm::dvec2(size_ws_.x, -size_ws_.y) * 0.5;
 
 }

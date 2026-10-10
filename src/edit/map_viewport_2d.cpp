@@ -13,15 +13,15 @@ edit::MapViewport2D::MapViewport2D(MapEditContext& context)
 {
 }
 
-static gfx::CameraParams GetCameraParams(const glm::vec2& p0, const glm::vec2& p1, float fov)
+static gfx::CameraParams GetCameraParams(const glm::dvec2& p0, const glm::dvec2& p1, float fov)
 {
     gfx::CameraParams cam{};
-    glm::vec2 center = (p0 + p1) * 0.5f;
+    glm::dvec2 center = (p0 + p1) * 0.5;
 
-    float height = std::abs(p1.y - p0.y);
+    double height = std::abs(p1.y - p0.y);
     float half_fov_radians = glm::radians(fov * 0.5f);
     float distance = (height * 0.5f) / std::tan(half_fov_radians);
-    cam.eye = glm::vec3(center.x, center.y, distance);
+    cam.eye = glm::dvec3(center.x, center.y, distance);
 
     cam.dir = glm::vec3(0.0f, 0.0f, -1.0f);
     cam.up = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -36,14 +36,14 @@ void edit::MapViewport2D::Update()
 
     // update cam
     auto cam_params = GetCameraParams(controls_.GetPosWsP0(), controls_.GetPosWsP1(), GetProperties().cam_fov_2d);
-    cam_params.eye.z += GetContext().project ? GetContext().project->GetTerrainHeight(cam_params.eye) : 0.0f;
+    cam_params.eye.z += GetContext().project ? GetContext().project->GetTerrainHeight(cam_params.eye) : 0.0;
     SetCameraParams(cam_params);
 
-    auto half_size_ws = controls_.GetSizeWs() * 0.5f;
-    auto center_ws = glm::vec3((controls_.GetPosWsP0() + controls_.GetPosWsP1()) * 0.5f, 100.0f);
+    auto half_size_ws = glm::vec2(controls_.GetSizeWs()) * 0.5f;
     auto proj = glm::ortho(-half_size_ws.x, half_size_ws.x, -half_size_ws.y, half_size_ws.y, -1000.0f, 1000.0f);
-    auto view = glm::lookAt(center_ws, center_ws + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    SetOverlayMatrices(view, proj);
+    auto view = glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    auto center_ws = glm::dvec3((controls_.GetPosWsP0() + controls_.GetPosWsP1()) * 0.5, 1000.0);
+    SetOverlayMatrices(view, proj, center_ws);
 
     Super::Update();
 
@@ -146,7 +146,7 @@ void edit::MapViewport2D::DrawChunks(ImDrawList& draw_list)
     const auto& map_cfg = project.GetMapConfig();
 
     auto half_chunks = static_cast<int>(map_cfg.chunks / 2);
-    auto [min_chunk, max_chunk] = mg::GetChunkRange(map_cfg, aabb_);
+    auto [min_chunk, max_chunk] = mg::GetChunkRange(map_cfg, AABBD2(aabb_.min, aabb_.max));
 
     auto grid_color = IM_COL32(255, 255, 255, 128);
 
