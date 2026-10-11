@@ -114,10 +114,15 @@ struct FarMatrix
 
     FarMatrix TransformNear(const glm::mat4& near_matrix) const
     {
-        // TODO: fix
-        glm::dvec3 new_position = position + glm::dmat3(basis) * glm::dvec3(near_matrix[3]);
-        glm::mat3 new_basis = basis * glm::mat3(near_matrix);
-        return FarMatrix(new_position, new_basis);
+        FarMatrix result;
+
+        const glm::mat3 near_basis(near_matrix);
+        const glm::dvec3 near_position(near_matrix[3]);
+
+        result.basis = near_basis * basis;
+        result.position = near_position + glm::dmat3(near_basis) * position;
+
+        return result;
     }
 
     glm::mat4 ToNearMatrix(const glm::dvec3& eye) const

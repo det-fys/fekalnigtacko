@@ -176,6 +176,8 @@ void game::view::MapInstanceView::InitObjsAndCollisions()
 
 void game::view::MapInstanceView::DrawChunk(const gfx::DrawContext& ctx, const assets::Chunk& chunk)
 {
+    static const FarMatrix identity(1.0f);
+
     // make basemodel not cast shadows
     if (ctx.pass != gfx::DRAW_PASS_SHADOW_MAP)
     {
@@ -183,6 +185,7 @@ void game::view::MapInstanceView::DrawChunk(const gfx::DrawContext& ctx, const a
 
         gfx::DrawSurfaceCmd cmd{};
         cmd.mesh = basemodel_view_->GetMesh().GetID();
+        cmd.transform = &identity;
         cmd.map_chunk_hash = chunk.light_hash;
 
         auto& dlist = ctx.dlist;
