@@ -116,7 +116,7 @@ void game::MapObjectCollision::Break(const MapObjectBreakInfo& info)
         return;
 
     btCollisionShape* shape = body_->getCollisionShape();
-    btScalar mass = 0.0f;
+    float mass = 0.0f;
     model_->GetParamFloat("destr_mass", mass); // dont care if not present
     btVector3 local_inertia(0, 0, 0);
     shape->calculateLocalInertia(mass, local_inertia);
@@ -142,7 +142,7 @@ void game::MapObjectCollision::Break(const MapObjectBreakInfo& info)
     if (info.impulse > 0.0f)
     {
         auto normal = glm::vec3(glm::normalize(info.hit_pos - info.from_pos));
-        auto impulse = normal * info.impulse * body_->getMass() * 0.003f;
+        auto impulse = normal * info.impulse * static_cast<float>(body_->getMass()) * 0.003f;
         body_->applyImpulse(btVector3(impulse.x, impulse.y, impulse.z),
                             btVector3(info.hit_pos.x, info.hit_pos.y, info.hit_pos.z) -
                                 body_->getCenterOfMassPosition());
