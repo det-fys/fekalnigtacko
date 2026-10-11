@@ -131,7 +131,7 @@ struct PositionQ
     PositionElemQ x, y, z;
 };
 
-using FarPositionElemQ = Quantized64<uint32_t, -10000, 10000, 1>;
+using FarPositionElemQ = Quantized64<uint32_t, -1000000, 1000000, 1>;
 struct FarPositionQ
 {
     FarPositionElemQ x, y, z;
