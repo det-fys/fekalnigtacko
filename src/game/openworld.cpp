@@ -50,6 +50,8 @@ CVAR(float, ow_npc_driver_armed_chance, CV_NONE, 0.4f, 0.0f, 1.0f);
 CVAR(float, ow_npc_passenger_chance, CV_NONE, 0.3f, 0.0f, 1.0f);
 CVAR(float, ow_npc_passenger_armed_chance, CV_NONE, 0.8f, 0.0f, 1.0f);
 
+CVAR(uint8_t, ow_legacy_map, CV_NONE, 0, 0, 1);
+
 static const char* GetRandomCarModel()
 {
     struct CarModelEntry
@@ -125,7 +127,17 @@ static collision::DynamicsWorldInfo GetOpenWorldDynamicsInfo()
 static game::WorldInfo GetOpenWorldInfo()
 {
     game::WorldInfo info{};
-    info.type = game::WORLD_TYPE_PROCEDURAL;
+    
+    if (ow_legacy_map.Get())
+    {
+        info.type = game::WORLD_TYPE_MAP;
+        info.mapname = "openworld";
+    }
+    else
+    {
+        info.type = game::WORLD_TYPE_PROCEDURAL;
+    }
+    
     return info;
 }
 
@@ -140,7 +152,8 @@ std::string GetSpzText(size_t num)
 
 game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo(), GetOpenWorldInfo()), game_(game)
 {
-    SetSpawnPoint(GetTerrainPos(glm::vec3(0.0f, 0.0f, 5.0f)));
+    auto spawn = ow_legacy_map.Get() ? glm::vec3(100.0f, 100.0f, 1.0f) : glm::vec3(0.0f, 0.0f, 5.0f);
+    SetSpawnPoint(GetTerrainPos(spawn));
 
     // initial twingo
     VehicleSpawnInfo twingo_info{};
@@ -165,37 +178,40 @@ game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo
         });
     }
 
-    //for (auto locs = GetMap().GetLocations("tuning"); const auto& loc : locs)
-    //{
-    //    CreateTuningGarage(loc.transform.position, glm::eulerAngles(loc.transform.rotation).x);
-    //}
+    if (ow_legacy_map.Get())
+    {
+        for (auto locs = GetMap()->GetLocations("tuning"); const auto& loc : locs)
+        {
+            CreateTuningGarage(loc.transform.position, glm::eulerAngles(loc.transform.rotation).x);
+        }
 
-    //CreatePermaItemPickups("airrifle");
-    //CreatePermaItemPickups("airsniper");
-    //CreatePermaItemPickups("ak47");
-    //CreatePermaItemPickups("uzi");
-    //CreatePermaItemPickups("panzerschreck");
+        CreatePermaItemPickups("airrifle");
+        CreatePermaItemPickups("airsniper");
+        CreatePermaItemPickups("ak47");
+        CreatePermaItemPickups("uzi");
+        CreatePermaItemPickups("panzerschreck");
 
-    //SpawnNpcs();
+        SpawnNpcs();
 
-    //// cow
-    //auto& cow = Spawn<Cow>(glm::vec3(0.0f, 0.0f, 2.0f), 0.0f);
-    //cow.SetNametag("no ty krávo");
+        // cow
+        auto& cow = Spawn<Cow>(glm::vec3(0.0f, 0.0f, 2.0f), 0.0f);
+        cow.SetNametag("no ty krávo");
 
-    //// hit target npc
-    //auto& npc = SpawnRandomNpc();
-    //npc.SetPosition({90.0f, 100.0f, 5.0f});
-    //npc.SetWeapon(std::make_shared<ItemInstance>("ak47"));
+        // hit target npc
+        auto& npc = SpawnRandomNpc();
+        npc.SetPosition({90.0f, 100.0f, 5.0f});
+        npc.SetWeapon(std::make_shared<ItemInstance>("ak47"));
 
-    //// hit target npc 2
-    //auto& npc2 = SpawnRandomNpc();
-    //npc2.SetPosition({80.0f, 100.0f, 5.0f});
-    //npc2.SetWeapon(std::make_shared<ItemInstance>("airsniper"));
+        // hit target npc 2
+        auto& npc2 = SpawnRandomNpc();
+        npc2.SetPosition({80.0f, 100.0f, 5.0f});
+        npc2.SetWeapon(std::make_shared<ItemInstance>("airsniper"));
 
-    //// hit target npc 3
-    //auto& npc3 = SpawnRandomNpc();
-    //npc3.SetPosition({70.0f, 100.0f, 5.0f});
-    //npc3.SetWeapon(std::make_shared<ItemInstance>("panzerschreck"));
+        // hit target npc 3
+        auto& npc3 = SpawnRandomNpc();
+        npc3.SetPosition({70.0f, 100.0f, 5.0f});
+        npc3.SetWeapon(std::make_shared<ItemInstance>("panzerschreck"));
+    }
 }
 
 void game::OpenWorld::Update(int64_t delta_time)
