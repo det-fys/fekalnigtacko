@@ -1247,6 +1247,7 @@ struct ChunkGenerator
             auto mesh_idx = grass_mesh_ids[static_cast<size_t>(rng() % grass_mesh_ids.size())];
             auto scale = glm::mix(1.1f, 2.5f, dist(rng));
             auto angle_z = glm::mix(0.0f, glm::two_pi<float>(), dist(rng));
+            auto z_offset = glm::mix(0.0f, 0.1f, dist(rng));
             
             auto density = grass_sampler.GetDensity(pos);
             auto keep_chance = glm::mix(0.1f, 1.0f, density);
@@ -1276,7 +1277,7 @@ struct ChunkGenerator
             auto color_packed = glm::packUnorm4x8(glm::vec4(color, 1.0f));
             
             auto height = tile->height;
-            height -= 0.2f;
+            height -= 0.3f * scale + z_offset;
 
             FarTransform obj_trans{};
             obj_trans.position = glm::dvec3(pos, height);
