@@ -30,9 +30,9 @@ using namespace game::view;
 struct SelectionListEntry
 {
     Object* obj;
-    glm::mat4 offset{1.0f};
+    FarMatrix offset{1.0};
 
-    SelectionListEntry(Object* obj, const glm::mat4& offset) : obj(obj), offset(offset) {}
+    SelectionListEntry(Object* obj, const FarMatrix& offset) : obj(obj), offset(offset) {}
 };
 
 struct StaticModelsEntry
@@ -64,28 +64,28 @@ public:
     void DrawOverlay(const DrawOverlayContext& ctx);
 
     // world
-    float GetTerrainHeight(const glm::vec2& pos) const;
+    float GetTerrainHeight(const glm::dvec2& pos) const;
 
     // assets
     const StaticModelsEntry& GetStaticModelsRoot() const { return static_models_root_; }
 
     // objects
-    void AddStaticObject(const glm::mat4& trans, const std::string& model_name);
-    void AddStaticObject(const glm::vec2& pos, const std::string& model_name);
-    Waypoint* AddWaypoint(const glm::mat4& trans);
-    Waypoint* AddWaypoint(const glm::vec2& pos);
+    void AddStaticObject(const FarMatrix& trans, const std::string& model_name);
+    void AddStaticObject(const glm::dvec2& pos, const std::string& model_name);
+    Waypoint* AddWaypoint(const FarMatrix& trans);
+    Waypoint* AddWaypoint(const glm::dvec2& pos);
 
     Waypoint* GetWaypoint(WaypointID id);
 
     // selection operations
-    void SetHover(const glm::vec3& start, const glm::vec3& end);
-    void MakeSelection(const glm::vec3& start, const glm::vec3& end, bool additive);
-    void MakeSelection2D(const glm::vec2& min, const glm::vec2* max, bool additive);
+    void SetHover(const glm::dvec3& start, const glm::dvec3& end);
+    void MakeSelection(const glm::dvec3& start, const glm::dvec3& end, bool additive);
+    void MakeSelection2D(const glm::dvec2& min, const glm::dvec2* max, bool additive);
     bool HasSelection() const;
-    const glm::mat4* GetSelectionMatrix() const;
-    void ApplySelectionTransform(const glm::mat4& delta);
-    void CloneSelection(const glm::mat4& trans);
-    void CloneSelection(const glm::vec2& pos);
+    const FarMatrix* GetSelectionMatrix() const;
+    void ApplySelectionTransform(const FarMatrix& delta);
+    void CloneSelection(const FarMatrix& trans);
+    void CloneSelection(const glm::dvec2& pos);
     void LinkSelection(bool link);
     void ClearSelection();
     void DeleteSelection();
@@ -106,12 +106,12 @@ private:
     void SelectOrDeselect(std::span<Object*> objs, bool additive, bool allow_deselect);
     void FixSelectionList();
 
-    glm::mat4 GetNewObjectTransform(const glm::vec2& pos) const;
-    glm::mat4 SnapTransform(const glm::mat4& trans) const;
+    FarMatrix GetNewObjectTransform(const glm::dvec2& pos) const;
+    FarMatrix SnapTransform(const FarMatrix& trans) const;
     void NewObjectAdded(Object& obj);
     void UpdateAllObjectsList();
 
-    Object* ObjectRaycast(const glm::vec3& start, const glm::vec3& end);
+    Object* ObjectRaycast(const glm::dvec3& start, const glm::dvec3& end);
 
     // generation
     void SetupChunks();

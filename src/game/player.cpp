@@ -139,7 +139,7 @@ void game::Player::DisplayDamageEvent(DamageEventType type)
     dmg_event_flags_ |= 1 << type;
 }
 
-bool game::Player::GetView(glm::vec3& eye, glm::vec3& forward)
+bool game::Player::GetView(glm::dvec3& eye, glm::vec3& forward)
 {
     if (!world_)
         return false;

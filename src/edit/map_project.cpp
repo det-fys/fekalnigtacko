@@ -72,7 +72,7 @@ void edit::Project::DrawOverlay(const DrawOverlayContext& ctx)
     }
 }
 
-float edit::Project::GetTerrainHeight(const glm::vec2& pos) const
+float edit::Project::GetTerrainHeight(const glm::dvec2& pos) const
 {
     if (!height_sampler_)
         return 0.0f;
@@ -80,19 +80,19 @@ float edit::Project::GetTerrainHeight(const glm::vec2& pos) const
     return height_sampler_->Get(pos);
 }
 
-void edit::Project::AddStaticObject(const glm::mat4& trans, const std::string& model_name)
+void edit::Project::AddStaticObject(const FarMatrix& trans, const std::string& model_name)
 {
     ClearSelection(); // to avoid invalid pointers
     auto& obj = static_objs_.emplace_back(*this, trans, model_name);
     NewObjectAdded(obj);
 }
 
-void edit::Project::AddStaticObject(const glm::vec2& pos, const std::string& model_name)
+void edit::Project::AddStaticObject(const glm::dvec2& pos, const std::string& model_name)
 {
     AddStaticObject(GetNewObjectTransform(pos), model_name);
 }
 
-edit::Waypoint* edit::Project::AddWaypoint(const glm::mat4& trans)
+edit::Waypoint* edit::Project::AddWaypoint(const FarMatrix& trans)
 {
     ClearSelection(); // to avoid invalid pointers
     auto id = utils::AllocNum(waypoints_, last_waypoint_id_);
@@ -106,7 +106,7 @@ edit::Waypoint* edit::Project::AddWaypoint(const glm::mat4& trans)
     return &wp;
 }
 
-edit::Waypoint* edit::Project::AddWaypoint(const glm::vec2& pos)
+edit::Waypoint* edit::Project::AddWaypoint(const glm::dvec2& pos)
 {
     return AddWaypoint(GetNewObjectTransform(pos));
 }
@@ -120,7 +120,7 @@ edit::Waypoint* edit::Project::GetWaypoint(WaypointID id)
     return (it != waypoints_.end()) ? &it->second : nullptr;
 }
 
-void edit::Project::SetHover(const glm::vec3& start, const glm::vec3& end)
+void edit::Project::SetHover(const glm::dvec3& start, const glm::dvec3& end)
 {
     Object* hovered_obj = ObjectRaycast(start, end);
 
@@ -130,15 +130,15 @@ void edit::Project::SetHover(const glm::vec3& start, const glm::vec3& end)
     }
 }
 
-void edit::Project::MakeSelection(const glm::vec3& start, const glm::vec3& end, bool additive)
+void edit::Project::MakeSelection(const glm::dvec3& start, const glm::dvec3& end, bool additive)
 {
     auto obj = ObjectRaycast(start, end);
     SelectOrDeselect({&obj, static_cast<size_t>(obj ? 1 : 0)}, additive, true);
 }
 
-void edit::Project::MakeSelection2D(const glm::vec2& min, const glm::vec2* max, bool additive)
+void edit::Project::MakeSelection2D(const glm::dvec2& min, const glm::dvec2* max, bool additive)
 {
-    MakeSelection(glm::vec3(min, 1000.0f), glm::vec3(min, 1000.0f), additive);
+    MakeSelection(glm::dvec3(min, 1000.0), glm::dvec3(min, 1000.0), additive);
 }
 
 bool edit::Project::HasSelection() const
@@ -146,7 +146,7 @@ bool edit::Project::HasSelection() const
     return !selection_.empty();
 }
 
-const glm::mat4* edit::Project::GetSelectionMatrix() const
+const FarMatrix* edit::Project::GetSelectionMatrix() const
 {
     if (!HasSelection())
         return nullptr;
@@ -154,7 +154,7 @@ const glm::mat4* edit::Project::GetSelectionMatrix() const
     return &selection_.front().obj->GetTransform();
 }
 
-void edit::Project::ApplySelectionTransform(const glm::mat4& delta)
+void edit::Project::ApplySelectionTransform(const FarMatrix& delta)
 {
     if (!HasSelection())
         return;
@@ -163,6 +163,8 @@ void edit::Project::ApplySelectionTransform(const glm::mat4& delta)
     auto& first_obj = *first_entry.obj;
 
     auto first_trans = delta * first_obj.GetTransform();
+    first_trans.NormalizeBasis();
+
     first_obj.SetTransform(SnapTransform(first_trans));
 
     for (uint32_t i = 1; i < selection_.size(); ++i)
@@ -173,7 +175,7 @@ void edit::Project::ApplySelectionTransform(const glm::mat4& delta)
     }
 }
 
-void edit::Project::CloneSelection(const glm::mat4& trans)
+void edit::Project::CloneSelection(const FarMatrix& trans)
 {
     if (!HasSelection())
         return;
@@ -182,7 +184,7 @@ void edit::Project::CloneSelection(const glm::mat4& trans)
     selection_[0].obj->Clone(trans);
 }
 
-void edit::Project::CloneSelection(const glm::vec2& pos)
+void edit::Project::CloneSelection(const glm::dvec2& pos)
 {
     CloneSelection(GetNewObjectTransform(pos));
 }
@@ -242,14 +244,14 @@ void edit::Project::InvalidateChunk(const glm::ivec2& chunk_pos)
 
 void edit::Project::GetChunkParams(mg::ChunkParams& params)
 {
-    AABB2 chunk_aabb = mg::GetChunkAABB(map_config_, params.coord, true);
+    AABBD2 chunk_aabb = mg::GetChunkAABB(map_config_, params.coord, true);
 
     // collect relevant objs
     for (const auto& obj : static_objs_)
     {
         // auto pos2d = glm::vec2(obj.GetPosition());
         const auto& obj_aabb = obj.GetAABB();
-        AABB2 obj_aabb_2d(glm::vec2(obj_aabb.min), glm::vec2(obj_aabb.max));
+        AABBD2 obj_aabb_2d(glm::dvec2(obj_aabb.min), glm::dvec2(obj_aabb.max));
 
         if (!chunk_aabb.CollidesWith(obj_aabb_2d))
             continue;
@@ -318,7 +320,7 @@ void edit::Project::Select(Object& obj)
     obj.SetSelected(true);
 
     auto selection_matrix = GetSelectionMatrix();
-    auto offset = selection_matrix ? glm::inverse(*selection_matrix) * obj.GetTransform() : glm::mat4(1.0f);
+    auto offset = selection_matrix ? selection_matrix->Invert() * obj.GetTransform() : FarMatrix(1.0);
 
     selection_.emplace_back(&obj, offset);
 }
@@ -368,18 +370,18 @@ void edit::Project::FixSelectionList()
                      selection_.end());
 }
 
-glm::mat4 edit::Project::GetNewObjectTransform(const glm::vec2& pos) const
+FarMatrix edit::Project::GetNewObjectTransform(const glm::dvec2& pos) const
 {
-    return glm::translate(glm::mat4(1.0f), glm::vec3(pos, GetTerrainHeight(pos)));
+    return FarMatrix(glm::dvec3(pos, GetTerrainHeight(pos)));
 }
 
-glm::mat4 edit::Project::SnapTransform(const glm::mat4& trans) const
+FarMatrix edit::Project::SnapTransform(const FarMatrix& trans) const
 {
     if (!properties_.snap_to_terrain_height)
         return trans;
 
     auto new_trans = trans;
-    new_trans[3].z = GetTerrainHeight(glm::vec2(trans[3]));
+    new_trans.position.z = GetTerrainHeight(trans.position);
     return new_trans;
 }
 
@@ -406,30 +408,33 @@ void edit::Project::UpdateAllObjectsList()
     }
 }
 
-static bool LineVsAABB(const glm::vec3& start, const glm::vec3& end, const AABB3& aabb)
+static bool LineVsAABB(const glm::dvec3& start, const glm::dvec3& end, const AABB3& aabb)
 {
-    glm::vec3 dir = end - start;
+    glm::dvec3 dir = end - start;
+
+    auto aabb_min = glm::dvec3(aabb.min);
+    auto aabb_max = glm::dvec3(aabb.max);
 
     // Initialize bounds to the line segment [0.0 (start), 1.0 (end)]
-    float tmin = 0.0f;
-    float tmax = 1.0f;
+    double tmin = 0.0;
+    double tmax = 1.0;
 
     for (int i = 0; i < 3; ++i)
     {
         // If the line is parallel to the slab, handle carefully to avoid division by zero
-        if (std::abs(dir[i]) < 1e-6f)
+        if (std::abs(dir[i]) < 1e-6)
         {
             // If the segment's origin is completely outside the parallel slab, it's a miss
-            if (start[i] < aabb.min[i] || start[i] > aabb.max[i])
+            if (start[i] < aabb_min[i] || start[i] > aabb_max[i])
             {
                 return false;
             }
         }
         else
         {
-            float inv_dir = 1.0f / dir[i];
-            float t1 = (aabb.min[i] - start[i]) * inv_dir;
-            float t2 = (aabb.max[i] - start[i]) * inv_dir;
+            double inv_dir = 1.0 / dir[i];
+            double t1 = (aabb_min[i] - start[i]) * inv_dir;
+            double t2 = (aabb_max[i] - start[i]) * inv_dir;
 
             if (t1 > t2)
             {
@@ -452,16 +457,16 @@ static bool LineVsAABB(const glm::vec3& start, const glm::vec3& end, const AABB3
     return true;
 }
 
-static float Distance2ToAABB(const glm::vec3& point, const AABB3& aabb)
+static double Distance2ToAABB(const glm::dvec3& point, const AABB3& aabb)
 {
-    glm::vec3 closest = glm::clamp(point, aabb.min, aabb.max);
-    glm::vec3 d = point - closest;
+    glm::dvec3 closest = glm::clamp(point, glm::dvec3(aabb.min), glm::dvec3(aabb.max));
+    glm::dvec3 d = point - closest;
     return glm::dot(d, d);
 }
 
-edit::Object* edit::Project::ObjectRaycast(const glm::vec3& start, const glm::vec3& end)
+edit::Object* edit::Project::ObjectRaycast(const glm::dvec3& start, const glm::dvec3& end)
 {
-    float nearest_dist2 = std::numeric_limits<float>().max();
+    auto nearest_dist2 = std::numeric_limits<double>().max();
     Object* nearest_obj = nullptr;
 
     for (auto& obj : all_objs_)
@@ -495,7 +500,7 @@ void edit::Project::SetupChunks()
 
 void edit::Project::UpdateChunks()
 {
-    constexpr std::array<float, 4> lod_distances = { 250.0f, 500.0f, 1000.0f, 2000.0f };
+    constexpr std::array<double, 4> lod_distances = { 250.0, 500.0, 1000.0, 2000.0 };
 
     chunk_manager_->BeginFrame(chunk_gen_time_);
     chunk_manager_->RequestArea(properties_.cam_pos_3d, lod_distances);

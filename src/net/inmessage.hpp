@@ -88,7 +88,7 @@ public:
     }
 
     template <AnyQuantized T>
-    bool Read(float& f)
+    bool Read(T::ScalarType& f)
     {
         T q;
         if (!Read(q))

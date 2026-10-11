@@ -18,7 +18,7 @@ public:
     virtual void Update(int64_t delta_time) override;
 
     // events
-    virtual PlayerCharacter& InsertPlayer(Player& player, const HumanCharacterTuning& tuning, const glm::vec3& pos,
+    virtual PlayerCharacter& InsertPlayer(Player& player, const HumanCharacterTuning& tuning, const glm::dvec3& pos,
                                           float yaw);
     virtual void PlayerInput(Player& player, PlayerInputType type, bool enabled);
     virtual void PlayerViewAnglesChanged(Player& player, float yaw, float pitch);
@@ -30,18 +30,19 @@ public:
 
     PlayerCharacter* GetPlayerCharacter(Player& player);
 
-    void SetSpawnPoint(const glm::vec3& pos) { spawnpoint_ = pos; }
-    const glm::vec3& GetSpawnPoint() const { return spawnpoint_; }
+    void SetSpawnPoint(const glm::dvec3& pos) { spawnpoint_ = pos; }
+    const glm::dvec3& GetSpawnPoint() const { return spawnpoint_; }
 
 private:
-    PlayerCharacter& CreatePlayerCharacter(Player& player, const HumanCharacterTuning& tuning, const glm::vec3& position, float yaw);
+    PlayerCharacter& CreatePlayerCharacter(Player& player, const HumanCharacterTuning& tuning,
+                                           const glm::dvec3& position, float yaw);
     void RemovePlayerCharacter(Player& player);
 
     void DrawNavMeshBeams();
 
 private:
     std::map<Player*, PlayerCharacter*> player_characters_;
-    glm::vec3 spawnpoint_{};
+    glm::dvec3 spawnpoint_{};
 
 };
 

@@ -420,7 +420,7 @@ void game::view::WorldView::UpdateChunks()
 
     const auto& cam_pos = session_.GetCameraParams().eye;
 
-    constexpr std::array<float, 4> lod_distances = {250.0f, 500.0f, 1000.0f, 2000.0f};
+    constexpr std::array<double, 4> lod_distances = {250.0, 500.0, 1000.0, 2000.0};
 
     chunk_manager_->BeginFrame(++chunk_time_);
     chunk_manager_->RequestArea(cam_pos, lod_distances);

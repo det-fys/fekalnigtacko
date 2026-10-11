@@ -14,7 +14,7 @@ game::MapInstance::MapInstance(collision::DynamicsWorld& world, std::string mapn
     const auto& basemodel = map_->GetBaseModel();
     if (basemodel)
     {
-        Transform identity;
+        FarTransform identity;
         basemodel_col_ = std::make_unique<MapObjectCollision>(world_, basemodel, 0, identity, 0);
     }
 
@@ -61,7 +61,7 @@ std::unique_ptr<game::MapObjectCollision> game::MapInstance::DestroyObj(net::Obj
 
 game::MapObjectCollision::MapObjectCollision(collision::DynamicsWorld& world,
                                              std::shared_ptr<const assets::Model> model, net::ObjNum num,
-                                             const Transform& trans, MapObjectCollisionFlags flags)
+                                             const FarTransform& trans, MapObjectCollisionFlags flags)
     : world_(world), model_(std::move(model)), num_(num)
 {
     auto cshape = model_->GetColShape();
@@ -116,7 +116,7 @@ void game::MapObjectCollision::Break(const MapObjectBreakInfo& info)
         return;
 
     btCollisionShape* shape = body_->getCollisionShape();
-    float mass = 10.0f;
+    float mass = 0.0f;
     model_->GetParamFloat("destr_mass", mass); // dont care if not present
     btVector3 local_inertia(0, 0, 0);
     shape->calculateLocalInertia(mass, local_inertia);
@@ -141,8 +141,8 @@ void game::MapObjectCollision::Break(const MapObjectBreakInfo& info)
 
     if (info.impulse > 0.0f)
     {
-        auto normal = glm::normalize(info.hit_pos - info.from_pos);
-        auto impulse = normal * info.impulse * body_->getMass() * 0.003f;
+        auto normal = glm::vec3(glm::normalize(info.hit_pos - info.from_pos));
+        auto impulse = normal * info.impulse * static_cast<float>(body_->getMass()) * 0.003f;
         body_->applyImpulse(btVector3(impulse.x, impulse.y, impulse.z),
                             btVector3(info.hit_pos.x, info.hit_pos.y, info.hit_pos.z) -
                                 body_->getCenterOfMassPosition());
@@ -150,7 +150,7 @@ void game::MapObjectCollision::Break(const MapObjectBreakInfo& info)
 
 }
 
-void game::MapObjectCollision::GetModelTransform(Transform& trans) const
+void game::MapObjectCollision::GetModelTransform(FarTransform& trans) const
 {
     trans.SetBtTransform(body_->getWorldTransform());
     trans.position -= trans.rotation * model_->GetColOffset(); // unapply offset

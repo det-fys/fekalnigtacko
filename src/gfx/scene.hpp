@@ -1,8 +1,8 @@
 #pragma once
 
 #include "draw_list.hpp"
-#include "frustum.hpp"
 #include "environment.hpp"
+#include "frustum.hpp"
 
 namespace gfx
 {
@@ -11,14 +11,14 @@ enum DrawPassType
 {
     DRAW_PASS_MAIN,
     DRAW_PASS_SHADOW_MAP,
-    //DRAW_PASS_CSM,
+    // DRAW_PASS_CSM,
 };
 
 struct DrawContext
 {
     DrawList& dlist;
     DrawPassType pass;
-    glm::vec3 eye;
+    glm::dvec3 eye;
     glm::mat4 view;
     glm::mat4 proj;
     glm::mat4 view_proj;
@@ -27,9 +27,9 @@ struct DrawContext
     float max_distance;
     glm::u32vec2 viewport_size;
 
-    DrawContext(DrawList& dlist, DrawPassType pass, const glm::vec3& eye, const glm::mat4& view, const glm::mat4& proj,
+    DrawContext(DrawList& dlist, DrawPassType pass, const glm::dvec3& eye, const glm::mat4& view, const glm::mat4& proj,
                 float min_distance, float max_distance, const glm::u32vec2& viewport_size)
-        : dlist(dlist), pass(pass), eye(eye), view(view), proj(proj), view_proj(proj * view), frustum(view_proj),
+        : dlist(dlist), pass(pass), eye(eye), view(view), proj(proj), view_proj(proj * view), frustum(view_proj, eye),
           min_distance(min_distance), max_distance(max_distance), viewport_size(viewport_size)
     {
     }
@@ -42,8 +42,6 @@ public:
 
     virtual Environment GetSceneEnvironment() = 0;
     virtual float GetMapChunkSize() = 0;
-
 };
 
-
-}
+} // namespace gfx

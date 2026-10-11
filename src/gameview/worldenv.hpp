@@ -33,7 +33,7 @@ public:
     const gfx::Environment& GetEnv() const { return env_; }
 
 private:
-    void DrawEnvModel(const gfx::DrawContext& ctx, const ModelView& model, const glm::mat4& matrix,
+    void DrawEnvModel(const gfx::DrawContext& ctx, const ModelView& model, const FarMatrix& matrix,
                       const glm::vec4& color, float dist);
 
 private:
@@ -43,16 +43,16 @@ private:
     std::shared_ptr<const ModelView> moonmodel_;
     std::shared_ptr<const ModelView> halfspheremodel_;
 
-    glm::mat4 sun_matrix_;
+    FarMatrix sun_far_matrix_;
     glm::vec4 sun_color_;
     
-    glm::mat4 moon_matrix_;
+    FarMatrix moon_far_matrix_;
     glm::vec4 moon_color_;
 
-    glm::mat4 sun_halfsphere_matrix_;
+    FarMatrix sun_halfsphere_far_matrix_;
     glm::vec4 sun_halfsphere_color_;
 
-    glm::mat4 moon_halfsphere_matrix_;
+    FarMatrix moon_halfsphere_far_matrix_;
     glm::vec4 moon_halfsphere_color_;
 
     gfx::Environment env_{};

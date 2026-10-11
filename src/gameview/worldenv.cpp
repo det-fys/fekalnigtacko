@@ -180,53 +180,58 @@ void game::view::WorldEnv::Draw(const gfx::DrawContext& ctx)
     float sun_angle = (daytime_ - 12.0f) * glm::two_pi<float>() / 24.0f;
 
     sun_color_ = glm::mix(kf1->sun_disc_color, kf2->sun_disc_color, t);
-    sun_matrix_ = glm::mat4(1.0f);
-    sun_matrix_ = glm::translate(sun_matrix_, ctx.eye);
-    sun_matrix_ = glm::scale(sun_matrix_, glm::vec3(dist));
-    sun_matrix_ = glm::rotate(sun_matrix_, 0.3f, glm::vec3(1.0f, 0.0f, 0.0f));
-    sun_matrix_ = glm::rotate(sun_matrix_, sun_angle, glm::vec3(0.0f, 1.0f, 0.0f));
-    sun_matrix_ = glm::translate(sun_matrix_, glm::vec3(0.0f, 0.0f, 1.0f));
-    sun_matrix_ = glm::scale(sun_matrix_, glm::vec3(0.7f));
+    auto sun_matrix = glm::mat4(1.0f);
+    // sun_matrix_ = glm::translate(sun_matrix_, ctx.eye);
+    sun_matrix = glm::scale(sun_matrix, glm::vec3(dist));
+    sun_matrix = glm::rotate(sun_matrix, 0.3f, glm::vec3(1.0f, 0.0f, 0.0f));
+    sun_matrix = glm::rotate(sun_matrix, sun_angle, glm::vec3(0.0f, 1.0f, 0.0f));
+    sun_matrix = glm::translate(sun_matrix, glm::vec3(0.0f, 0.0f, 1.0f));
+    sun_matrix = glm::scale(sun_matrix, glm::vec3(0.7f));
 
     sun_halfsphere_color_ = glm::mix(kf1->sun_halfsphere_color, kf2->sun_halfsphere_color, t);
-    sun_halfsphere_matrix_ = glm::scale(sun_matrix_, glm::vec3(1.0f, 1.0f, 1.5f));
+    auto sun_halfsphere_matrix = glm::scale(sun_matrix, glm::vec3(1.0f, 1.0f, 1.5f));
 
     moon_color_ = glm::mix(kf1->moon_disc_color, kf2->moon_disc_color, t);
-    moon_matrix_ = glm::mat4(1.0f);
-    moon_matrix_ = glm::translate(moon_matrix_, ctx.eye);
-    moon_matrix_ = glm::scale(moon_matrix_, glm::vec3(dist));
-    moon_matrix_ = glm::rotate(moon_matrix_, sun_angle + glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f));
-    moon_matrix_ = glm::translate(moon_matrix_, glm::vec3(0.0f, 0.0f, 1.0f));
-    moon_matrix_ = glm::scale(moon_matrix_, glm::vec3(0.6f));
+    auto moon_matrix = glm::mat4(1.0f);
+    // moon_matrix_ = glm::translate(moon_matrix_, ctx.eye);
+    moon_matrix = glm::scale(moon_matrix, glm::vec3(dist));
+    moon_matrix = glm::rotate(moon_matrix, sun_angle + glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f));
+    moon_matrix = glm::translate(moon_matrix, glm::vec3(0.0f, 0.0f, 1.0f));
+    moon_matrix = glm::scale(moon_matrix, glm::vec3(0.6f));
 
     moon_halfsphere_color_ = glm::mix(kf1->moon_halfsphere_color, kf2->moon_halfsphere_color, t);
-    moon_halfsphere_matrix_ = glm::scale(moon_matrix_, glm::vec3(1.1f, 1.1f, 1.5f));
+    auto moon_halfsphere_matrix = glm::scale(moon_matrix, glm::vec3(1.1f, 1.1f, 1.5f));
 
     float sun_dir = glm::mix(kf1->sun_dir, kf2->sun_dir, t);
 
     if (sun_dir >= 0.0f)
     {
-        env_.sun_direction = -glm::normalize(glm::vec3(sun_matrix_[2]));
+        env_.sun_direction = -glm::normalize(glm::vec3(sun_matrix[2]));
         env_.sun_color *= sun_dir;
     }
     else
     {
-        env_.sun_direction = -glm::normalize(glm::vec3(moon_matrix_[2]));
+        env_.sun_direction = -glm::normalize(glm::vec3(moon_matrix[2]));
         env_.sun_color *= -sun_dir;
     }
 
-    DrawEnvModel(ctx, *halfspheremodel_, moon_halfsphere_matrix_, moon_halfsphere_color_, dist);
-    DrawEnvModel(ctx, *halfspheremodel_, sun_halfsphere_matrix_, sun_halfsphere_color_, dist - 1.0f);
-    DrawEnvModel(ctx, *sunmodel_, moon_matrix_, moon_color_, dist - 2.0f);
-    DrawEnvModel(ctx, *sunmodel_, sun_matrix_, sun_color_, dist - 3.0f);
+    sun_far_matrix_ = FarMatrix::FromNearMatrix(sun_matrix, ctx.eye);
+    moon_far_matrix_ = FarMatrix::FromNearMatrix(moon_matrix, ctx.eye);
+    sun_halfsphere_far_matrix_ = FarMatrix::FromNearMatrix(sun_halfsphere_matrix, ctx.eye);
+    moon_halfsphere_far_matrix_ = FarMatrix::FromNearMatrix(moon_halfsphere_matrix, ctx.eye);
+
+    DrawEnvModel(ctx, *halfspheremodel_, moon_halfsphere_far_matrix_, moon_halfsphere_color_, dist);
+    DrawEnvModel(ctx, *halfspheremodel_, sun_halfsphere_far_matrix_, sun_halfsphere_color_, dist - 1.0f);
+    DrawEnvModel(ctx, *sunmodel_, moon_far_matrix_, moon_color_, dist - 2.0f);
+    DrawEnvModel(ctx, *sunmodel_, sun_far_matrix_, sun_color_, dist - 3.0f);
 }
 
-void game::view::WorldEnv::DrawEnvModel(const gfx::DrawContext& ctx, const ModelView& model, const glm::mat4& matrix,
+void game::view::WorldEnv::DrawEnvModel(const gfx::DrawContext& ctx, const ModelView& model, const FarMatrix& matrix,
                                         const glm::vec4& color, float dist)
 {
     gfx::DrawSurfaceCmd cmd{};
     cmd.mesh = model.GetMesh().GetID();
-    cmd.matrix = &matrix;
+    cmd.transform = &matrix;
     cmd.colors = {&color, 1};
     cmd.dist = dist;
 

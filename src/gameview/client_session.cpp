@@ -10,6 +10,7 @@
 #include "assets/asset_manager.hpp"
 #include "assets/item.hpp"
 #include "game/player_hud_data.hpp"
+#include "utils/math.hpp"
 
 game::view::ClientSession::ClientSession(App& app) : app_(app), hud_(app.GetTime())
 {
@@ -360,7 +361,15 @@ void game::view::ClientSession::UpdateCamera(const UpdateInfo& info)
     }
 
     // update audio
-    glm::mat4 camera_world = glm::inverse(camera_controller_.GetViewMatrix());
+    auto basis = BasisFromDir(camera_controller_.GetForward());
+
+    auto camera_world = glm::mat4(
+        glm::vec4(basis[0], 0.0f),
+        glm::vec4(basis[1], 0.0f),
+        glm::vec4(basis[2], 0.0f),
+        glm::vec4(camera_controller_.GetEye(), 1.0f)
+    );
+
     GetAudioMaster().SetListenerOrientation(camera_world);
 }
 

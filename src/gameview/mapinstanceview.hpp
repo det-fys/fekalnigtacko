@@ -14,7 +14,8 @@ namespace game::view
 class MapObjectCollisionView
 {
 public:
-    MapObjectCollisionView(collision::DynamicsWorld& world, std::shared_ptr<const assets::Model> model, const Transform& trans);
+    MapObjectCollisionView(collision::DynamicsWorld& world, std::shared_ptr<const assets::Model> model,
+                           const FarTransform& trans);
     DELETE_COPY_MOVE(MapObjectCollisionView)
 
     void SetEnabled(bool enabled);
@@ -72,7 +73,7 @@ private:
     void InitObjsAndCollisions();
 
     void DrawChunk(const gfx::DrawContext& ctx, const assets::Chunk& chunk);
-    void DrawObj(const gfx::DrawContext& ctx, MapModel& mapmodel, const glm::mat4& matrix);
+    void DrawObj(const gfx::DrawContext& ctx, MapModel& mapmodel, const FarMatrix& matrix);
 
     void UpdateModelSpecial(MapModel& mapmodel);
 

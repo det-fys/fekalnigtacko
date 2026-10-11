@@ -44,7 +44,7 @@ private:
     std::vector<uint8_t> BuildTile(int x, int y);
 
     void AddTileTris(const AABB3& aabb, std::vector<float>& verts, std::vector<int>& tris);
-    void AddModelTris(const Model& model, const Transform& trans, uint32_t first, uint32_t count,
+    void AddModelTris(const Model& model, const FarTransform& trans, uint32_t first, uint32_t count,
                       std::vector<float>& verts, std::vector<int>& tris);
 
 private:

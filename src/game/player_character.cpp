@@ -213,7 +213,7 @@ void game::PlayerCharacter::SpawnLoot()
             continue;
 
         size_t ammo = GetAmmo(slot->def->clip_size * 5, slot->def->ammo_type);
-        auto pos = root_.GetGlobalPosition() + glm::vec3(RandomFloat(-1.0f, 1.0f), RandomFloat(-1.0f, 1.0f), RandomFloat(-0.3f, 0.1f));
+        auto pos = root_.GetGlobalPosition() + glm::dvec3(RandomFloat(-1.0f, 1.0f), RandomFloat(-1.0f, 1.0f), RandomFloat(-0.3f, 0.1f));
         GetWorld().CreateItemPickup(pos, std::move(slot), RandomInt(59000, 61000), 0, ammo);
     }
 
@@ -288,11 +288,12 @@ void game::PlayerCharacter::UpdateAimTarget()
     if (!player_ || !IsAlive())
         return;
 
-    glm::vec3 eye, forward;
+    glm::dvec3 eye;
+    glm::vec3 forward;
     if (!player_->GetView(eye, forward))
         return;
 
-    auto target = eye + forward * 1000.0f;
+    auto target = eye + glm::dvec3(forward * 1000.0f);
 
     if (GetAiming()) // save perf if not aiming
     {
@@ -311,7 +312,7 @@ void game::PlayerCharacter::UpdateAimTarget()
     if (plc_aim_beams.Get() > 0)
     {
         GetWorld().Beam(eye, target, 0xFFFF00, 1.0 / 25.0f);
-        GetWorld().BeamBox(target - 0.05f, target + 0.05f, 0xFFFF00, 1.5f / 25.0f);
+        GetWorld().BeamBox(target - 0.05, target + 0.05, 0xFFFF00, 1.5f / 25.0f);
     }
 }
 

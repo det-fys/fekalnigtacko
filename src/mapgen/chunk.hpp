@@ -6,6 +6,7 @@
 #include <tuple>
 
 #include "utils/aabb.hpp"
+#include "utils/transform.hpp"
 #include "map_config.hpp"
 #include "defs.hpp"
 #include "heightmesh.hpp"
@@ -53,7 +54,7 @@ struct ChunkTile
 
 struct ChunkStaticObject
 {
-    glm::mat4 trans{1.0f};
+    FarMatrix trans{1.0};
     //AABB3 aabb{};
     std::string model_name;
     std::shared_ptr<const HeightMesh> heightmesh;
@@ -67,7 +68,7 @@ enum ChunkSplineNodeType : uint8_t
 
 struct ChunkSplineNode
 {
-    glm::vec3 pos{0.0f};
+    glm::dvec3 pos{0.0};
     std::array<uint32_t, 4> links = { 0, 0, 0, 0 };
     ChunkSplineNodeType type = CHUNK_SPLINE_NODE_NORMAL;
     uint32_t res_id = 0; // mesh id for CHUNK_SPLINE_NODE_MESH, might be used for something else for other types
@@ -85,21 +86,22 @@ struct ChunkParams
 
 struct ChunkOutputObject
 {
-    glm::mat4 trans{1.0f};
+    FarMatrix trans{1.0f};
     uint32_t model_id = 0;
 };
 
 struct Chunk
 {
-    glm::ivec2 coord;
+    glm::ivec2 coord{0};
+    glm::dvec3 center{0.0};
     uint32_t lod = 0;
     ChunkMesh mesh{};
     std::vector<ChunkOutputObject> objs;
     AABB3 aabb;
 };
 
-AABB2 GetChunkAABB(const MapConfig& cfg, const glm::ivec2& chunk_pos, bool include_border = false);
-std::tuple<glm::ivec2, glm::ivec2> GetChunkRange(const MapConfig& cfg, const AABB2& aabb, bool include_margin = false);
+AABBD2 GetChunkAABB(const MapConfig& cfg, const glm::ivec2& chunk_pos, bool include_border = false);
+std::tuple<glm::ivec2, glm::ivec2> GetChunkRange(const MapConfig& cfg, const AABBD2& aabb, bool include_margin = false);
 
 Chunk GenerateChunk(const ResourceSet& res, const MapConfig& cfg, const ChunkParams& params);
 

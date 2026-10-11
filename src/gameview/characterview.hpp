@@ -14,7 +14,7 @@ namespace game::view
 
 struct CharacterViewState
 {
-    Transform trans;
+    FarTransform trans;
     
     float loco_blend = 0.0f;
     float loco_phase = 0.0f;
@@ -81,8 +81,8 @@ private:
     float update_time_ = 0.0f;
 
     std::string item_name_;
-    TransformNode item_node_;
-    TransformNode fire_snd_node_;
+    FarTransformNode item_node_;
+    FarTransformNode fire_snd_node_;
     std::shared_ptr<const assets::Item> item_;
     std::shared_ptr<const ModelView> item_model_;
     std::shared_ptr<const audio::Sound> fire_snd_;

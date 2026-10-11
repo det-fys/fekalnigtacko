@@ -98,7 +98,7 @@ private:
     void Render(Scene& scene, const CameraParams& camera, const glm::u32vec2& size, bool is_main_viewport);
 
     void CreateLightGrid(std::span<DrawLightCmd> light_cmds, const DrawInfo& info);
-    void AddLightToGrid(const LightData& light, LightGrid& grid, float cell_size);
+    void AddLightToGrid(const DrawLightCmd& cmd, LightGrid& grid, float cell_size, const DrawInfo& info);
 
     void DrawSurfaceList(std::span<DrawSurfaceCmd> list, const DrawInfo& info);
     void DrawBeamList(std::span<DrawBeamCmd> queue, const DrawInfo& info);

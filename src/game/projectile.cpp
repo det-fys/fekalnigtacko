@@ -37,21 +37,21 @@ void game::Projectile::UpdatePreSync()
     info_.velocity.z -= info_.gravity / 25.0f;
 
     // step forward
-    auto step = info_.velocity / 25.0f;
-    auto start = root_.local.position - step * glm::min(alive_frames, 1.0f);
+    auto step = glm::dvec3(info_.velocity) / 25.0;
+    auto start = root_.local.position - step * glm::min(static_cast<double>(alive_frames), 1.0);
     auto end = root_.local.position + step; 
 
     // make fx
     if (!info_.fx_name.empty() && alive_time > 40)
     {
-        world.Effect(info_.fx_name, root_.local.position - step * 0.7f, glm::normalize(info_.velocity));
+        world.Effect(info_.fx_name, root_.local.position - step * 0.7, glm::normalize(info_.velocity));
     }
 
-    glm::vec3 hit_pos;
+    glm::dvec3 hit_pos;
     collision::ObjectCallback* hit_obj_cb = nullptr;
     if (world.TraceBullet(start, end, shooter_, hit_pos, &hit_obj_cb))
     {
-        auto boom_pos = hit_pos - glm::normalize(info_.velocity) * 0.1f;
+        auto boom_pos = hit_pos - glm::dvec3(glm::normalize(info_.velocity) * 0.1f);
 
         Remove();
         world.Effect("explo", boom_pos, glm::vec3(0.0f, 0.0f, 1.0f));

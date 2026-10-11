@@ -19,8 +19,8 @@ public:
     const glm::mat4& GetProj() const { return proj_; }
     const glm::mat4& GetView() const { return view_; }
     const glm::mat4& GetViewProj() const { return view_proj_; }
-
-    const gfx::Frustum GetFrustum() const { return frustum_; }
+    const glm::dvec3& GetEye() const { return eye_; }
+    const gfx::Frustum& GetFrustum() const { return frustum_; }
 
 protected:
     virtual void Update() override;
@@ -30,12 +30,13 @@ protected:
 
     void SetCameraParams(const gfx::CameraParams& cam) { cam_ = cam; }
 
-    void SetOverlayMatrices(const glm::mat4& view, const glm::mat4& proj)
+    void SetOverlayMatrices(const glm::mat4& view, const glm::mat4& proj, const glm::dvec3& eye)
     {
         view_ = view;
         proj_ = proj;
         view_proj_ = proj * view;
-        frustum_ = gfx::Frustum(view_proj_);
+        eye_ = eye;
+        frustum_ = gfx::Frustum(view_proj_, eye);
     }
 
     bool ContextMenuItem(const char* label, const char* shortcut_str, ImGuiKey shortcut_key, bool enabled = true) const;
@@ -54,6 +55,7 @@ private:
     glm::mat4 proj_{1.0f};
     glm::mat4 view_{1.0f};
     glm::mat4 view_proj_{1.0f};
+    glm::dvec3 eye_{0.0};
     gfx::Frustum frustum_;
 
     bool context_menu_shown_ = false;

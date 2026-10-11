@@ -16,12 +16,12 @@ class Waypoint : public Object
 public:
     using Super = Object;
 
-    Waypoint(Project& project, const glm::mat4& trans, WaypointID id);
+    Waypoint(Project& project, const FarMatrix& trans, WaypointID id);
 
     virtual void DrawOverlay(const DrawOverlayContext& ctx) override;
 
-    virtual void SetTransform(const glm::mat4& trans) override;
-    virtual void Clone(const glm::mat4& trans) override;
+    virtual void SetTransform(const FarMatrix& trans) override;
+    virtual void Clone(const FarMatrix& trans) override;
     virtual void Link(Object& other, bool link) override;
     void Link(Waypoint& other, bool link);
     virtual void Delete() override;
@@ -33,12 +33,12 @@ private:
     void UpdateAABB();
 
     void DrawLinksOverlay(const DrawOverlayContext& ctx) const;
-    static void GetPath(const Waypoint& wp0, const Waypoint& wp1, std::span<glm::vec3> out_positions);
+    static void GetPath(const Waypoint& wp0, const Waypoint& wp1, std::span<glm::dvec3> out_positions);
     static void DrawPath(const DrawOverlayContext& ctx, const Waypoint& wp0, const Waypoint& wp1, uint32_t color0,
                          uint32_t color1);
-    static void DrawPathTypeMarker(const DrawOverlayContext& ctx, std::span<const glm::vec3> positions,
-                                   std::span<const std::optional<ImVec2>> positions_2d, bool from_end,
-                                   uint32_t color, float length);
+    static void DrawPathTypeMarker(const DrawOverlayContext& ctx, std::span<const glm::dvec3> positions,
+                                   std::span<const std::optional<ImVec2>> positions_2d, bool from_end, uint32_t color,
+                                   float length);
 
     void UnlinkAll();
 

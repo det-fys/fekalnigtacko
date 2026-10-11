@@ -53,9 +53,9 @@ public:
     PlayerInputFlags GetNewInput() const { return in_new_; }
     float GetViewYaw() const { return camera_controller_.GetYaw(); }
     float GetViewPitch() const { return camera_controller_.GetPitch(); }
-    bool GetView(glm::vec3& eye, glm::vec3& forward);
+    bool GetView(glm::dvec3& eye, glm::vec3& forward);
 
-    const glm::vec3 GetCullPos() const { return cull_pos_; }
+    const glm::dvec3 GetCullPos() const { return cull_pos_; }
 
     void SetAdmin(bool admin) { is_admin_ = admin; }
     bool IsAdmin() const { return is_admin_; }
@@ -115,7 +115,7 @@ private:
 
     CameraInfo camera_info_;
     CameraController camera_controller_;
-    glm::vec3 cull_pos_ = glm::vec3(0.0f);
+    glm::dvec3 cull_pos_{0.0};
 
     // menus
     // TODO: allow more menus

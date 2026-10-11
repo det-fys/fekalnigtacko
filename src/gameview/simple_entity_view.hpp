@@ -9,7 +9,7 @@ namespace game::view
 
 struct SimpleEntityViewState
 {
-    Transform trans;
+    FarTransform trans;
 };
 
 class SimpleEntityView : public EntityView

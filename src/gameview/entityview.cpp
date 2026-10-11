@@ -116,7 +116,7 @@ void game::view::EntityView::DrawNametag(const DrawArgs& args)
         return;
 
     // calc screen position
-    glm::vec4 world_pos = GetRoot().matrix * glm::vec4(glm::vec3(0.0f, 0.0f, 2.0f), 1.0f);
+    glm::vec4 world_pos = glm::vec4(GetRoot().matrix.TransformPoint(glm::vec3(0.0f, 0.0f, 2.0f)) - args.ctx.eye, 1.0f);
     glm::vec4 clip_pos = args.ctx.view_proj * world_pos;
     if (clip_pos.w == 0.0f)
         return;
@@ -149,8 +149,9 @@ void game::view::EntityView::DrawAxes(const DrawArgs& args)
         glm::vec3 end(0.0f);
         end[i] = len;
 
-        glm::vec3 beam_start = glm::vec3(root_.matrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        glm::vec3 beam_end = glm::vec3(root_.matrix * glm::vec4(end, 1.0f));
+
+        auto beam_start = root_.matrix.TransformPoint(glm::vec3(0.0f, 0.0f, 0.0f));
+        auto beam_end = root_.matrix.TransformPoint(end);
 
         args.ctx.dlist.AddBeam(beam_start, beam_end, colors[i], 0.05f);
     }

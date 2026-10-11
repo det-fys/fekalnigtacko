@@ -16,7 +16,7 @@ namespace assets
 
 struct MapStaticObject
 {
-    game::TransformNode node;
+    game::FarTransformNode node;
     AABB3 aabb;
     size_t model_idx = 0;
     glm::vec3 color = glm::vec3(1.0f);
@@ -65,7 +65,7 @@ struct Chunk
 
 struct MapGraphNode
 {
-    glm::vec3 position = glm::vec3(0.0f);
+    glm::dvec3 position = glm::vec3(0.0f);
     size_t num_nbs = 0;
     size_t nbs = 0;
 };

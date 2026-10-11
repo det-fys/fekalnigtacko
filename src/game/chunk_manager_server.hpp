@@ -10,6 +10,7 @@ class World;
 struct ServerChunkData
 {
     glm::ivec2 coord{0};
+    glm::dvec3 center{0.0};
     std::shared_ptr<const collision::TriangleMesh> col_mesh;
     std::unique_ptr<btRigidBody> col_body;
 };

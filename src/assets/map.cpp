@@ -235,7 +235,7 @@ void assets::MapLoader::LoadStructs()
 
             obj.node.UpdateMatrix();
 
-            obj.aabb = TransformAABB(*map_->obj_models_[model_idx], obj.node.matrix);
+            obj.aabb = TransformAABB(*map_->obj_models_[model_idx], obj.node.matrix.ToNearMatrix(glm::dvec3(0.0)));
             chunk->aabb.AddAABB(obj.aabb);
             map_->aabb_.AddAABB(obj.aabb);
 

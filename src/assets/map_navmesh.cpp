@@ -592,7 +592,7 @@ void assets::MapNavMesh::AddTileTris(const AABB3& aabb, std::vector<float>& vert
         for (const auto& surface : chunk.surfaces)
         {
             const auto& basemodel_surface = basemodel_surfaces[surface.idx];
-            AddModelTris(basemodel, Transform(), basemodel_surface.tri_offset + surface.first, surface.count, verts, tris);
+            AddModelTris(basemodel, FarTransform(), basemodel_surface.tri_offset + surface.first, surface.count, verts, tris);
         }
 
         // add chunk static objects
@@ -609,7 +609,7 @@ void assets::MapNavMesh::AddTileTris(const AABB3& aabb, std::vector<float>& vert
 
 }
 
-void assets::MapNavMesh::AddModelTris(const Model& model, const Transform& trans, uint32_t first, uint32_t count,
+void assets::MapNavMesh::AddModelTris(const Model& model, const FarTransform& trans, uint32_t first, uint32_t count,
                                       std::vector<float>& verts, std::vector<int>& tris)
 {
     std::map<uint32_t, uint32_t> vert_map;
@@ -617,7 +617,7 @@ void assets::MapNavMesh::AddModelTris(const Model& model, const Transform& trans
     const auto& model_verts = model.GetVertices().positions;
     const auto& model_tris = model.GetTriangles();
 
-    glm::mat4 trans_mat = trans.ToMatrix();
+    auto matrix = trans.ToFarMatrix();
 
     if (count == 0)
     {
@@ -640,7 +640,7 @@ void assets::MapNavMesh::AddModelTris(const Model& model, const Transform& trans
                 uint32_t new_idx = verts.size() / 3;
                 vert_map[vert_idx] = new_idx;
 
-                glm::vec4 pos = trans_mat * glm::vec4(model_verts[vert_idx], 1.0f);
+                auto pos = matrix.TransformPoint(model_verts[vert_idx]);
                 auto pos_rc = PointToRc(pos);
                 verts.push_back(pos_rc.x);
                 verts.push_back(pos_rc.y);

@@ -18,7 +18,7 @@ inline LightCellCoordHash HashCellCoord(LightCellCoord coord)
     return (static_cast<uint32_t>(coord.y) << 16) | static_cast<uint32_t>(coord.x);
 }
 
-inline LightCellCoord GetCellCoord(const glm::vec3& pos, float cell_size)
+inline LightCellCoord GetCellCoord(const glm::dvec3& pos, float cell_size)
 {
     auto x = static_cast<int>(glm::floor(pos.x / cell_size));
     auto y = static_cast<int>(glm::floor(pos.y / cell_size));

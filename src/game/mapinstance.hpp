@@ -19,20 +19,20 @@ enum MapObjectCollisionFlag : MapObjectCollisionFlags
 struct MapObjectBreakInfo
 {
     float impulse;
-    glm::vec3 from_pos;
-    glm::vec3 hit_pos;
+    glm::dvec3 from_pos;
+    glm::dvec3 hit_pos;
 };
 
 class MapObjectCollision : public collision::ObjectCallback
 {
 public:
     MapObjectCollision(collision::DynamicsWorld& world, std::shared_ptr<const assets::Model> model,
-                       net::ObjNum num, const Transform& trans, MapObjectCollisionFlags flags);
+                       net::ObjNum num, const FarTransform& trans, MapObjectCollisionFlags flags);
     DELETE_COPY_MOVE(MapObjectCollision)
 
     void Break(const MapObjectBreakInfo& info);
 
-    void GetModelTransform(Transform& trans) const;
+    void GetModelTransform(FarTransform& trans) const;
     
     const std::shared_ptr<const assets::Model>& GetModel() const { return model_; }
     btRigidBody& GetBtBody() { return *body_; }

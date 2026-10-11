@@ -21,7 +21,7 @@ void net::MsgProducer::DiscardMsg()
     message_buf_.resize(msg_start_);
 }
 
-net::OutMessage net::LocalMsgProducer::BeginLocalMsg(const glm::vec3& position, float radius, MessageType type)
+net::OutMessage net::LocalMsgProducer::BeginLocalMsg(const glm::dvec3& position, float radius, MessageType type)
 {
     LocalMsgInfo& local_msg = local_msgs_.emplace_back();
     local_msg.start = local_msg_buf_.size();
@@ -34,7 +34,7 @@ net::OutMessage net::LocalMsgProducer::BeginLocalMsg(const glm::vec3& position, 
     return msg;
 }
 
-void net::LocalMsgProducer::PickLocalMsgs(MsgProducer& target, const glm::vec3& target_pos)
+void net::LocalMsgProducer::PickLocalMsgs(MsgProducer& target, const glm::dvec3& target_pos)
 {
     for (size_t i = 0; i < local_msgs_.size(); ++i)
     {

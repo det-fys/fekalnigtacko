@@ -3,7 +3,7 @@
 audio::Player::Player(Master& master) : master_(master) {}
 
 audio::SoundSource* audio::Player::PlaySound(const std::shared_ptr<const Sound>& sound,
-                                             const game::TransformNode* attach_node)
+                                             const game::FarTransformNode* attach_node)
 {
     SoundSource* source = new SoundSource(this, sound);
     source->AttachToNode(attach_node);

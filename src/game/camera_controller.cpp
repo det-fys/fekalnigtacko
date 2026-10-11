@@ -9,14 +9,9 @@ void game::CameraController::SetViewAngles(float yaw, float pitch)
     // TODO: validate
 }
 
-static glm::vec3 TranslationFromMatrix(const glm::mat4& matrix)
+static glm::vec3 UpFromMatrix(const FarMatrix& matrix)
 {
-    return matrix[3];
-}
-
-static glm::vec3 UpFromMatrix(const glm::mat4& matrix)
-{
-    return matrix[2];
+    return matrix.basis[2];
 }
 
 void game::CameraController::Update(float time)
@@ -34,8 +29,8 @@ void game::CameraController::Recalculate(collision::DynamicsWorld* world)
     forward_ = glm::vec3(-yaw_sin * pitch_cos, yaw_cos * pitch_cos, pitch_sin);
     glm::vec3 right = glm::cross(forward_, glm::vec3(0.0f, 0.0f, 1.0f));
 
-    glm::vec3 start_noaim(0.0f);
-    glm::vec3 start_aim(0.0f);
+    glm::dvec3 start_noaim(0.0);
+    glm::dvec3 start_aim(0.0);
     bool scope = ShouldDrawScope();
 
     float distance_noaim = 5.0f;
@@ -44,11 +39,11 @@ void game::CameraController::Recalculate(collision::DynamicsWorld* world)
     if (character_transform_)
     {
         auto up = UpFromMatrix(*character_transform_);
-        start_noaim = TranslationFromMatrix(*character_transform_) + up * (scope ? 1.8f : 2.0f);
+        start_noaim = character_transform_->position + glm::dvec3(up * (scope ? 1.8f : 2.0f));
 
         if (!scope)
         {
-            start_aim = start_noaim - up * 0.3f;
+            start_aim = start_noaim - glm::dvec3(up * 0.3f);
         }
         else
         {
@@ -59,7 +54,7 @@ void game::CameraController::Recalculate(collision::DynamicsWorld* world)
 
     if (rideable_transform_)
     {
-        start_noaim = TranslationFromMatrix(*rideable_transform_) + glm::vec3(0.0f, 0.0f, 2.0f);
+        start_noaim = rideable_transform_->position + glm::dvec3(0.0, 0.0, 2.0);
         distance_noaim = 8.0f;
 
         if (!scope)
@@ -68,8 +63,8 @@ void game::CameraController::Recalculate(collision::DynamicsWorld* world)
         }
     }
 
-    glm::vec3 end_noaim = start_noaim - forward_ * distance_noaim; 
-    glm::vec3 end_aim = start_aim + aim_end_offset;
+    auto end_noaim = start_noaim - glm::dvec3(forward_ * distance_noaim); 
+    auto end_aim = start_aim + glm::dvec3(aim_end_offset);
 
     auto aim_factor_smooth = scope ? 1.0f : glm::smoothstep(0.0f, 1.0f, aim_factor_);
     auto start = glm::mix(start_noaim, start_aim, aim_factor_smooth);
@@ -84,10 +79,10 @@ void game::CameraController::Recalculate(collision::DynamicsWorld* world)
     }
 }
 
-glm::mat4 game::CameraController::GetViewMatrix() const
-{
-    return glm::lookAt(eye_, eye_ + forward_, glm::vec3(0.0f, 0.0f, 1.0f));
-}
+// glm::mat4 game::CameraController::GetViewMatrix() const
+// {
+//     return glm::lookAt(eye_, eye_ + forward_, glm::vec3(0.0f, 0.0f, 1.0f));
+// }
 
 bool game::CameraController::ShouldDrawCrosshair() const
 {

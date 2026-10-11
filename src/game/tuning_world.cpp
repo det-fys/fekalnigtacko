@@ -12,7 +12,7 @@ static game::WorldInfo CreateTuningWorldInfo(const std::string& mapname)
     return info;
 }
 
-game::TuningWorld::TuningWorld(Game& game, EnterableWorld& exit_world, const glm::vec3& exit_pos, float exit_yaw,
+game::TuningWorld::TuningWorld(Game& game, EnterableWorld& exit_world, const glm::dvec3& exit_pos, float exit_yaw,
                                std::string mapname)
     : Super(collision::DynamicsWorldInfo{}, CreateTuningWorldInfo(mapname)), game_(game), exit_world_(exit_world),
       exit_pos_(exit_pos), exit_yaw_(exit_yaw)
@@ -20,7 +20,7 @@ game::TuningWorld::TuningWorld(Game& game, EnterableWorld& exit_world, const glm
 }
 
 game::PlayerCharacter& game::TuningWorld::InsertPlayer(Player& player, const HumanCharacterTuning& tuning,
-                                                       const glm::vec3& pos, float yaw)
+                                                       const glm::dvec3& pos, float yaw)
 {
     auto& character = Super::InsertPlayer(player, tuning, pos, yaw);
     character.SetInvulnerable(true);

@@ -353,7 +353,8 @@ private:
     void ComputeCSMMatrices(const glm::mat4& view, float fov, float aspect, const glm::vec3& sun_dir);
     void PrepareSurfaceCmds(std::span<DrawSurfaceCmd> cmds, std::vector<PreparedCmd>& pcmds, SurfacePipelineFlags pflags);
     void EncodePreparedCmds(ViewportWGPU& viewport, wgpu::RenderPassEncoder& pass, std::span<PreparedCmd> pcmds,
-                            const GlobalUniformData& globals, uint32_t globals_index, SurfacePipelineFlags pflags);
+                            const glm::dvec3& eye, const GlobalUniformData& globals, uint32_t globals_index,
+                            SurfacePipelineFlags pflags);
     void PrepareLights(std::span<DrawLightCmd> cmds, const DrawContext& ctx);
     void EncodeLightCullingPass(ViewportWGPU& viewport, wgpu::CommandEncoder& encoder, const DrawContext& ctx);
     void EncodeAO(ViewportWGPU& viewport, wgpu::CommandEncoder& encoder, const DrawContext& ctx);

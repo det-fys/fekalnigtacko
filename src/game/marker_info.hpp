@@ -16,7 +16,7 @@ enum MarkerType : uint8_t
 
 struct MarkerInfo
 {
-    glm::vec3 position;
+    glm::dvec3 position;
     MarkerType type;
     uint32_t color;
     std::string model;

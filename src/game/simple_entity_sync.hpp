@@ -7,7 +7,7 @@ namespace game
 
 struct SimpleEntitySyncState
 {
-    net::PositionQ pos;
+    net::FarPositionQ pos;
     net::QuatQ rot;
 };
 

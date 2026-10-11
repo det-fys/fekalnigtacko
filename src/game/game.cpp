@@ -473,7 +473,7 @@ void game::Game::PlayerLeft(Player& player)
     BroadcastChat(player.GetName() + "^r se vodpojil zmrd");
 }
 
-void game::Game::MovePlayerToWorld(Player& player, EnterableWorld& world, bool with_vehicle, const glm::vec3& pos,
+void game::Game::MovePlayerToWorld(Player& player, EnterableWorld& world, bool with_vehicle, const glm::dvec3& pos,
                                    float yaw)
 {
     auto& player_info = GetPlayerInfo(player);
@@ -514,7 +514,7 @@ void game::Game::BroadcastChat(const std::string& text)
 }
 
 game::PlayerCharacter& game::Game::MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld& new_world,
-                                                     const glm::vec3& pos, float yaw)
+                                                     const glm::dvec3& pos, float yaw)
 {
     auto& player = player_info.player;
     auto& old_world = *player_info.world;
@@ -533,7 +533,7 @@ game::PlayerCharacter& game::Game::MovePlayerToWorld(PlayerGameInfo& player_info
     return new_character;
 }
 
-void game::Game::MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& new_world, const glm::vec3& pos,
+void game::Game::MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& new_world, const glm::dvec3& pos,
                                     float yaw)
 {
     VehicleSpawnInfo vehicle_info{};
@@ -560,7 +560,7 @@ void game::Game::MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& ne
 
         auto& player_info = GetPlayerInfo(*player);
 
-        auto& new_character = MovePlayerToWorld(player_info, new_world, glm::vec3(0.0f), 0.0f);
+        auto& new_character = MovePlayerToWorld(player_info, new_world, glm::dvec3(0.0), 0.0f);
         new_character.Ride(&new_vehicle, i);
     }
 
@@ -569,7 +569,7 @@ void game::Game::MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& ne
     new_world.OnVehicleJoined(new_vehicle);
 }
 
-void game::Game::MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld* new_world, const glm::vec3& pos,
+void game::Game::MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld* new_world, const glm::dvec3& pos,
                                    float yaw, bool with_vehicle)
 {
     auto& player = player_info.player;

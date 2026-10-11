@@ -1,6 +1,12 @@
 #include "frustum.hpp"
 
-gfx::Frustum::Frustum(const glm::mat4& vp)
+static glm::vec4 TranslatePlane(const glm::vec4& plane, const glm::vec3& translation)
+{
+    float d_prime = plane.w - (plane.x * translation.x + plane.y * translation.y + plane.z * translation.z);
+    return glm::vec4(plane.x, plane.y, plane.z, d_prime);
+}
+
+gfx::Frustum::Frustum(const glm::mat4& vp, const glm::dvec3& eye)
 {
     for (int i = 0; i < 4; ++i)
     {
@@ -27,12 +33,19 @@ gfx::Frustum::Frustum(const glm::mat4& vp)
                                          glm::vec3(-1.0f, -1.0f, 1.0f),  glm::vec3(1.0f, -1.0f, 1.0f),
                                          glm::vec3(-1.0f, 1.0f, 1.0f),   glm::vec3(1.0f, 1.0f, 1.0f)};
 
+    auto eye_float = glm::vec3(eye); // TODO: consider using double precision for frustum planes and AABB
+
     for (int i = 0; i < 8; ++i)
     {
         glm::vec4 corner_ws = inv_vp * glm::vec4(corners[i], 1.0f);
         corner_ws /= corner_ws.w;
 
-        aabb_.AddPoint(glm::vec3(corner_ws));
+        aabb_.AddPoint(glm::vec3(corner_ws) + eye_float);
+    }
+
+    for (int i = 0; i < 6; ++i)
+    {
+        planes_[i] = TranslatePlane(planes_[i], eye_float);
     }
 }
 

@@ -8,18 +8,18 @@
 
 namespace
 {
-constexpr float kEpsilon = 1e-6f;
+constexpr double kEpsilon = 1e-6;
 
-glm::vec3 SafeNormalize(const glm::vec3& v, const glm::vec3& fallback)
+glm::dvec3 SafeNormalize(const glm::dvec3& v, const glm::dvec3& fallback)
 {
-    const float len2 = glm::length2(v);
+    const auto len2 = glm::length2(v);
 
     if (!std::isfinite(len2) || len2 <= kEpsilon * kEpsilon)
     {
         return fallback;
     }
 
-    return v / std::sqrt(len2);
+    return v / glm::sqrt(len2);
 }
 
 /**
@@ -28,26 +28,26 @@ glm::vec3 SafeNormalize(const glm::vec3& v, const glm::vec3& fallback)
  * This chooses the world axis least aligned with tangent,
  * avoiding a poorly conditioned cross product.
  */
-glm::vec3 MakePerpendicular(const glm::vec3& tangent)
+glm::dvec3 MakePerpendicular(const glm::dvec3& tangent)
 {
-    const glm::vec3 abs_t = glm::abs(tangent);
+    const glm::dvec3 abs_t = glm::abs(tangent);
 
-    glm::vec3 reference;
+    glm::dvec3 reference;
 
     if (abs_t.x <= abs_t.y && abs_t.x <= abs_t.z)
     {
-        reference = glm::vec3(1.0f, 0.0f, 0.0f);
+        reference = glm::dvec3(1.0, 0.0, 0.0);
     }
     else if (abs_t.y <= abs_t.z)
     {
-        reference = glm::vec3(0.0f, 1.0f, 0.0f);
+        reference = glm::dvec3(0.0, 1.0, 0.0);
     }
     else
     {
-        reference = glm::vec3(0.0f, 0.0f, 1.0f);
+        reference = glm::dvec3(0.0, 0.0, 1.0);
     }
 
-    return SafeNormalize(glm::cross(tangent, reference), glm::vec3(1.0f, 0.0f, 0.0f));
+    return SafeNormalize(glm::cross(tangent, reference), glm::dvec3(1.0, 0.0, 0.0));
 }
 } // namespace
 
@@ -55,62 +55,64 @@ glm::vec3 MakePerpendicular(const glm::vec3& tangent)
 // CatmullRomSpline
 // ============================================================================
 
-CatmullRomSpline::CatmullRomSpline(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3,
-                                   float alpha)
+CatmullRomSpline::CatmullRomSpline(const glm::dvec3& p0, const glm::dvec3& p1, const glm::dvec3& p2, const glm::dvec3& p3,
+                                   double alpha)
     : p0_(p0), p1_(p1), p2_(p2), p3_(p3)
 {
-    alpha = glm::clamp(alpha, 0.0f, 1.0f);
+    alpha = glm::clamp(alpha, 0.0, 1.0);
 
-    t0_ = 0.0f;
+    t0_ = 0.0;
     t1_ = CalculateKnot(t0_, p0_, p1_, alpha);
     t2_ = CalculateKnot(t1_, p1_, p2_, alpha);
     t3_ = CalculateKnot(t2_, p2_, p3_, alpha);
 }
 
-float CatmullRomSpline::CalculateKnot(float t_prev, const glm::vec3& p_prev, const glm::vec3& p_curr, float alpha) const
+double CatmullRomSpline::CalculateKnot(double t_prev, const glm::dvec3& p_prev, const glm::dvec3& p_curr,
+                                       double alpha) const
 {
-    const float distance = glm::distance(p_prev, p_curr);
+    const double distance = glm::distance(p_prev, p_curr);
 
     // Prevent coincident control points from collapsing the knot
     // interval entirely.
-    const float safe_distance = std::max(distance, kEpsilon);
+    const double safe_distance = std::max(distance, kEpsilon);
 
     return t_prev + std::pow(safe_distance, alpha);
 }
 
-glm::vec3 CatmullRomSpline::SafeLerp(const glm::vec3& a, const glm::vec3& b, float t, float t_start, float t_end) const
+glm::dvec3 CatmullRomSpline::SafeLerp(const glm::dvec3& a, const glm::dvec3& b, double t, double t_start,
+                                      double t_end) const
 {
-    const float interval = t_end - t_start;
+    const double interval = t_end - t_start;
 
     if (std::abs(interval) <= kEpsilon)
     {
         return a;
     }
 
-    const float weight = (t - t_start) / interval;
+    const double weight = (t - t_start) / interval;
 
     return glm::mix(a, b, weight);
 }
 
-glm::vec3 CatmullRomSpline::SafeLerpDerivative(const glm::vec3& a, const glm::vec3& b, const glm::vec3& da,
-                                               const glm::vec3& db, float t, float t_start, float t_end) const
+glm::dvec3 CatmullRomSpline::SafeLerpDerivative(const glm::dvec3& a, const glm::dvec3& b, const glm::dvec3& da,
+                                               const glm::dvec3& db, double t, double t_start, double t_end) const
 {
-    const float interval = t_end - t_start;
+    const double interval = t_end - t_start;
 
     if (std::abs(interval) <= kEpsilon)
     {
         return da;
     }
 
-    const float weight = (t - t_start) / interval;
+    const double weight = (t - t_start) / interval;
 
     return glm::mix(da, db, weight) + (b - a) / interval;
 }
 
-glm::vec3 CatmullRomSpline::FallbackDerivative() const
+glm::dvec3 CatmullRomSpline::FallbackDerivative() const
 {
     // The primary segment direction is the best fallback.
-    glm::vec3 result = p2_ - p1_;
+    glm::dvec3 result = p2_ - p1_;
 
     if (glm::length2(result) > kEpsilon * kEpsilon)
     {
@@ -139,81 +141,81 @@ glm::vec3 CatmullRomSpline::FallbackDerivative() const
         return result;
     }
 
-    return glm::vec3(0.0f);
+    return glm::dvec3(0.0);
 }
 
-glm::vec3 CatmullRomSpline::Get(float u) const
+glm::dvec3 CatmullRomSpline::Get(double u) const
 {
-    u = glm::clamp(u, 0.0f, 1.0f);
+    u = glm::clamp(u, 0.0, 1.0);
 
     // Map normalized u to the actual knot interval.
-    const float t = glm::mix(t1_, t2_, u);
+    const double t = glm::mix(t1_, t2_, u);
 
     // Level 1.
-    const glm::vec3 A1 = SafeLerp(p0_, p1_, t, t0_, t1_);
-    const glm::vec3 A2 = SafeLerp(p1_, p2_, t, t1_, t2_);
-    const glm::vec3 A3 = SafeLerp(p2_, p3_, t, t2_, t3_);
+    const glm::dvec3 A1 = SafeLerp(p0_, p1_, t, t0_, t1_);
+    const glm::dvec3 A2 = SafeLerp(p1_, p2_, t, t1_, t2_);
+    const glm::dvec3 A3 = SafeLerp(p2_, p3_, t, t2_, t3_);
 
     // Level 2.
-    const glm::vec3 B1 = SafeLerp(A1, A2, t, t0_, t2_);
-    const glm::vec3 B2 = SafeLerp(A2, A3, t, t1_, t3_);
+    const glm::dvec3 B1 = SafeLerp(A1, A2, t, t0_, t2_);
+    const glm::dvec3 B2 = SafeLerp(A2, A3, t, t1_, t3_);
 
     // Level 3.
     return SafeLerp(B1, B2, t, t1_, t2_);
 }
 
-glm::vec3 CatmullRomSpline::GetDerivative(float u) const
+glm::dvec3 CatmullRomSpline::GetDerivative(double u) const
 {
-    u = glm::clamp(u, 0.0f, 1.0f);
+    u = glm::clamp(u, 0.0, 1.0);
 
-    const float dt_du = t2_ - t1_;
+    const double dt_du = t2_ - t1_;
 
     if (dt_du <= kEpsilon)
     {
         return FallbackDerivative();
     }
 
-    const float t = glm::mix(t1_, t2_, u);
+    const double t = glm::mix(t1_, t2_, u);
 
     // ------------------------------------------------------------------------
     // Level 1 positions.
     // ------------------------------------------------------------------------
-    const glm::vec3 A1 = SafeLerp(p0_, p1_, t, t0_, t1_);
-    const glm::vec3 A2 = SafeLerp(p1_, p2_, t, t1_, t2_);
-    const glm::vec3 A3 = SafeLerp(p2_, p3_, t, t2_, t3_);
+    const glm::dvec3 A1 = SafeLerp(p0_, p1_, t, t0_, t1_);
+    const glm::dvec3 A2 = SafeLerp(p1_, p2_, t, t1_, t2_);
+    const glm::dvec3 A3 = SafeLerp(p2_, p3_, t, t2_, t3_);
 
     // ------------------------------------------------------------------------
     // Level 1 derivatives dA/dt.
     // ------------------------------------------------------------------------
-    const glm::vec3 dA1 = SafeLerpDerivative(p0_, p1_, glm::vec3(0.0f), glm::vec3(0.0f), t, t0_, t1_);
-    const glm::vec3 dA2 = SafeLerpDerivative(p1_, p2_, glm::vec3(0.0f), glm::vec3(0.0f), t, t1_, t2_);
-    const glm::vec3 dA3 = SafeLerpDerivative(p2_, p3_, glm::vec3(0.0f), glm::vec3(0.0f), t, t2_, t3_);
+    const glm::dvec3 dA1 = SafeLerpDerivative(p0_, p1_, glm::dvec3(0.0), glm::dvec3(0.0), t, t0_, t1_);
+    const glm::dvec3 dA2 = SafeLerpDerivative(p1_, p2_, glm::dvec3(0.0), glm::dvec3(0.0), t, t1_, t2_);
+    const glm::dvec3 dA3 = SafeLerpDerivative(p2_, p3_, glm::dvec3(0.0), glm::dvec3(0.0), t, t2_, t3_);
 
     // ------------------------------------------------------------------------
     // Level 2 positions.
     // ------------------------------------------------------------------------
-    const glm::vec3 B1 = SafeLerp(A1, A2, t, t0_, t2_);
-    const glm::vec3 B2 = SafeLerp(A2, A3, t, t1_, t3_);
+    const glm::dvec3 B1 = SafeLerp(A1, A2, t, t0_, t2_);
+    const glm::dvec3 B2 = SafeLerp(A2, A3, t, t1_, t3_);
 
     // ------------------------------------------------------------------------
     // Level 2 derivatives dB/dt.
     // ------------------------------------------------------------------------
-    const glm::vec3 dB1 = SafeLerpDerivative(A1, A2, dA1, dA2, t, t0_, t2_);
-    const glm::vec3 dB2 = SafeLerpDerivative(A2, A3, dA2, dA3, t, t1_, t3_);
+    const glm::dvec3 dB1 = SafeLerpDerivative(A1, A2, dA1, dA2, t, t0_, t2_);
+    const glm::dvec3 dB2 = SafeLerpDerivative(A2, A3, dA2, dA3, t, t1_, t3_);
 
     // ------------------------------------------------------------------------
     // Level 3 derivative dC/dt.
     // ------------------------------------------------------------------------
-    const glm::vec3 dC_dt = SafeLerpDerivative(B1, B2, dB1, dB2, t, t1_, t2_);
+    const glm::dvec3 dC_dt = SafeLerpDerivative(B1, B2, dB1, dB2, t, t1_, t2_);
 
     // Chain rule:
     //
     //     dP/du = dP/dt * dt/du
     //
     // and dt/du = t2 - t1.
-    const glm::vec3 result = dC_dt * dt_du;
+    const glm::dvec3 result = dC_dt * dt_du;
 
-    const float result_len2 = glm::length2(result);
+    const double result_len2 = glm::length2(result);
 
     if (std::isfinite(result_len2) && result_len2 > kEpsilon * kEpsilon)
     {
@@ -228,7 +230,7 @@ glm::vec3 CatmullRomSpline::GetDerivative(float u) const
 // SplinePath
 // ============================================================================
 
-SplinePath::SplinePath(std::span<const glm::vec3> points, int samples_per_segment)
+SplinePath::SplinePath(std::span<const glm::dvec3> points, int samples_per_segment)
 {
     if (points.size() < 4 || samples_per_segment <= 0)
     {
@@ -246,23 +248,23 @@ SplinePath::SplinePath(std::span<const glm::vec3> points, int samples_per_segmen
     // neighboring positions. This is especially robust at the endpoints.
     // ------------------------------------------------------------------------
 
-    float curr_length = 0.0f;
+    double curr_length = 0.0;
 
-    glm::vec3 last_pos(0.0f);
+    glm::dvec3 last_pos(0.0);
     bool have_last_pos = false;
 
     for (size_t i = 0; i < points.size() - 3; ++i)
     {
-        CatmullRomSpline segment(points[i], points[i + 1], points[i + 2], points[i + 3], 0.5f);
+        CatmullRomSpline segment(points[i], points[i + 1], points[i + 2], points[i + 3], 0.5);
 
         // Avoid duplicating the shared boundary between segments.
         const int start_s = (i == 0) ? 0 : 1;
 
         for (int s = start_s; s <= samples_per_segment; ++s)
         {
-            const float u = static_cast<float>(s) / static_cast<float>(samples_per_segment);
+            const double u = static_cast<double>(s) / static_cast<double>(samples_per_segment);
 
-            const glm::vec3 pos = segment.Get(u);
+            const glm::dvec3 pos = segment.Get(u);
 
             if (!have_last_pos)
             {
@@ -303,7 +305,7 @@ SplinePath::SplinePath(std::span<const glm::vec3> points, int samples_per_segmen
 
     for (size_t i = 0; i < raw_frames.size(); ++i)
     {
-        glm::vec3 tangent(0.0f);
+        glm::dvec3 tangent(0.0);
 
         if (i == 0)
         {
@@ -318,7 +320,7 @@ SplinePath::SplinePath(std::span<const glm::vec3> points, int samples_per_segmen
             tangent = raw_frames[i + 1].pos - raw_frames[i - 1].pos;
         }
 
-        raw_frames[i].tangent = SafeNormalize(tangent, glm::vec3(1.0f, 0.0f, 0.0f));
+        raw_frames[i].tangent = SafeNormalize(tangent, glm::dvec3(1.0, 0.0, 0.0));
     }
 
     // ------------------------------------------------------------------------
@@ -334,21 +336,21 @@ SplinePath::SplinePath(std::span<const glm::vec3> points, int samples_per_segmen
     // This preserves "upright" geometry while remaining exactly orthogonal.
     // ------------------------------------------------------------------------
 
-    const glm::vec3 world_up(0.0f, 0.0f, 1.0f);
+    const glm::dvec3 world_up(0.0, 0.0, 1.0);
 
     for (SplineFrame& frame : raw_frames)
     {
-        glm::vec3 T = SafeNormalize(frame.tangent, glm::vec3(1.0f, 0.0f, 0.0f));
+        glm::dvec3 T = SafeNormalize(frame.tangent, glm::dvec3(1.0, 0.0, 0.0));
 
         // Project world Z onto the plane perpendicular to T.
-        glm::vec3 N = world_up - T * glm::dot(world_up, T);
+        glm::dvec3 N = world_up - T * glm::dot(world_up, T);
 
         // Your path is almost horizontal, so this should never normally
         // happen. The fallback simply keeps pathological input finite.
         N = SafeNormalize(N, MakePerpendicular(T));
 
         // Right vector.
-        glm::vec3 B = SafeNormalize(glm::cross(T, N), MakePerpendicular(T));
+        glm::dvec3 B = SafeNormalize(glm::cross(T, N), MakePerpendicular(T));
 
         // Recompute N so the basis is exactly orthogonal after normalization.
         N = SafeNormalize(glm::cross(B, T), world_up);
@@ -365,24 +367,24 @@ SplinePath::SplinePath(std::span<const glm::vec3> points, int samples_per_segmen
     ResampleUniform(raw_frames, kDefaultSpacing);
 }
 
-void SplinePath::ResampleUniform(std::span<const SplineFrame> raw_frames, float desired_spacing)
+void SplinePath::ResampleUniform(std::span<const SplineFrame> raw_frames, double desired_spacing)
 {
     uniform_frames_.clear();
 
-    if (raw_frames.size() < 2 || total_length_ <= 0.0f)
+    if (raw_frames.size() < 2 || total_length_ <= 0.0)
     {
-        spacing_ = 0.0f;
+        spacing_ = 0.0;
         return;
     }
 
-    desired_spacing = std::max(desired_spacing, 0.001f);
+    desired_spacing = std::max(desired_spacing, 0.001);
 
     // Number of intervals required so no interval exceeds the requested
     // spacing.
     const size_t interval_count = std::max<size_t>(1, static_cast<size_t>(std::ceil(total_length_ / desired_spacing)));
 
     // Adjust spacing so the last frame lands EXACTLY at total_length_.
-    spacing_ = total_length_ / static_cast<float>(interval_count);
+    spacing_ = total_length_ / static_cast<double>(interval_count);
 
     uniform_frames_.reserve(interval_count + 1);
 
@@ -391,7 +393,7 @@ void SplinePath::ResampleUniform(std::span<const SplineFrame> raw_frames, float 
     for (size_t i = 0; i <= interval_count; ++i)
     {
         // Force the final sample to be exactly the endpoint.
-        const float dist = (i == interval_count) ? total_length_ : static_cast<float>(i) * spacing_;
+        const double dist = (i == interval_count) ? total_length_ : static_cast<double>(i) * spacing_;
 
         while (raw_idx + 1 < raw_frames.size() && raw_frames[raw_idx + 1].arc_length < dist)
         {
@@ -401,15 +403,15 @@ void SplinePath::ResampleUniform(std::span<const SplineFrame> raw_frames, float 
         const SplineFrame& f1 = raw_frames[raw_idx];
         const SplineFrame& f2 = raw_frames[std::min(raw_idx + 1, raw_frames.size() - 1)];
 
-        const float segment_length = f2.arc_length - f1.arc_length;
-        float t = 0.0f;
+        const double segment_length = f2.arc_length - f1.arc_length;
+        double t = 0.0;
 
         if (segment_length > kEpsilon)
         {
             t = (dist - f1.arc_length) / segment_length;
         }
 
-        t = glm::clamp(t, 0.0f, 1.0f);
+        t = glm::clamp(t, 0.0, 1.0);
 
         SplineFrame frame;
 
@@ -423,7 +425,7 @@ void SplinePath::ResampleUniform(std::span<const SplineFrame> raw_frames, float 
 
         // Interpolate the Z-up normals, then re-project onto the tangent
         // plane to guarantee orthogonality.
-        glm::vec3 normal = glm::mix(f1.normal, f2.normal, t);
+        glm::dvec3 normal = glm::mix(f1.normal, f2.normal, t);
 
         normal -= frame.tangent * glm::dot(normal, frame.tangent);
 
@@ -439,24 +441,24 @@ void SplinePath::ResampleUniform(std::span<const SplineFrame> raw_frames, float 
     }
 }
 
-glm::vec3 SplinePath::DeformVertex(const glm::vec3& vert_pos) const
+glm::dvec3 SplinePath::DeformVertex(const glm::dvec3& vert_pos) const
 {
-    if (uniform_frames_.empty() || spacing_ <= 0.0f)
+    if (uniform_frames_.empty() || spacing_ <= 0.0)
     {
         return vert_pos;
     }
 
-    const float requested_dist = vert_pos.y;
+    const double requested_dist = vert_pos.y;
 
     // Distance used for spline-frame lookup.
-    const float dist = glm::clamp(requested_dist, 0.0f, total_length_);
-    const float frame_pos = dist / spacing_;
+    const double dist = glm::clamp(requested_dist, 0.0, total_length_);
+    const double frame_pos = dist / spacing_;
     const int last_index = static_cast<int>(uniform_frames_.size()) - 1;
     int idx1 = static_cast<int>(std::floor(frame_pos));
     idx1 = glm::clamp(idx1, 0, last_index);
     const int idx2 = std::min(idx1 + 1, last_index);
-    float t = frame_pos - static_cast<float>(idx1);
-    t = glm::clamp(t, 0.0f, 1.0f);
+    double t = frame_pos - static_cast<double>(idx1);
+    t = glm::clamp(t, 0.0, 1.0);
 
     const SplineFrame& f1 = uniform_frames_[idx1];
     const SplineFrame& f2 = uniform_frames_[idx2];
@@ -464,24 +466,24 @@ glm::vec3 SplinePath::DeformVertex(const glm::vec3& vert_pos) const
     // ------------------------------------------------------------------------
     // Interpolate position.
     // ------------------------------------------------------------------------
-    glm::vec3 pos = glm::mix(f1.pos, f2.pos, t);
+    glm::dvec3 pos = glm::mix(f1.pos, f2.pos, t);
 
     // ------------------------------------------------------------------------
     // Interpolate tangent.
     // ------------------------------------------------------------------------
-    glm::vec3 tangent = SafeNormalize(glm::mix(f1.tangent, f2.tangent, t), f1.tangent);
+    glm::dvec3 tangent = SafeNormalize(glm::mix(f1.tangent, f2.tangent, t), f1.tangent);
 
     // ------------------------------------------------------------------------
     // Interpolate normal and enforce orthogonality.
     // ------------------------------------------------------------------------
-    glm::vec3 normal = glm::mix(f1.normal, f2.normal, t);
+    glm::dvec3 normal = glm::mix(f1.normal, f2.normal, t);
     normal -= tangent * glm::dot(normal, tangent);
     normal = SafeNormalize(normal, f1.normal);
 
     // ------------------------------------------------------------------------
     // Recompute binormal.
     // ------------------------------------------------------------------------
-    glm::vec3 binormal = SafeNormalize(glm::cross(tangent, normal), f1.binormal);
+    glm::dvec3 binormal = SafeNormalize(glm::cross(tangent, normal), f1.binormal);
 
     // Final orthogonalization.
     normal = SafeNormalize(glm::cross(binormal, tangent), normal);
@@ -494,7 +496,7 @@ glm::vec3 SplinePath::DeformVertex(const glm::vec3& vert_pos) const
     // Z = height         -> normal
     // ------------------------------------------------------------------------
 
-    glm::vec3 result = pos + binormal * vert_pos.x + normal * vert_pos.z;
+    glm::dvec3 result = pos + binormal * vert_pos.x + normal * vert_pos.z;
 
     // ------------------------------------------------------------------------
     // Linear extension before the beginning.
@@ -502,7 +504,7 @@ glm::vec3 SplinePath::DeformVertex(const glm::vec3& vert_pos) const
     // Use the exact start frame rather than the clamped/interpolated frame.
     // ------------------------------------------------------------------------
 
-    if (requested_dist < 0.0f)
+    if (requested_dist < 0.0)
     {
         const SplineFrame& start = uniform_frames_.front();
 

@@ -28,7 +28,7 @@ private:
 
 private:
     im::Viewport2DControls controls_;
-    glm::vec2 new_obj_pos_{0.0f};
+    glm::dvec2 new_obj_pos_{0.0f};
 
     // temp
     AABB2 aabb_{};

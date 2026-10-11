@@ -71,7 +71,7 @@ std::shared_ptr<assets::Item> assets::Item::LoadFromFile(const std::string& path
                     throw std::runtime_error("Invalid skeleton location: " + loc_name);
 
                 item->bone = loc->bone_name;
-                item->bone_offset = loc->offset;
+                item->bone_offset = FarTransform::FromNearTransform(loc->offset);
             }
             else
             {

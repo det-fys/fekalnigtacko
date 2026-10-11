@@ -17,52 +17,58 @@ namespace
 
 struct PoissonCellData
 {
-    glm::vec2 pos;
-    float priority;
+    glm::dvec2 pos;
+    double priority;
 };
 
 // Fast, deterministic pseudo-random number generator for a specific grid cell
-PoissonCellData GetPoissonCellCandidate(int cx, int cy, float cell_size, uint32_t seed)
+PoissonCellData GetPoissonCellCandidate(int cx, int cy, double cell_size, uint32_t seed)
 {
     // Spatial hash seed based on grid coordinates
     uint32_t h = seed + static_cast<uint32_t>(cx) * 374761393U + static_cast<uint32_t>(cy) * 668265263U;
     h = (h ^ (h >> 13)) * 1274126177U;
     h = h ^ (h >> 16);
 
-    // Helper lambda to extract a random float in [0.0, 1.0) and advance the hash state
-    auto next_float = [&h]() -> float {
+    auto next_float = [&h]() -> double {
         h = h * 747796405U + 2891336453U;
-        uint32_t word = ((h >> ((h >> 28) + 4)) ^ h) * 277803737U;
-        uint32_t res = (word >> 22) ^ word;
-        return static_cast<float>(res >> 8) / 16777216.0f; // 24-bit float resolution
+        uint32_t word1 = ((h >> ((h >> 28) + 4)) ^ h) * 277803737U;
+        uint32_t res1 = (word1 >> 22) ^ word1;
+
+        h = h * 747796405U + 2891336453U;
+        uint32_t word2 = ((h >> ((h >> 28) + 4)) ^ h) * 277803737U;
+        uint32_t res2 = (word2 >> 22) ^ word2;
+
+        uint64_t bits = (static_cast<uint64_t>(res1) << 21) | (res2 >> 11);
+
+        return static_cast<double>(bits) / 9007199254740992.0;
     };
 
-    float ox = next_float();
-    float oy = next_float();
-    float priority = next_float();
+    double ox = next_float();
+    double oy = next_float();
+    double priority = next_float();
 
     // Convert grid coordinates + local offset to world space
-    glm::vec2 pos = glm::vec2(cx + ox, cy + oy) * cell_size;
+    glm::dvec2 pos = glm::dvec2(cx + ox, cy + oy) * cell_size;
     return {pos, priority};
 }
 
-void ChunkPoissonVariable(uint32_t seed, glm::ivec2 coord, float chunk_size, float r_min, float r_max,
-                          float border_size, std::vector<glm::vec2>& out_points,
-                          std::function<float(glm::vec2)> radius_fn, std::function<bool(glm::vec2)> filter_fn)
+void ChunkPoissonVariable(uint32_t seed, glm::ivec2 coord, double chunk_size, double r_min, double r_max,
+                          double border_size, std::vector<glm::dvec2>& out_points,
+                          std::function<double(glm::dvec2)> radius_fn, std::function<bool(glm::dvec2)> filter_fn)
 {
     // Base cell size on minimum radius to guarantee <= 1 candidate per cell
-    float cell_size = r_min / std::sqrt(2.0f);
+    double cell_size = r_min / std::sqrt(2.0);
 
     // Calculate maximum search radius in terms of grid cells
     int search_k = static_cast<int>(std::ceil(r_max / cell_size));
 
     // Strict chunk bounds
-    glm::vec2 chunk_min = glm::vec2(coord) * chunk_size;
-    glm::vec2 chunk_max = chunk_min + glm::vec2(chunk_size);
+    glm::dvec2 chunk_min = glm::dvec2(coord) * chunk_size;
+    glm::dvec2 chunk_max = chunk_min + glm::dvec2(chunk_size);
 
     // Expanded bounds including border
-    glm::vec2 eval_min = chunk_min - glm::vec2(border_size);
-    glm::vec2 eval_max = chunk_max + glm::vec2(border_size);
+    glm::dvec2 eval_min = chunk_min - glm::dvec2(border_size);
+    glm::dvec2 eval_max = chunk_max + glm::dvec2(border_size);
 
     // Grid coverage using EXPANDED bounds
     int start_cx = static_cast<int>(std::floor(eval_min.x / cell_size));
@@ -84,7 +90,7 @@ void ChunkPoissonVariable(uint32_t seed, glm::ivec2 coord, float chunk_size, flo
             }
 
             // Query local radius at target position
-            float r_target = glm::clamp(radius_fn(target.pos), r_min, r_max);
+            double r_target = glm::clamp(radius_fn(target.pos), r_min, r_max);
 
             bool is_valid = true;
 
@@ -110,18 +116,18 @@ void ChunkPoissonVariable(uint32_t seed, glm::ivec2 coord, float chunk_size, flo
                     }
 
                     // Quick bounding box check before calculating squared distance
-                    float dx = target.pos.x - neighbor.pos.x;
-                    float dy = target.pos.y - neighbor.pos.y;
+                    double dx = target.pos.x - neighbor.pos.x;
+                    double dy = target.pos.y - neighbor.pos.y;
 
                     if (glm::abs(dx) > r_max || glm::abs(dy) > r_max)
                     {
                         continue;
                     }
 
-                    float r_neighbor = glm::clamp(radius_fn(neighbor.pos), r_min, r_max);
+                    double r_neighbor = glm::clamp(radius_fn(neighbor.pos), r_min, r_max);
 
                     // Effective clearance between the two points
-                    float eff_r = glm::min(r_target, r_neighbor);
+                    double eff_r = glm::min(r_target, r_neighbor);
 
                     if ((dx * dx + dy * dy) < (eff_r * eff_r))
                     {
@@ -146,12 +152,12 @@ struct JunctionLinkInfo
     uint32_t path_id = INVALID_ID;
     bool path_from_end = false;
     uint32_t profile_id = 0;
-    float margin = 0.0f;
+    double margin = 0.0;
 };
 
 struct JunctionInfo
 {
-    glm::vec3 pos{0.0f};
+    glm::dvec3 pos{0.0};
     uint32_t mesh_id = 0;
     uint32_t base_vertex = INVALID_ID;
     std::array<JunctionLinkInfo, 4> links;
@@ -194,8 +200,10 @@ struct ChunkGenerator
     glm::ivec2 chunk_coord;
     std::span<const mg::ChunkStaticObject> objs;
     mg::Chunk& chunk;
-    AABB2 bounds;
-    AABB2 extended_bounds;
+    AABBD2 bounds;
+    AABBD2 extended_bounds;
+    glm::dvec2 chunk_center;
+    AABB2 local_bounds; // in local chunk space
 
     // seeds
     uint32_t heightmap_seed;
@@ -217,11 +225,12 @@ struct ChunkGenerator
     mg::GrassSampler grass_sampler;
 
     // tiles
-    float tile_size_m;
+    double tile_size_m;
     uint32_t tiles_border;
     uint32_t tiles_stride;
     std::vector<mg::ChunkTile> tiles;
-    AABB2 tiles_aabb;
+    AABBD2 tiles_aabb;
+    AABB2 local_tiles_aabb; // in local chunk space
 
     // splines
     const std::map<uint32_t, mg::ChunkSplineNode>* spline_nodes;
@@ -247,10 +256,14 @@ struct ChunkGenerator
           heightmap_seed(params.heightmap_seed), height_sampler(cfg), forest_sampler(heightmap_seed),
           color_sampler(heightmap_seed), grass_sampler(heightmap_seed), tiles_border(cfg.chunk_border),
           tiles_stride(cfg.chunk_tiles + cfg.chunk_border * 2), tiles(tiles_stride * tiles_stride),
-          tile_size_m(cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles)),
-          tiles_aabb(bounds.min - glm::vec2(cfg.chunk_border) * tile_size_m,
-                     bounds.max + glm::vec2(cfg.chunk_border) * tile_size_m)
+          tile_size_m(cfg.chunk_size_m / static_cast<double>(cfg.chunk_tiles)),
+          tiles_aabb(bounds.min - glm::dvec2(cfg.chunk_border) * static_cast<double>(tile_size_m),
+                     bounds.max + glm::dvec2(cfg.chunk_border) * static_cast<double>(tile_size_m)),
+          chunk_center((bounds.min + bounds.max) * 0.5),
+          local_tiles_aabb(glm::vec2(tiles_aabb.min - chunk_center), glm::vec2(tiles_aabb.max - chunk_center)),
+          local_bounds(glm::vec2(bounds.min - chunk_center), glm::vec2(bounds.max - chunk_center))
     {
+        chunk.center = glm::dvec3(chunk_center, 0.0);
     }
 
     void Generate()
@@ -279,7 +292,7 @@ struct ChunkGenerator
         path_segment_length_scale = 1.0f / terrain_density_scale;
     }
 
-    uint32_t GetTileIndexAtPos(const glm::vec2& pos) const
+    uint32_t GetTileIndexAtPos(const glm::dvec2& pos) const
     {
         if (!tiles_aabb.Contains(pos))
         {
@@ -296,13 +309,13 @@ struct ChunkGenerator
         return static_cast<uint32_t>(tile_idx.y * tiles_stride + tile_idx.x);
     }
 
-    mg::ChunkTile* GetTileAtPos(const glm::vec2& pos)
+    mg::ChunkTile* GetTileAtPos(const glm::dvec2& pos)
     { 
         auto tile_idx = GetTileIndexAtPos(pos);
         return tile_idx != INVALID_ID ? &tiles[tile_idx] : nullptr;
     }
 
-    const mg::ChunkTile* GetTileAtPos(const glm::vec2& pos) const
+    const mg::ChunkTile* GetTileAtPos(const glm::dvec2& pos) const
     {
         auto tile_idx = GetTileIndexAtPos(pos);
         return tile_idx != INVALID_ID ? &tiles[tile_idx] : nullptr;
@@ -315,7 +328,7 @@ struct ChunkGenerator
             for (uint32_t x = 0; x < tiles_stride; ++x)
             {
                 auto& tile = tiles[y * tiles_stride + x];
-                auto pos = tiles_aabb.min + glm::vec2(x, y) * tile_size_m;
+                auto pos = tiles_aabb.min + glm::dvec2(x, y) * tile_size_m;
                 tile.height = height_sampler.Get(pos);
             }
         }
@@ -358,7 +371,7 @@ struct ChunkGenerator
 
         const auto& second_node = spline_nodes->at(second_node_id);
 
-        std::vector<glm::vec3> spline_points;
+        std::vector<glm::dvec3> spline_points;
         spline_points.reserve(16);
 
         // find the point before junction for correct direction
@@ -485,7 +498,7 @@ struct ChunkGenerator
         if (material.type != mg::TPL_MATERIAL_HEIGHTMESH)
         {
             auto centroid = (raw_verts[v0].pos + raw_verts[v1].pos + raw_verts[v2].pos) / 3.0f;
-            if (!bounds.Contains(centroid))
+            if (!bounds.Contains(chunk_center + glm::dvec2(centroid)))
             {
                 return; // triangle outside chunk bounds
             }
@@ -504,8 +517,8 @@ struct ChunkGenerator
         const auto& mesh = res.GetMeshes().GetByIndex(junction.mesh_id);
 
         // check if within chunk bounds
-        constexpr float radius = 15.0f; // TODO: calculate actual radius from mesh bounds
-        if (!extended_bounds.CollidesWith(AABB2(junction.pos - radius, junction.pos + radius)))
+        constexpr double radius = 15.0; // TODO: calculate actual radius from mesh bounds
+        if (!extended_bounds.CollidesWith(AABBD2(junction.pos - radius, junction.pos + radius)))
         {
             return; // junction mesh outside chunk bounds
         }
@@ -519,7 +532,7 @@ struct ChunkGenerator
             // chunk_vert.color = 0xFFFFFFFF; // TODO
             chunk_vert.normal = glm::vec3(0.0f);
 
-            chunk_vert.pos = glm::vec3(0.0f);
+            glm::dvec3 far_pos(0.0);
 
             for (uint32_t i = 0; i < mesh.links.size(); ++i)
             {
@@ -543,8 +556,10 @@ struct ChunkGenerator
                 }
 
                 auto w = vert.link_weights[i];
-                chunk_vert.pos += path.spline.DeformVertex(spline_pos) * w;
+                far_pos += path.spline.DeformVertex(spline_pos) * static_cast<double>(w);
             }
+
+            chunk_vert.pos = far_pos - glm::dvec3(chunk_center, 0.0);
         }
 
         for (const auto& tri : mesh.tris)
@@ -566,7 +581,7 @@ struct ChunkGenerator
         }
     }
 
-    void InsertPathProfileVertices(const mg::TemplateProfile& profile, const SplinePath& spline, float t, float uv_t,
+    void InsertPathProfileVertices(const mg::TemplateProfile& profile, const SplinePath& spline, double t, float uv_t,
                                    std::span<uint32_t> out_verts)
     {
         auto base_vertex = static_cast<uint32_t>(raw_verts.size());
@@ -576,7 +591,8 @@ struct ChunkGenerator
             const auto& profile_vert = profile.verts[i];
             auto& chunk_vert = raw_verts[base_vertex + i];
 
-            chunk_vert.pos = spline.DeformVertex(glm::vec3(profile_vert.pos.x, t, profile_vert.pos.z));
+            chunk_vert.pos = spline.DeformVertex(glm::dvec3(profile_vert.pos.x, t, profile_vert.pos.z)) -
+                             glm::dvec3(chunk_center, 0.0);
             chunk_vert.normal = glm::vec3(0.0f); // profile_vert.normal; // TODO: transform normal
             chunk_vert.uv = profile_vert.uv + profile_vert.uv_advance * uv_t;
             // chunk_vert.color = 0xFFFFFFFF; // TODO: color
@@ -670,22 +686,22 @@ struct ChunkGenerator
             have_start_verts = true;
         }
 
-        const auto step_size = 3.0f * path_segment_length_scale; // meters
-        const auto min_step = step_size * 0.5f;
+        const auto step_size = 3.0 * path_segment_length_scale; // meters
+        const auto min_step = step_size * 0.5;
         const auto start_margin = start_junction.links[start_endpoint.link_idx].margin;
         const auto start_t = start_margin + step_size;
         const auto end_margin = end_junction.links[end_endpoint.link_idx].margin;
         const auto end_with_margin =  path.spline.GetTotalLength() - end_margin;
         const auto end_t = end_with_margin - min_step;
 
-        for (float t = start_t; t < end_t; t += step_size)
+        for (double t = start_t; t < end_t; t += step_size)
         {
             bool have_end_verts = false;
 
             // check if this segment collides with the chunk
-            auto pos = spline.DeformVertex(glm::vec3(0.0f, t, 0.0f));
-            constexpr float margin = 10.0f; // meters
-            if (extended_bounds.CollidesWith(AABB2(pos - margin, pos + margin)))
+            auto pos = spline.DeformVertex(glm::dvec3(0.0, t, 0.0));
+            constexpr double margin = 10.0; // meters
+            if (extended_bounds.CollidesWith(AABBD2(pos - margin, pos + margin)))
             {
                 InsertPathProfileVertices(profile, spline, t, t - start_margin, end_verts);
                 have_end_verts = true;
@@ -763,8 +779,8 @@ struct ChunkGenerator
 
             for (const auto& vert : verts)
             {
-                glm::vec4 world_pos = obj.trans * glm::vec4(vert, 1.0f);
-                hm_verts.emplace_back(world_pos);
+                auto world_pos = obj.trans.TransformPoint(vert);
+                hm_verts.emplace_back(world_pos - glm::dvec3(chunk_center, 0.0));
             }
 
             for (const auto& tri : tris)
@@ -790,6 +806,8 @@ struct ChunkGenerator
             float override_height_weight[3] = {0.0f, 0.0f, 0.0f};
         };
 
+        const float tile_size = static_cast<float>(tile_size_m);
+
         std::vector<TileUpdate> tile_updates(tiles.size());
 
         const glm::ivec2 grid_size(tiles_stride);
@@ -803,7 +821,7 @@ struct ChunkGenerator
             for (int i = 0; i < 3; ++i)
             {
                 glm::vec3 world_pos = hm_verts[tri[i]];
-                glm::vec2 tile_pos = (glm::vec2(world_pos) - tiles_aabb.min) / tile_size_m;
+                glm::vec2 tile_pos = (glm::vec2(world_pos) - local_tiles_aabb.min) / tile_size;
                 pos_ts[i] = tile_pos;
                 tri_aabb_ts.AddPoint(tile_pos);
             }
@@ -1009,7 +1027,7 @@ struct ChunkGenerator
             for (uint32_t x = 0; x < tiles_stride; ++x)
             {
                 auto& tile = tiles[y * tiles_stride + x];
-                auto pos = tiles_aabb.min + glm::vec2(x, y) * tile_size_m;
+                auto pos = tiles_aabb.min + glm::dvec2(x, y) * tile_size_m;
 
                 auto forest = forest_sampler.Get(pos);
                 tile.forest_level = static_cast<uint8_t>(forest.intensity * 255.0f);
@@ -1034,13 +1052,13 @@ struct ChunkGenerator
             return;
 
         // place trees
-        std::vector<glm::vec2> tree_positions;
+        std::vector<glm::dvec2> tree_positions;
 
         constexpr float tree_radius = 5.0f; // meters
 
         ChunkPoissonVariable(
             map_cfg.seed, chunk_coord, map_cfg.chunk_size_m, tree_radius, tree_radius, tree_radius, tree_positions,
-            [&](glm::vec2 pos) {
+            [&](glm::dvec2 pos) {
                 //auto tile = GetTileAtPos(pos);
                 //if (!tile)
                 //    return 10.0f; // default radius
@@ -1050,7 +1068,7 @@ struct ChunkGenerator
                 //return glm::mix(10.0f, 5.0f, density); // radius based on forest density
                 return tree_radius; // fixed radius for now
             },
-            [&](glm::vec2 pos) {
+            [&](glm::dvec2 pos) {
                 //auto tile = GetTileAtPos(pos);
                 //if (!tile)
                 //    return false;
@@ -1135,32 +1153,33 @@ struct ChunkGenerator
         
             auto model_idx = model_group[static_cast<size_t>(type_vals[2] * 1000000.0f) % model_group.size()];
 
-            auto obj_pos = glm::vec3(pos, height);
-            auto trans = glm::translate(glm::mat4(1.0f), obj_pos) *
-                         glm::rotate(glm::mat4(1.0f), angle_z, glm::vec3(0.0f, 0.0f, 1.0f)) *
-                         glm::scale(glm::mat4(1.0f), glm::vec3(scale));
+            auto obj_pos = glm::dvec3(pos, height);
 
+            FarTransform obj_trans{};
+            obj_trans.position = obj_pos;
+            obj_trans.rotation = glm::angleAxis(angle_z, glm::vec3(0.0f, 0.0f, 1.0f));
+            obj_trans.scale = scale;
+
+            auto obj_matrix = obj_trans.ToFarMatrix();
 
             if (gen_tree_objs)
             {
                 auto& obj = chunk.objs.emplace_back();
                 obj.model_id = model_idx;
-                obj.trans = trans;
+                obj.trans = obj_matrix;
             }
             else
             {
                 auto& obj_model = res.GetModels().GetByIndex(model_idx);
-                AddMesh(obj_pos, obj_model.cross_mesh_id, scale, angle_z, 0xFFFFFFFF);
+                AddMesh(obj_matrix, obj_model.cross_mesh_id, 0xFFFFFFFF);
             }
         }
     }
 
-    void AddMesh(const glm::vec3& pos, uint32_t mesh_id, float scale, float angle_z,
+    void AddMesh(const FarMatrix& matrix, uint32_t mesh_id,
                  uint32_t color, float offset_intensity = 0.0f)
     {
-        auto trans = glm::translate(glm::mat4(1.0f), pos) *
-                     glm::rotate(glm::mat4(1.0f), angle_z, glm::vec3(0.0f, 0.0f, 1.0f)) *
-                     glm::scale(glm::mat4(1.0f), glm::vec3(scale));
+        auto local_matrix = matrix.ToNearMatrix(glm::dvec3(chunk_center, 0.0));
 
         auto& mesh = res.GetMeshes().GetByIndex(mesh_id);
 
@@ -1168,14 +1187,15 @@ struct ChunkGenerator
         for (const auto& mesh_vert : mesh.verts)
         {
             auto& vert = raw_verts.emplace_back();
-            vert.pos = glm::vec3(trans * glm::vec4(mesh_vert.pos, 1.0f));
-            vert.normal = glm::vec3(trans * glm::vec4(mesh_vert.normal, 0.0f));
+            vert.pos = glm::vec3(local_matrix * glm::vec4(mesh_vert.pos, 1.0f));
+            vert.normal = glm::vec3(local_matrix * glm::vec4(mesh_vert.normal, 0.0f));
             vert.uv = mesh_vert.uv;
             vert.color = color;
 
             if (offset_intensity > 0.0f)
             {
-                vert.pos += glm::vec3(grass_sampler.GetOffset(vert.pos) * (offset_intensity * mesh_vert.pos.z), 0.0f);
+                auto far_pos = glm::dvec2(vert.pos) + chunk_center;
+                vert.pos += glm::vec3(grass_sampler.GetOffset(far_pos) * (offset_intensity * mesh_vert.pos.z), 0.0f);
             }
         }
 
@@ -1192,16 +1212,16 @@ struct ChunkGenerator
             return;
 
         constexpr float grass_radius = 1.2f; // meters
-        std::vector<glm::vec2> grass_positions;
+        std::vector<glm::dvec2> grass_positions;
 
         auto grass_seed = map_cfg.seed ^ 0x62455000;
 
         ChunkPoissonVariable(
             grass_seed, chunk_coord, map_cfg.chunk_size_m, grass_radius, grass_radius, grass_radius, grass_positions,
-            [&](glm::vec2 pos) {
+            [&](glm::dvec2 pos) {
                 return grass_radius; // fixed radius for now
             },
-            [&](glm::vec2 pos) {
+            [&](glm::dvec2 pos) {
                 return true;
             });
 
@@ -1258,40 +1278,43 @@ struct ChunkGenerator
             auto height = tile->height;
             height -= 0.2f;
 
-            auto obj_pos = glm::vec3(pos, height);
+            FarTransform obj_trans{};
+            obj_trans.position = glm::dvec3(pos, height);
+            obj_trans.rotation = glm::angleAxis(angle_z, glm::vec3(0.0f, 0.0f, 1.0f));
+            obj_trans.scale = scale;
 
-            AddMesh(obj_pos, mesh_idx, scale, angle_z, color_packed, 1.0f);
+            AddMesh(obj_trans.ToFarMatrix(), mesh_idx, color_packed, 1.0f);
         }
     }
 
     void TriangulateTerrain()
     {
         auto terrain_points_offset = hm_verts.size();
-        std::vector<glm::vec2> terrain_points;
+        std::vector<glm::dvec2> terrain_points;
 
         const float r = 3.0f / terrain_density_scale;
         const float r_min = 2.0f / terrain_density_scale;
         const float r_border = r * 5.0f / terrain_density_scale;
 
         // append corners
-        const auto terrain_points_margin = map_cfg.chunk_size_m;
+        const auto terrain_points_margin = static_cast<double>(map_cfg.chunk_size_m);
         auto c0 = bounds.min - terrain_points_margin;
         auto c1 = bounds.max + terrain_points_margin;
         terrain_points.emplace_back(c0);
-        terrain_points.emplace_back(glm::vec2(c1.x, c0.y));
+        terrain_points.emplace_back(glm::dvec2(c1.x, c0.y));
         terrain_points.emplace_back(c1);
-        terrain_points.emplace_back(glm::vec2(c0.x, c1.y));
+        terrain_points.emplace_back(glm::dvec2(c0.x, c1.y));
 
         ChunkPoissonVariable(
             map_cfg.seed, chunk_coord, map_cfg.chunk_size_m, r_min, r, r_border, terrain_points,
-            [&](glm::vec2 pos) {
+            [&](glm::dvec2 pos) {
                 auto tile = GetTileAtPos(pos);
 
                 float density = tile ? static_cast<float>(tile->obstruction_level) / 64.0f : 0.0f;
                 density = glm::clamp(density, 0.0f, 1.0f);
                 return glm::mix(r, r_min, density);
             },
-            [&](glm::vec2 pos) {
+            [&](glm::dvec2 pos) {
                 auto tile = GetTileAtPos(pos);
                 if (!tile)
                 {
@@ -1309,7 +1332,7 @@ struct ChunkGenerator
 
         for (const auto& p : terrain_points)
         {
-            del_points.emplace_back(p.x, p.y);
+            del_points.emplace_back(p.x - chunk_center.x, p.y - chunk_center.y);
         }
 
         tpp::Delaunay delaunay(del_points);
@@ -1383,7 +1406,7 @@ struct ChunkGenerator
                     int terrain_idx = v[i] - static_cast<int>(terrain_points_offset);
                     auto tile = GetTileAtPos(terrain_points[terrain_idx]);
                     auto height = tile ? tile->height : 0.0f;
-                    vert_pos[i] = glm::vec3(terrain_points[terrain_idx], height);
+                    vert_pos[i] = glm::vec3(terrain_points[terrain_idx] - chunk_center, height);
                 }
             }
 
@@ -1406,7 +1429,7 @@ struct ChunkGenerator
             auto centroid = (vert_pos[0] + vert_pos[1] + vert_pos[2]) / 3.0f;
 
             // check if out of bounds
-            if (!bounds.Contains(centroid))
+            if (!local_bounds.Contains(centroid))
             {
                 
                 if (sink_border)
@@ -1439,7 +1462,7 @@ struct ChunkGenerator
 
                     auto pos = vert_pos[i];
                     auto& vert = raw_verts.emplace_back();
-                    vert.pos = pos; // Placeholder height; replace with actual terrain height
+                    vert.pos = pos;
                     vert.uv = glm::vec2(pos) * 0.1f;
 
                     vertex_map[v[i]] = new_idx;
@@ -1465,8 +1488,6 @@ struct ChunkGenerator
         // sink border vertices
         if (sink_border)
         {
-            auto chunk_center = glm::vec2(bounds.min + bounds.max) * 0.5f;
-
             std::set<uint32_t> raw_verts_to_sink;
             for (const auto& [v0, v1] : sink_edges)
             {
@@ -1483,13 +1504,13 @@ struct ChunkGenerator
             for (const auto& v : raw_verts_to_sink)
             {
                 auto& rv = raw_verts[v];
-                auto sink_offset = glm::vec3(glm::sign(glm::vec2(rv.pos) - chunk_center) * sink_amount, -sink_amount * 0.5f);
+                auto sink_offset = glm::vec3(glm::sign(glm::vec2(rv.pos)) * sink_amount, -sink_amount * 0.5f);
                 rv.pos += sink_offset;
             }
         }
     }
 
-    uint32_t GetTerrainColor(const glm::vec2& pos) const
+    uint32_t GetTerrainColor(const glm::dvec2& pos) const
     {
         auto tile = GetTileAtPos(pos);
 
@@ -1563,7 +1584,9 @@ struct ChunkGenerator
 
                 // copy position
                 out_vert.pos = vert.pos;
-                chunk.aabb.AddPoint(out_vert.pos);
+
+                auto far_pos = glm::dvec3(out_vert.pos) + glm::dvec3(chunk_center, 0.0);
+                chunk.aabb.AddPoint(glm::vec3(far_pos));
 
                 // normalize normal
                 out_vert.normal = glm::dot(vert.normal, vert.normal) > 0.0001f ? glm::normalize(vert.normal)
@@ -1573,7 +1596,7 @@ struct ChunkGenerator
                 out_vert.uv = is_terrain ? vert.pos * terrain_uv_scale : vert.uv;
 
                 // set color
-                out_vert.color = is_terrain ? GetTerrainColor(vert.pos) : vert.color;
+                out_vert.color = is_terrain ? GetTerrainColor(glm::dvec2(far_pos)) : vert.color;
             }
         }
     }
@@ -1581,30 +1604,30 @@ struct ChunkGenerator
 
 } // namespace
 
-AABB2 mg::GetChunkAABB(const MapConfig& cfg, const glm::ivec2& chunk_pos, bool include_border)
+AABBD2 mg::GetChunkAABB(const MapConfig& cfg, const glm::ivec2& chunk_pos, bool include_border)
 {
-    glm::vec2 min = glm::vec2(chunk_pos) * cfg.chunk_size_m;
-    glm::vec2 max = min + glm::vec2(cfg.chunk_size_m);
+    glm::dvec2 min = glm::dvec2(chunk_pos) * static_cast<double>(cfg.chunk_size_m);
+    glm::dvec2 max = min + glm::dvec2(cfg.chunk_size_m);
 
-    const float border_m =
-        static_cast<float>(cfg.chunk_border) * cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles);
+    const double border_m =
+        static_cast<double>(cfg.chunk_border) * cfg.chunk_size_m / static_cast<double>(cfg.chunk_tiles);
 
     if (include_border)
     {
         min -= border_m;
         max += border_m;
     }
-    return AABB2(min, max);
+    return AABBD2(min, max);
 }
 
-std::tuple<glm::ivec2, glm::ivec2> mg::GetChunkRange(const MapConfig& cfg, const AABB2& aabb, bool include_margin)
+std::tuple<glm::ivec2, glm::ivec2> mg::GetChunkRange(const MapConfig& cfg, const AABBD2& aabb, bool include_margin)
 {
     auto bounds_min = aabb.min;
     auto bounds_max = aabb.max;
 
     if (include_margin)
     {
-        float border_m = static_cast<float>(cfg.chunk_border) * cfg.chunk_size_m / static_cast<float>(cfg.chunk_tiles);
+        double border_m = static_cast<double>(cfg.chunk_border) * cfg.chunk_size_m / static_cast<double>(cfg.chunk_tiles);
         // border_m += 30.0f; // additional margin for heightmap bleed
         bounds_min -= border_m;
         bounds_max += border_m;
@@ -1612,8 +1635,10 @@ std::tuple<glm::ivec2, glm::ivec2> mg::GetChunkRange(const MapConfig& cfg, const
 
     int half_chunks = static_cast<int>(cfg.chunks / 2);
 
-    glm::ivec2 min_chunk = glm::clamp(glm::ivec2(glm::floor(bounds_min / cfg.chunk_size_m)), -half_chunks, half_chunks);
-    glm::ivec2 max_chunk = glm::clamp(glm::ivec2(glm::floor(bounds_max / cfg.chunk_size_m)), -half_chunks, half_chunks);
+    glm::ivec2 min_chunk = glm::clamp(glm::ivec2(glm::floor(bounds_min / static_cast<double>(cfg.chunk_size_m))),
+                                      -half_chunks, half_chunks);
+    glm::ivec2 max_chunk = glm::clamp(glm::ivec2(glm::floor(bounds_max / static_cast<double>(cfg.chunk_size_m))),
+                                      -half_chunks, half_chunks);
 
     return {min_chunk, max_chunk};
 }

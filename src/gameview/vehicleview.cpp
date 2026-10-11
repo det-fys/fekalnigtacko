@@ -72,7 +72,7 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
     float t = (info.time - update_time_) * tps * 0.8f; // assume some jitter, interpolate for longer
     t = glm::clamp(t, 0.0f, 2.0f);
     auto t_clamped = glm::clamp(t, 0.0f, 1.0f);
-    root_.local = Transform::Lerp(state_[0].trans, state_[1].trans, t);
+    root_.local = FarTransform::Lerp(state_[0].trans, state_[1].trans, t);
     root_.UpdateMatrix();
     steering_ = glm::mix(state_[0].steering, state_[1].steering, t_clamped);
 
@@ -250,7 +250,7 @@ bool game::view::VehicleView::ReadState(net::InMessage* msg)
                 !net::ReadDelta(*msg, sync_.pos.z))
                 return false;
 
-            net::DecodePosition(sync_.pos, root_trans.position);
+            net::DecodeFarPosition(sync_.pos, root_trans.position);
         }
 
         // rot
@@ -426,7 +426,7 @@ void game::view::VehicleView::InitSteeringWheel()
     if (!loc)
         return;
 
-    steerw_transform_ = *loc;
+    steerw_transform_ = FarTransform::FromNearTransform(*loc);
     steerw_model_ = assets::AssetManager::GetInstance().Get<ModelView>("steerw");
     steerw_node_.parent = &GetRoot();
     has_steerw_ = true;
@@ -515,7 +515,7 @@ void game::view::VehicleView::DrawBaseModel(const DrawArgs& args) const
 
     gfx::DrawSurfaceCmd cmd{};
     cmd.mesh = model_view_->GetMesh().GetID();
-    cmd.matrix = &root_.matrix;
+    cmd.transform = &root_.matrix;
     cmd.colors = {colors, VCS__COUNT};
     
     if (windows_broken)
@@ -569,7 +569,7 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
     if ((flags_ & VF_EXPLODED) > 0)
         return;
     
-    auto forward = glm::normalize(glm::vec3(root_.matrix[1]));
+    auto forward = glm::normalize(root_.matrix.basis[1]);
     
     if (headlights_factor_ > 0.01f)
     {
@@ -583,7 +583,7 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
             light_cone_mdl_->Draw(args.ctx, light_cone_node_[i].matrix, {&headlight_cone_color_, 1});
 
             spotlight_pos += light_cone_node_[i].GetGlobalPosition();
-            dlist.AddCorona(root_.matrix * glm::vec4(headlight_pos_[i], 1.0f), forward, spotlight_color, 1.0f);
+            dlist.AddCorona(root_.matrix.TransformPoint(headlight_pos_[i]), forward, spotlight_color, 1.0f);
         }
 
         // spotlight
@@ -602,7 +602,7 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
         // REAR LIGHTS
         for (size_t i = 0; i < num_rearlights_; ++i)
         {
-            glm::vec3 pos = root_.matrix * glm::vec4(rearlight_pos_[i], 1.0f);
+            auto pos = root_.matrix.TransformPoint(rearlight_pos_[i]);
             glm::vec3 color = glm::vec3(1.0f, 0.1f, 0.1f) * (headlights_factor_ * 0.5f + braking_lights_factor_ * 0.7f);
 
             dlist.AddCorona(pos, -forward, color, 0.3f + braking_lights_factor_ * 0.7f);
@@ -615,7 +615,7 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
         // BRAKING LIGHT
         for (size_t i = 0; i < num_brakinglights_; ++i)
         {
-            dlist.AddCorona(root_.matrix * glm::vec4(brakinglights_pos_[i], 1.0f), -forward,
+            dlist.AddCorona(root_.matrix.TransformPoint(brakinglights_pos_[i]), -forward,
                             glm::vec3(1.0f, 0.1f, 0.1f) * braking_lights_factor_, 1.0f);
         }
     }
@@ -625,7 +625,7 @@ void game::view::VehicleView::DrawLights(const DrawArgs& args) const
         // REVERSE LIGHT
         for (size_t i = 0; i < num_reverselights_; ++i)
         {
-            glm::vec3 pos = root_.matrix * glm::vec4(reverselights_pos_[i], 1.0f);
+            auto pos = root_.matrix.TransformPoint(reverselights_pos_[i]);
             glm::vec3 color(reverse_light_factor_);
 
             dlist.AddCorona(pos, -forward, color, 1.0f);

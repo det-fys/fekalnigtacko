@@ -114,7 +114,7 @@ void game::NpcCharacter::SpawnLoot()
         if (balance < amount)
             return false;
         
-        auto cash_pos = pos + glm::vec3(RandomFloat(-0.5f, 0.5f), RandomFloat(-0.5f, 0.5f), RandomFloat(-0.3f, 0.1f));
+        auto cash_pos = pos + glm::dvec3(RandomFloat(-0.5f, 0.5f), RandomFloat(-0.5f, 0.5f), RandomFloat(-0.3f, 0.1f));
         world.CreateCashPickup(cash_pos, amount, RandomInt(30000, 65000), 0);
         balance -= amount;
         return true;
@@ -208,7 +208,7 @@ void game::NpcCharacter::UpdateEnemy()
         const auto& held_item = GetHeldItem(); 
         if (held_item && held_item->def->fire_type == assets::FIRETYPE_PROJECTILE)
         {
-            glm::vec3 aim_target;
+            glm::dvec3 aim_target;
             // aim at vehicle and predict
             if (enemy_->GetRideable())
             {
@@ -216,10 +216,10 @@ void game::NpcCharacter::UpdateEnemy()
             }
             else
             {
-                aim_target = enemy_->GetRoot().GetGlobalPosition() + glm::vec3(0.0f, 0.0f, 0.2f);
+                aim_target = enemy_->GetRoot().GetGlobalPosition() + glm::dvec3(0.0f, 0.0f, 0.2f);
             }
 
-            auto velocity = (aim_target - last_enemy_pos_) * 20.0f;
+            auto velocity = glm::vec3(aim_target - last_enemy_pos_) * 20.0f;
             last_enemy_pos_ = aim_target;
         
             aim_target += velocity * 0.5f; 
@@ -228,7 +228,7 @@ void game::NpcCharacter::UpdateEnemy()
         }
         else
         {
-            glm::vec3 aim_target = enemy_->GetRoot().matrix * glm::vec4(0.0f, 0.0f, 1.7f, 1.0f);
+            glm::dvec3 aim_target = enemy_->GetRoot().matrix.TransformPoint(glm::dvec3(0.0f, 0.0f, 1.7f));
             SetAimTarget(aim_target);
         }
 
@@ -254,7 +254,7 @@ bool game::NpcCharacter::CheckEnemyLost()
     }
 
     const float max_dist = npc_max_enemy_distance.Get();
-    auto dist2 = glm::distance2(root_.GetGlobalPosition(), enemy_->GetRoot().GetGlobalPosition());
+    auto dist2 = glm::length2(glm::vec3(root_.GetGlobalPosition() - enemy_->GetRoot().GetGlobalPosition()));
     if (dist2 > (max_dist * max_dist))
         return true; // too far
 
@@ -302,7 +302,7 @@ void game::NpcCharacter::SetPathMode(bool to_target)
     path_to_target_ = to_target;
 }
 
-void game::NpcCharacter::FindVehiclePath(const glm::vec3& position)
+void game::NpcCharacter::FindVehiclePath(const glm::dvec3& position)
 {
     if (path_to_target_)
     {
@@ -314,7 +314,7 @@ void game::NpcCharacter::FindVehiclePath(const glm::vec3& position)
     }
 }
 
-void game::NpcCharacter::FindVehiclePathRoads(const glm::vec3& position)
+void game::NpcCharacter::FindVehiclePathRoads(const glm::dvec3& position)
 {
     if (last_waypoint_idx_ == INVALID_WAYPOINT_IDX)
     {
@@ -331,7 +331,7 @@ void game::NpcCharacter::FindVehiclePathRoads(const glm::vec3& position)
         float closest_dist2 = 10000000000.0f;
         for (size_t i = 0; i < roads_->nodes.size(); ++i)
         {
-            auto d = position - roads_->nodes[i].position;
+            auto d = glm::vec3(position - roads_->nodes[i].position);
             auto dist2 = glm::dot(d, d);
             if (dist2 < closest_dist2)
             {
@@ -359,7 +359,7 @@ void game::NpcCharacter::FindVehiclePathRoads(const glm::vec3& position)
     }
 }
 
-void game::NpcCharacter::FindVehiclePathToTarget(const glm::vec3& position)
+void game::NpcCharacter::FindVehiclePathToTarget(const glm::dvec3& position)
 {
     last_waypoint_idx_ = INVALID_WAYPOINT_IDX;
 
@@ -370,7 +370,9 @@ void game::NpcCharacter::FindVehiclePathToTarget(const glm::vec3& position)
     if (!path_.empty())
     {
         int64_t time_since_last_pathfind = time - last_pathfind_time_;
-        if ((glm::distance(glm::vec2(path_.back()), glm::vec2(target_pos)) < 5.0f || time_since_last_pathfind < 120) && time_since_last_pathfind < 3000)
+        if ((glm::distance(glm::dvec2(path_.back()), glm::dvec2(target_pos)) < 5.0 ||
+             time_since_last_pathfind < 120) &&
+            time_since_last_pathfind < 3000)
         {
             return; // already close and recent enough
         }
@@ -401,19 +403,19 @@ void game::NpcCharacter::FindVehiclePathToTarget(const glm::vec3& position)
 
 }
 
-static float FindClosestPointOnSegment(const glm::vec3& p0, const glm::vec3& p1, const glm::vec3& pos)
+static double FindClosestPointOnSegment(const glm::dvec3& p0, const glm::dvec3& p1, const glm::dvec3& pos)
 {
-    glm::vec3 seg_dir = p1 - p0;
-    float seg_len2 = glm::dot(seg_dir, seg_dir);
-    if (seg_len2 < 0.0001f)
-        return 0.0f; // segment is too short
+    glm::dvec3 seg_dir = p1 - p0;
+    double seg_len2 = glm::dot(seg_dir, seg_dir);
+    if (seg_len2 < 0.0001)
+        return 0.0; // segment is too short
 
-    float t = glm::dot(pos - p0, seg_dir) / seg_len2;
-    // t = glm::clamp(t, 0.0f, 1.0f);
+    double t = glm::dot(pos - p0, seg_dir) / seg_len2;
+    // t = glm::clamp(t, 0.0, 1.0);
     return t;
 }
 
-static glm::vec3 LookAhead(std::span<glm::vec3> path, float distance)
+static glm::dvec3 LookAhead(std::span<glm::dvec3> path, double distance)
 {
     for (size_t i = 0; i < path.size() - 1; ++i)
     {
@@ -445,7 +447,7 @@ static float GetTurnAngle2D(const glm::vec2& forward, const glm::vec2& to_target
     return angle; // in [-pi, pi]
 }
 
-static float GetTurnAngle(const glm::vec3& pos, const glm::quat& rot, const glm::vec3& target)
+static float GetTurnAngle(const glm::dvec3& pos, const glm::quat& rot, const glm::dvec3& target)
 {
     glm::vec3 forward = rot * glm::vec3{0.0f, 1.0f, 0.0f};
     glm::vec3 to_target = target - pos;
@@ -454,7 +456,7 @@ static float GetTurnAngle(const glm::vec3& pos, const glm::quat& rot, const glm:
     return GetTurnAngle2D(forward_xy, to_target_xy);
 }
 
-float CalculateNPCTargetSpeed(std::span<const glm::vec3> waypoints, const glm::quat& vehicleOrientation)
+float CalculateNPCTargetSpeed(std::span<const glm::dvec3> waypoints, const glm::quat& vehicleOrientation)
 {
     // Configuration parameters (Tweak these to match your game's driving feel)
     const float MAX_SPEED_KMH = 100.0f;      // Speed on a straight road
@@ -524,7 +526,7 @@ float CalculateNPCTargetSpeed(std::span<const glm::vec3> waypoints, const glm::q
     return targetSpeedKMH;
 }
 
-void game::NpcCharacter::UpdateVehicleInput(std::span<glm::vec3> actual_path)
+void game::NpcCharacter::UpdateVehicleInput(std::span<glm::dvec3> actual_path)
 {
     auto vehicle = GetVehicle();
     auto vehicle_pos = vehicle->GetRoot().GetGlobalPosition();
@@ -533,8 +535,8 @@ void game::NpcCharacter::UpdateVehicleInput(std::span<glm::vec3> actual_path)
     auto target_pos = LookAhead(actual_path, glm::max(npc_driver_lookahead_min.Get(),
                                                       vehicle->GetSpeed() * npc_driver_lookahead_per_kmh.Get()));
     // auto target_speed = 10.0f;
-    std::span<glm::vec3> speed_path = actual_path;
-    if (glm::distance2(actual_path[0], actual_path[1]) < 4.0f)
+    std::span<glm::dvec3> speed_path = actual_path;
+    if (glm::distance2(actual_path[0], actual_path[1]) < 4.0)
     {
         speed_path = { actual_path.begin() + 1, actual_path.end() };
     }
@@ -641,7 +643,7 @@ void game::NpcCharacter::UpdateVehicleInput(std::span<glm::vec3> actual_path)
                 break;
         }
         GetWorld().Beam(vehicle_pos, target_pos, 0xFFFF00FF, 1.5f / 25.0f);
-        GetWorld().BeamBox(target_pos - 0.05f, target_pos + 0.05f, 0xFFFF00FF, 1.5f / 25.0f);
+        GetWorld().BeamBox(target_pos - 0.05, target_pos + 0.05, 0xFFFF00FF, 1.5f / 25.0f);
     }
 }
 
@@ -662,12 +664,12 @@ void game::NpcCharacter::UpdateVehicleInputToFollowPath()
     {
         bool need_break = path_.size() <= 2;
 
-        auto seg_dir = path_[1] - path_[0];
+        auto seg_dir = glm::vec3(path_[1] - path_[0]);
         auto seg_len2 = glm::dot(seg_dir, seg_dir);
         auto seg_len = glm::sqrt(seg_len2);
         if (seg_len > 0.1f || need_break)
         {
-            seg_t = glm::dot(vehicle_pos - path_[0], seg_dir) / seg_len2;
+            seg_t = glm::dot(glm::vec3(vehicle_pos - path_[0]), seg_dir) / seg_len2;
             if (seg_t < (1.0f - 3.0f / seg_len) || need_break)
             {
                 break;
@@ -686,7 +688,7 @@ void game::NpcCharacter::UpdateVehicleInputToFollowPath()
     const auto& p1 = path_[1];
     auto on_segment = glm::mix(p0, p1, seg_t);
 
-    std::array<glm::vec3, PATH_NEXT_WAYPOINTS + 1> actual_path; // pos,on_segment,path[1],path[2]...
+    std::array<glm::dvec3, PATH_NEXT_WAYPOINTS + 1> actual_path; // pos,on_segment,path[1],path[2]...
     actual_path[0] = vehicle_pos;
     actual_path[1] = on_segment;
 
@@ -712,7 +714,7 @@ void game::NpcCharacter::UpdateVehicleInputToFollowEnemy()
     if (!vehicle)
         return;
 
-    std::array<glm::vec3, 2> actual_path;
+    std::array<glm::dvec3, 2> actual_path;
     actual_path[0] = vehicle->GetRoot().GetGlobalPosition();;
     actual_path[1] = enemy_->GetRoot().GetGlobalPosition();;
 

@@ -31,6 +31,27 @@ inline void WritePositionQ(OutMessage& msg, const PositionQ& posq)
     msg.Write(posq.z.value);
 }
 
+inline void WriteFarPosition(OutMessage& msg, const glm::dvec3& pos)
+{
+    msg.Write<FarPositionElemQ>(pos.x);
+    msg.Write<FarPositionElemQ>(pos.y);
+    msg.Write<FarPositionElemQ>(pos.z);
+}
+
+inline void EncodeFarPosition(const glm::dvec3& pos, FarPositionQ& out)
+{
+    out.x.Encode(pos.x);
+    out.y.Encode(pos.y);
+    out.z.Encode(pos.z);
+}
+
+inline void WriteFarPositionQ(OutMessage& msg, const FarPositionQ& posq)
+{
+    msg.Write(posq.x.value);
+    msg.Write(posq.y.value);
+    msg.Write(posq.z.value);
+}
+
 // inline void WriteRotation(OutMessage& msg, const glm::quat& quat)
 // {
 //     auto q = glm::normalize(quat);
@@ -77,6 +98,23 @@ inline bool ReadPositionQ(InMessage& msg, PositionQ& posq)
 }
 
 inline void DecodePosition(const PositionQ& posq, glm::vec3& out)
+{
+    out.x = posq.x.Decode();
+    out.y = posq.y.Decode();
+    out.z = posq.z.Decode();
+}
+
+inline bool ReadFarPosition(InMessage& msg, glm::dvec3& pos)
+{
+    return msg.Read<FarPositionElemQ>(pos.x) && msg.Read<FarPositionElemQ>(pos.y) && msg.Read<FarPositionElemQ>(pos.z);
+}
+
+inline bool ReadFarPositionQ(InMessage& msg, FarPositionQ& posq)
+{
+    return msg.Read(posq.x.value) && msg.Read(posq.y.value) && msg.Read(posq.z.value);
+}
+
+inline void DecodeFarPosition(const FarPositionQ& posq, glm::dvec3& out)
 {
     out.x = posq.x.Decode();
     out.y = posq.y.Decode();

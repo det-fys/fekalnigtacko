@@ -7,7 +7,7 @@
 #include "map_viewport.hpp"
 #include "utils/files.hpp"
 
-edit::StaticObject::StaticObject(Project& project, const glm::mat4& trans, const std::string& model_name)
+edit::StaticObject::StaticObject(Project& project, const FarMatrix& trans, const std::string& model_name)
     : Object(project, trans), model_name_(model_name)
 {
     model_ = assets::AssetManager::GetInstance().Get<ModelView>(model_name);
@@ -32,7 +32,7 @@ void edit::StaticObject::DrawOverlay(const DrawOverlayContext& ctx)
     Super::DrawOverlay(ctx);
 }
 
-void edit::StaticObject::SetTransform(const glm::mat4& trans)
+void edit::StaticObject::SetTransform(const FarMatrix& trans)
 {
     MaybeInvalidateChunks();
 
@@ -42,7 +42,7 @@ void edit::StaticObject::SetTransform(const glm::mat4& trans)
     MaybeInvalidateChunks();
 }
 
-void edit::StaticObject::Clone(const glm::mat4& trans)
+void edit::StaticObject::Clone(const FarMatrix& trans)
 {
     GetProject().AddStaticObject(trans, model_name_);
 }

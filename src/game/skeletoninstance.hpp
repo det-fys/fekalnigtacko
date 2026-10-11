@@ -8,14 +8,13 @@
 
 namespace game
 {
-
+    
 class SkeletonInstance
 {
 public:
     SkeletonInstance() = default;
-    SkeletonInstance(std::shared_ptr<const assets::Skeleton> skeleton, const TransformNode* root_node);
+    SkeletonInstance(std::shared_ptr<const assets::Skeleton> skeleton);
 
-    const TransformNode* GetRootNode() const { return root_node_; }
     const TransformNode& GetBoneNode(size_t index) const { return bone_nodes_[index]; }
     const TransformNode* GetBoneNodeByName(const std::string& bone_name) const;
 
@@ -34,7 +33,6 @@ private:
 
 private:
     std::shared_ptr<const assets::Skeleton> skeleton_;
-    const TransformNode* root_node_ = nullptr;
     std::vector<TransformNode> bone_nodes_;
 };
 

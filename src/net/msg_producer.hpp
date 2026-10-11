@@ -28,7 +28,7 @@ private:
 struct LocalMsgInfo
 {
     size_t start;
-    glm::vec3 position;
+    glm::dvec3 position;
     float radius;
 };
 
@@ -37,8 +37,8 @@ class LocalMsgProducer
 public:
     LocalMsgProducer() = default;
 
-    OutMessage BeginLocalMsg(const glm::vec3& position, float radius, MessageType type = MSG_NONE);
-    void PickLocalMsgs(MsgProducer& target, const glm::vec3& target_pos);
+    OutMessage BeginLocalMsg(const glm::dvec3& position, float radius, MessageType type = MSG_NONE);
+    void PickLocalMsgs(MsgProducer& target, const glm::dvec3& target_pos);
     void ResetLocalMsgs();
 
 private:

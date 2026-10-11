@@ -45,7 +45,7 @@ public:
     void PlayerChat(Player& player, std::string_view line);
     void PlayerLeft(Player& player);
 
-    void MovePlayerToWorld(Player& player, EnterableWorld& world, bool with_vehicle, const glm::vec3& pos, float yaw);
+    void MovePlayerToWorld(Player& player, EnterableWorld& world, bool with_vehicle, const glm::dvec3& pos, float yaw);
 
     db::GameDatabase& GetDb() const { return *db_; }
 
@@ -55,10 +55,10 @@ private:
 
     void BroadcastChat(const std::string& text);
 
-    PlayerCharacter& MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld& new_world, const glm::vec3& pos, float yaw);
-    void MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& new_world, const glm::vec3& pos, float yaw);
+    PlayerCharacter& MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld& new_world, const glm::dvec3& pos, float yaw);
+    void MoveVehicleToWorld(DrivableVehicle& vehicle, EnterableWorld& new_world, const glm::dvec3& pos, float yaw);
 
-    void MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld* new_world, const glm::vec3& pos, float yaw, bool with_vehicle = false);
+    void MovePlayerToWorld(PlayerGameInfo& player_info, EnterableWorld* new_world, const glm::dvec3& pos, float yaw, bool with_vehicle = false);
 
     PlayerGameInfo& GetPlayerInfo(Player& player);
     EnterableWorld* FindPlayerWorld(Player& player) const;

@@ -7,9 +7,7 @@ game::view::ClientChunkManager::ClientChunkManager(std::shared_ptr<const mg::Res
 
 void game::view::ClientChunkManager::Draw(const gfx::DrawContext& ctx) const
 {
-    static glm::mat4 identity{1.0f};
-
-    AABB2 frustum_aabb(ctx.frustum.GetAABB().min, ctx.frustum.GetAABB().max);
+    AABBD2 frustum_aabb(ctx.frustum.GetAABB().min, ctx.frustum.GetAABB().max);
 
     auto [min_coord, max_coord] = mg::GetChunkRange(GetMapConfig(), frustum_aabb, false);
     auto [loaded_min, loaded_max] = GetLoadedChunkRange();
@@ -32,14 +30,14 @@ void game::view::ClientChunkManager::Draw(const gfx::DrawContext& ctx) const
                 continue;
 
             if (ctx.pass == gfx::DRAW_PASS_MAIN && chunk.model)
-                chunk.model->Draw(ctx, identity, {});
+                chunk.model->Draw(ctx, chunk.matrix, {});
 
             for (const auto& obj : chunk.objs)
             {
                 if (!ctx.frustum.IsAABBVisible(obj.aabb))
                     continue;
 
-                obj.model->Draw(ctx, obj.trans, {});
+                obj.model->Draw(ctx, obj.matrix, {});
             }
         }
     }
@@ -66,6 +64,11 @@ void game::view::ClientChunkManager::OnChunkGenerated(const mg::ChunkGenData& ge
 {
     ChunkView& chunk = chunks_[gen_data.coord];
     chunk.aabb = gen_data.aabb;
+
+    FarTransform trans{};
+    trans.position = gen_data.center;
+    chunk.matrix = trans.ToFarMatrix();
+
     chunk.model.reset();
     chunk.model = std::make_shared<ModelView>(gen_data.model);
 
@@ -74,7 +77,7 @@ void game::view::ClientChunkManager::OnChunkGenerated(const mg::ChunkGenData& ge
     for (const auto& obj : gen_data.objs)
     {
         ChunkObjView obj_view{};
-        obj_view.trans = obj.trans;
+        obj_view.matrix = obj.trans;
         obj_view.aabb = obj.aabb;
         obj_view.model = assets::AssetManager::GetInstance().Get<ModelView>(obj.model->GetAssetName());
 

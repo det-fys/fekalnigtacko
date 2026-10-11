@@ -82,7 +82,7 @@ public:
     virtual ~HumanCharacter() override;
 
 protected:
-    void SetAimTargetSmart(const glm::vec3& target_position, const glm::vec3& target_velocity);
+    void SetAimTargetSmart(const glm::dvec3& target_position, const glm::vec3& target_velocity);
 
     virtual void OnRideableChanged() {}
     virtual void OnAimingChanged() {}
@@ -151,7 +151,7 @@ private:
     HumanCharacterState state_ = HS_INIT;
     HumanCharacterStateSignals signals_ = 0;
 
-    glm::vec3 rideable_exit_pos_ = glm::vec3(0.0f);
+    glm::dvec3 rideable_exit_pos_{0.0};
 
     bool aimheld_ = false;
     bool fireheld_ = false;

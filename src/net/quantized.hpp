@@ -7,45 +7,63 @@
 namespace net
 {
 
-template <std::unsigned_integral T, long long MinL = -1, long long MaxL = 1, long long DivisorL = 1>
-struct Quantized
+template <std::floating_point S, std::unsigned_integral T, long long MinL = -1, long long MaxL = 1, long long DivisorL = 1>
+struct BasicQuantized
 {
-    static constexpr float Min = static_cast<float>(MinL) / static_cast<float>(DivisorL);
-    static constexpr float Max = static_cast<float>(MaxL) / static_cast<float>(DivisorL);
+    using ScalarType = S;
+    using IntType = T;
+
+    static constexpr S Min = static_cast<S>(MinL) / static_cast<S>(DivisorL);
+    static constexpr S Max = static_cast<S>(MaxL) / static_cast<S>(DivisorL);
 
     static constexpr T max_int = std::numeric_limits<T>::max();
-    static constexpr float range = Max - Min;
-    static constexpr float scale = static_cast<float>(max_int) / range;
-    static constexpr float inv_scale = range / static_cast<float>(max_int);
+    static constexpr S range = Max - Min;
+    static constexpr S scale = static_cast<S>(max_int) / range;
+    static constexpr S inv_scale = range / static_cast<S>(max_int);
 
 public:
     T value{0};
 
-    Quantized() = default;
-    Quantized(T value) : value(value) {}
-    Quantized(float fvalue) { Encode(fvalue); }
+    BasicQuantized() = default;
+    BasicQuantized(T value) : value(value) {}
+    BasicQuantized(S fvalue) { Encode(fvalue); }
 
-    void Encode(float fvalue) noexcept
+    void Encode(S fvalue) noexcept
     {
         fvalue = std::clamp(fvalue, Min, Max);
 
-        float normalized = (fvalue - Min) * scale;
-        value = static_cast<T>(normalized + 0.5f); // round
+        S normalized = (fvalue - Min) * scale;
+        value = static_cast<T>(normalized + static_cast<S>(0.5)); // round
     }
 
-    float Decode() const noexcept { return Min + static_cast<float>(value) * inv_scale; }
+    S Decode() const noexcept { return Min + static_cast<S>(value) * inv_scale; }
 
-    static constexpr float MaxError() noexcept { return inv_scale * 0.5f; }
+    static constexpr S MaxError() noexcept { return inv_scale * static_cast<S>(0.5); }
 };
 
-template <typename T>
-concept AnyQuantized = requires(T t, float f)
+template <typename S, typename T>
+concept AnyBasicQuantized = requires(T t, S f)
 {
     { T(f) };
     { t.Encode(f) };
-    { t.Decode() } -> std::convertible_to<float>;
+    { t.Decode() } -> std::convertible_to<S>;
     // { t.value } -> std::unsigned_integral;
     { t.value };
 };
+
+template <std::unsigned_integral T, long long MinL = -1, long long MaxL = 1, long long DivisorL = 1>
+using Quantized = BasicQuantized<float, T, MinL, MaxL, DivisorL>;
+
+template <std::unsigned_integral T, long long MinL = -1, long long MaxL = 1, long long DivisorL = 1>
+using Quantized64 = BasicQuantized<double, T, MinL, MaxL, DivisorL>;
+
+template <typename T>
+concept AnyQuantized32 = AnyBasicQuantized<float, T>;
+
+template <typename T>
+concept AnyQuantized64 = AnyBasicQuantized<double, T>;
+
+template <typename T>
+concept AnyQuantized = AnyQuantized32<T> || AnyQuantized64<T>;
 
 } // namespace net

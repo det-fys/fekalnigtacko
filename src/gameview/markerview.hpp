@@ -22,7 +22,7 @@ public:
 private:
     bool Init(net::InMessage& msg);
 
-    void DrawModel(const DrawArgs& args, const ModelView& model, const TransformNode& node);
+    void DrawModel(const DrawArgs& args, const ModelView& model, const FarTransformNode& node);
 
 private:
     MarkerType marker_type_;
@@ -30,7 +30,7 @@ private:
 
     std::shared_ptr<const ModelView> base_model_;
     std::shared_ptr<const ModelView> model_;
-    TransformNode icon_node_;
+    FarTransformNode icon_node_;
 
 };
 

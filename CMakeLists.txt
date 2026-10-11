@@ -7,6 +7,8 @@ project(FekalniGtacko)
 option(BUILD_CLIENT "Build the client application" ON)
 option(BUILD_SERVER "Build the server application" ON)
 
+option(DOUBLE_PRECISION_PHYSICS "Use double precision for bullet" ON)
+
 # ------------------------------------------------------------------------------
 # Version
 # ------------------------------------------------------------------------------
@@ -122,6 +124,9 @@ set(BUILD_BULLET2_DEMOS OFF CACHE BOOL "" FORCE)
 set(BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_PYBULLET OFF CACHE BOOL "" FORCE)
 set(BUILD_OPENGL3_DEMOS OFF CACHE BOOL "" FORCE)
+if(DOUBLE_PRECISION_PHYSICS)
+    set(USE_DOUBLE_PRECISION ON CACHE BOOL "" FORCE)
+endif()
 add_subdirectory(external/bullet3)
 
 # Recast Navigation
@@ -240,6 +245,10 @@ if(BUILD_CLIENT)
         zip
         TrianglePP
     )
+
+    if (DOUBLE_PRECISION_PHYSICS)
+        target_compile_definitions(${MAIN_NAME} PRIVATE BT_USE_DOUBLE_PRECISION)
+    endif()
 
     # Client-only external libraries
     add_subdirectory(external/ogg)
@@ -408,5 +417,9 @@ if(BUILD_SERVER)
             zip
             TrianglePP
         )
+
+        if (DOUBLE_PRECISION_PHYSICS)
+            target_compile_definitions(${SERVER_NAME} PRIVATE BT_USE_DOUBLE_PRECISION)
+        endif()
     endif()
 endif()

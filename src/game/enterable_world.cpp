@@ -23,7 +23,7 @@ void game::EnterableWorld::Update(int64_t delta_time)
 }
 
 game::PlayerCharacter& game::EnterableWorld::InsertPlayer(Player& player, const HumanCharacterTuning& tuning,
-                                                          const glm::vec3& pos, float yaw)
+                                                          const glm::dvec3& pos, float yaw)
 {
     return CreatePlayerCharacter(player, tuning, pos, yaw);
 }
@@ -94,7 +94,8 @@ game::PlayerCharacter* game::EnterableWorld::GetPlayerCharacter(Player& player)
     return it->second;
 }
 
-game::PlayerCharacter& game::EnterableWorld::CreatePlayerCharacter(Player& player, const HumanCharacterTuning& tuning, const glm::vec3& position, float yaw)
+game::PlayerCharacter& game::EnterableWorld::CreatePlayerCharacter(Player& player, const HumanCharacterTuning& tuning,
+                                                                   const glm::dvec3& position, float yaw)
 {
     RemovePlayerCharacter(player);
 

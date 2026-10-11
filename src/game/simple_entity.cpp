@@ -1,7 +1,8 @@
 #include "simple_entity.hpp"
 #include "net/utils.hpp"
 
-game::SimpleEntity::SimpleEntity(World& world, const std::string& modelname) : Super(world, net::ET_SIMPLE), modelname_(modelname)
+game::SimpleEntity::SimpleEntity(World& world, const std::string& modelname)
+    : Super(world, net::ET_SIMPLE), modelname_(modelname)
 {
     UpdateSyncState();
 }
@@ -35,11 +36,12 @@ void game::SimpleEntity::UpdateSyncState()
 {
     SimpleEntitySyncState& state = sync_[sync_current_];
         
-    net::EncodePosition(root_.local.position, state.pos);
+    net::EncodeFarPosition(root_.local.position, state.pos);
     net::EncodeRotation(root_.local.rotation, state.rot);
 }
 
-game::SimpleEntitySyncFieldFlags game::SimpleEntity::WriteState(net::OutMessage& msg, const SimpleEntitySyncState& base) const
+game::SimpleEntitySyncFieldFlags game::SimpleEntity::WriteState(net::OutMessage& msg,
+                                                                const SimpleEntitySyncState& base) const
 {
     SimpleEntitySyncFieldFlags fields = 0;
     const SimpleEntitySyncState& curr = sync_[sync_current_];

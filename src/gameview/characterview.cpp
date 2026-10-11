@@ -12,7 +12,7 @@ game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) 
         throw EntityInitError();;
 
     basemodel_ = assets::AssetManager::GetInstance().Get<ModelView>(std::string(model_name));
-    sk_ = SkeletonInstance(basemodel_->GetModel()->GetSkeleton(), &root_);
+    sk_ = SkeletonInstance(basemodel_->GetModel()->GetSkeleton());
     
     gfx::SkeletonPoseDescriptor pose_desc{};
     pose_desc.num_bones = sk_.GetSkeleton()->GetNumBones();
@@ -80,7 +80,7 @@ void game::view::CharacterView::Update(const UpdateInfo& info)
     t = glm::clamp(t, 0.0f, 2.0f);
     float t_sane = glm::clamp(t, 0.0f, 1.0f);
 
-    root_.local = Transform::Lerp(states_[0].trans, states_[1].trans, t);
+    root_.local = FarTransform::Lerp(states_[0].trans, states_[1].trans, t);
 
     // loco
     animstate_.loco_blend = glm::mix(states_[0].loco_blend, states_[1].loco_blend, t);
@@ -209,7 +209,7 @@ bool game::view::CharacterView::ReadState(net::InMessage* msg)
                 !net::ReadDelta(*msg, sync_.pos.z) || !net::ReadDelta(*msg, sync_.yaw))
                 return false;
 
-            net::DecodePosition(sync_.pos, new_state.trans.position);
+            net::DecodeFarPosition(sync_.pos, new_state.trans.position);
             new_state.trans.rotation =
                 glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), sync_.yaw.Decode(), glm::vec3(0, 0, 1));
         }
@@ -352,11 +352,12 @@ void game::view::CharacterView::SetItem(const std::string& item_name)
     item_model_ = assets::AssetManager::GetInstance().Get<ModelView>(item_->model_name);
 
     auto bone_node = sk_.GetBoneNodeByName(item_->bone);
-    item_node_.parent = bone_node ? bone_node : &root_;
+    item_node_.parent = &root_;
+    item_node_.near_parent = bone_node ? bone_node : nullptr;
     item_node_.local = item_->bone_offset;
 
     fire_snd_node_.parent = &item_node_;
-    fire_snd_node_.local.position = glm::vec3(0.0f, 0.1f, 0.0f);
+    fire_snd_node_.local.position = glm::dvec3(0.0, 0.1, 0.0);
 
     // snd
     if (!item_->fire_snd.empty())
@@ -394,8 +395,8 @@ void game::view::CharacterView::FireItem()
 
     if (fire_fx_)
     {
-        glm::vec3 pos = item_node_.matrix * glm::vec4(fire_fx_offset_, 1.0f);
-        glm::vec3 dir = item_node_.matrix * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+        auto pos = item_node_.matrix.TransformPoint(fire_fx_offset_);
+        auto dir = item_node_.matrix.TransformDir(glm::vec3(0.0f, 1.0f, 0.0f));
         world_.GetEmitter().Emit(fire_fx_, pos, glm::normalize(dir));
     }
 

@@ -9,7 +9,7 @@ namespace collision
 class MotionState : public btMotionState
 {
 public:
-    MotionState(Transform& transform) : transform_(transform) {}
+    MotionState(FarTransform& transform) : transform_(transform) {}
 
     void getWorldTransform(btTransform& bt_trans) const override {
         bt_trans = transform_.ToBtTransform();
@@ -20,7 +20,7 @@ public:
     }
 
 private:
-    Transform& transform_;
+    FarTransform& transform_;
 };
 
 }

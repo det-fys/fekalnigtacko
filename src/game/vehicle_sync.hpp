@@ -28,7 +28,7 @@ struct VehicleSyncState
 {
     VehicleFlags flags = VF_NONE;
     
-    net::PositionQ pos;
+    net::FarPositionQ pos;
     net::QuatQ rot;
 
     net::AngleQ steering;

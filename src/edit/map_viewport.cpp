@@ -4,9 +4,10 @@
 
 #include "im/utils.hpp"
 #include "object.hpp"
+#include <glm/gtx/string_cast.hpp>
 
 edit::MapViewport::MapViewport(std::string title, MapEditContext& context)
-    : Super(std::move(title)), context_(context), frustum_(glm::mat4(1.0f))
+    : Super(std::move(title)), context_(context), frustum_(glm::mat4(1.0f), glm::dvec3(0.0))
 {
 }
 
@@ -34,8 +35,11 @@ void edit::MapViewport::Update()
             glm::vec4 world_start = inv_vp * ndc_start;
             glm::vec4 world_end = inv_vp * ndc_end;
 
-            glm::vec3 start = glm::vec3(world_start) / world_start.w;
-            glm::vec3 end = glm::vec3(world_end) / world_end.w;
+            glm::vec3 local_start = glm::vec3(world_start) / world_start.w;
+            glm::vec3 local_end = glm::vec3(world_end) / world_end.w;
+
+            auto start = glm::dvec3(local_start) + eye_;
+            auto end = glm::dvec3(local_end) + eye_;
 
             project.SetHover(start, end);
 
@@ -99,14 +103,17 @@ void edit::MapViewport::Draw(ImDrawList& draw_list)
     {
         ImGuizmo::PushID("Selection Gizmo");
 
-        auto matrix = *selection_matrix;
+        auto local_matrix = selection_matrix->ToNearMatrix(eye_);
+        auto prev_local_matrix = local_matrix;
         glm::mat4 delta_matrix{1.0f};
 
         if (ImGuizmo::Manipulate(glm::value_ptr(view_), glm::value_ptr(proj_), properties.gizmo_operation,
-                                 ImGuizmo::LOCAL, glm::value_ptr(matrix), glm::value_ptr(delta_matrix),
+                                 ImGuizmo::LOCAL, glm::value_ptr(local_matrix), glm::value_ptr(delta_matrix),
                                  ImGui::IsKeyDown(ImGuiKey_LeftCtrl) ? glm::value_ptr(snap) : nullptr))
         {
-            project.ApplySelectionTransform(delta_matrix);
+            auto new_far_matrix = FarMatrix::FromNearMatrix(local_matrix, eye_);
+            auto far_delta_matrix = new_far_matrix * selection_matrix->Invert();
+            project.ApplySelectionTransform(far_delta_matrix);
         }
 
         ImGuizmo::PopID();

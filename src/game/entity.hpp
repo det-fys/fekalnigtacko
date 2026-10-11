@@ -46,8 +46,8 @@ public:
     void Remove() { removed_ = true; }
     bool IsRemoved() const { return removed_; }
 
-    const TransformNode& GetRoot() const { return root_; }
-    const Transform& GetRootTransform() const { return root_.local; }
+    const FarTransformNode& GetRoot() const { return root_; }
+    const FarTransform& GetRootTransform() const { return root_.local; }
 
     bool IsVisibleTo(const Player& player) const;
     float GetMaxDistance() const { return max_distance_; }
@@ -71,7 +71,7 @@ protected:
     const net::EntNum entnum_;
     const net::EntType viewtype_;
 
-    TransformNode root_;
+    FarTransformNode root_;
     Entity* parent_ = nullptr;
 
     bool visible_ = true;
