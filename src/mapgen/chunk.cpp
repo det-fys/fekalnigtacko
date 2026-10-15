@@ -287,8 +287,8 @@ struct ChunkGenerator
         gen_tree_objs = lod <= 1;
         gen_tree_billboards = (lod <= 3) && !collision_only;
         gen_grass = (lod <= 2) && !collision_only;
-        grass_cull_chance = lod == 0 ? 0.0f : lod == 1 ? 0.5f : 0.75f;
-        terrain_density_scale = lod <= 1 ? 1.0f : (lod <= 2 ? 0.5f : 0.25f);
+        grass_cull_chance = lod == 0 ? 0.0f : lod == 1 ? 0.5f : 0.9f;
+        terrain_density_scale = lod <= 1 ? 1.0f : (lod <= 2 ? 0.75f : 0.25f);
         path_segment_length_scale = 1.0f / terrain_density_scale;
     }
 
