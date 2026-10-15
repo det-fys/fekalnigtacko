@@ -323,13 +323,42 @@ struct ChunkGenerator
 
     void InitHeightmap()
     {
+        // sample supertiles with expensive base height
+        static constexpr uint32_t supertile_tiles = 8;
+        auto supertile_res = tiles_stride / supertile_tiles + 1;
+        
+        std::vector<float> supertiles(supertile_res * supertile_res);
+        for (uint32_t y = 0; y < supertile_res; ++y)
+        {
+            for (uint32_t x = 0; x < supertile_res; ++x)
+            {
+                auto pos = tiles_aabb.min + glm::dvec2(x, y) * (tile_size_m * static_cast<double>(supertile_tiles));
+                supertiles[y * supertile_res + x] = height_sampler.GetBase(pos);
+            }
+        }
+
         for (uint32_t y = 0; y < tiles_stride; ++y)
         {
             for (uint32_t x = 0; x < tiles_stride; ++x)
             {
                 auto& tile = tiles[y * tiles_stride + x];
                 auto pos = tiles_aabb.min + glm::dvec2(x, y) * tile_size_m;
-                tile.height = height_sampler.Get(pos);
+                auto detail_height = height_sampler.GetDetail(pos);
+            
+                //interpolate base height
+                auto sx = x / supertile_tiles;
+                auto sy = y / supertile_tiles;
+
+                auto stx = x % supertile_tiles;
+                auto sty = y % supertile_tiles;
+
+                auto base_height = glm::mix(
+                    glm::mix(supertiles[sy * supertile_res + sx], supertiles[sy * supertile_res + (sx + 1)], stx / static_cast<float>(supertile_tiles)),
+                    glm::mix(supertiles[(sy + 1) * supertile_res + sx], supertiles[(sy + 1) * supertile_res + (sx + 1)], stx / static_cast<float>(supertile_tiles)),
+                    sty / static_cast<float>(supertile_tiles)
+                );
+
+                tile.height = base_height + detail_height;
             }
         }
     }
@@ -1383,9 +1412,15 @@ struct ChunkGenerator
         const bool sink_border = terrain_density_scale < 1.0f;
         const float sink_amount = r * 0.75f / terrain_density_scale;
 
+        auto terrain_bounds = local_bounds;
+        if (sink_border)
+        {
+            terrain_bounds.min -= glm::vec2(sink_amount);
+            terrain_bounds.max += glm::vec2(sink_amount);
+        }
+
         std::map<uint32_t, uint32_t> vertex_map; // maps delaunay vertex index to raw vertex index
         std::vector<glm::vec3> normals(terrain_points_offset + terrain_points.size(), glm::vec3(0.0f));
-        std::set<std::tuple<uint32_t, uint32_t>> sink_edges;
 
         for (const auto& face : delaunay.faces())
         {
@@ -1430,22 +1465,8 @@ struct ChunkGenerator
             auto centroid = (vert_pos[0] + vert_pos[1] + vert_pos[2]) / 3.0f;
 
             // check if out of bounds
-            if (!local_bounds.Contains(centroid))
+            if (!terrain_bounds.Contains(centroid))
             {
-                
-                if (sink_border)
-                {
-                    // record edges for border sinking
-                    for (int i = 0; i < 3; ++i)
-                    {
-                        uint32_t v0 = v[i];
-                        uint32_t v1 = v[(i + 1) % 3];
-                        if (v0 > v1)
-                            std::swap(v0, v1);
-                        sink_edges.emplace(v0, v1);
-                    }
-                }
-
                 continue;
             }
 
@@ -1484,30 +1505,6 @@ struct ChunkGenerator
         {
             auto& vert = raw_verts[c_idx];
             vert.normal = glm::normalize(normals[v_idx]);
-        }
-
-        // sink border vertices
-        if (sink_border)
-        {
-            std::set<uint32_t> raw_verts_to_sink;
-            for (const auto& [v0, v1] : sink_edges)
-            {
-                auto it0 = vertex_map.find(v0);
-                auto it1 = vertex_map.find(v1);
-
-                if (it0 != vertex_map.end())
-                    raw_verts_to_sink.insert(it0->second);
-
-                if (it1 != vertex_map.end())
-                    raw_verts_to_sink.insert(it1->second);
-            }
-
-            for (const auto& v : raw_verts_to_sink)
-            {
-                auto& rv = raw_verts[v];
-                auto sink_offset = glm::vec3(glm::sign(glm::vec2(rv.pos)) * sink_amount, -sink_amount * 0.5f);
-                rv.pos += sink_offset;
-            }
         }
     }
 

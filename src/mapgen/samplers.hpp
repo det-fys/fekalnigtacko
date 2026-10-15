@@ -16,6 +16,8 @@ class TerrainHeightSampler
 public:
     TerrainHeightSampler(const MapConfig& cfg);
 
+    float GetBase(const glm::dvec2& pos) const;
+    float GetDetail(const glm::dvec2& pos) const;
     float Get(const glm::dvec2& pos) const;
 
 private:
