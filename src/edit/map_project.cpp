@@ -72,6 +72,18 @@ void edit::Project::DrawOverlay(const DrawOverlayContext& ctx)
     }
 }
 
+void edit::Project::ShowSelectionProperties()
+{
+    if (selection_.empty())
+    {
+        ImGui::Text("nothing selected");
+        return;
+    }
+
+    auto& selected_obj = *selection_.front().obj;
+    selected_obj.ShowProperties();
+}
+
 float edit::Project::GetTerrainHeight(const glm::dvec2& pos) const
 {
     if (!height_sampler_)

@@ -173,6 +173,7 @@ struct PathEndpointInfo
 struct PathInfo
 {
     SplinePath spline;
+    uint32_t profile_id = INVALID_ID;
     std::array<PathEndpointInfo, 2> endpoints;
 };
 
@@ -394,6 +395,13 @@ struct ChunkGenerator
         }
 
         const auto& start_node = spline_nodes->at(start_junction_id);
+
+        const auto& start_mesh = res.GetMeshes().GetByIndex(start_node.res_id);
+        if (start_link_idx >= start_mesh.links.size())
+            return std::nullopt; // invalid link index
+
+        auto profile_id = start_mesh.links[start_link_idx].profile_id;
+
         auto second_node_id = start_node.links[start_link_idx];
         if (second_node_id == 0)
             return std::nullopt; // invalid link
@@ -442,14 +450,27 @@ struct ChunkGenerator
         }
 
         const auto& end_junction_id = current_node_id;
+        const auto& end_node = spline_nodes->at(end_junction_id);
 
         auto end_link_idx = GetLinkIndex(spline_nodes->at(end_junction_id), prev_node_id);
+        if (end_link_idx == INVALID_ID)
+            return std::nullopt; // end junction does not link to this path ??
+
+        // check profile match
+        const auto& end_mesh = res.GetMeshes().GetByIndex(end_node.res_id);
+        if (end_link_idx >= end_mesh.links.size())
+            return std::nullopt; // invalid link index
+
+        if (end_mesh.links[end_link_idx].profile_id != profile_id)
+            return std::nullopt; // profile mismatch
+
         auto end_key = std::make_tuple(end_junction_id, end_link_idx);
 
         // store path
         auto path_id = static_cast<uint32_t>(paths.size());
         auto& path = paths.emplace_back();
         path.spline = SplinePath(spline_points);
+        path.profile_id = profile_id;
         path.endpoints[0].junction_node_id = start_junction_id;
         path.endpoints[0].link_idx = start_link_idx;
         path.endpoints[1].junction_node_id = end_junction_id;
@@ -541,6 +562,51 @@ struct ChunkGenerator
         tri.material = material;
     }
 
+    glm::dvec3 DeformJunctionVertex(const mg::TemplateMesh& mesh, const JunctionInfo& junction,
+                                    const glm::vec3& pos, std::span<const float> link_weights)
+    {
+        glm::dvec3 far_pos(0.0);
+        double total_w = 0.0;
+
+        for (uint32_t i = 0; i < mesh.links.size(); ++i)
+        {
+            auto& mesh_link = mesh.links[i];
+            auto& junction_link = junction.links[i];
+
+            if (junction_link.path_id == INVALID_ID)
+                continue; // no path for this link
+
+            const auto& path = paths[junction_link.path_id];
+
+            glm::vec3 spline_pos;
+            if (!junction_link.path_from_end)
+            {
+                spline_pos = mesh_link.start_matrix * glm::vec4(pos, 1.0f);
+            }
+            else
+            {
+                spline_pos = mesh_link.end_matrix * glm::vec4(pos, 1.0f);
+                spline_pos.y += path.spline.GetTotalLength();
+            }
+
+            double w = link_weights[i];
+            far_pos += path.spline.DeformVertex(spline_pos) * w;
+            total_w += w;
+        }
+
+        if (total_w > 0.0)
+        {
+            far_pos /= total_w;
+        }
+        else
+        {
+            // default to junction position 
+            far_pos = glm::dvec3(pos) + junction.pos;
+        }
+
+        return far_pos;
+    }
+
     void GenerateJunctionMesh(JunctionInfo& junction)
     {
         const auto& mesh = res.GetMeshes().GetByIndex(junction.mesh_id);
@@ -561,33 +627,7 @@ struct ChunkGenerator
             // chunk_vert.color = 0xFFFFFFFF; // TODO
             chunk_vert.normal = glm::vec3(0.0f);
 
-            glm::dvec3 far_pos(0.0);
-
-            for (uint32_t i = 0; i < mesh.links.size(); ++i)
-            {
-                auto& mesh_link = mesh.links[i];
-                auto& junction_link = junction.links[i];
-
-                if (junction_link.path_id == INVALID_ID)
-                    continue; // no path for this link
-
-                const auto& path = paths[junction_link.path_id];
-
-                glm::vec3 spline_pos;
-                if (!junction_link.path_from_end)
-                {
-                    spline_pos = mesh_link.start_matrix * glm::vec4(vert.pos, 1.0f);
-                }
-                else
-                {
-                    spline_pos = mesh_link.end_matrix * glm::vec4(vert.pos, 1.0f);
-                    spline_pos.y += path.spline.GetTotalLength();
-                }
-
-                auto w = vert.link_weights[i];
-                far_pos += path.spline.DeformVertex(spline_pos) * static_cast<double>(w);
-            }
-
+            auto far_pos = DeformJunctionVertex(mesh, junction, vert.pos, vert.link_weights);
             chunk_vert.pos = far_pos - glm::dvec3(chunk_center, 0.0);
         }
 
@@ -678,20 +718,7 @@ struct ChunkGenerator
 
     void GeneratePathMesh(const PathInfo& path)
     {
-        std::array<uint32_t, 2> endpoint_profiles;
-
-        for (uint32_t i = 0; i < 2; ++i)
-        {
-            const auto& junction = junctions[path.endpoints[i].junction_idx];
-            endpoint_profiles[i] = junction.links[path.endpoints[i].link_idx].profile_id;
-        }
-
-        if (endpoint_profiles[0] != endpoint_profiles[1])
-        {
-            return; // incompatible ends
-        }
-
-        const auto& profile = res.GetProfiles().GetByIndex(endpoint_profiles[0]);
+        const auto& profile = res.GetProfiles().GetByIndex(path.profile_id);
 
         const auto verts_count = static_cast<uint32_t>(profile.verts.size());
         std::vector<uint32_t> vertices(verts_count * 2);

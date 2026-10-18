@@ -20,10 +20,14 @@ public:
 
     virtual void DrawOverlay(const DrawOverlayContext& ctx) override;
 
+    virtual void ShowProperties() override;
+
     virtual void SetTransform(const FarMatrix& trans) override;
     virtual void Clone(const FarMatrix& trans) override;
     virtual void Link(Object& other, bool link) override;
     void Link(Waypoint& other, bool link);
+    void SwapLinks(uint32_t i0, uint32_t i1);
+    void UnlinkIndex(uint32_t idx);
     virtual void Delete() override;
 
     WaypointID GetID() const { return id_; }

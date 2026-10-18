@@ -33,6 +33,71 @@ void edit::Waypoint::DrawOverlay(const DrawOverlayContext& ctx)
     }
 }
 
+void edit::Waypoint::ShowProperties()
+{
+    Super::ShowProperties();
+
+    // show links table
+    if (ImGui::BeginTable("Links", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit))
+    {
+        ImGui::TableSetupColumn("#");
+        ImGui::TableSetupColumn("->");
+        ImGui::TableSetupColumn("swap");
+        ImGui::TableSetupColumn("delete");
+
+        ImGui::TableHeadersRow();
+        
+        for (uint32_t i = 0; i < links_.size(); ++i)
+        {
+            ImGui::PushID(i);
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("%u", i);
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("%u", links_[i]);
+
+            // swap buttons
+            ImGui::TableSetColumnIndex(2);
+            for (uint32_t j = 0; j < links_.size(); ++j)
+            {
+                ImGui::PushID(j);
+
+                bool enabled = i != j;
+
+                static constexpr const char* numbers[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
+
+                if (j > 0)
+                    ImGui::SameLine();
+
+                ImGui::BeginDisabled(!enabled);
+                if (ImGui::Button(numbers[j]) && enabled)
+                {
+                    SwapLinks(i, j);
+                }
+                ImGui::EndDisabled();
+
+                ImGui::PopID();
+            }
+
+            // unlink button
+            ImGui::TableSetColumnIndex(3);
+            bool enabled = links_[i] != 0;
+            ImGui::BeginDisabled(!enabled);
+            if (ImGui::Button("X") && enabled)
+            {
+                UnlinkIndex(i);
+            }
+            ImGui::EndDisabled();
+            ////
+
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+
+}
+
 void edit::Waypoint::SetTransform(const FarMatrix& trans)
 {
     Super::SetTransform(GetTranslationOnly(trans));
@@ -100,6 +165,27 @@ void edit::Waypoint::Link(Waypoint& other, bool link)
         FixLinksToPrioritizeMainPath();
         other.FixLinksToPrioritizeMainPath();
     }
+}
+
+void edit::Waypoint::SwapLinks(uint32_t i0, uint32_t i1)
+{
+    if (links_[i0] == 0 && links_[i1] == 0)
+        return;
+
+    InvalidatePathsChunks();
+    std::swap(links_[i0], links_[i1]);
+    InvalidatePathsChunks();
+}
+
+void edit::Waypoint::UnlinkIndex(uint32_t idx)
+{
+    auto other_id = links_[idx];
+    if (other_id == 0)
+        return;
+
+    auto other_wp = GetProject().GetWaypoint(other_id);
+    if (other_wp)
+        Link(*other_wp, false);
 }
 
 void edit::Waypoint::Delete()

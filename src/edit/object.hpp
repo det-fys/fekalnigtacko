@@ -29,6 +29,8 @@ public:
     virtual void Draw(const gfx::DrawContext& ctx) {}
     virtual void DrawOverlay(const DrawOverlayContext& ctx);
 
+    virtual void ShowProperties();
+
     void SetVisible(bool visible) { visible_ = visible; }
     bool IsVisible() const { return visible_; }
 

@@ -404,11 +404,7 @@ static mg::TemplateMesh LoadTemplateMesh(const mg::ResourceSet& res, CmdLineStre
     // init weights to a small value to avoid zero weights
     for (auto& v : mesh.verts)
     {
-        v.link_weights.fill(0.0f);
-        for (uint32_t i = 0; i < mesh.links.size(); ++i)
-        {
-            v.link_weights[i] = 0.0001f;
-        }
+        v.link_weights.fill(0.0001f);
     }
 
     if (has_weight_groups)

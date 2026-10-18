@@ -16,6 +16,15 @@ void edit::Object::DrawOverlay(const DrawOverlayContext& ctx)
     }
 }
 
+void edit::Object::ShowProperties()
+{
+    auto new_trans = trans_;
+    if (ImGui::DragScalarN("Position", ImGuiDataType_Double, &new_trans.position.x, 3, 0.1f, nullptr, nullptr, "%.2f"))
+    {
+        SetTransform(new_trans);
+    }
+}
+
 void edit::Object::InvalidateChunks(const AABB3& aabb) const
 {
     auto& map_cfg = project_->GetMapConfig();

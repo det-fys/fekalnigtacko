@@ -19,7 +19,7 @@ private:
 
     void ShowMainWindow(bool* open);
 
-    void ShowListWindow(bool* open);
+    void ShowSelectionWindow(bool* open);
     void ShowPropertiesWindow(bool* open);
 
     // commands

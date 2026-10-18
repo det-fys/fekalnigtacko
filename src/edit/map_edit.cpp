@@ -13,7 +13,7 @@ void edit::MapEdit::Show(bool* open)
     // show sub windows
     viewport_2d_.Show(nullptr);
     viewport_3d_.Show(nullptr);
-    ShowListWindow(nullptr);
+    ShowSelectionWindow(nullptr);
     ShowPropertiesWindow(nullptr);
 }
 
@@ -93,7 +93,7 @@ void edit::MapEdit::ShowMainWindow(bool* open)
 
         ImGui::DockBuilderDockWindow("2D viewport", dock_main_id);
         ImGui::DockBuilderDockWindow("3D viewport", dock_right_id);
-        ImGui::DockBuilderDockWindow("List", dock_bottom_left_id);
+        ImGui::DockBuilderDockWindow("Selection", dock_bottom_left_id);
         ImGui::DockBuilderDockWindow("Properties", dock_bottom_id);
 
         ImGui::DockBuilderFinish(dockspace_id);
@@ -104,11 +104,14 @@ void edit::MapEdit::ShowMainWindow(bool* open)
     ImGui::End();
 }
 
-void edit::MapEdit::ShowListWindow(bool* open)
+void edit::MapEdit::ShowSelectionWindow(bool* open)
 {
-    if (ImGui::Begin("List", open))
+    if (ImGui::Begin("Selection", open))
     {
-        ImGui::Text("List window content");
+        if (context_.project)
+        {
+            context_.project->ShowSelectionProperties();
+        }
     }
     ImGui::End();
 }

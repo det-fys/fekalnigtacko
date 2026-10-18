@@ -63,6 +63,8 @@ public:
 
     void DrawOverlay(const DrawOverlayContext& ctx);
 
+    void ShowSelectionProperties();
+
     // world
     float GetTerrainHeight(const glm::dvec2& pos) const;
 
