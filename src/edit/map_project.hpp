@@ -16,6 +16,7 @@
 #include "gameview/modelview.hpp"
 #include "gameview/worldenv.hpp"
 #include "gfx/scene.hpp"
+#include "mapgen/resources.hpp"
 #include "static_object.hpp"
 #include "waypoint.hpp"
 #include "utils/allocnum.hpp"
@@ -99,6 +100,7 @@ public:
     const std::unordered_map<glm::ivec2, ProjectChunkData>& GetChunks() const { return chunk_manager_->GetChunks(); }
     mg::ChunkState GetChunkState(const glm::ivec2& chunk_pos) const { return chunk_manager_->GetChunkState(chunk_pos); }
     const mg::MapConfig& GetMapConfig() const { return map_config_; }
+    const mg::ResourceSet& GetResourceSet() const { return *mg_res_; }
 
 private:
     void InitStaticModels();

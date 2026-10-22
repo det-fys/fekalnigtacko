@@ -16,6 +16,8 @@
 namespace mg
 {
 
+static constexpr uint32_t INVALID_RES_ID = 0xFFFFFFFF;
+
 // material
 
 enum TemplateMaterialType : uint8_t
@@ -88,7 +90,7 @@ struct TemplateMeshTriangle
 
 struct TemplateMeshLink
 {
-    uint32_t profile_id = 0;
+    uint32_t profile_id = INVALID_RES_ID;
     glm::vec3 pos{0.0f};
     //std::vector<TemplateMeshLinkEdgeMapping> edge_mappings;
     std::vector<uint32_t> profile_vert_mappings; // profile vertex index -> mesh vertex index
@@ -136,7 +138,7 @@ public:
     uint32_t GetIndexByName(const std::string& name) const
     {
         auto it = name_map_.find(name);
-        return it != name_map_.end() ? it->second : UINT32_MAX;
+        return it != name_map_.end() ? it->second : INVALID_RES_ID;
     }
 
     const T* TryGetByIndex(uint32_t idx) const { return idx < resources_.size() ? &resources_[idx] : nullptr; }
@@ -152,10 +154,12 @@ public:
     const T& GetByName(const std::string& name) const
     {
         uint32_t idx = GetIndexByName(name);
-        if (idx == UINT32_MAX)
+        if (idx == INVALID_RES_ID)
             throw std::out_of_range("Name not found");
         return GetByIndex(idx);
     }
+
+    const uint32_t Size() const { return static_cast<uint32_t>(resources_.size()); }
 
 private:
     std::vector<T> resources_;

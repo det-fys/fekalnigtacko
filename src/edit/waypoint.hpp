@@ -6,6 +6,8 @@
 
 #include "object.hpp"
 
+#include "mapgen/resources.hpp"
+
 namespace edit
 {
 
@@ -29,6 +31,9 @@ public:
     void SwapLinks(uint32_t i0, uint32_t i1);
     void UnlinkIndex(uint32_t idx);
     virtual void Delete() override;
+
+    void SetMeshID(uint32_t mesh_id);
+    uint32_t GetMeshID() const { return mesh_id_; }
 
     WaypointID GetID() const { return id_; }
     WaypointID GetLink(uint32_t index) const { return links_[index]; }
@@ -58,6 +63,8 @@ private:
 
 private:
     WaypointID id_ = 0;
+
+    uint32_t mesh_id_ = mg::INVALID_RES_ID;
 
     // 0-1: main path
     // 2-3: side path

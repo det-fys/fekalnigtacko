@@ -37,6 +37,33 @@ void edit::Waypoint::ShowProperties()
 {
     Super::ShowProperties();
 
+    // Show mesh selection
+    auto& res = GetProject().GetResourceSet();
+    auto& res_meshes = res.GetMeshes();
+
+    ImGui::Text("Junction:");
+    if (ImGui::BeginCombo("##mesh", mesh_id_ == mg::INVALID_RES_ID ? "-- none --"
+                                                                   : res_meshes.GetByIndex(mesh_id_).name.c_str()))
+    {
+        // no mesh option
+        if (ImGui::Selectable("-- none --", GetMeshID() == mg::INVALID_RES_ID))
+        {
+            SetMeshID(mg::INVALID_RES_ID);
+        }
+
+        for (uint32_t i = 0; i < res_meshes.Size(); ++i)
+        {
+            const auto& mesh = res_meshes.GetByIndex(i);
+                        
+            bool selected = i == GetMeshID();
+            if (ImGui::Selectable(mesh.name.c_str(), selected))
+            {
+                SetMeshID(i);
+            }
+        }
+        ImGui::EndCombo();
+    }
+
     // show links table
     if (ImGui::BeginTable("Links", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit))
     {
@@ -192,6 +219,13 @@ void edit::Waypoint::Delete()
 {
     InvalidatePathsChunks();
     UnlinkAll();
+}
+
+void edit::Waypoint::SetMeshID(uint32_t mesh_id)
+{
+    mesh_id_ = mesh_id;
+    InvalidateChunks(GetAABB());
+    InvalidatePathsChunks();
 }
 
 void edit::Waypoint::UpdateAABB()

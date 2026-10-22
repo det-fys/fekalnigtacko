@@ -304,7 +304,7 @@ static mg::TemplateMesh LoadTemplateMesh(const mg::ResourceSet& res, CmdLineStre
         mg::TemplateMeshLink link{};
 
         // TODO: get profile from model param
-        link.profile_id = 0;
+        link.profile_id = res.GetProfiles().GetIndexByName("road1");
         auto& profile = res.GetProfiles().GetByIndex(link.profile_id);
 
         link.pos = loc->position;

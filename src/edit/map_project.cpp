@@ -279,22 +279,20 @@ void edit::Project::GetChunkParams(mg::ChunkParams& params)
     {
         mg::ChunkSplineNode node{};
         node.pos = waypoint.GetPosition();
-        
-        uint32_t link_count = 0;
+        node.type = mg::CHUNK_SPLINE_NODE_NORMAL;
+
         for (uint32_t i = 0; i < 4; ++i)
         {
-            auto link_id = waypoint.GetLink(i);
-            node.links[i] = link_id;
-
-            if (link_id != 0)
-                ++link_count;
+            node.links[i] = waypoint.GetLink(i);
         }
 
-        if (link_count == 0)
-            continue; // skip unlinked waypoints
-
-        node.type = link_count == 2 ? mg::CHUNK_SPLINE_NODE_NORMAL : mg::CHUNK_SPLINE_NODE_JUNCTION;
-        node.res_id = mg_res_->GetMeshes().GetIndexByName(link_count < 2 ? "deadend1" : "intersection1");
+        // junction?
+        auto mesh_id = waypoint.GetMeshID();
+        if (mesh_id != mg::INVALID_RES_ID)
+        {
+            node.type = mg::CHUNK_SPLINE_NODE_JUNCTION;    
+            node.res_id = mesh_id;
+        }   
 
         params.nodes[id] = node;
     }
