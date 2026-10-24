@@ -194,6 +194,11 @@ void edit::Waypoint::Link(Waypoint& other, bool link)
     }
 }
 
+void edit::Waypoint::SetLink(uint32_t idx, WaypointID other_id)
+{
+    links_[idx] = other_id;
+}
+
 void edit::Waypoint::SwapLinks(uint32_t i0, uint32_t i1)
 {
     if (links_[i0] == 0 && links_[i1] == 0)

@@ -2,6 +2,9 @@
 
 #include <imgui_internal.h>
 
+constexpr static std::string_view MAP_PROJ_PREFIX = "projects/";
+constexpr static std::string_view MAP_PROJ_SUFFIX = ".mapproj";
+
 edit::MapEdit::MapEdit() : viewport_2d_(context_), viewport_3d_(context_) {}
 
 void edit::MapEdit::Show(bool* open)
@@ -15,15 +18,159 @@ void edit::MapEdit::Show(bool* open)
     viewport_3d_.Show(nullptr);
     ShowSelectionWindow(nullptr);
     ShowPropertiesWindow(nullptr);
+
+    // show dialogs
+    ShowOpenProjectDialog();
+    ShowSaveAsDialog();
 }
 
 void edit::MapEdit::Update()
 {
     if (context_.project)
     {
-        auto& project = *context_.project;        
+        auto& project = *context_.project;
         project.Update();
     }
+}
+
+void edit::MapEdit::OpenOpenProjectDialog()
+{
+    LoadProjectList();
+    selected_project_index_ = -1;
+    open_open_dialog = true;
+}
+
+void edit::MapEdit::LoadProjectList()
+{
+    map_projects_.clear();
+
+    fs::FileSystem::GetInstance().ForEachFile([this](const std::string& path) {
+        if (path.starts_with(MAP_PROJ_PREFIX) && path.ends_with(MAP_PROJ_SUFFIX))
+        {
+            auto name =
+                path.substr(MAP_PROJ_PREFIX.size(), path.size() - MAP_PROJ_PREFIX.size() - MAP_PROJ_SUFFIX.size());
+            map_projects_.push_back(name);
+        }
+    });
+}
+
+void edit::MapEdit::ShowOpenProjectDialog()
+{
+    if (open_open_dialog)
+    {
+        ImGui::OpenPopup("Open Project");
+        open_open_dialog = false;
+    }
+
+    if (BeginDialogPopupModal("Open Project"))
+    {
+        if (ImGui::BeginListBox("##project_list", ImVec2(-FLT_MIN, 10 * ImGui::GetTextLineHeightWithSpacing())))
+        {
+
+            for (int i = 0; i < map_projects_.size(); ++i)
+            {
+                const auto& project_name = map_projects_[i];
+                bool selected = (selected_project_index_ == i);
+                if (ImGui::Selectable(project_name.c_str(), selected))
+                {
+                    selected_project_index_ = i;
+                }
+            }
+
+            ImGui::EndListBox();
+        }
+
+        const bool can_open = selected_project_index_ >= 0 && selected_project_index_ < map_projects_.size();
+        ImGui::BeginDisabled(!can_open);
+        if (ImGui::Button("Open") && can_open)
+        {
+            ImGui::CloseCurrentPopup();
+            OpenProject(map_projects_[selected_project_index_]);
+        }
+        ImGui::EndDisabled();
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+            ImGui::CloseCurrentPopup();
+
+        ImGui::EndPopup();
+    }
+}
+
+void edit::MapEdit::OpenProject(const std::string& project_name)
+{
+    auto file_name = std::string(MAP_PROJ_PREFIX) + project_name + std::string(MAP_PROJ_SUFFIX);
+    CmdClose();
+    context_.project.emplace(context_.properties, project_name, file_name);
+}
+
+void edit::MapEdit::OpenSaveAsDialog()
+{
+    if (!context_.project)
+        return;
+
+    save_as_name_buf_[0] = '\0';
+    open_save_as_dialog_ = true;
+}
+
+void edit::MapEdit::ShowSaveAsDialog()
+{
+    if (open_save_as_dialog_)
+    {
+        ImGui::OpenPopup("Save As");
+        open_save_as_dialog_ = false;
+    }
+
+    if (BeginDialogPopupModal("Save As"))
+    {
+        ImGui::InputText("Name", save_as_name_buf_.data(), save_as_name_buf_.size());
+
+        // validate name
+        bool valid_name = save_as_name_buf_[0] != '\0';
+        if (valid_name)
+        {
+            for (const auto& c : save_as_name_buf_)
+            {
+                if (c == '\0')
+                    break;
+
+                if (!std::isalnum(c) && c != '_' && c != '-')
+                {
+                    valid_name = false;
+                    break;
+                }
+            }
+        }
+
+        if (!valid_name)
+        {
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Invalid name [a-zA-Z0-9_-] length > 0");
+        }
+
+        ImGui::BeginDisabled(!valid_name);
+        if (ImGui::Button("Save") && valid_name)
+        {
+            SaveProject(save_as_name_buf_.data());
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndDisabled();
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+            ImGui::CloseCurrentPopup();
+        
+        ImGui::EndPopup();
+    }
+}
+
+void edit::MapEdit::SaveProject(const std::string& name)
+{
+    if (!context_.project)
+        return;
+
+    auto file_name = std::string(MAP_PROJ_PREFIX) + name + std::string(MAP_PROJ_SUFFIX);
+    context_.project->SetName(name, file_name);
+    context_.project->Save();
 }
 
 void edit::MapEdit::ShowMainWindow(bool* open)
@@ -47,14 +194,19 @@ void edit::MapEdit::ShowMainWindow(bool* open)
             if (ImGui::BeginMenu("Map"))
             {
                 if (ImGui::MenuItem("New"))
-                {
-                    NewMap();
-                }
+                    CmdNew();
+
+                if (ImGui::MenuItem("Open..."))
+                    CmdOpen();
+
+                if (ImGui::MenuItem("Save"))
+                    CmdSave();
+
+                if (ImGui::MenuItem("Save As..."))
+                    CmdSaveAs();
 
                 if (ImGui::MenuItem("Close"))
-                {
-                    MapClose();
-                }
+                    CmdClose();
 
                 ImGui::EndMenu();
             }
@@ -82,12 +234,9 @@ void edit::MapEdit::ShowMainWindow(bool* open)
         ImGui::DockBuilderSetNodeSize(dockspace_id, ImGui::GetContentRegionAvail());
 
         ImGuiID dock_main_id = dockspace_id;
-
         ImGuiID dock_right_id = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.4f, nullptr, &dock_main_id);
-
         ImGuiID dock_bottom_id =
             ImGui::DockBuilderSplitNode(dock_right_id, ImGuiDir_Down, 0.3f, nullptr, &dock_right_id);
-
         ImGuiID dock_bottom_left_id =
             ImGui::DockBuilderSplitNode(dock_bottom_id, ImGuiDir_Left, 0.4f, nullptr, &dock_bottom_id);
 
@@ -162,13 +311,42 @@ void edit::MapEdit::ShowPropertiesWindow(bool* open)
     ImGui::End();
 }
 
-void edit::MapEdit::NewMap()
+bool edit::MapEdit::BeginDialogPopupModal(const char* name) const
 {
-    MapClose();
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_Appearing);
+    return ImGui::BeginPopupModal(name, nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+}
+
+void edit::MapEdit::CmdNew()
+{
+    CmdClose();
     context_.project.emplace(context_.properties);
 }
 
-void edit::MapEdit::MapClose()
+void edit::MapEdit::CmdOpen()
+{
+    OpenOpenProjectDialog();
+}
+
+void edit::MapEdit::CmdSave()
+{
+    if (!context_.project)
+        return;
+
+    if (context_.project->Save())
+        return; // success
+
+    // project has no file name, show save as dialog
+    CmdSaveAs();
+}
+
+void edit::MapEdit::CmdSaveAs()
+{
+    OpenSaveAsDialog();
+}
+
+void edit::MapEdit::CmdClose()
 {
     context_.project.reset();
 }

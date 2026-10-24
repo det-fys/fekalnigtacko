@@ -53,7 +53,11 @@ struct StaticModelsEntry
 class Project : public gfx::Scene
 {
 public:
-    Project(MapEditProperties& properties);
+    Project(MapEditProperties& properties); // new
+    Project(MapEditProperties& properties, const std::string& name, const std::string& file_name); // load
+
+    bool Save();
+    void SetName(const std::string& name, const std::string& file_name);
 
     void Update();
 
@@ -105,6 +109,9 @@ public:
 private:
     void InitStaticModels();
 
+    void Load(const std::string& file_name);
+    void Save(const std::string& file_name);
+
     void Select(Object& obj);
     void Deselect(Object& obj, bool fix_list = true);
     void SelectOrDeselect(std::span<Object*> objs, bool additive, bool allow_deselect);
@@ -126,6 +133,9 @@ private:
 
     std::shared_ptr<const mg::ResourceSet> mg_res_;
     StaticModelsEntry static_models_root_;
+
+    std::string name_;
+    std::string file_name_;
 
     std::optional<mg::TerrainHeightSampler> height_sampler_;
 

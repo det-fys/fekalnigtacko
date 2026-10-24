@@ -22,6 +22,28 @@ edit::Project::Project(MapEditProperties& properties) : properties_(properties),
     SetupChunks();
 }
 
+edit::Project::Project(MapEditProperties& properties, const std::string& name, const std::string& file_name)
+    : Project(properties)
+{
+    SetName(name, file_name);
+    Load(file_name_);
+}
+
+bool edit::Project::Save()
+{
+    if (file_name_.empty())
+        return false;
+
+    Save(file_name_);
+    return true;
+}
+
+void edit::Project::SetName(const std::string& name, const std::string& file_name)
+{
+    name_ = name;
+    file_name_ = file_name;
+}
+
 void edit::Project::Update()
 {
     UpdateChunks();
@@ -320,6 +342,110 @@ void edit::Project::InitStaticModels()
     misc.children.emplace_back("lightpole", "lightpole");
     misc.children.emplace_back("woodfence", "woodfence");
     misc.children.emplace_back("woodfencepole", "woodfencepole");
+}
+
+void edit::Project::Load(const std::string& file_name)
+{
+    static_objs_.clear();
+    waypoints_.clear();
+
+    assets::LoadCMDFile(file_name, [&](const std::string& cmd, CmdLineStream& iss) {
+        if (cmd == "obj")
+        {
+            std::string model_name;
+            FarMatrix trans{1.0f};
+            iss >> model_name;
+            iss >> trans.position.x >> trans.position.y >> trans.position.z;
+            for (int i = 0; i < 3; ++i)
+                iss >> trans.basis[i][0] >> trans.basis[i][1] >> trans.basis[i][2];
+
+            static_objs_.emplace_back(*this, trans, model_name);
+        }
+        else if (cmd == "wp")
+        {
+            WaypointID id;
+            FarMatrix trans{1.0f};
+            iss >> id;
+            iss >> trans.position.x >> trans.position.y >> trans.position.z;
+
+            auto& wp = waypoints_.emplace(id, Waypoint(*this, trans, id)).first->second;
+
+            // read links
+            for (int i = 0; i < 4; ++i)
+            {
+                WaypointID link_id;
+                iss >> link_id;
+                wp.SetLink(i, link_id);
+            }
+
+            while (!iss.Eol())
+            {
+                std::string param;
+                iss >> param;
+
+                if (param == "+mesh")
+                {
+                    std::string mesh_name;
+                    iss >> mesh_name;
+                    auto mesh_id = mg_res_->GetMeshes().GetIndexByName(mesh_name);
+                    wp.SetMeshID(mesh_id);
+                }
+                else
+                {
+                    throw std::runtime_error("Unknown waypoint parameter: " + param);
+                }
+            }
+        }
+        else
+        {
+            throw std::runtime_error("Unknown command: " + cmd);
+        }
+    });
+
+    UpdateAllObjectsList();
+}
+
+void edit::Project::Save(const std::string& file_name)
+{
+    std::ostringstream oss;
+
+    // write objs
+    for (const auto& obj : static_objs_)
+    {
+        const auto& trans = obj.GetTransform();
+        oss << "obj " << obj.GetModelName() << ' ';
+        oss << trans.position.x << ' ' << trans.position.y << ' ' << trans.position.z << ' ';
+        oss << trans.basis[0][0] << ' ' << trans.basis[0][1] << ' ' << trans.basis[0][2] << ' ';
+        oss << trans.basis[1][0] << ' ' << trans.basis[1][1] << ' ' << trans.basis[1][2] << ' ';
+        oss << trans.basis[2][0] << ' ' << trans.basis[2][1] << ' ' << trans.basis[2][2] << '\n';
+    }
+
+    // write waypoints
+    for (const auto& [id, waypoint] : waypoints_)
+    {
+        const auto& trans = waypoint.GetTransform();
+        oss << "wp " << id << ' ';
+
+        oss << trans.position.x << ' ' << trans.position.y << ' ' << trans.position.z << ' ';
+        
+        // links
+        for (auto link_id : waypoint.GetLinks())
+        {
+            oss << ' ' << link_id;
+        }
+        oss << ' ';
+
+        // mesh
+        auto mesh_id = waypoint.GetMeshID();
+        if (mesh_id != mg::INVALID_RES_ID)
+        {
+            oss << " +mesh " << mg_res_->GetMeshes().GetByIndex(mesh_id).name;
+        }
+
+        oss << '\n';
+    }
+
+    fs::WriteFile(file_name, oss.str());
 }
 
 void edit::Project::Select(Object& obj)

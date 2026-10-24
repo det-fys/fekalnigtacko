@@ -53,7 +53,7 @@ void fs::FileSystem::WriteFile(const std::string& virtual_path, std::string_view
 {
     std::lock_guard<std::mutex> lock(mtx_);
 
-    std::filesystem::path path(base_path_ / virtual_path);
+    std::filesystem::path path(base_path_ / "save" / virtual_path);
     std::filesystem::create_directories(path.parent_path());
     std::ofstream file(path, std::ios::binary);
     file.write(content.data(), content.size());
@@ -194,4 +194,12 @@ std::string fs::FileSystem::ReadPhysicalFile(const std::string& path)
     file.read(&buffer[0], size);
 
     return buffer;
+}
+
+void fs::FileSystem::ForEachFile(std::function<void(const std::string&)> callback)
+{
+    for (const auto& pair : files_)
+    {
+        callback(pair.first);
+    }
 }

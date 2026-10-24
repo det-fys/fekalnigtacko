@@ -28,6 +28,7 @@ public:
     virtual void Clone(const FarMatrix& trans) override;
     virtual void Link(Object& other, bool link) override;
     void Link(Waypoint& other, bool link);
+    void SetLink(uint32_t idx, WaypointID other_id);
     void SwapLinks(uint32_t i0, uint32_t i1);
     void UnlinkIndex(uint32_t idx);
     virtual void Delete() override;
@@ -37,6 +38,7 @@ public:
 
     WaypointID GetID() const { return id_; }
     WaypointID GetLink(uint32_t index) const { return links_[index]; }
+    std::span<const WaypointID> GetLinks() const { return links_; }
 
 private:
     void UpdateAABB();

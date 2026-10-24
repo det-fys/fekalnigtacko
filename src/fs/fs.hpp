@@ -36,6 +36,8 @@ public:
 
     static std::string ReadPhysicalFile(const std::string& path);
 
+    void ForEachFile(std::function<void(const std::string&)> callback);
+
 private:
     FileSystem() = default;
 
