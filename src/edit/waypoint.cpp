@@ -16,6 +16,9 @@ void edit::Waypoint::DrawOverlay(const DrawOverlayContext& ctx)
 {
     Super::DrawOverlay(ctx);
 
+    if (!ctx.viewport.GetProperties().draw_waypoints_overlay)
+        return;
+
     DrawLinksOverlay(ctx);
 
     glm::vec2 pos;

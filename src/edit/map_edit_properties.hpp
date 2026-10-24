@@ -26,6 +26,7 @@ struct MapEditProperties
     bool draw_world = true;
     bool draw_chunk_mesh = false;
     bool draw_chunk_state = false;
+    bool draw_waypoints_overlay = true;
 
     // editor
     bool snap_to_terrain_height = false;

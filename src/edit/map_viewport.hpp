@@ -22,6 +22,9 @@ public:
     const glm::dvec3& GetEye() const { return eye_; }
     const gfx::Frustum& GetFrustum() const { return frustum_; }
 
+    MapEditContext& GetContext() const { return context_; }
+    MapEditProperties& GetProperties() const { return context_.properties; }
+
 protected:
     virtual void Update() override;
     virtual void Draw(ImDrawList& draw_list) override;
@@ -40,9 +43,6 @@ protected:
     }
 
     bool ContextMenuItem(const char* label, const char* shortcut_str, ImGuiKey shortcut_key, bool enabled = true) const;
-
-    MapEditContext& GetContext() { return context_; }
-    MapEditProperties& GetProperties() { return context_.properties; }
 
     bool IsContextMenuShown() const { return context_menu_shown_; }
 

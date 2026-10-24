@@ -300,6 +300,7 @@ void edit::MapEdit::ShowPropertiesWindow(bool* open)
         ImGui::Checkbox("Draw World", &properties.draw_world);
         ImGui::Checkbox("Draw Chunk Mesh", &properties.draw_chunk_mesh);
         ImGui::Checkbox("Draw Chunk State", &properties.draw_chunk_state);
+        ImGui::Checkbox("Draw Waypoints Overlay", &properties.draw_waypoints_overlay);
         ImGui::PopID();
 
         // editor
