@@ -233,6 +233,7 @@ mg::ChunkGenData mg::ChunkManager::FinalizeChunk(const mg::ResourceSet& res, mg:
         obj.trans = mgobj.trans;
         obj.model = res.GetModels().GetByIndex(mgobj.model_id).model;        
         obj.aabb = TransformAABB(obj.model->GetAABB(), obj.trans);
+        obj.color = mgobj.color;
     }
 
     return gen_data;

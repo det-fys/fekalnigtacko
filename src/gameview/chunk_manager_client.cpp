@@ -23,7 +23,7 @@ void game::view::ClientChunkManager::Draw(const gfx::DrawContext& ctx) const
             auto it = chunks_.find(coord);
             if (it == chunks_.end())
                 continue;
-
+             
             const ChunkView& chunk = it->second;
 
             if (!ctx.frustum.IsAABBVisible(chunk.aabb))
@@ -37,7 +37,7 @@ void game::view::ClientChunkManager::Draw(const gfx::DrawContext& ctx) const
                 if (!ctx.frustum.IsAABBVisible(obj.aabb))
                     continue;
 
-                obj.model->Draw(ctx, obj.matrix, {});
+                obj.model->Draw(ctx, obj.matrix, {&obj.color, 1});
             }
         }
     }
@@ -80,8 +80,9 @@ void game::view::ClientChunkManager::OnChunkGenerated(const mg::ChunkGenData& ge
         obj_view.matrix = obj.trans;
         obj_view.aabb = obj.aabb;
         obj_view.model = assets::AssetManager::GetInstance().Get<ModelView>(obj.model->GetAssetName());
+        obj_view.color = glm::unpackUnorm4x8(obj.color);
 
-        chunk.objs.push_back(std::move(obj_view));
+        chunk.objs.emplace_back(std::move(obj_view));
     }
 }
 

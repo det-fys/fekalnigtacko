@@ -88,6 +88,7 @@ struct ChunkOutputObject
 {
     FarMatrix trans{1.0f};
     uint32_t model_id = 0;
+    uint32_t color = 0xFFFFFFFF;
 };
 
 struct Chunk

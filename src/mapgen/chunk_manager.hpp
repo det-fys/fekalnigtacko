@@ -21,6 +21,7 @@ struct ChunkObj
     FarMatrix trans{1.0f};
     AABB3 aabb{};
     std::shared_ptr<const assets::Model> model;
+    uint32_t color = 0xFFFFFFFF;
 };
 
 struct ChunkGenData

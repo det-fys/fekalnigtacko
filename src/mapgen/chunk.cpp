@@ -1161,6 +1161,8 @@ struct ChunkGenerator
             auto type_vals = glm::vec3(dist(rng), dist(rng), dist(rng));
             auto scale = glm::mix(0.8f, 1.2f, dist(rng));
             auto angle_z = glm::mix(0.0f, glm::two_pi<float>(), dist(rng));
+            auto brightness = glm::mix(0.85f, 1.0f, dist(rng));
+            auto color_variation = glm::vec3(dist(rng), dist(rng), dist(rng)) * 0.1f + 0.9f;
 
             if (tile->forest_level == 0 || tile->obstruction_level >= 127)
                 continue;
@@ -1218,16 +1220,19 @@ struct ChunkGenerator
 
             auto obj_matrix = obj_trans.ToFarMatrix();
 
+            auto color = glm::packUnorm4x8(glm::vec4(color_variation * brightness, 1.0f));
+
             if (gen_tree_objs)
             {
                 auto& obj = chunk.objs.emplace_back();
                 obj.model_id = model_idx;
                 obj.trans = obj_matrix;
+                obj.color = color;
             }
             else
             {
                 auto& obj_model = res.GetModels().GetByIndex(model_idx);
-                AddMesh(obj_matrix, obj_model.cross_mesh_id, 0xFFFFFFFF);
+                AddMesh(obj_matrix, obj_model.cross_mesh_id, color);
             }
         }
     }
@@ -1304,7 +1309,8 @@ struct ChunkGenerator
             auto scale = glm::mix(1.1f, 2.5f, dist(rng));
             auto angle_z = glm::mix(0.0f, glm::two_pi<float>(), dist(rng));
             auto z_offset = glm::mix(0.0f, 0.1f, dist(rng));
-            
+            auto color_variation = glm::vec3(dist(rng), dist(rng), dist(rng)) * 0.1f + 0.95f;
+
             auto density = grass_sampler.GetDensity(pos);
             auto keep_chance = glm::mix(0.1f, 1.0f, density);
 
@@ -1330,6 +1336,7 @@ struct ChunkGenerator
             
             auto color = color_sampler.GetGrassColor(pos);
             color *= grass_sampler.GetBrightness(pos);
+            color *= color_variation;
             auto color_packed = glm::packUnorm4x8(glm::vec4(color, 1.0f));
             
             auto height = tile->height;

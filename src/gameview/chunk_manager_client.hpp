@@ -12,6 +12,7 @@ struct ChunkObjView
     FarMatrix matrix{};
     AABB3 aabb{};
     std::shared_ptr<const ModelView> model;
+    glm::vec4 color{1.0f};
 };
 
 struct ChunkView
