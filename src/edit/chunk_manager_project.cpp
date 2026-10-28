@@ -20,6 +20,7 @@ void edit::ProjectChunkManager::OnChunkGenerated(const mg::ChunkGenData& gen_dat
     Super::OnChunkGenerated(gen_data);
 
     auto& chunk_data = chunks_[gen_data.coord];
+    chunk_data.center = glm::dvec2(gen_data.center);
 
     chunk_data.vis_verts.clear();
     chunk_data.vis_edges.clear();
@@ -30,6 +31,7 @@ void edit::ProjectChunkManager::OnChunkGenerated(const mg::ChunkGenData& gen_dat
 
     auto& verts = gen_data.model->GetVertices();
     auto& tris = gen_data.model->GetTriangles();
+    auto& surfaces = gen_data.model->GetSurfaces();
 
     // add verts
     for (const auto& v : verts.positions)
@@ -39,15 +41,20 @@ void edit::ProjectChunkManager::OnChunkGenerated(const mg::ChunkGenData& gen_dat
 
     // add tris
     std::set<std::tuple<uint32_t, uint32_t>> edges_set;
-    for (const auto& t : tris)
+    for (const auto& surface : surfaces)
     {
-        const auto& v = t.vertices;
+        if (surface.material.properties.twosided)
+            continue;
 
-        chunk_data.vis_tris.emplace_back(v[0], v[1], v[2]);
-
-        edges_set.emplace(std::min(v[0], v[1]), std::max(v[0], v[1]));
-        edges_set.emplace(std::min(v[1], v[2]), std::max(v[1], v[2]));
-        edges_set.emplace(std::min(v[2], v[0]), std::max(v[2], v[0]));
+        for (uint32_t i = 0; i < surface.tri_count; ++i)
+        {
+            const auto& t = tris[surface.tri_offset + i];
+            const auto& v = t.vertices;
+            chunk_data.vis_tris.emplace_back(v[0], v[1], v[2]);
+            edges_set.emplace(std::min(v[0], v[1]), std::max(v[0], v[1]));
+            edges_set.emplace(std::min(v[1], v[2]), std::max(v[1], v[2]));
+            edges_set.emplace(std::min(v[2], v[0]), std::max(v[2], v[0]));
+        }
     }
 
     // add edges

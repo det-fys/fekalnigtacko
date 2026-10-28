@@ -224,9 +224,10 @@ void edit::MapViewport2D::DrawChunkMesh(ImDrawList& draw_list, const glm::ivec2&
     // draw tris
     for (const auto& [i0, i1, i2] : chunk.vis_tris)
     {
-        auto& p0 = chunk.vis_verts[i0];
-        auto& p1 = chunk.vis_verts[i1];
-        auto& p2 = chunk.vis_verts[i2];
+        auto p0 = glm::dvec2(chunk.vis_verts[i0]) + chunk.center;
+        auto p1 = glm::dvec2(chunk.vis_verts[i1]) + chunk.center;
+        auto p2 = glm::dvec2(chunk.vis_verts[i2]) + chunk.center;
+
         draw_list.AddTriangleFilled(im::VecToImGui(controls_.WsToCanvas(p0)), im::VecToImGui(controls_.WsToCanvas(p1)),
                                     im::VecToImGui(controls_.WsToCanvas(p2)), color2);
     }
@@ -234,8 +235,8 @@ void edit::MapViewport2D::DrawChunkMesh(ImDrawList& draw_list, const glm::ivec2&
     // draw mesh edges
     for (const auto& [i0, i1] : chunk.vis_edges)
     {
-        auto& p0 = chunk.vis_verts[i0];
-        auto& p1 = chunk.vis_verts[i1];
+        auto p0 = glm::dvec2(chunk.vis_verts[i0]) + chunk.center;
+        auto p1 = glm::dvec2(chunk.vis_verts[i1]) + chunk.center;
 
         draw_list.AddLine(im::VecToImGui(controls_.WsToCanvas(p0)), im::VecToImGui(controls_.WsToCanvas(p1)), color);
     }

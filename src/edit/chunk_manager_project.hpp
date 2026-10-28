@@ -9,6 +9,8 @@ class Project;
 
 struct ProjectChunkData
 {
+    glm::dvec2 center{0.0};
+
     // visualization
     std::vector<glm::vec2> vis_verts;
     std::vector<std::tuple<uint32_t, uint32_t>> vis_edges;
