@@ -15,6 +15,8 @@
 namespace
 {
 
+using namespace mg;
+
 struct PoissonCellData
 {
     glm::dvec2 pos;
@@ -196,21 +198,15 @@ struct RawMeshTriangle
 
 struct ChunkGenerator
 {
-    const mg::ResourceSet& res;
-    const mg::MapConfig& map_cfg;
-    glm::ivec2 chunk_coord;
-    std::span<const mg::ChunkStaticObject> objs;
+    const ResourceSet& res;
+    const ChunkParams& params;
     mg::Chunk& chunk;
     AABBD2 bounds;
     AABBD2 extended_bounds;
     glm::dvec2 chunk_center;
     AABB2 local_bounds; // in local chunk space
 
-    // seeds
-    uint32_t heightmap_seed;
-
     // lod
-    uint32_t lod;
     bool collision_only = false;
     bool gen_tree_objs = false;
     bool gen_tree_billboards = false;
@@ -220,10 +216,10 @@ struct ChunkGenerator
     float path_segment_length_scale = 1.0f;
 
     // samplers
-    mg::TerrainHeightSampler height_sampler;
-    mg::ForestSampler forest_sampler;
-    mg::TerrainColorSampler color_sampler;
-    mg::GrassSampler grass_sampler;
+    TerrainHeightSampler height_sampler;
+    ForestSampler forest_sampler;
+    TerrainColorSampler color_sampler;
+    GrassSampler grass_sampler;
 
     // tiles
     double tile_size_m;
@@ -232,9 +228,6 @@ struct ChunkGenerator
     std::vector<mg::ChunkTile> tiles;
     AABBD2 tiles_aabb;
     AABB2 local_tiles_aabb; // in local chunk space
-
-    // splines
-    const std::map<uint32_t, mg::ChunkSplineNode>* spline_nodes;
 
     std::vector<JunctionInfo> junctions;
     std::vector<PathInfo> paths;
@@ -249,17 +242,16 @@ struct ChunkGenerator
     std::vector<glm::vec3> hm_verts;
     std::vector<mg::Triangle> hm_tris;
 
-    ChunkGenerator(const mg::ResourceSet& res, const mg::MapConfig& cfg, const mg::ChunkParams& params,
-                   mg::Chunk& chunk)
-        : res(res), map_cfg(cfg), spline_nodes(&params.nodes), chunk_coord(params.coord), lod(params.lod),
-          collision_only(params.collision_only), objs(params.objs), chunk(chunk),
-          bounds(GetChunkAABB(cfg, params.coord)), extended_bounds(GetChunkAABB(cfg, params.coord, true)),
-          heightmap_seed(params.heightmap_seed), height_sampler(cfg), forest_sampler(heightmap_seed),
-          color_sampler(heightmap_seed), grass_sampler(heightmap_seed), tiles_border(cfg.chunk_border),
-          tiles_stride(cfg.chunk_tiles + cfg.chunk_border * 2), tiles(tiles_stride * tiles_stride),
-          tile_size_m(cfg.chunk_size_m / static_cast<double>(cfg.chunk_tiles)),
-          tiles_aabb(bounds.min - glm::dvec2(cfg.chunk_border) * static_cast<double>(tile_size_m),
-                     bounds.max + glm::dvec2(cfg.chunk_border) * static_cast<double>(tile_size_m)),
+    ChunkGenerator(const mg::ResourceSet& res, const mg::ChunkParams& params, mg::Chunk& chunk)
+        : res(res), params(params), chunk(chunk), bounds(GetChunkAABB(params.map.cfg, params.coord)),
+          extended_bounds(GetChunkAABB(params.map.cfg, params.coord, true)), height_sampler(params.map.cfg),
+          forest_sampler(params.map.cfg.seed), color_sampler(params.map.cfg.seed), grass_sampler(params.map.cfg.seed),
+          tiles_border(params.map.cfg.chunk_border),
+          tiles_stride(params.map.cfg.chunk_tiles + params.map.cfg.chunk_border * 2),
+          tiles(tiles_stride * tiles_stride),
+          tile_size_m(params.map.cfg.chunk_size_m / static_cast<double>(params.map.cfg.chunk_tiles)),
+          tiles_aabb(bounds.min - glm::dvec2(params.map.cfg.chunk_border) * static_cast<double>(tile_size_m),
+                     bounds.max + glm::dvec2(params.map.cfg.chunk_border) * static_cast<double>(tile_size_m)),
           chunk_center((bounds.min + bounds.max) * 0.5),
           local_tiles_aabb(glm::vec2(tiles_aabb.min - chunk_center), glm::vec2(tiles_aabb.max - chunk_center)),
           local_bounds(glm::vec2(bounds.min - chunk_center), glm::vec2(bounds.max - chunk_center))
@@ -274,6 +266,7 @@ struct ChunkGenerator
         MakeJunctionsAndPaths();
         GenerateJunctionAndPathMeshes();
         GenerateHeightmesh();
+        AppendObjects();
         AppendObjectsHeightmeshes();
         RasterizeHeightmesh();
         SetupLevels();
@@ -285,11 +278,11 @@ struct ChunkGenerator
 
     void SetupLod()
     {
-        gen_tree_objs = lod <= 1;
-        gen_tree_billboards = (lod <= 3) && !collision_only;
-        gen_grass = (lod <= 2) && !collision_only;
-        grass_cull_chance = lod == 0 ? 0.0f : lod == 1 ? 0.5f : 0.9f;
-        terrain_density_scale = lod <= 1 ? 1.0f : (lod <= 2 ? 0.75f : 0.25f);
+        gen_tree_objs = params.lod <= 1;
+        gen_tree_billboards = (params.lod <= 3) && !collision_only;
+        gen_grass = (params.lod <= 2) && !collision_only;
+        grass_cull_chance = params.lod == 0 ? 0.0f : params.lod == 1 ? 0.5f : 0.9f;
+        terrain_density_scale = params.lod <= 1 ? 1.0f : (params.lod <= 2 ? 0.75f : 0.25f);
         path_segment_length_scale = 1.0f / terrain_density_scale;
     }
 
@@ -310,13 +303,13 @@ struct ChunkGenerator
         return static_cast<uint32_t>(tile_idx.y * tiles_stride + tile_idx.x);
     }
 
-    mg::ChunkTile* GetTileAtPos(const glm::dvec2& pos)
+    ChunkTile* GetTileAtPos(const glm::dvec2& pos)
     { 
         auto tile_idx = GetTileIndexAtPos(pos);
         return tile_idx != INVALID_ID ? &tiles[tile_idx] : nullptr;
     }
 
-    const mg::ChunkTile* GetTileAtPos(const glm::dvec2& pos) const
+    const ChunkTile* GetTileAtPos(const glm::dvec2& pos) const
     {
         auto tile_idx = GetTileIndexAtPos(pos);
         return tile_idx != INVALID_ID ? &tiles[tile_idx] : nullptr;
@@ -364,7 +357,7 @@ struct ChunkGenerator
         }
     }
 
-    static uint32_t GetPathContinuation(const mg::ChunkSplineNode& node, uint32_t prev_node_id)
+    static uint32_t GetPathContinuation(const Node& node, uint32_t prev_node_id)
     {
         if (node.links[0] == prev_node_id)
             return node.links[1];
@@ -375,7 +368,7 @@ struct ChunkGenerator
         return 0;
     }
 
-    static uint32_t GetLinkIndex(const mg::ChunkSplineNode& node, uint32_t link_node_id)
+    static uint32_t GetLinkIndex(const Node& node, uint32_t link_node_id)
     {
         for (uint32_t i = 0; i < node.links.size(); ++i)
         {
@@ -387,6 +380,8 @@ struct ChunkGenerator
 
     std::optional<std::tuple<uint32_t, bool>> CreateSplinePath(uint32_t start_junction_id, uint32_t start_link_idx)
     {
+        const auto& nodes = params.map.nodes;
+
         auto start_key = std::make_tuple(start_junction_id, start_link_idx);
 
         if (auto it = link2path.find(start_key); it != link2path.end())
@@ -394,9 +389,9 @@ struct ChunkGenerator
             return it->second; // already processed
         }
 
-        const auto& start_node = spline_nodes->at(start_junction_id);
+        const auto& start_node = nodes.at(start_junction_id);
 
-        const auto& start_mesh = res.GetMeshes().GetByIndex(start_node.res_id);
+        const auto& start_mesh = res.GetMeshes().GetByIndex(start_node.mesh_id);
         if (start_link_idx >= start_mesh.links.size())
             return std::nullopt; // invalid link index
 
@@ -406,14 +401,14 @@ struct ChunkGenerator
         if (second_node_id == 0)
             return std::nullopt; // invalid link
 
-        const auto& second_node = spline_nodes->at(second_node_id);
+        const auto& second_node = nodes.at(second_node_id);
 
         std::vector<glm::dvec3> spline_points;
         spline_points.reserve(16);
 
         // find the point before junction for correct direction
         auto prev_node_id = GetPathContinuation(start_node, second_node_id);
-        spline_points.push_back(prev_node_id > 0 ? spline_nodes->at(prev_node_id).pos : start_node.pos);
+        spline_points.push_back(prev_node_id > 0 ? nodes.at(prev_node_id).pos : start_node.pos);
 
         // add start and second node
         spline_points.push_back(start_node.pos);
@@ -425,16 +420,16 @@ struct ChunkGenerator
 
         while (true)
         {
-            auto& current_node = spline_nodes->at(current_node_id);
+            auto& current_node = nodes.at(current_node_id);
             spline_points.push_back(current_node.pos);
 
             auto next_node_id = GetPathContinuation(current_node, prev_node_id);
 
             // terminate if current node is a junction
-            if (current_node.type == mg::CHUNK_SPLINE_NODE_JUNCTION)
+            if (current_node.mesh_id != mg::INVALID_RES_ID)
             {
                 // add next node position for correct direction
-                spline_points.push_back(next_node_id > 0 ? spline_nodes->at(next_node_id).pos : current_node.pos);
+                spline_points.push_back(next_node_id > 0 ? nodes.at(next_node_id).pos : current_node.pos);
 
                 break;
             }
@@ -450,14 +445,14 @@ struct ChunkGenerator
         }
 
         const auto& end_junction_id = current_node_id;
-        const auto& end_node = spline_nodes->at(end_junction_id);
+        const auto& end_node = nodes.at(end_junction_id);
 
-        auto end_link_idx = GetLinkIndex(spline_nodes->at(end_junction_id), prev_node_id);
+        auto end_link_idx = GetLinkIndex(nodes.at(end_junction_id), prev_node_id);
         if (end_link_idx == INVALID_ID)
             return std::nullopt; // end junction does not link to this path ??
 
         // check profile match
-        const auto& end_mesh = res.GetMeshes().GetByIndex(end_node.res_id);
+        const auto& end_mesh = res.GetMeshes().GetByIndex(end_node.mesh_id);
         if (end_link_idx >= end_mesh.links.size())
             return std::nullopt; // invalid link index
 
@@ -488,14 +483,14 @@ struct ChunkGenerator
         std::map<uint32_t, uint32_t> node2junction; // node id -> junction idx
 
         // iterate over junctions and create paths from their links
-        for (const auto& [node_id, node] : *spline_nodes)
+        for (const auto& [node_id, node] : params.map.nodes)
         {
-            if (node.type != mg::CHUNK_SPLINE_NODE_JUNCTION)
+            if (node.mesh_id == INVALID_RES_ID)
                 continue; // not junction
 
             JunctionInfo junction{};
             junction.pos = node.pos;
-            junction.mesh_id = node.res_id;
+            junction.mesh_id = node.mesh_id;
 
             const auto& mesh = res.GetMeshes().GetByIndex(junction.mesh_id);
 
@@ -821,15 +816,31 @@ struct ChunkGenerator
         }
     }
 
+    void AppendObjects()
+    {
+        for (const auto& obj : params.map.objs)
+        {
+            if (!bounds.Contains(obj.trans.position))
+                continue; // not primary chunk for this obj
+
+            auto& chunk_obj = chunk.objs.emplace_back();
+            chunk_obj.trans = obj.trans;
+            chunk_obj.model_id = obj.model_id;
+            chunk_obj.color = 0xFFFFFFFF;
+        }
+    }
+
     void AppendObjectsHeightmeshes()
     {
-        for (const auto& obj : objs)
+        for (const auto& obj : params.map.objs)
         {
-            if (!obj.heightmesh)
+            const auto& mgmodel = res.GetModels().GetByIndex(obj.model_id);
+
+            if (!mgmodel.heightmesh)
                 continue;
 
-            auto& verts = obj.heightmesh->GetVerts();
-            auto& tris = obj.heightmesh->GetTris();
+            auto& verts = mgmodel.heightmesh->GetVerts();
+            auto& tris = mgmodel.heightmesh->GetTris();
 
             uint32_t base_idx = static_cast<uint32_t>(hm_verts.size());
 
@@ -1113,7 +1124,8 @@ struct ChunkGenerator
         constexpr float tree_radius = 5.0f; // meters
 
         ChunkPoissonVariable(
-            map_cfg.seed, chunk_coord, map_cfg.chunk_size_m, tree_radius, tree_radius, tree_radius, tree_positions,
+            params.map.cfg.seed, params.coord, params.map.cfg.chunk_size_m, tree_radius, tree_radius, tree_radius,
+            tree_positions,
             [&](glm::dvec2 pos) {
                 //auto tile = GetTileAtPos(pos);
                 //if (!tile)
@@ -1142,7 +1154,7 @@ struct ChunkGenerator
         std::array<uint32_t, 2> bush_model_indices = {res.GetModels().GetIndexByName("bush1"),
                                                       res.GetModels().GetIndexByName("bush2")};
 
-        std::mt19937 rng(map_cfg.seed + chunk_coord.x * 73856093 + chunk_coord.y * 19349663);
+        std::mt19937 rng(params.map.cfg.seed + params.coord.x * 73856093 + params.coord.y * 19349663);
         std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
         for (const auto& pos : tree_positions)
@@ -1275,10 +1287,11 @@ struct ChunkGenerator
         constexpr float grass_radius = 1.2f; // meters
         std::vector<glm::dvec2> grass_positions;
 
-        auto grass_seed = map_cfg.seed ^ 0x62455000;
+        auto grass_seed = params.map.cfg.seed ^ 0x62455000;
 
         ChunkPoissonVariable(
-            grass_seed, chunk_coord, map_cfg.chunk_size_m, grass_radius, grass_radius, grass_radius, grass_positions,
+            grass_seed, params.coord, params.map.cfg.chunk_size_m, grass_radius, grass_radius, grass_radius,
+            grass_positions,
             [&](glm::dvec2 pos) {
                 return grass_radius; // fixed radius for now
             },
@@ -1291,7 +1304,7 @@ struct ChunkGenerator
             res.GetMeshes().GetIndexByName("grass3"), res.GetMeshes().GetIndexByName("grass4"),
             res.GetMeshes().GetIndexByName("grass5")};
 
-        std::mt19937 rng(grass_seed + chunk_coord.x * 73856093 + chunk_coord.y * 19349663);
+        std::mt19937 rng(grass_seed + params.coord.x * 73856093 + params.coord.y * 19349663);
         std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
         for (const auto& pos : grass_positions)
@@ -1361,7 +1374,7 @@ struct ChunkGenerator
         const float r_border = r * 5.0f / terrain_density_scale;
 
         // append corners
-        const auto terrain_points_margin = static_cast<double>(map_cfg.chunk_size_m);
+        const auto terrain_points_margin = static_cast<double>(params.map.cfg.chunk_size_m);
         auto c0 = bounds.min - terrain_points_margin;
         auto c1 = bounds.max + terrain_points_margin;
         terrain_points.emplace_back(c0);
@@ -1370,7 +1383,7 @@ struct ChunkGenerator
         terrain_points.emplace_back(glm::dvec2(c0.x, c1.y));
 
         ChunkPoissonVariable(
-            map_cfg.seed, chunk_coord, map_cfg.chunk_size_m, r_min, r, r_border, terrain_points,
+            params.map.cfg.seed, params.coord, params.map.cfg.chunk_size_m, r_min, r, r_border, terrain_points,
             [&](glm::dvec2 pos) {
                 auto tile = GetTileAtPos(pos);
 
@@ -1675,13 +1688,13 @@ std::tuple<glm::ivec2, glm::ivec2> mg::GetChunkRange(const MapConfig& cfg, const
     return {min_chunk, max_chunk};
 }
 
-mg::Chunk mg::GenerateChunk(const ResourceSet& res, const MapConfig& cfg, const ChunkParams& params)
+mg::Chunk mg::GenerateChunk(const ResourceSet& res, const ChunkParams& params)
 {
     mg::Chunk chunk{};
     chunk.coord = params.coord;
     chunk.lod = params.lod;
 
-    ChunkGenerator ctx(res, cfg, params, chunk);
+    ChunkGenerator ctx(res, params, chunk);
     ctx.Generate();
 
     return chunk;

@@ -105,6 +105,7 @@ set(COMMON_SOURCES
     "src/mapgen/common.cpp"
     "src/mapgen/global_layout.cpp"
     "src/mapgen/heightmesh.cpp"
+    "src/mapgen/map_layout_file.cpp"
     "src/mapgen/resources.cpp"
     "src/mapgen/samplers.cpp"
     "src/server/client.cpp"

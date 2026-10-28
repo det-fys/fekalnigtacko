@@ -12,6 +12,7 @@
 #include "assets/material.hpp"
 #include "assets/model.hpp"
 #include "defs.hpp"
+#include "heightmesh.hpp"
 
 namespace mg
 {
@@ -114,9 +115,17 @@ struct TemplateMesh
 struct StaticObjectModel
 {
     std::string name;
+    std::string path;
     std::shared_ptr<const assets::Model> model;
+    std::shared_ptr<const HeightMesh> heightmesh;
     uint32_t cross_mesh_id = 0xFFFFFFFF;
-    // TODO: info about coloring, billboarding etc.
+};
+
+// model directory
+struct StaticObjectModelDir
+{
+    std::map<std::string, StaticObjectModelDir> subdirs;
+    std::map<std::string, uint32_t> models;
 };
 
 // set
@@ -179,11 +188,18 @@ public:
     const ResourceArray<TemplateMesh>& GetMeshes() const { return meshes_; }
     const ResourceArray<StaticObjectModel>& GetModels() const { return models_; }
 
+    const StaticObjectModelDir& GetStaticModelsRoot() const { return models_root_; }
+
+private:
+    void AddStaticModelDirEntry(const std::string& path, uint32_t id);
+
 private:
     ResourceArray<TemplateMaterial> materials_;
     ResourceArray<TemplateProfile> profiles_;
     ResourceArray<TemplateMesh> meshes_;
     ResourceArray<StaticObjectModel> models_;
+
+    StaticObjectModelDir models_root_;
 };
 
 } // namespace mg

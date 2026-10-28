@@ -3,7 +3,7 @@
 #include <string>
 
 #include "gameview/modelview.hpp"
-#include "mapgen/heightmesh.hpp"
+#include "mapgen/resources.hpp"
 #include "object.hpp"
 
 namespace edit
@@ -16,7 +16,7 @@ class StaticObject : public Object
 public:
     using Super = Object;
 
-    StaticObject(Project& project, const FarMatrix& trans, const std::string& model_name);
+    StaticObject(Project& project, const FarMatrix& trans, uint32_t model_id);
 
     virtual void Draw(const gfx::DrawContext& ctx) override;
     virtual void DrawOverlay(const DrawOverlayContext& ctx) override;
@@ -25,9 +25,8 @@ public:
     virtual void Clone(const FarMatrix& trans) override;
     virtual void Delete() override;
 
-    const std::string& GetModelName() const { return model_name_; }
+    uint32_t GetModelID() const { return model_id_; }
     const std::shared_ptr<const ModelView>& GetModel() const { return model_; }
-    const std::shared_ptr<const mg::HeightMesh>& GetHeightMesh() const { return heightmesh_; }
 
 private:
     void UpdateAABB();
@@ -35,9 +34,9 @@ private:
     void MaybeInvalidateChunks();
 
 private:
-    std::string model_name_;
+    uint32_t model_id_ = mg::INVALID_RES_ID;
     std::shared_ptr<const ModelView> model_;
-    std::shared_ptr<const mg::HeightMesh> heightmesh_;
+
 };
 
 } // namespace edit

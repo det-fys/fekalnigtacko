@@ -36,20 +36,6 @@ struct SelectionListEntry
     SelectionListEntry(Object* obj, const FarMatrix& offset) : obj(obj), offset(offset) {}
 };
 
-struct StaticModelsEntry
-{
-    std::string display_name;
-    std::string model_name;
-    std::vector<StaticModelsEntry> children;
-
-    StaticModelsEntry(std::string display_name) : display_name(std::move(display_name)) {}
-
-    StaticModelsEntry(std::string display_name, std::string model_name)
-        : display_name(std::move(display_name)), model_name(std::move(model_name))
-    {
-    }
-};
-
 class Project : public gfx::Scene
 {
 public:
@@ -73,12 +59,9 @@ public:
     // world
     float GetTerrainHeight(const glm::dvec2& pos) const;
 
-    // assets
-    const StaticModelsEntry& GetStaticModelsRoot() const { return static_models_root_; }
-
     // objects
-    void AddStaticObject(const FarMatrix& trans, const std::string& model_name);
-    void AddStaticObject(const glm::dvec2& pos, const std::string& model_name);
+    void AddStaticObject(const FarMatrix& trans, uint32_t model_id);
+    void AddStaticObject(const glm::dvec2& pos, uint32_t model_id);
     Waypoint* AddWaypoint(const FarMatrix& trans);
     Waypoint* AddWaypoint(const glm::dvec2& pos);
 
@@ -99,6 +82,7 @@ public:
 
     // generation
     void InvalidateChunk(const glm::ivec2& chunk_pos);
+    mg::MapLayout GetMapLayout(const AABBD2* aabb = nullptr) const;
     void GetChunkParams(mg::ChunkParams& out_params);
 
     const std::unordered_map<glm::ivec2, ProjectChunkData>& GetChunks() const { return chunk_manager_->GetChunks(); }
@@ -107,11 +91,11 @@ public:
     const mg::ResourceSet& GetResourceSet() const { return *mg_res_; }
 
 private:
-    void InitStaticModels();
-
     void Load(const std::string& file_name);
     void Save(const std::string& file_name);
 
+    void SetMapLayout(const mg::MapLayout& map);
+    
     void Select(Object& obj);
     void Deselect(Object& obj, bool fix_list = true);
     void SelectOrDeselect(std::span<Object*> objs, bool additive, bool allow_deselect);
@@ -132,7 +116,6 @@ private:
     MapEditProperties& properties_;
 
     std::shared_ptr<const mg::ResourceSet> mg_res_;
-    StaticModelsEntry static_models_root_;
 
     std::string name_;
     std::string file_name_;

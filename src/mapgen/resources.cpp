@@ -480,7 +480,7 @@ static mg::TemplateMesh LoadTemplateMesh(const mg::ResourceSet& res, CmdLineStre
 static mg::StaticObjectModel LoadStaticObjectModel(const mg::ResourceSet& res, CmdLineStream& iss)
 {
     mg::StaticObjectModel obj_model{};
-    iss >> obj_model.name;
+    iss >> obj_model.name >> obj_model.path;
 
     auto model = assets::AssetManager::GetInstance().Get<assets::Model>(obj_model.name);
     if (!model)
@@ -490,11 +490,24 @@ static mg::StaticObjectModel LoadStaticObjectModel(const mg::ResourceSet& res, C
 
     obj_model.model = model;
 
-    if (!iss.Eol())
+    // HM
+    if (fs::FileExists("data/" + obj_model.name + ".hm"))
     {
-        std::string cross_mesh_name;
-        iss >> cross_mesh_name;
-        obj_model.cross_mesh_id = res.GetMeshes().GetIndexByName(cross_mesh_name);
+        // load heightmesh
+        obj_model.heightmesh = assets::AssetManager::GetInstance().Get<mg::HeightMesh>(obj_model.name);
+    }
+
+    std::string param;
+    while (!iss.Eol())
+    {
+        iss >> param;
+
+        if (param == "+lodmesh")
+        {
+            std::string cross_mesh_name;
+            iss >> cross_mesh_name;
+            obj_model.cross_mesh_id = res.GetMeshes().GetIndexByName(cross_mesh_name);
+        }
     }
 
     return obj_model;
@@ -527,7 +540,9 @@ std::shared_ptr<mg::ResourceSet> mg::ResourceSet::LoadFromFile(const std::string
         {
             auto obj_model = LoadStaticObjectModel(*res, iss);
             auto name = obj_model.name;
-            res->models_.Add(name, std::move(obj_model));
+            auto path = obj_model.path;
+            auto id = res->models_.Add(name, std::move(obj_model));
+            res->AddStaticModelDirEntry(path, id);
         }
         else
         {
@@ -536,4 +551,26 @@ std::shared_ptr<mg::ResourceSet> mg::ResourceSet::LoadFromFile(const std::string
     });
 
     return res;
+}
+
+void mg::ResourceSet::AddStaticModelDirEntry(const std::string& path, uint32_t id)
+{
+    StaticObjectModelDir* current_dir = &models_root_;
+
+    std::string_view remaining_path = path;
+
+    while (true)
+    {
+        auto pos = remaining_path.find('/');
+        if (pos == std::string_view::npos)
+        {
+            std::string_view model_name = remaining_path;
+            current_dir->models[std::string(model_name)] = id;
+            break;
+        }
+
+        std::string_view dir_name = remaining_path.substr(0, pos);
+        remaining_path.remove_prefix(pos + 1);
+        current_dir = &current_dir->subdirs[std::string(dir_name)];        
+    }
 }

@@ -2,8 +2,8 @@
 
 #include <imgui_internal.h>
 
-constexpr static std::string_view MAP_PROJ_PREFIX = "projects/";
-constexpr static std::string_view MAP_PROJ_SUFFIX = ".mapproj";
+constexpr static std::string_view MAP_PROJ_PREFIX = "data/";
+constexpr static std::string_view MAP_PROJ_SUFFIX = ".mapl";
 
 edit::MapEdit::MapEdit() : viewport_2d_(context_), viewport_3d_(context_) {}
 

@@ -13,12 +13,11 @@
 #include "map_viewport.hpp"
 #include "object.hpp"
 #include "static_object.hpp"
+#include "mapgen/map_layout_file.hpp"
 
-edit::Project::Project(MapEditProperties& properties) : properties_(properties), static_models_root_("root")
+edit::Project::Project(MapEditProperties& properties) : properties_(properties)
 {
     mg_res_ = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
-    InitStaticModels();
-
     SetupChunks();
 }
 
@@ -114,16 +113,16 @@ float edit::Project::GetTerrainHeight(const glm::dvec2& pos) const
     return height_sampler_->Get(pos);
 }
 
-void edit::Project::AddStaticObject(const FarMatrix& trans, const std::string& model_name)
+void edit::Project::AddStaticObject(const FarMatrix& trans, uint32_t model_id)
 {
     ClearSelection(); // to avoid invalid pointers
-    auto& obj = static_objs_.emplace_back(*this, trans, model_name);
+    auto& obj = static_objs_.emplace_back(*this, trans, model_id);
     NewObjectAdded(obj);
 }
 
-void edit::Project::AddStaticObject(const glm::dvec2& pos, const std::string& model_name)
+void edit::Project::AddStaticObject(const glm::dvec2& pos, uint32_t model_id)
 {
-    AddStaticObject(GetNewObjectTransform(pos), model_name);
+    AddStaticObject(GetNewObjectTransform(pos), model_id);
 }
 
 edit::Waypoint* edit::Project::AddWaypoint(const FarMatrix& trans)
@@ -276,176 +275,87 @@ void edit::Project::InvalidateChunk(const glm::ivec2& chunk_pos)
         chunk_manager_->InvalidateChunk(chunk_pos);
 }
 
-void edit::Project::GetChunkParams(mg::ChunkParams& params)
+mg::MapLayout edit::Project::GetMapLayout(const AABBD2* aabb) const
 {
-    AABBD2 chunk_aabb = mg::GetChunkAABB(map_config_, params.coord, true);
+    mg::MapLayout map{};
+    map.cfg = map_config_;
 
-    // collect relevant objs
+    // static objs
     for (const auto& obj : static_objs_)
     {
-        // auto pos2d = glm::vec2(obj.GetPosition());
-        const auto& obj_aabb = obj.GetAABB();
-        AABBD2 obj_aabb_2d(glm::dvec2(obj_aabb.min), glm::dvec2(obj_aabb.max));
+        if (aabb)
+        {
+            const auto& obj_aabb = obj.GetAABB();
+            AABBD2 obj_aabb_2d(glm::dvec2(obj_aabb.min), glm::dvec2(obj_aabb.max));
 
-        if (!chunk_aabb.CollidesWith(obj_aabb_2d))
-            continue;
+            if (!aabb->CollidesWith(obj_aabb_2d))
+                continue;
+        }
 
-        auto& mgobj = params.objs.emplace_back();
+        auto& mgobj = map.objs.emplace_back();
         mgobj.trans = obj.GetTransform();
-        mgobj.model_name = obj.GetModelName();
-        mgobj.heightmesh = obj.GetHeightMesh();
+        mgobj.model_id = obj.GetModelID();
     }
-    
-    // collect splines
+
+    // waypoints
     for (const auto& [id, waypoint] : waypoints_)
     {
-        mg::ChunkSplineNode node{};
+        auto& node = map.nodes[id];
         node.pos = waypoint.GetPosition();
-        node.type = mg::CHUNK_SPLINE_NODE_NORMAL;
+        node.mesh_id = waypoint.GetMeshID();
 
         for (uint32_t i = 0; i < 4; ++i)
         {
             node.links[i] = waypoint.GetLink(i);
         }
-
-        // junction?
-        auto mesh_id = waypoint.GetMeshID();
-        if (mesh_id != mg::INVALID_RES_ID)
-        {
-            node.type = mg::CHUNK_SPLINE_NODE_JUNCTION;    
-            node.res_id = mesh_id;
-        }   
-
-        params.nodes[id] = node;
     }
+
+    return map;
 }
 
-void edit::Project::InitStaticModels()
+void edit::Project::GetChunkParams(mg::ChunkParams& params)
 {
-    auto& root = static_models_root_;
-
-    auto& buildings = root.children.emplace_back("buildings");
-    buildings.children.emplace_back("house1", "house1");
-    buildings.children.emplace_back("house2", "house2");
-    buildings.children.emplace_back("rabbithouse1", "rabbithouse1");
-    buildings.children.emplace_back("tuning_house", "tuning_house");
-
-    auto& natural = root.children.emplace_back("natural");
-    natural.children.emplace_back("bush1", "bush1");
-    natural.children.emplace_back("bush2", "bush2");
-    natural.children.emplace_back("biggertree", "biggertree");
-    natural.children.emplace_back("commontree", "commontree");
-    natural.children.emplace_back("pine", "pine");
-    natural.children.emplace_back("spruce", "spruce");
-
-    auto& misc = root.children.emplace_back("misc");
-    misc.children.emplace_back("lightpole", "lightpole");
-    misc.children.emplace_back("woodfence", "woodfence");
-    misc.children.emplace_back("woodfencepole", "woodfencepole");
+    AABBD2 chunk_aabb = mg::GetChunkAABB(map_config_, params.coord, true);
+    params.map = GetMapLayout(&chunk_aabb);
 }
 
 void edit::Project::Load(const std::string& file_name)
 {
-    static_objs_.clear();
-    waypoints_.clear();
-
-    assets::LoadCMDFile(file_name, [&](const std::string& cmd, CmdLineStream& iss) {
-        if (cmd == "obj")
-        {
-            std::string model_name;
-            FarMatrix trans{1.0f};
-            iss >> model_name;
-            iss >> trans.position.x >> trans.position.y >> trans.position.z;
-            for (int i = 0; i < 3; ++i)
-                iss >> trans.basis[i][0] >> trans.basis[i][1] >> trans.basis[i][2];
-
-            static_objs_.emplace_back(*this, trans, model_name);
-        }
-        else if (cmd == "wp")
-        {
-            WaypointID id;
-            FarMatrix trans{1.0f};
-            iss >> id;
-            iss >> trans.position.x >> trans.position.y >> trans.position.z;
-
-            auto& wp = waypoints_.emplace(id, Waypoint(*this, trans, id)).first->second;
-
-            // read links
-            for (int i = 0; i < 4; ++i)
-            {
-                WaypointID link_id;
-                iss >> link_id;
-                wp.SetLink(i, link_id);
-            }
-
-            while (!iss.Eol())
-            {
-                std::string param;
-                iss >> param;
-
-                if (param == "+mesh")
-                {
-                    std::string mesh_name;
-                    iss >> mesh_name;
-                    auto mesh_id = mg_res_->GetMeshes().GetIndexByName(mesh_name);
-                    wp.SetMeshID(mesh_id);
-                }
-                else
-                {
-                    throw std::runtime_error("Unknown waypoint parameter: " + param);
-                }
-            }
-        }
-        else
-        {
-            throw std::runtime_error("Unknown command: " + cmd);
-        }
-    });
-
-    UpdateAllObjectsList();
+    SetMapLayout(mg::LoadMapLayout(file_name, *mg_res_));
 }
 
 void edit::Project::Save(const std::string& file_name)
 {
-    std::ostringstream oss;
+    mg::SaveMapLayout(file_name, *mg_res_, GetMapLayout());
+}
 
-    // write objs
-    for (const auto& obj : static_objs_)
+void edit::Project::SetMapLayout(const mg::MapLayout& map)
+{
+    static_objs_.clear();
+    waypoints_.clear();
+
+    // OBJS
+    for (const auto& obj : map.objs)
     {
-        const auto& trans = obj.GetTransform();
-        oss << "obj " << obj.GetModelName() << ' ';
-        oss << trans.position.x << ' ' << trans.position.y << ' ' << trans.position.z << ' ';
-        oss << trans.basis[0][0] << ' ' << trans.basis[0][1] << ' ' << trans.basis[0][2] << ' ';
-        oss << trans.basis[1][0] << ' ' << trans.basis[1][1] << ' ' << trans.basis[1][2] << ' ';
-        oss << trans.basis[2][0] << ' ' << trans.basis[2][1] << ' ' << trans.basis[2][2] << '\n';
+        static_objs_.emplace_back(*this, obj.trans, obj.model_id);
     }
 
-    // write waypoints
-    for (const auto& [id, waypoint] : waypoints_)
+    // NODES
+    for (const auto& [id, node] : map.nodes)
     {
-        const auto& trans = waypoint.GetTransform();
-        oss << "wp " << id << ' ';
+        auto& wp = waypoints_.emplace(id, Waypoint(*this, node.pos, id)).first->second;
 
-        oss << trans.position.x << ' ' << trans.position.y << ' ' << trans.position.z << ' ';
-        
         // links
-        for (auto link_id : waypoint.GetLinks())
+        for (uint32_t i = 0; i < 4; ++i)
         {
-            oss << ' ' << link_id;
-        }
-        oss << ' ';
-
-        // mesh
-        auto mesh_id = waypoint.GetMeshID();
-        if (mesh_id != mg::INVALID_RES_ID)
-        {
-            oss << " +mesh " << mg_res_->GetMeshes().GetByIndex(mesh_id).name;
+            wp.SetLink(i, node.links[i]);
         }
 
-        oss << '\n';
+        // mesh id
+        wp.SetMeshID(node.mesh_id);
     }
 
-    fs::WriteFile(file_name, oss.str());
+    UpdateAllObjectsList();
 }
 
 void edit::Project::Select(Object& obj)

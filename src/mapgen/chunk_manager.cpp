@@ -168,11 +168,11 @@ void mg::ChunkManager::ScheduleChunkUpdate(const glm::ivec2& coord, uint32_t lod
     mg::ChunkParams params{};
     params.coord = coord;
     params.lod = lod;
-    params.heightmap_seed = map_cfg_.seed;
+    params.map.cfg = map_cfg_;
     GetChunkParams(params);
 
-    auto func = [res = res_, map_cfg = map_cfg_, params = std::move(params)]() mutable {
-        auto mg_chunk = mg::GenerateChunk(*res, map_cfg, params);
+    auto func = [res = res_, params = std::move(params)]() mutable {
+        auto mg_chunk = mg::GenerateChunk(*res, params);
         auto gen_data = FinalizeChunk(*res, std::move(mg_chunk));
         return gen_data;
     };

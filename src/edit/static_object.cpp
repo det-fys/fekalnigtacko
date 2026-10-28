@@ -7,16 +7,11 @@
 #include "map_viewport.hpp"
 #include "utils/files.hpp"
 
-edit::StaticObject::StaticObject(Project& project, const FarMatrix& trans, const std::string& model_name)
-    : Object(project, trans), model_name_(model_name)
+edit::StaticObject::StaticObject(Project& project, const FarMatrix& trans, uint32_t model_id)
+    : Object(project, trans), model_id_(model_id)
 {
-    model_ = assets::AssetManager::GetInstance().Get<ModelView>(model_name);
-
-    if (fs::FileExists("data/" + model_name + ".hm"))
-    {
-        // load heightmesh
-        heightmesh_ = assets::AssetManager::GetInstance().Get<mg::HeightMesh>(model_name);
-    }
+    const auto& mgmodel = project.GetResourceSet().GetModels().GetByIndex(model_id_);
+    model_ = assets::AssetManager::GetInstance().Get<ModelView>(mgmodel.model->GetAssetName());
 
     UpdateAABB();
     MaybeInvalidateChunks();
@@ -24,7 +19,7 @@ edit::StaticObject::StaticObject(Project& project, const FarMatrix& trans, const
 
 void edit::StaticObject::Draw(const gfx::DrawContext& ctx)
 {
-    model_->Draw(ctx, GetTransform(), {});
+    //model_->Draw(ctx, GetTransform(), {});
 }
 
 void edit::StaticObject::DrawOverlay(const DrawOverlayContext& ctx)
@@ -44,7 +39,7 @@ void edit::StaticObject::SetTransform(const FarMatrix& trans)
 
 void edit::StaticObject::Clone(const FarMatrix& trans)
 {
-    GetProject().AddStaticObject(trans, model_name_);
+    GetProject().AddStaticObject(trans, model_id_);
 }
 
 void edit::StaticObject::Delete()
@@ -59,8 +54,5 @@ void edit::StaticObject::UpdateAABB()
 
 void edit::StaticObject::MaybeInvalidateChunks()
 {
-    bool invalidate_needed = (bool)heightmesh_;
-
-    if (invalidate_needed)
-        InvalidateChunks(GetAABB());
+    InvalidateChunks(GetAABB());
 }

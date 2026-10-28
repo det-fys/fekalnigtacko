@@ -83,26 +83,22 @@ void edit::MapViewport2D::Draw(ImDrawList& draw_list)
     DrawChunks(draw_list);
 }
 
-static void ShowStaticModelsMenu(const edit::StaticModelsEntry& entry, std::function<void(const std::string&)> cb)
+static void ShowStaticModelsMenu(const mg::StaticObjectModelDir& dir, std::function<void(uint32_t)> cb)
 {
-    for (const auto& child : entry.children)
+    for (const auto& subdir : dir.subdirs)
     {
-        // leaf
-        if (child.children.empty())
+        if (ImGui::BeginMenu(subdir.first.c_str()))
         {
-            if (ImGui::MenuItem(child.display_name.c_str()))
-            {
-                cb(child.model_name);
-            }
-
-            continue;
-        }
-
-        // dir
-        if (ImGui::BeginMenu(child.display_name.c_str()))
-        {
-            ShowStaticModelsMenu(child, cb);
+            ShowStaticModelsMenu(subdir.second, cb);
             ImGui::EndMenu();
+        }
+    }
+
+    for (const auto& model : dir.models)
+    {
+        if (ImGui::MenuItem(model.first.c_str()))
+        {
+            cb(model.second);
         }
     }
 }
@@ -126,8 +122,8 @@ void edit::MapViewport2D::ShowContextMenuContent()
 
     ImGui::SeparatorText("add static object");
 
-    ShowStaticModelsMenu(project.GetStaticModelsRoot(),
-                         [&](const std::string& model_name) { project.AddStaticObject(new_obj_pos_, model_name); });
+    ShowStaticModelsMenu(project.GetResourceSet().GetStaticModelsRoot(),
+                         [&](uint32_t model_id) { project.AddStaticObject(new_obj_pos_, model_id); });
 
     ImGui::SeparatorText("add other");
 
