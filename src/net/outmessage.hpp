@@ -106,6 +106,21 @@ public:
         Write(p, i);
     }
 
+    void WriteVarUInt(uint64_t value)
+    {
+        char p[10];
+        p[0] = 0b10000000 | (value & 0b01111111);
+        value >>= 7;
+        size_t i;
+        for (i = 1; value; ++i)
+        {
+            p[i] = 0b10000000 | (value & 0b01111111);
+            value >>= 7;
+        }
+        p[i - 1] &= 0b01111111; // end mark
+        Write(p, i);
+    }
+
 private:
     std::vector<char>& buffer_;
 };

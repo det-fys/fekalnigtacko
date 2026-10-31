@@ -33,10 +33,6 @@ void mg::PathGenerator::Generate(const std::map<uint32_t, Node>& nodes)
                 continue; // failed to create path
 
             std::tie(junction_link.path_id, junction_link.path_from_end) = *path_info;
-
-            const auto& mesh_link = mesh.links[i];
-            junction_link.margin = mesh_link.margin;
-            junction_link.profile_id = mesh_link.profile_id;
         }
 
         auto junction_idx = static_cast<uint32_t>(jp_.junctions.size());
@@ -153,7 +149,6 @@ std::optional<std::tuple<uint32_t, bool>> mg::PathGenerator::CreateSplinePath(co
     // store path
     auto path_id = static_cast<uint32_t>(jp_.paths.size());
     auto& path = jp_.paths.emplace_back();
-    path.profile_id = profile_id;
 
     path.points_start = static_cast<uint32_t>(jp_.path_points.size());
     path.points_count = static_cast<uint32_t>(points_.size());

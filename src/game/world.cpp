@@ -13,6 +13,9 @@
 #include "utils/chatcolors.hpp"
 #include "utils/format.hpp"
 #include "utils/random.hpp"
+#include "utils/cvars.hpp"
+#include "mapgen/map_layout_file.hpp"
+#include "mapgen/map_layout_sync.hpp"
 
 game::World::World(const collision::DynamicsWorldInfo& col_info, const WorldInfo& world_info)
     : DynamicsWorld(col_info), Scheduler(time_ms_), type_(world_info.type)
@@ -23,15 +26,7 @@ game::World::World(const collision::DynamicsWorldInfo& col_info, const WorldInfo
     }
     else if (world_info.type == WORLD_TYPE_PROCEDURAL)
     {
-        auto res = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
-
-        map_cfg_.seed = 67;
-        map_cfg_.chunks = 256;
-        map_cfg_.chunk_tiles = 128;
-        map_cfg_.chunk_size_m = 128.0f;
-
-        chunk_manager_.emplace(res, map_cfg_, *this);
-        terrain_sampler_.emplace(map_cfg_);
+        InitProcComponent(world_info);
     }
     else
     {
@@ -49,8 +44,8 @@ void game::World::SendInitData(Player& player, net::OutMessage& msg)
     }
     else
     {
-        msg.Write(map_cfg_.seed);
-        msg.Write(map_cfg_.chunks);
+        msg.Write(proc_->map.cfg.seed);
+        msg.Write(proc_->map.cfg.chunks);
     }
 
     msg.Write<net::ObjCount>(destroyed_objs_.size());
@@ -589,23 +584,47 @@ void game::World::CreateCashPickup(const glm::dvec3& position, int64_t amount, i
 
 void game::World::RequestChunkArea(const glm::dvec3& center, float radius)
 {
-    if (!chunk_manager_)
+    if (!proc_)
         return; // not procedural world
 
-    requested_areas_.emplace_back(center, radius);
+    proc_->requested_areas.emplace_back(center, radius);
 }
 
 float game::World::GetTerrainHeight(const glm::dvec3& pos)
 {
-    if (!terrain_sampler_)
+    if (!proc_)
         return 0.0f;
 
-    return terrain_sampler_->Get(pos);
+    return proc_->terrain_sampler.Get(pos);
 }
 
 glm::dvec3 game::World::GetTerrainPos(const glm::dvec3& pos)
 {
     return glm::dvec3(glm::dvec2(pos), GetTerrainHeight(pos) + pos.z);
+}
+
+const mg::MapLayoutChunk* game::World::GetChunkLayout(const glm::ivec2 coord) const
+{
+    if (!proc_)
+        return nullptr;
+
+    return proc_->chunkizer.GetChunkLayout(coord);
+}
+
+void game::World::GetChunkParams(mg::ChunkParams& params)
+{
+    if (!proc_)
+        return;
+
+    auto map_chunk = proc_->chunkizer.GetChunkLayout(params.coord);
+    if (map_chunk)
+    {
+        // encode and decode to ensure the same quantization as when sending over net
+        auto new_chunk = mg::ReencodeMapLayoutChunk(proc_->chunk_layout_buffer, *map_chunk, *proc_->res);
+
+        params.objs = std::move(new_chunk.objs);
+        params.jp = std::move(new_chunk.jp);
+    }
 }
 
 static void ApplyCrashDamage(collision::ObjectCallback& obj_cb, collision::ObjectCallback* other_obj_cb, float impulse,
@@ -633,6 +652,26 @@ static void ApplyCrashDamage(collision::ObjectCallback& obj_cb, collision::Objec
     {
         obj_cb.ReceiveDamage(damage);
     }
+}
+
+void game::World::InitProcComponent(const WorldInfo& world_info)
+{
+    std::cout << "loading proc map: " << world_info.mapname << std::endl;
+
+    auto res = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
+    auto map = mg::LoadMapLayout("data/" + world_info.mapname + ".mapl", *res);
+    proc_.emplace(res, std::move(map), *this);
+
+    // gen paths
+    mg::PathGenerator path_gen(*res);
+    std::cout << "generating paths..." << std::endl;
+    path_gen.Generate(proc_->map.nodes);
+
+    // chunkize map & paths
+    std::cout << "chunkizing map..." << std::endl;
+    proc_->chunkizer.Chunkize(*res, proc_->map, path_gen.GetPathSet());
+
+    std::cout << "proc map loaded: " << world_info.mapname << std::endl;
 }
 
 void game::World::HandleContacts()
@@ -886,16 +925,19 @@ glm::dvec3 game::World::GetGroundPosition(const glm::dvec3& pos)
 
 void game::World::UpdateChunks()
 {
-    if (!chunk_manager_)
+    if (!proc_)
         return;
 
-    chunk_manager_->BeginFrame(time_ms_);
-    for (const auto& [center, radius] : requested_areas_)
+    auto& chunk_manager = proc_->chunk_manager;
+    auto& requested_areas = proc_->requested_areas;
+
+    chunk_manager.BeginFrame(time_ms_);
+    for (const auto& [center, radius] : requested_areas)
     {
         auto radius_d = static_cast<double>(radius);
-        chunk_manager_->RequestArea(center, {&radius_d, 1});
+        chunk_manager.RequestArea(center, {&radius_d, 1});
     }
-    chunk_manager_->EndFrame();
+    chunk_manager.EndFrame();
 
-    requested_areas_.clear();
+    requested_areas.clear();
 }

@@ -11,6 +11,7 @@
 #include "utils/chatcolors.hpp"
 #include "db/db.hpp"
 #include "utils/format.hpp"
+#include "mapgen/map_layout_sync.hpp"
 
 CVAR(uint8_t, pl_autoadmin, CV_NONE, 0, 0, 1);
 
@@ -196,6 +197,10 @@ void game::Player::SyncWorld()
         known_world_ = world_;
         known_ents_.clear();
 
+        current_chunk_.reset();
+        known_chunks_.clear();
+        chunk_queue_.clear();
+
         return; // send updates next frame
     }
 
@@ -205,6 +210,7 @@ void game::Player::SyncWorld()
         SendWorldUpdateMsg();
         SendEnv();
         SyncEntities();
+        SyncChunks();
     }
 }
 
@@ -339,6 +345,104 @@ void game::Player::SendEnv()
 
     auto msg = BeginMsg(net::MSG_ENV);
     msg.Write<net::DayTimeQ>(world_->GetDayTime());
+}
+
+void game::Player::SyncChunks()
+{
+    if (!world_ || !world_->IsProcedural())
+        return;
+
+    UpdateChunkArea();
+
+    // send one chunk per frame
+    if (!chunk_queue_.empty())
+    {
+        auto coord = chunk_queue_.back();
+        chunk_queue_.pop_back();
+        SendChunkLayout(coord);
+        known_chunks_.insert(coord);
+    }
+}
+
+static inline float ChunkDistanceSq(const glm::ivec2& a, const glm::ivec2& b)
+{
+    auto d = glm::vec2(a - b);
+    return glm::dot(d, d);
+}
+
+void game::Player::UpdateChunkArea()
+{
+    constexpr int MAX_CHUNK_DIST = 10; // in chunks
+    constexpr auto MAX_CHUNK_DIST_SQ = static_cast<float>(MAX_CHUNK_DIST * MAX_CHUNK_DIST);
+
+    auto chunk_coord = glm::ivec2(glm::floor(cull_pos_ / static_cast<double>(world_->GetMapConfig().chunk_size_m)));
+    if (current_chunk_ && *current_chunk_ == chunk_coord)
+        return; // already up to date
+
+    current_chunk_ = chunk_coord;
+
+    // forget far chunks
+    for (auto it = known_chunks_.begin(); it != known_chunks_.end();)
+    {
+        if ((ChunkDistanceSq(*it, chunk_coord) - 1.5f) > MAX_CHUNK_DIST_SQ)
+        {
+            SendChunkForget(*it);
+            it = known_chunks_.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    // queue new chunks
+    chunk_queue_.clear();
+
+    auto min_chunk = chunk_coord - MAX_CHUNK_DIST;
+    auto max_chunk = chunk_coord + MAX_CHUNK_DIST;
+
+    for (int y = min_chunk.y; y <= max_chunk.y; ++y)
+    {
+        for (int x = min_chunk.x; x <= max_chunk.x; ++x)
+        {
+            glm::ivec2 coord(x, y);
+            if (ChunkDistanceSq(coord, chunk_coord) > MAX_CHUNK_DIST_SQ)
+                continue;
+
+            if (known_chunks_.contains(coord))
+                continue;
+
+            auto chunk_layout = world_->GetChunkLayout(coord);
+            if (!chunk_layout)
+                continue; // nothing in this chunk, no need to send
+
+            chunk_queue_.emplace_back(coord);
+        }
+    }
+
+    // sort by distance to player in order from farthest as the queue vector is processed from the back
+    std::sort(chunk_queue_.begin(), chunk_queue_.end(), [chunk_coord](const glm::ivec2& a, const glm::ivec2& b) {
+        return ChunkDistanceSq(a, chunk_coord) > ChunkDistanceSq(b, chunk_coord);
+    });
+}
+
+void game::Player::SendChunkLayout(const glm::ivec2& coord)
+{
+    auto map_chunk = world_->GetChunkLayout(coord);
+    if (!map_chunk)
+        return; // should not happen
+
+    auto msg = BeginMsg(net::MSG_CHUNKLAYOUT);
+    msg.WriteVarInt(coord.x);
+    msg.WriteVarInt(coord.y);
+    mg::WriteMapLayoutChunk(msg, *map_chunk);
+}
+
+void game::Player::SendChunkForget(const glm::ivec2& coord)
+{
+    auto msg = BeginMsg(net::MSG_CHUNKFORGET);
+    msg.WriteVarInt(coord.x);
+    msg.WriteVarInt(coord.y);
 }
 
 void game::Player::SyncEntities()

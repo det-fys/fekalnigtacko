@@ -520,7 +520,18 @@ struct ChunkGenerator
     void GeneratePathMesh(uint32_t path_id)
     {
         const auto& path = params.jp.paths[path_id];
-        const auto& profile = res.GetProfiles().GetByIndex(path.profile_id);
+
+        const auto& start_endpoint = path.endpoints[0];
+        const auto& end_endpoint = path.endpoints[1];
+
+        const auto& start_junction = params.jp.junctions[start_endpoint.junction_id];
+        const auto& start_junction_gen = junctions_gen[start_endpoint.junction_id];
+        const auto& start_junction_mesh = res.GetMeshes().GetByIndex(start_junction.mesh_id);
+        const auto& end_junction = params.jp.junctions[end_endpoint.junction_id];
+        const auto& end_junction_gen = junctions_gen[end_endpoint.junction_id];
+        const auto& end_junction_mesh = res.GetMeshes().GetByIndex(end_junction.mesh_id);
+
+        const auto& profile = res.GetProfiles().GetByIndex(start_junction_mesh.links[start_endpoint.link_idx].profile_id);
 
         const auto verts_count = static_cast<uint32_t>(profile.verts.size());
         std::vector<uint32_t> vertices(verts_count * 2);
@@ -529,14 +540,6 @@ struct ChunkGenerator
 
         auto& spline = temp_paths[0];
         spline.SetPoints(params.jp.GetPathPoints(path_id));
-
-        const auto& start_endpoint = path.endpoints[0];
-        const auto& end_endpoint = path.endpoints[1];
-
-        const auto& start_junction = params.jp.junctions[start_endpoint.junction_id];
-        const auto& start_junction_gen = junctions_gen[start_endpoint.junction_id];
-        const auto& end_junction = params.jp.junctions[end_endpoint.junction_id];
-        const auto& end_junction_gen = junctions_gen[end_endpoint.junction_id];
 
         bool have_start_verts = false;
 
@@ -549,9 +552,9 @@ struct ChunkGenerator
 
         const auto step_size = 3.0 * path_segment_length_scale; // meters
         const auto min_step = step_size * 0.5;
-        const auto start_margin = start_junction.links[start_endpoint.link_idx].margin;
+        const auto start_margin = start_junction_mesh.links[start_endpoint.link_idx].margin;
         const auto start_t = start_margin + step_size;
-        const auto end_margin = end_junction.links[end_endpoint.link_idx].margin;
+        const auto end_margin = end_junction_mesh.links[end_endpoint.link_idx].margin;
         const auto end_with_margin =  spline.GetTotalLength() - end_margin;
         const auto end_t = end_with_margin - min_step;
 

@@ -14,6 +14,7 @@
 #include "object.hpp"
 #include "static_object.hpp"
 #include "mapgen/map_layout_file.hpp"
+#include "mapgen/map_layout_sync.hpp"
 
 edit::Project::Project(MapEditProperties& properties)
     : properties_(properties), mg_res_(assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources")),
@@ -315,8 +316,11 @@ void edit::Project::GetChunkParams(mg::ChunkParams& params)
     auto map_chunk = map_chunkizer_.GetChunkLayout(params.coord);
     if (map_chunk)
     {
-        params.objs = map_chunk->objs;
-        params.jp = map_chunk->jp;
+        // encode and decode to ensure the same quantization as when sending over net
+        auto new_chunk = mg::ReencodeMapLayoutChunk(chunk_layout_buffer_, *map_chunk, *mg_res_);
+
+        params.objs = std::move(new_chunk.objs);
+        params.jp = std::move(new_chunk.jp);
     }
 }
 
@@ -536,11 +540,6 @@ edit::Object* edit::Project::ObjectRaycast(const glm::dvec3& start, const glm::d
 
 void edit::Project::SetupChunks()
 {
-    map_config_.seed = 0;
-    map_config_.chunks = 128;
-    map_config_.chunk_size_m = 128.0f;
-    map_config_.chunk_tiles = 128;
-
     height_sampler_.emplace(map_config_);
     chunk_manager_.emplace(mg_res_, map_config_, *this);
 }

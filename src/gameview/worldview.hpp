@@ -13,6 +13,8 @@
 #include "particle_emitter.hpp"
 #include "game/world_info.hpp"
 #include "chunk_manager_client.hpp"
+#include "mapgen/resources.hpp"
+#include "mapgen/map_layout_chunkizer.hpp"
 
 namespace game::view
 {
@@ -26,6 +28,23 @@ struct BeamView
     glm::vec3 end;
     float width;
     uint32_t color;
+};
+
+class WorldView;
+
+class WorldViewChunkManager : public ClientChunkManager
+{
+public:
+    WorldViewChunkManager(std::shared_ptr<const mg::ResourceSet> res, const mg::MapConfig& map_cfg, WorldView& world)
+        : ClientChunkManager(std::move(res), map_cfg), world_(world)
+    {
+    }
+    
+protected:
+    virtual void GetChunkParams(mg::ChunkParams& out_params) override;
+
+private:
+    WorldView& world_;
 };
 
 class WorldView : public collision::DynamicsWorld
@@ -49,6 +68,8 @@ public:
 
     bool IsLoaded() const;
 
+    void GetChunkParams(mg::ChunkParams& out_params);
+
 private:
     void UpdateEnv();
     void DrawEnv(const DrawArgs& args) const;
@@ -62,6 +83,8 @@ private:
     bool ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, bool enable);
     bool ProcessBeamMsg(net::InMessage& msg);
     bool ProcessFxMsg(net::InMessage& msg);
+    bool ProcessChunkLayoutMsg(net::InMessage& msg);
+    bool ProcessChunkForgetMsg(net::InMessage& msg);
 
     void UpdateBeams();
     void DrawBeams(const DrawArgs& args) const;
@@ -77,8 +100,10 @@ private:
     std::unique_ptr<MapInstanceView> map_;
 
     // procedural type
+    std::shared_ptr<const mg::ResourceSet> mg_res_;
     mg::MapConfig map_cfg_;
-    std::optional<ClientChunkManager> chunk_manager_;
+    std::optional<WorldViewChunkManager> chunk_manager_;
+    std::unordered_map<glm::ivec2, mg::MapLayoutChunk> chunk_layouts_;
     int64_t chunk_time_ = 0;
 
     std::map<net::EntNum, std::unique_ptr<EntityView>> ents_;

@@ -131,6 +131,25 @@ public:
         return true;
     }
 
+    bool ReadVarUInt(uint64_t& value)
+    {
+        uint8_t p;
+        if (!Read(p))
+            return false;
+        bool next = p & 0b10000000;
+        value = p & 0b01111111;
+        size_t shift = 7;
+        while (next)
+        {
+            if (!Read(p))
+                return false;
+            next = p & 0b10000000;
+            value |= static_cast<uint64_t>(p & 0b01111111) << shift;
+            shift += 7;
+        }
+        return true;
+    }
+
     bool Skip(size_t count)
     {
         if (!CheckAvail(count))

@@ -108,6 +108,7 @@ set(COMMON_SOURCES
     "src/mapgen/map_layout.cpp"
     "src/mapgen/map_layout_chunkizer.cpp"
     "src/mapgen/map_layout_file.cpp"
+    "src/mapgen/map_layout_sync.cpp"
     "src/mapgen/path_gen.cpp"
     "src/mapgen/resources.cpp"
     "src/mapgen/samplers.cpp"

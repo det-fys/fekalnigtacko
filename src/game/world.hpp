@@ -14,6 +14,9 @@
 #include "chunk_manager_server.hpp"
 #include "world_info.hpp"
 #include "mapgen/samplers.hpp"
+#include "mapgen/map_layout.hpp"
+#include "mapgen/path_gen.hpp"
+#include "mapgen/map_layout_chunkizer.hpp"
 
 namespace game
 {
@@ -64,6 +67,25 @@ struct WorldInfo
 {
     WorldType type = WORLD_TYPE_MAP;
     std::string mapname;
+};
+
+class World;
+
+struct ProceduralWorldComponent
+{
+    std::shared_ptr<const mg::ResourceSet> res;
+    mg::MapLayout map;
+    mg::MapLayoutChunkizer chunkizer;
+    std::vector<char> chunk_layout_buffer;
+    ServerChunkManager chunk_manager;
+    mg::TerrainHeightSampler terrain_sampler;
+    std::vector<std::tuple<glm::dvec3, float>> requested_areas;
+
+    ProceduralWorldComponent(std::shared_ptr<const mg::ResourceSet> res, mg::MapLayout&& map, World& world)
+        : res(std::move(res)), map(std::move(map)), chunk_manager(this->res, this->map.cfg, world),
+          terrain_sampler(this->map.cfg)
+    {
+    }
 };
 
 class World : public collision::DynamicsWorld, public net::MsgProducer, public net::LocalMsgProducer, public Scheduler
@@ -129,12 +151,20 @@ public:
     float GetTerrainHeight(const glm::dvec3& pos);
     glm::dvec3 GetTerrainPos(const glm::dvec3& pos);
 
+    bool IsProcedural() const { return proc_.has_value(); }
+    const mg::MapConfig& GetMapConfig() const { return proc_->map.cfg; }
+    const mg::MapLayoutChunk* GetChunkLayout(const glm::ivec2 coord) const;
+
+    void GetChunkParams(mg::ChunkParams& out_params);
+
     virtual ~World() = default;
 
 protected:
     virtual void QueryChunkGenCenters(std::vector<glm::dvec3>& out_centers) {}
 
 private:
+    void InitProcComponent(const WorldInfo& world_info);
+
     void HandleContacts();
 
     void DestroyObject(net::ObjNum objnum, const MapObjectBreakInfo& info);
@@ -159,10 +189,7 @@ private:
     std::set<net::ObjNum> destroyed_objs_;
 
     // procedural type
-    mg::MapConfig map_cfg_;
-    std::optional<ServerChunkManager> chunk_manager_;
-    std::optional<mg::TerrainHeightSampler> terrain_sampler_;
-    std::vector<std::tuple<glm::dvec3, float>> requested_areas_;
+    std::optional<ProceduralWorldComponent> proc_;
 
     std::map<net::EntNum, std::unique_ptr<Entity>> ents_;
     net::EntNum last_entnum_ = 0;

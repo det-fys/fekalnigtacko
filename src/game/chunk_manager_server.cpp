@@ -21,8 +21,7 @@ game::ServerChunkManager::~ServerChunkManager()
 void game::ServerChunkManager::GetChunkParams(mg::ChunkParams& out_params)
 {
     out_params.collision_only = true;
-
-    // TODO
+    world_.GetChunkParams(out_params);
 }
 
 void game::ServerChunkManager::OnChunkGenerated(const mg::ChunkGenData& gen_data)

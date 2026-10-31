@@ -13,6 +13,7 @@
 #include "net/utils.hpp"
 #include "gui/loading_screen.hpp"
 #include "utils/cvars.hpp"
+#include "mapgen/map_layout_sync.hpp"
 
 CVAR_CL(uint8_t, wv_chunk_distance, CV_SAVE, 5, 0, 5);
 
@@ -35,11 +36,8 @@ game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) :
         if (!msg.Read(map_cfg_.seed) || !msg.Read(map_cfg_.chunks))
             throw EntityInitError();
 
-        map_cfg_.chunk_size_m = 128.0f;
-        map_cfg_.chunk_tiles = 128;
-
-        auto res = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
-        chunk_manager_.emplace(res, map_cfg_);
+        mg_res_ = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
+        chunk_manager_.emplace(mg_res_, map_cfg_, *this);
     }
     else
     {
@@ -95,6 +93,12 @@ bool game::view::WorldView::ProcessMsg(net::MessageType type, net::InMessage& ms
 
     case net::MSG_FX:
         return ProcessFxMsg(msg);
+
+    case net::MSG_CHUNKLAYOUT:
+        return ProcessChunkLayoutMsg(msg);
+
+    case net::MSG_CHUNKFORGET:
+        return ProcessChunkForgetMsg(msg);
 
     default:
         return false;
@@ -198,6 +202,18 @@ game::view::EntityView* game::view::WorldView::GetEntity(net::EntNum entnum)
 bool game::view::WorldView::IsLoaded() const
 {
     return !map_ || map_->IsLoaded();
+}
+
+void game::view::WorldView::GetChunkParams(mg::ChunkParams& out_params)
+{
+    auto it = chunk_layouts_.find(out_params.coord);
+
+    if (it != chunk_layouts_.end())
+    {
+        out_params.objs = it->second.objs;
+        out_params.jp = it->second.jp;
+        return;
+    }
 }
 
 void game::view::WorldView::UpdateEnv()
@@ -399,6 +415,48 @@ bool game::view::WorldView::ProcessFxMsg(net::InMessage& msg)
 
 }
 
+static inline bool ReadChunkCoord(net::InMessage& msg, glm::ivec2& coord)
+{
+    int64_t x, y;
+    if (!msg.ReadVarInt(x) || !msg.ReadVarInt(y))
+        return false;
+
+    coord.x = static_cast<int>(x);
+    coord.y = static_cast<int>(y);
+    return true;
+}
+
+bool game::view::WorldView::ProcessChunkLayoutMsg(net::InMessage& msg)
+{
+    if (!chunk_manager_)
+        return false; // not procedural world
+
+    glm::ivec2 coord;
+    if (!ReadChunkCoord(msg, coord))
+        return false;
+
+    mg::MapLayoutChunk chunk_layout;
+    if (!mg::ReadMapLayoutChunk(msg, chunk_layout, *mg_res_))
+        return false;
+
+    chunk_layouts_[coord] = std::move(chunk_layout);
+    chunk_manager_->InvalidateChunk(coord);
+    return true;
+}
+
+bool game::view::WorldView::ProcessChunkForgetMsg(net::InMessage& msg)
+{
+    if (!chunk_manager_)
+        return false; // not procedural world
+
+    glm::ivec2 coord;
+    if (!ReadChunkCoord(msg, coord))
+        return false;
+    
+    chunk_layouts_.erase(coord);
+    return true;
+}
+
 void game::view::WorldView::UpdateBeams()
 {
     beams_.erase(std::remove_if(beams_.begin(), beams_.end(),
@@ -446,4 +504,9 @@ void game::view::WorldView::UpdateChunks()
     chunk_manager_->BeginFrame(++chunk_time_);
     chunk_manager_->RequestArea(cam_pos, lod_distances);
     chunk_manager_->EndFrame();
+}
+
+void game::view::WorldViewChunkManager::GetChunkParams(mg::ChunkParams& out_params)
+{
+    world_.GetChunkParams(out_params);
 }

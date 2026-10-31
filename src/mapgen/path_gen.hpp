@@ -16,14 +16,11 @@ struct JunctionLink
 {
     uint32_t path_id = INVALID_ID;
     bool path_from_end = false;
-    uint32_t profile_id = INVALID_RES_ID;
-    double margin = 0.0;
 };
 
 struct Junction
 {
     glm::dvec3 pos{0.0};
-    //uint32_t node_id = INVALID_ID;
     uint32_t mesh_id = INVALID_RES_ID;
     std::array<JunctionLink, 4> links;
 };
@@ -38,8 +35,6 @@ struct PathEndpoint
 struct Path
 {
     std::array<PathEndpoint, 2> endpoints;
-    uint32_t profile_id = INVALID_ID;
-
     uint32_t points_start = 0;
     uint32_t points_count = 0;
 };

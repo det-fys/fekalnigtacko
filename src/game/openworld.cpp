@@ -51,6 +51,7 @@ CVAR(float, ow_npc_passenger_chance, CV_NONE, 0.3f, 0.0f, 1.0f);
 CVAR(float, ow_npc_passenger_armed_chance, CV_NONE, 0.8f, 0.0f, 1.0f);
 
 CVAR(uint8_t, ow_legacy_map, CV_NONE, 0, 0, 1);
+CVAR(std::string, ow_map_layout, CV_NONE, "default", 0, 32);
 
 static const char* GetRandomCarModel()
 {
@@ -136,6 +137,7 @@ static game::WorldInfo GetOpenWorldInfo()
     else
     {
         info.type = game::WORLD_TYPE_PROCEDURAL;
+        info.mapname = ow_map_layout.Get();
     }
     
     return info;

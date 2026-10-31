@@ -1,9 +1,11 @@
 #pragma once
 
 #include <set>
+#include <unordered_set>
 #include <memory>
 
 #include <glm/glm.hpp>
+#include <glm/gtx/hash.hpp>
 
 #include "net/defs.hpp"
 #include "net/inmessage.hpp"
@@ -75,6 +77,12 @@ private:
     void SendDamageEvent(DamageEventType type);
     void SendEnv();
 
+    // chunk sync
+    void SyncChunks();
+    void UpdateChunkArea();
+    void SendChunkLayout(const glm::ivec2& coord);
+    void SendChunkForget(const glm::ivec2& coord);
+
     // entities sync
     void SyncEntities();
     bool ShouldSeeEntity(const Entity& entity) const;
@@ -105,10 +113,16 @@ private:
     db::PlayerId id_ = 0;
     std::string name_;
 
+    // world
     World* world_ = nullptr;
     World* known_world_ = nullptr;
     std::set<net::EntNum> known_ents_;
     int64_t last_env_time_ = 0;
+
+    // procedural world
+    std::optional<glm::ivec2> current_chunk_;
+    std::unordered_set<glm::ivec2> known_chunks_;
+    std::vector<glm::ivec2> chunk_queue_;
 
     PlayerInputFlags in_ = 0;
     PlayerInputFlags in_new_ = 0;

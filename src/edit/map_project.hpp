@@ -141,6 +141,7 @@ private:
     mg::MapConfig map_config_;
     mg::PathGenerator path_gen_;
     mg::MapLayoutChunkizer map_chunkizer_;
+    std::vector<char> chunk_layout_buffer_;
     bool map_valid_ = false;
     int64_t chunk_gen_time_ = 0;
     std::optional<ProjectChunkManager> chunk_manager_;

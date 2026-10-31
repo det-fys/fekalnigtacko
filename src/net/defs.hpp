@@ -52,6 +52,13 @@ enum MessageType : uint8_t
     // HUDEVENT ...
     MSG_HUDEVENT,
 
+    /*~~~~~~~~ Chunks ~~~~~~~~*/
+    // CHUNKLAYOUT <VarInt X> <VarInt Y> ...
+    MSG_CHUNKLAYOUT,
+
+    // CHUNKFORGET <VarInt X> <VarInt Y>
+    MSG_CHUNKFORGET,
+
     /*~~~~~~~~ Entity ~~~~~~~~*/
     // ENTSPAWN <EntNum> <EntType> data...
     MSG_ENTSPAWN,
