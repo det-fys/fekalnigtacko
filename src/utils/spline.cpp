@@ -230,16 +230,20 @@ glm::dvec3 CatmullRomSpline::GetDerivative(double u) const
 // SplinePath
 // ============================================================================
 
-SplinePath::SplinePath(std::span<const glm::dvec3> points, int samples_per_segment)
+void SplinePath::SetPoints(std::span<const glm::dvec3> points, double resolution, int samples_per_segment)
 {
+    // reset
+    total_length_ = 0.0;
+    spacing_ = 0.0;
+    raw_frames_.clear();
+    uniform_frames_.clear();
+
     if (points.size() < 4 || samples_per_segment <= 0)
     {
         return;
     }
-
-    std::vector<SplineFrame> raw_frames;
-
-    raw_frames.reserve((points.size() - 3) * static_cast<size_t>(samples_per_segment + 1));
+    
+    raw_frames_.reserve((points.size() - 3) * static_cast<size_t>(samples_per_segment + 1));
 
     // ------------------------------------------------------------------------
     // 1. Dense sampling.
@@ -282,13 +286,13 @@ SplinePath::SplinePath(std::span<const glm::dvec3> points, int samples_per_segme
             frame.arc_length = curr_length;
             frame.pos = pos;
 
-            raw_frames.push_back(frame);
+            raw_frames_.push_back(frame);
         }
     }
 
     total_length_ = curr_length;
 
-    if (raw_frames.size() < 2)
+    if (raw_frames_.size() < 2)
     {
         return;
     }
@@ -303,24 +307,24 @@ SplinePath::SplinePath(std::span<const glm::dvec3> points, int samples_per_segme
     // endpoint deformation problem.
     // ------------------------------------------------------------------------
 
-    for (size_t i = 0; i < raw_frames.size(); ++i)
+    for (size_t i = 0; i < raw_frames_.size(); ++i)
     {
         glm::dvec3 tangent(0.0);
 
         if (i == 0)
         {
-            tangent = raw_frames[1].pos - raw_frames[0].pos;
+            tangent = raw_frames_[1].pos - raw_frames_[0].pos;
         }
-        else if (i == raw_frames.size() - 1)
+        else if (i == raw_frames_.size() - 1)
         {
-            tangent = raw_frames[i].pos - raw_frames[i - 1].pos;
+            tangent = raw_frames_[i].pos - raw_frames_[i - 1].pos;
         }
         else
         {
-            tangent = raw_frames[i + 1].pos - raw_frames[i - 1].pos;
+            tangent = raw_frames_[i + 1].pos - raw_frames_[i - 1].pos;
         }
 
-        raw_frames[i].tangent = SafeNormalize(tangent, glm::dvec3(1.0, 0.0, 0.0));
+        raw_frames_[i].tangent = SafeNormalize(tangent, glm::dvec3(1.0, 0.0, 0.0));
     }
 
     // ------------------------------------------------------------------------
@@ -338,7 +342,7 @@ SplinePath::SplinePath(std::span<const glm::dvec3> points, int samples_per_segme
 
     const glm::dvec3 world_up(0.0, 0.0, 1.0);
 
-    for (SplineFrame& frame : raw_frames)
+    for (SplineFrame& frame : raw_frames_)
     {
         glm::dvec3 T = SafeNormalize(frame.tangent, glm::dvec3(1.0, 0.0, 0.0));
 
@@ -364,14 +368,14 @@ SplinePath::SplinePath(std::span<const glm::dvec3> points, int samples_per_segme
     // 4. Resample by arc length.
     // ------------------------------------------------------------------------
 
-    ResampleUniform(raw_frames, kDefaultSpacing);
+    ResampleUniform(resolution);
 }
 
-void SplinePath::ResampleUniform(std::span<const SplineFrame> raw_frames, double desired_spacing)
+void SplinePath::ResampleUniform(double desired_spacing)
 {
     uniform_frames_.clear();
 
-    if (raw_frames.size() < 2 || total_length_ <= 0.0)
+    if (raw_frames_.size() < 2 || total_length_ <= 0.0)
     {
         spacing_ = 0.0;
         return;
@@ -395,13 +399,13 @@ void SplinePath::ResampleUniform(std::span<const SplineFrame> raw_frames, double
         // Force the final sample to be exactly the endpoint.
         const double dist = (i == interval_count) ? total_length_ : static_cast<double>(i) * spacing_;
 
-        while (raw_idx + 1 < raw_frames.size() && raw_frames[raw_idx + 1].arc_length < dist)
+        while (raw_idx + 1 < raw_frames_.size() && raw_frames_[raw_idx + 1].arc_length < dist)
         {
             ++raw_idx;
         }
 
-        const SplineFrame& f1 = raw_frames[raw_idx];
-        const SplineFrame& f2 = raw_frames[std::min(raw_idx + 1, raw_frames.size() - 1)];
+        const SplineFrame& f1 = raw_frames_[raw_idx];
+        const SplineFrame& f2 = raw_frames_[std::min(raw_idx + 1, raw_frames_.size() - 1)];
 
         const double segment_length = f2.arc_length - f1.arc_length;
         double t = 0.0;

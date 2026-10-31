@@ -147,36 +147,9 @@ void ChunkPoissonVariable(uint32_t seed, glm::ivec2 coord, double chunk_size, do
     }
 }
 
-constexpr uint32_t INVALID_ID = 0xFFFFFFFF;
-
-struct JunctionLinkInfo
+struct JunctionGenInfo
 {
-    uint32_t path_id = INVALID_ID;
-    bool path_from_end = false;
-    uint32_t profile_id = 0;
-    double margin = 0.0;
-};
-
-struct JunctionInfo
-{
-    glm::dvec3 pos{0.0};
-    uint32_t mesh_id = 0;
     uint32_t base_vertex = INVALID_ID;
-    std::array<JunctionLinkInfo, 4> links;
-};
-
-struct PathEndpointInfo
-{
-    uint32_t junction_node_id = INVALID_ID; // original node id
-    uint32_t junction_idx = INVALID_ID;     // idx in junctions vector
-    uint32_t link_idx = INVALID_ID;
-};
-
-struct PathInfo
-{
-    SplinePath spline;
-    uint32_t profile_id = INVALID_ID;
-    std::array<PathEndpointInfo, 2> endpoints;
 };
 
 struct RawMeshVertex
@@ -229,10 +202,9 @@ struct ChunkGenerator
     AABBD2 tiles_aabb;
     AABB2 local_tiles_aabb; // in local chunk space
 
-    std::vector<JunctionInfo> junctions;
-    std::vector<PathInfo> paths;
-    std::map<std::tuple<uint32_t, uint32_t>, std::tuple<uint32_t, bool>>
-        link2path; // (node_id, link_index) -> (path_id, from_end)
+    // J&Ps
+    std::vector<JunctionGenInfo> junctions_gen;
+    std::array<SplinePath, 4> temp_paths;
 
     // raw mesh - both visual/collision and heightmesh
     std::vector<RawMeshVertex> raw_verts;
@@ -243,15 +215,14 @@ struct ChunkGenerator
     std::vector<mg::Triangle> hm_tris;
 
     ChunkGenerator(const mg::ResourceSet& res, const mg::ChunkParams& params, mg::Chunk& chunk)
-        : res(res), params(params), chunk(chunk), bounds(GetChunkAABB(params.map.cfg, params.coord)),
-          extended_bounds(GetChunkAABB(params.map.cfg, params.coord, true)), height_sampler(params.map.cfg),
-          forest_sampler(params.map.cfg.seed), color_sampler(params.map.cfg.seed), grass_sampler(params.map.cfg.seed),
-          tiles_border(params.map.cfg.chunk_border),
-          tiles_stride(params.map.cfg.chunk_tiles + params.map.cfg.chunk_border * 2),
+        : res(res), params(params), chunk(chunk), bounds(GetChunkAABB(params.cfg, params.coord)),
+          extended_bounds(GetChunkAABB(params.cfg, params.coord, true)), height_sampler(params.cfg),
+          forest_sampler(params.cfg.seed), color_sampler(params.cfg.seed), grass_sampler(params.cfg.seed),
+          tiles_border(params.cfg.chunk_border), tiles_stride(params.cfg.chunk_tiles + params.cfg.chunk_border * 2),
           tiles(tiles_stride * tiles_stride),
-          tile_size_m(params.map.cfg.chunk_size_m / static_cast<double>(params.map.cfg.chunk_tiles)),
-          tiles_aabb(bounds.min - glm::dvec2(params.map.cfg.chunk_border) * static_cast<double>(tile_size_m),
-                     bounds.max + glm::dvec2(params.map.cfg.chunk_border) * static_cast<double>(tile_size_m)),
+          tile_size_m(params.cfg.chunk_size_m / static_cast<double>(params.cfg.chunk_tiles)),
+          tiles_aabb(bounds.min - glm::dvec2(params.cfg.chunk_border) * static_cast<double>(tile_size_m),
+                     bounds.max + glm::dvec2(params.cfg.chunk_border) * static_cast<double>(tile_size_m)),
           chunk_center((bounds.min + bounds.max) * 0.5),
           local_tiles_aabb(glm::vec2(tiles_aabb.min - chunk_center), glm::vec2(tiles_aabb.max - chunk_center)),
           local_bounds(glm::vec2(bounds.min - chunk_center), glm::vec2(bounds.max - chunk_center))
@@ -263,7 +234,6 @@ struct ChunkGenerator
     {
         SetupLod();
         InitHeightmap();
-        MakeJunctionsAndPaths();
         GenerateJunctionAndPathMeshes();
         GenerateHeightmesh();
         AppendObjects();
@@ -357,178 +327,6 @@ struct ChunkGenerator
         }
     }
 
-    static uint32_t GetPathContinuation(const Node& node, uint32_t prev_node_id)
-    {
-        if (node.links[0] == prev_node_id)
-            return node.links[1];
-
-        if (node.links[1] == prev_node_id)
-            return node.links[0];
-
-        return 0;
-    }
-
-    static uint32_t GetLinkIndex(const Node& node, uint32_t link_node_id)
-    {
-        for (uint32_t i = 0; i < node.links.size(); ++i)
-        {
-            if (node.links[i] == link_node_id)
-                return i;
-        }
-        return INVALID_ID; // not found
-    }
-
-    std::optional<std::tuple<uint32_t, bool>> CreateSplinePath(uint32_t start_junction_id, uint32_t start_link_idx)
-    {
-        const auto& nodes = params.map.nodes;
-
-        auto start_key = std::make_tuple(start_junction_id, start_link_idx);
-
-        if (auto it = link2path.find(start_key); it != link2path.end())
-        {
-            return it->second; // already processed
-        }
-
-        const auto& start_node = nodes.at(start_junction_id);
-
-        const auto& start_mesh = res.GetMeshes().GetByIndex(start_node.mesh_id);
-        if (start_link_idx >= start_mesh.links.size())
-            return std::nullopt; // invalid link index
-
-        auto profile_id = start_mesh.links[start_link_idx].profile_id;
-
-        auto second_node_id = start_node.links[start_link_idx];
-        if (second_node_id == 0)
-            return std::nullopt; // invalid link
-
-        const auto& second_node = nodes.at(second_node_id);
-
-        std::vector<glm::dvec3> spline_points;
-        spline_points.reserve(16);
-
-        // find the point before junction for correct direction
-        auto prev_node_id = GetPathContinuation(start_node, second_node_id);
-        spline_points.push_back(prev_node_id > 0 ? nodes.at(prev_node_id).pos : start_node.pos);
-
-        // add start and second node
-        spline_points.push_back(start_node.pos);
-        // spline_points.push_back(second_node.pos);
-
-        // traverse the spline until we reach another junction
-        prev_node_id = start_junction_id;
-        uint32_t current_node_id = second_node_id;
-
-        while (true)
-        {
-            auto& current_node = nodes.at(current_node_id);
-            spline_points.push_back(current_node.pos);
-
-            auto next_node_id = GetPathContinuation(current_node, prev_node_id);
-
-            // terminate if current node is a junction
-            if (current_node.mesh_id != mg::INVALID_RES_ID)
-            {
-                // add next node position for correct direction
-                spline_points.push_back(next_node_id > 0 ? nodes.at(next_node_id).pos : current_node.pos);
-
-                break;
-            }
-
-            if (next_node_id == 0)
-            {
-                // reached end without junction -> invalid path
-                return std::nullopt;
-            }
-
-            prev_node_id = current_node_id;
-            current_node_id = next_node_id;
-        }
-
-        const auto& end_junction_id = current_node_id;
-        const auto& end_node = nodes.at(end_junction_id);
-
-        auto end_link_idx = GetLinkIndex(nodes.at(end_junction_id), prev_node_id);
-        if (end_link_idx == INVALID_ID)
-            return std::nullopt; // end junction does not link to this path ??
-
-        // check profile match
-        const auto& end_mesh = res.GetMeshes().GetByIndex(end_node.mesh_id);
-        if (end_link_idx >= end_mesh.links.size())
-            return std::nullopt; // invalid link index
-
-        if (end_mesh.links[end_link_idx].profile_id != profile_id)
-            return std::nullopt; // profile mismatch
-
-        auto end_key = std::make_tuple(end_junction_id, end_link_idx);
-
-        // store path
-        auto path_id = static_cast<uint32_t>(paths.size());
-        auto& path = paths.emplace_back();
-        path.spline = SplinePath(spline_points);
-        path.profile_id = profile_id;
-        path.endpoints[0].junction_node_id = start_junction_id;
-        path.endpoints[0].link_idx = start_link_idx;
-        path.endpoints[1].junction_node_id = end_junction_id;
-        path.endpoints[1].link_idx = end_link_idx;
-
-        // store path mapping for both ends
-        link2path[start_key] = std::make_tuple(path_id, false);
-        link2path[end_key] = std::make_tuple(path_id, true);
-
-        return std::make_tuple(path_id, false);
-    }
-
-    void MakeJunctionsAndPaths()
-    {
-        std::map<uint32_t, uint32_t> node2junction; // node id -> junction idx
-
-        // iterate over junctions and create paths from their links
-        for (const auto& [node_id, node] : params.map.nodes)
-        {
-            if (node.mesh_id == INVALID_RES_ID)
-                continue; // not junction
-
-            JunctionInfo junction{};
-            junction.pos = node.pos;
-            junction.mesh_id = node.mesh_id;
-
-            const auto& mesh = res.GetMeshes().GetByIndex(junction.mesh_id);
-
-            for (uint32_t i = 0; i < node.links.size(); ++i)
-            {
-                const auto& node_link = node.links[i];
-                auto& junction_link = junction.links[i];
-
-                if (node_link == 0)
-                    continue; // no link
-
-                auto path_info = CreateSplinePath(node_id, i);
-                if (!path_info)
-                    continue; // failed to create path
-
-                std::tie(junction_link.path_id, junction_link.path_from_end) = *path_info;
-
-                const auto& mesh_link = mesh.links[i];
-                junction_link.margin = mesh_link.margin;
-                junction_link.profile_id = mesh_link.profile_id;
-            }
-
-            auto junction_idx = static_cast<uint32_t>(junctions.size());
-            junctions.emplace_back(junction);
-            node2junction[node_id] = junction_idx;
-        }
-
-        // update path endpoints with junction indices
-        for (auto& path : paths)
-        {
-            for (uint32_t i = 0; i < 2; ++i)
-            {
-                auto& endpoint = path.endpoints[i];
-                endpoint.junction_idx = node2junction.at(endpoint.junction_node_id);
-            }
-        }
-    }
-
     void AddTriangle(uint32_t v0, uint32_t v1, uint32_t v2, mg::TemplateMaterialRef material)
     {
         // smooth vertex normals
@@ -557,7 +355,7 @@ struct ChunkGenerator
         tri.material = material;
     }
 
-    glm::dvec3 DeformJunctionVertex(const mg::TemplateMesh& mesh, const JunctionInfo& junction,
+    glm::dvec3 DeformJunctionVertex(const mg::TemplateMesh& mesh, const Junction& junction,
                                     const glm::vec3& pos, std::span<const float> link_weights)
     {
         glm::dvec3 far_pos(0.0);
@@ -571,8 +369,6 @@ struct ChunkGenerator
             if (junction_link.path_id == INVALID_ID)
                 continue; // no path for this link
 
-            const auto& path = paths[junction_link.path_id];
-
             glm::vec3 spline_pos;
             if (!junction_link.path_from_end)
             {
@@ -581,11 +377,11 @@ struct ChunkGenerator
             else
             {
                 spline_pos = mesh_link.end_matrix * glm::vec4(pos, 1.0f);
-                spline_pos.y += path.spline.GetTotalLength();
+                spline_pos.y += temp_paths[i].GetTotalLength();
             }
 
             double w = link_weights[i];
-            far_pos += path.spline.DeformVertex(spline_pos) * w;
+            far_pos += temp_paths[i].DeformVertex(spline_pos) * w;
             total_w += w;
         }
 
@@ -602,7 +398,7 @@ struct ChunkGenerator
         return far_pos;
     }
 
-    void GenerateJunctionMesh(JunctionInfo& junction)
+    void GenerateJunctionMesh(const Junction& junction, JunctionGenInfo& junction_gen)
     {
         const auto& mesh = res.GetMeshes().GetByIndex(junction.mesh_id);
 
@@ -613,7 +409,17 @@ struct ChunkGenerator
             return; // junction mesh outside chunk bounds
         }
 
-        junction.base_vertex = static_cast<uint32_t>(raw_verts.size());
+        // init link splines
+        for (uint32_t i = 0; i < mesh.links.size(); ++i)
+        {
+            auto& junction_link = junction.links[i];
+            if (junction_link.path_id == INVALID_ID)
+                continue; // no path for this link
+            const auto& path = params.jp.paths[junction_link.path_id];
+            temp_paths[i].SetPoints(params.jp.GetPathPoints(junction_link.path_id));
+        }
+
+        junction_gen.base_vertex = static_cast<uint32_t>(raw_verts.size());
 
         for (const auto& vert : mesh.verts)
         {
@@ -628,20 +434,20 @@ struct ChunkGenerator
 
         for (const auto& tri : mesh.tris)
         {
-            AddTriangle(junction.base_vertex + tri.tri[0], junction.base_vertex + tri.tri[1],
-                        junction.base_vertex + tri.tri[2], tri.material);
+            AddTriangle(junction_gen.base_vertex + tri.tri[0], junction_gen.base_vertex + tri.tri[1],
+                        junction_gen.base_vertex + tri.tri[2], tri.material);
         }
     }
 
-    void LoadJunctionLinkProfileVertices(const JunctionInfo& junction, uint32_t link_idx,
-                                         std::span<uint32_t> out_verts) const
+    void LoadJunctionLinkProfileVertices(const Junction& junction, const JunctionGenInfo& junction_gen,
+                                         uint32_t link_idx, std::span<uint32_t> out_verts) const
     {
         const auto& mesh = res.GetMeshes().GetByIndex(junction.mesh_id);
         const auto& mesh_link = mesh.links[link_idx];
         for (uint32_t i = 0; i < mesh_link.profile_vert_mappings.size(); ++i)
         {
             const auto& profile_vert = mesh_link.profile_vert_mappings[i];
-            out_verts[i] = junction.base_vertex + profile_vert;
+            out_verts[i] = junction_gen.base_vertex + profile_vert;
         }
     }
 
@@ -711,8 +517,9 @@ struct ChunkGenerator
         }
     }
 
-    void GeneratePathMesh(const PathInfo& path)
+    void GeneratePathMesh(uint32_t path_id)
     {
+        const auto& path = params.jp.paths[path_id];
         const auto& profile = res.GetProfiles().GetByIndex(path.profile_id);
 
         const auto verts_count = static_cast<uint32_t>(profile.verts.size());
@@ -720,20 +527,23 @@ struct ChunkGenerator
         std::span<uint32_t> start_verts(vertices.data(), verts_count);
         std::span<uint32_t> end_verts(vertices.data() + verts_count, verts_count);
 
-        const auto& spline = path.spline;
+        auto& spline = temp_paths[0];
+        spline.SetPoints(params.jp.GetPathPoints(path_id));
 
         const auto& start_endpoint = path.endpoints[0];
         const auto& end_endpoint = path.endpoints[1];
 
-        const auto& start_junction = junctions[start_endpoint.junction_idx];
-        const auto& end_junction = junctions[end_endpoint.junction_idx];
+        const auto& start_junction = params.jp.junctions[start_endpoint.junction_id];
+        const auto& start_junction_gen = junctions_gen[start_endpoint.junction_id];
+        const auto& end_junction = params.jp.junctions[end_endpoint.junction_id];
+        const auto& end_junction_gen = junctions_gen[end_endpoint.junction_id];
 
         bool have_start_verts = false;
 
         // load start verts from junction mesh
-        if (start_junction.base_vertex != INVALID_ID)
+        if (start_junction_gen.base_vertex != INVALID_ID)
         {
-            LoadJunctionLinkProfileVertices(start_junction, start_endpoint.link_idx, start_verts);
+            LoadJunctionLinkProfileVertices(start_junction, start_junction_gen, start_endpoint.link_idx, start_verts);
             have_start_verts = true;
         }
 
@@ -742,7 +552,7 @@ struct ChunkGenerator
         const auto start_margin = start_junction.links[start_endpoint.link_idx].margin;
         const auto start_t = start_margin + step_size;
         const auto end_margin = end_junction.links[end_endpoint.link_idx].margin;
-        const auto end_with_margin =  path.spline.GetTotalLength() - end_margin;
+        const auto end_with_margin =  spline.GetTotalLength() - end_margin;
         const auto end_t = end_with_margin - min_step;
 
         for (double t = start_t; t < end_t; t += step_size)
@@ -769,23 +579,24 @@ struct ChunkGenerator
         }
 
         // make final segment connecting to the end junction
-        if (end_junction.base_vertex != INVALID_ID && have_start_verts)
+        if (end_junction_gen.base_vertex != INVALID_ID && have_start_verts)
         {
-            LoadJunctionLinkProfileVertices(end_junction, end_endpoint.link_idx, end_verts);
+            LoadJunctionLinkProfileVertices(end_junction, end_junction_gen, end_endpoint.link_idx, end_verts);
             TriangulatePathSegment(profile, start_verts, end_verts, true, end_with_margin - start_margin);
         }
     }
 
     void GenerateJunctionAndPathMeshes()
     {
-        for (auto& junction : junctions)
+        junctions_gen.resize(params.jp.junctions.size());
+        for (uint32_t i = 0; i < params.jp.junctions.size(); ++i)
         {
-            GenerateJunctionMesh(junction);
+            GenerateJunctionMesh(params.jp.junctions[i], junctions_gen[i]);
         }
 
-        for (const auto& path : paths)
+        for (uint32_t i = 0; i < params.jp.paths.size(); ++i)
         {
-            GeneratePathMesh(path);
+            GeneratePathMesh(i);
         }
     }
 
@@ -818,7 +629,7 @@ struct ChunkGenerator
 
     void AppendObjects()
     {
-        for (const auto& obj : params.map.objs)
+        for (const auto& obj : params.objs)
         {
             if (!bounds.Contains(obj.trans.position))
                 continue; // not primary chunk for this obj
@@ -832,7 +643,7 @@ struct ChunkGenerator
 
     void AppendObjectsHeightmeshes()
     {
-        for (const auto& obj : params.map.objs)
+        for (const auto& obj : params.objs)
         {
             const auto& mgmodel = res.GetModels().GetByIndex(obj.model_id);
 
@@ -1124,7 +935,7 @@ struct ChunkGenerator
         constexpr float tree_radius = 5.0f; // meters
 
         ChunkPoissonVariable(
-            params.map.cfg.seed, params.coord, params.map.cfg.chunk_size_m, tree_radius, tree_radius, tree_radius,
+            params.cfg.seed, params.coord, params.cfg.chunk_size_m, tree_radius, tree_radius, tree_radius,
             tree_positions,
             [&](glm::dvec2 pos) {
                 //auto tile = GetTileAtPos(pos);
@@ -1154,7 +965,7 @@ struct ChunkGenerator
         std::array<uint32_t, 2> bush_model_indices = {res.GetModels().GetIndexByName("bush1"),
                                                       res.GetModels().GetIndexByName("bush2")};
 
-        std::mt19937 rng(params.map.cfg.seed + params.coord.x * 73856093 + params.coord.y * 19349663);
+        std::mt19937 rng(params.cfg.seed + params.coord.x * 73856093 + params.coord.y * 19349663);
         std::uniform_real_distribution<float> dist(0.0f, 1.0f);
 
         for (const auto& pos : tree_positions)
@@ -1287,10 +1098,10 @@ struct ChunkGenerator
         constexpr float grass_radius = 1.2f; // meters
         std::vector<glm::dvec2> grass_positions;
 
-        auto grass_seed = params.map.cfg.seed ^ 0x62455000;
+        auto grass_seed = params.cfg.seed ^ 0x62455000;
 
         ChunkPoissonVariable(
-            grass_seed, params.coord, params.map.cfg.chunk_size_m, grass_radius, grass_radius, grass_radius,
+            grass_seed, params.coord, params.cfg.chunk_size_m, grass_radius, grass_radius, grass_radius,
             grass_positions,
             [&](glm::dvec2 pos) {
                 return grass_radius; // fixed radius for now
@@ -1374,7 +1185,7 @@ struct ChunkGenerator
         const float r_border = r * 5.0f / terrain_density_scale;
 
         // append corners
-        const auto terrain_points_margin = static_cast<double>(params.map.cfg.chunk_size_m);
+        const auto terrain_points_margin = static_cast<double>(params.cfg.chunk_size_m);
         auto c0 = bounds.min - terrain_points_margin;
         auto c1 = bounds.max + terrain_points_margin;
         terrain_points.emplace_back(c0);
@@ -1383,7 +1194,7 @@ struct ChunkGenerator
         terrain_points.emplace_back(glm::dvec2(c0.x, c1.y));
 
         ChunkPoissonVariable(
-            params.map.cfg.seed, params.coord, params.map.cfg.chunk_size_m, r_min, r, r_border, terrain_points,
+            params.cfg.seed, params.coord, params.cfg.chunk_size_m, r_min, r, r_border, terrain_points,
             [&](glm::dvec2 pos) {
                 auto tile = GetTileAtPos(pos);
 

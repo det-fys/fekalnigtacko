@@ -22,6 +22,8 @@
 #include "utils/allocnum.hpp"
 #include "mapgen/samplers.hpp"
 #include "chunk_manager_project.hpp"
+#include "mapgen/path_gen.hpp"
+#include "mapgen/map_layout_chunkizer.hpp"
 
 namespace edit
 {
@@ -82,7 +84,7 @@ public:
 
     // generation
     void InvalidateChunk(const glm::ivec2& chunk_pos);
-    mg::MapLayout GetMapLayout(const AABBD2* aabb = nullptr) const;
+    mg::MapLayout GetMapLayout() const;
     void GetChunkParams(mg::ChunkParams& out_params);
 
     const std::unordered_map<glm::ivec2, ProjectChunkData>& GetChunks() const { return chunk_manager_->GetChunks(); }
@@ -111,6 +113,7 @@ private:
     // generation
     void SetupChunks();
     void UpdateChunks();
+    void UpdateMapAndPaths();
 
 private:
     MapEditProperties& properties_;
@@ -135,7 +138,10 @@ private:
     ImGuizmo::OPERATION gizmo_operation_ = ImGuizmo::TRANSLATE;
 
     // chunk generation
-    mg::MapConfig map_config_{};
+    mg::MapConfig map_config_;
+    mg::PathGenerator path_gen_;
+    mg::MapLayoutChunkizer map_chunkizer_;
+    bool map_valid_ = false;
     int64_t chunk_gen_time_ = 0;
     std::optional<ProjectChunkManager> chunk_manager_;
     

@@ -23,6 +23,9 @@ struct Node
     glm::dvec3 pos{0.0};
     std::array<uint32_t, 4> links = {0, 0, 0, 0};
     uint32_t mesh_id = INVALID_RES_ID;
+
+    uint32_t GetLinkIdx(uint32_t node_id) const;
+    uint32_t GetPathContinuation(const ResourceSet& res, uint32_t from_node_id) const;
 };
 
 struct MapLayout

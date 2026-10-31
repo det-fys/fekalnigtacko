@@ -58,18 +58,19 @@ class SplinePath
 {
 public:
     SplinePath() = default;
-    SplinePath(std::span<const glm::dvec3> points, int samples_per_segment = 32);
+    void SetPoints(std::span<const glm::dvec3> points, double resolution = 0.5,
+                   int samples_per_segment = 32);
     glm::dvec3 DeformVertex(const glm::dvec3& vert_pos) const;
     double GetTotalLength() const { return total_length_; }
     double GetSpacing() const { return spacing_; }
 
 private:
-    static constexpr double kDefaultSpacing = 0.5;
     static constexpr double kEpsilon = 1e-6;
 
-    void ResampleUniform(std::span<const SplineFrame> raw_frames, double desired_spacing);
+    void ResampleUniform(double desired_spacing);
 
 private:
+    std::vector<SplineFrame> raw_frames_;
     std::vector<SplineFrame> uniform_frames_;
 
     double total_length_ = 0.0;

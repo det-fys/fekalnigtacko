@@ -8,6 +8,8 @@
 namespace mg
 {
 
+constexpr uint32_t INVALID_ID = 0xFFFFFFFF;
+
 struct Triangle
 {
     std::array<uint32_t, 3> verts;

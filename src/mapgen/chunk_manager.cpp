@@ -166,9 +166,9 @@ void mg::ChunkManager::ScheduleChunkUpdate(const glm::ivec2& coord, uint32_t lod
     chunk_data.in_progress = true;
 
     mg::ChunkParams params{};
+    params.cfg = map_cfg_;
     params.coord = coord;
     params.lod = lod;
-    params.map.cfg = map_cfg_;
     GetChunkParams(params);
 
     auto func = [res = res_, params = std::move(params)]() mutable {

@@ -15,9 +15,10 @@
 #include "static_object.hpp"
 #include "mapgen/map_layout_file.hpp"
 
-edit::Project::Project(MapEditProperties& properties) : properties_(properties)
+edit::Project::Project(MapEditProperties& properties)
+    : properties_(properties), mg_res_(assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources")),
+      path_gen_(*mg_res_)
 {
-    mg_res_ = assets::AssetManager::GetInstance().Get<mg::ResourceSet>("resources");
     SetupChunks();
 }
 
@@ -271,11 +272,14 @@ void edit::Project::DeleteSelection()
 
 void edit::Project::InvalidateChunk(const glm::ivec2& chunk_pos)
 {
+    map_valid_ = false; // regen junctions & paths
+
     if (chunk_manager_)
         chunk_manager_->InvalidateChunk(chunk_pos);
+
 }
 
-mg::MapLayout edit::Project::GetMapLayout(const AABBD2* aabb) const
+mg::MapLayout edit::Project::GetMapLayout() const
 {
     mg::MapLayout map{};
     map.cfg = map_config_;
@@ -283,15 +287,6 @@ mg::MapLayout edit::Project::GetMapLayout(const AABBD2* aabb) const
     // static objs
     for (const auto& obj : static_objs_)
     {
-        if (aabb)
-        {
-            const auto& obj_aabb = obj.GetAABB();
-            AABBD2 obj_aabb_2d(glm::dvec2(obj_aabb.min), glm::dvec2(obj_aabb.max));
-
-            if (!aabb->CollidesWith(obj_aabb_2d))
-                continue;
-        }
-
         auto& mgobj = map.objs.emplace_back();
         mgobj.trans = obj.GetTransform();
         mgobj.model_id = obj.GetModelID();
@@ -315,8 +310,14 @@ mg::MapLayout edit::Project::GetMapLayout(const AABBD2* aabb) const
 
 void edit::Project::GetChunkParams(mg::ChunkParams& params)
 {
-    AABBD2 chunk_aabb = mg::GetChunkAABB(map_config_, params.coord, true);
-    params.map = GetMapLayout(&chunk_aabb);
+    UpdateMapAndPaths();
+
+    auto map_chunk = map_chunkizer_.GetChunkLayout(params.coord);
+    if (map_chunk)
+    {
+        params.objs = map_chunk->objs;
+        params.jp = map_chunk->jp;
+    }
 }
 
 void edit::Project::Load(const std::string& file_name)
@@ -553,4 +554,16 @@ void edit::Project::UpdateChunks()
     chunk_manager_->EndFrame();
 
     chunk_gen_time_ += 1000; // TODO
+}
+
+void edit::Project::UpdateMapAndPaths()
+{
+    if (map_valid_)
+        return;
+
+    auto map = GetMapLayout();
+    path_gen_.Generate(map.nodes);
+    map_chunkizer_.Chunkize(*mg_res_, map, path_gen_.GetPathSet());
+
+    map_valid_ = true;
 }

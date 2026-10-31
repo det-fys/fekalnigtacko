@@ -12,6 +12,7 @@
 #include "heightmesh.hpp"
 #include "resources.hpp"
 #include "map_layout.hpp"
+#include "path_gen.hpp"
 
 namespace mg
 {
@@ -55,10 +56,12 @@ struct ChunkTile
 
 struct ChunkParams
 {
-    MapLayout map{};
+    MapConfig cfg{};
     glm::ivec2 coord{0};
     uint32_t lod = 0;
     bool collision_only = false;
+    std::vector<StaticObject> objs;
+    PathSet jp{};
 };
 
 struct ChunkOutputObject
