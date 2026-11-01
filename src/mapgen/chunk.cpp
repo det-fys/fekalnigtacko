@@ -935,7 +935,7 @@ struct ChunkGenerator
         // place trees
         std::vector<glm::dvec2> tree_positions;
 
-        constexpr float tree_radius = 5.0f; // meters
+        constexpr float tree_radius = 4.0f; // meters
 
         ChunkPoissonVariable(
             params.cfg.seed, params.coord, params.cfg.chunk_size_m, tree_radius, tree_radius, tree_radius,
@@ -985,7 +985,7 @@ struct ChunkGenerator
             
             // random params
             auto type_vals = glm::vec3(dist(rng), dist(rng), dist(rng));
-            auto scale = glm::mix(0.8f, 1.2f, dist(rng));
+            auto scale = glm::mix(0.5f, 1.0f, dist(rng));
             auto angle_z = glm::mix(0.0f, glm::two_pi<float>(), dist(rng));
             auto brightness = glm::mix(0.85f, 1.0f, dist(rng));
             auto color_variation = glm::vec3(dist(rng), dist(rng), dist(rng)) * 0.1f + 0.9f;
@@ -1019,7 +1019,7 @@ struct ChunkGenerator
             if (type_vals[1] < bush_chance)
             {
                 model_group = bush_model_indices;
-                scale *= 2.0f;
+                scale *= 1.7f;
             }
             else if (type_vals[1] < (bush_chance + deciduous_chance))
             {
