@@ -6,7 +6,8 @@
 static game::CharacterTuning GetCharacterTuning(const game::HumanCharacterTuning& tuning)
 {
     game::CharacterTuning ct{};
-    ct.shape = game::CharacterShape(0.3f, 0.75f);
+    ct.shape.radius = 0.3f;
+    ct.shape.height = 1.8f - (ct.shape.radius * 2.0f);
     ct.model_name = "human";
     ct.clothes = tuning.clothes;
 

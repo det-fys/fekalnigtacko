@@ -4,7 +4,8 @@
 static game::CharacterTuning GetCowTuning()
 {
     game::CharacterTuning ct{};
-    ct.shape = game::CharacterShape(0.3f, 0.75f);
+    ct.shape.radius = 0.3f;
+    ct.shape.height = 2.0f - (ct.shape.radius * 2.0f);
     ct.model_name = "cow";
     return ct;
 }

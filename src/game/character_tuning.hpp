@@ -22,7 +22,7 @@ struct CharacterConfigClothes
 
 struct CharacterTuning
 {
-    CharacterShape shape  = CharacterShape(0.3f, 0.75f);
+    CharacterShape shape  = CharacterShape(0.3f, 0.9f);
     std::string model_name;
     std::vector<CharacterConfigClothes> clothes;
 };

@@ -6,6 +6,7 @@ project(FekalniGtacko)
 # ------------------------------------------------------------------------------
 option(BUILD_CLIENT "Build the client application" ON)
 option(BUILD_SERVER "Build the server application" ON)
+option(BUILD_COLLISION_TESTS "Build headless character controller regression tests" OFF)
 
 option(DOUBLE_PRECISION_PHYSICS "Use double precision for bullet" ON)
 
@@ -61,6 +62,7 @@ set(COMMON_SOURCES
     "src/assets/skeleton.cpp"
     "src/assets/vehiclemdl.cpp"
     "src/collision/dynamicsworld.cpp"
+    "src/collision/kinematic_character_controller.cpp"
     "src/collision/trianglemesh.cpp"
     "src/game/camera_controller.cpp"
     "src/game/character_anim_state.cpp"
@@ -133,6 +135,11 @@ if(DOUBLE_PRECISION_PHYSICS)
     set(USE_DOUBLE_PRECISION ON CACHE BOOL "" FORCE)
 endif()
 add_subdirectory(external/bullet3)
+
+if(BUILD_COLLISION_TESTS)
+    enable_testing()
+    add_subdirectory(src/collision/tests)
+endif()
 
 # Recast Navigation
 set(RECASTNAVIGATION_DEMO OFF CACHE BOOL "" FORCE)

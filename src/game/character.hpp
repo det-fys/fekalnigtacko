@@ -2,7 +2,7 @@
 
 #include <btBulletDynamicsCommon.h>
 #include <BulletCollision/CollisionDispatch/btGhostObject.h>
-#include <BulletDynamics/Character/btKinematicCharacterController.h>
+#include "collision/kinematic_character_controller.hpp"
 #include "character_anim_state.hpp"
 #include "character_sync.hpp"
 #include "entity.hpp"
@@ -31,8 +31,8 @@ public:
     CharacterPhysicsController(Character& character, btDynamicsWorld& bt_world, btCapsuleShapeZ& bt_shape);
     DELETE_COPY_MOVE(CharacterPhysicsController)
 
-    btKinematicCharacterController& GetBtController() { return bt_character_; }
-    const btKinematicCharacterController& GetBtController() const { return bt_character_; }
+    collision::KinematicCharacterController& GetBtController() { return bt_character_; }
+    const collision::KinematicCharacterController& GetBtController() const { return bt_character_; }
     btGhostObject& GetBtGhost() { return bt_ghost_; }
     const btGhostObject& GetBtGhost() const { return bt_ghost_; }
 
@@ -42,7 +42,7 @@ private:
     Character& character_;
     btDynamicsWorld& bt_world_;
     btPairCachingGhostObject bt_ghost_;
-    btKinematicCharacterController bt_character_;
+    collision::KinematicCharacterController bt_character_;
 };
 
 enum CharacterMovementType

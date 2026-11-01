@@ -13,7 +13,8 @@ CVAR(uint8_t, ch_aim_beams, CV_NONE, 0, 0, 1);
 game::Character::Character(World& world, const CharacterTuning& tuning)
     : Super(world, net::ET_CHARACTER), tuning_(tuning), bt_shape_(tuning_.shape.radius, tuning_.shape.height)
 {
-    z_offset_ = tuning_.shape.height * 0.5f + tuning_.shape.radius - 0.05f;
+    // The controller keeps the capsule above the ground; align its bottom with the feet.
+    z_offset_ = tuning_.shape.height * 0.5f + tuning_.shape.radius;
 
     sk_ = SkeletonInstance(assets::AssetManager::GetInstance().Get<assets::Skeleton>(tuning.model_name));
     SetupHitBones();
@@ -797,7 +798,7 @@ void game::Character::UpdatePose()
 }
 
 game::CharacterPhysicsController::CharacterPhysicsController(Character& character, btDynamicsWorld& bt_world, btCapsuleShapeZ& bt_shape)
-    : character_(character), bt_world_(bt_world), bt_character_(&bt_ghost_, &bt_shape, 0.3f, btVector3(0, 0, 1))
+    : character_(character), bt_world_(bt_world), bt_character_(&bt_ghost_, &bt_shape, 0.4f, btVector3(0, 0, 1))
 {
     btTransform start_transform;
     start_transform.setIdentity();
