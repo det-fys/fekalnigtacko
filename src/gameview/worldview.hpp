@@ -24,8 +24,8 @@ class ClientSession;
 struct BeamView
 {
     float expiration;
-    glm::vec3 start;
-    glm::vec3 end;
+    glm::dvec3 start;
+    glm::dvec3 end;
     float width;
     uint32_t color;
 };

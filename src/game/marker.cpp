@@ -18,7 +18,7 @@ void game::Marker::SendInitData(Player& player, net::OutMessage& msg) const
     Super::SendInitData(player, msg);
 
     msg.Write(info_.type);
-    net::WritePosition(msg, info_.position);
+    net::WriteFarPosition(msg, info_.position);
     net::WriteRGB(msg, info_.color);
     msg.Write(net::ModelName(info_.model));
 }

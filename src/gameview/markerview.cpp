@@ -50,7 +50,8 @@ bool game::view::MarkerView::Init(net::InMessage& msg)
 {
     uint32_t color;
     net::ModelName model_name;
-    if (!msg.Read(marker_type_) || !net::ReadFarPosition(msg, root_.local.position) || !net::ReadRGB(msg, color) || !msg.Read(model_name))
+    if (!msg.Read(marker_type_) || !net::ReadFarPosition(msg, root_.local.position) || !net::ReadRGB(msg, color) ||
+        !msg.Read(model_name))
         return false;
     
     root_.UpdateMatrix();

@@ -386,8 +386,9 @@ bool game::view::WorldView::ProcessObjDestroyOrRespawnMsg(net::InMessage& msg, b
 bool game::view::WorldView::ProcessBeamMsg(net::InMessage& msg)
 {
     BeamView beam;
-    if (!net::ReadPosition(msg, beam.start) || !net::ReadPosition(msg, beam.end) || !net::ReadRGB(msg, beam.color) || !msg.Read<net::BeamTimeQ>(beam.expiration))
-    return false;
+    if (!net::ReadFarPosition(msg, beam.start) || !net::ReadFarPosition(msg, beam.end) ||
+        !net::ReadRGB(msg, beam.color) || !msg.Read<net::BeamTimeQ>(beam.expiration))
+        return false;
     
     beam.expiration += GetTime();
     beam.width = 0.02f;
@@ -400,10 +401,11 @@ bool game::view::WorldView::ProcessBeamMsg(net::InMessage& msg)
 bool game::view::WorldView::ProcessFxMsg(net::InMessage& msg)
 {
     net::ModelName name;
-    glm::vec3 pos, dir;
+    glm::dvec3 pos;
+    glm::vec3 dir;
 
-    if (!msg.Read(name) || !net::ReadPosition(msg, pos) || !msg.Read<net::DirQ>(dir.x) || !msg.Read<net::DirQ>(dir.y) ||
-        !msg.Read<net::DirQ>(dir.z))
+    if (!msg.Read(name) || !net::ReadFarPosition(msg, pos) || !msg.Read<net::DirQ>(dir.x) ||
+        !msg.Read<net::DirQ>(dir.y) || !msg.Read<net::DirQ>(dir.z))
         return false;
 
     if (glm::length2(dir) < 0.3f)
