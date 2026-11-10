@@ -416,6 +416,7 @@ void game::Character::UpdateAiming()
         delta = 6.0f / 25.0f;
         MoveToward(aim_yaw_, 0.0f, delta);
         MoveToward(aim_pitch_, 0.0f, delta);
+        MoveToward(aim_pitch_bias_, 0.0f, delta);
         UpdateAimDirection();
         return;
     }
@@ -446,6 +447,9 @@ void game::Character::UpdateAiming()
     }
 
     MoveToward(aim_pitch_, target_pitch, delta);
+
+    constexpr float passenger_aim_pitch_bias = glm::radians(-13.0f);
+    MoveToward(aim_pitch_bias_, parent_ ? passenger_aim_pitch_bias : 0.0f, delta);
 
     if (movement_ == CMT_DISABLED)
     {
@@ -496,7 +500,7 @@ void game::Character::UpdatePain()
 void game::Character::UpdateAnimAngles()
 {
     animstate_.yaw = aim_yaw_ + pain_yaw_;
-    animstate_.pitch = aim_pitch_ + pain_pitch_;
+    animstate_.pitch = aim_pitch_ + pain_pitch_ + aim_pitch_bias_;
 }
 
 void game::Character::UpdateSyncState()

@@ -184,6 +184,7 @@ private:
 
     float aim_yaw_ = 0.0f;
     float aim_pitch_ = 0.0f;
+    float aim_pitch_bias_ = 0.0f;
 
     float pain_yaw_ = 0.0f;
     float pain_pitch_ = 0.0f;
