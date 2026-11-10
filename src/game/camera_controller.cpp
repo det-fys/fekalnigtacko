@@ -62,6 +62,7 @@ void game::CameraController::Recalculate(collision::DynamicsWorld* world)
 
             // transform to rideable space
             forward_ = glm::normalize(smooth_basis * forward_);
+            right = glm::normalize(smooth_basis * right);
         }
 
         if (character_transform_)
@@ -72,10 +73,17 @@ void game::CameraController::Recalculate(collision::DynamicsWorld* world)
         // calc aiming offset
         const float spine_offset = 0.25f;
         glm::vec3 aiming_offset(0.0f);
-        // if (aim_factor_smooth > 0.0f)
+        if (aim_factor_smooth > 0.0f)
         {
             aiming_offset += (-pitch_sin * spine_offset) * forward_;
             aiming_offset += ((-1.0f + pitch_cos) * spine_offset) * up_;
+            aiming_offset += 0.09f * right; // offset to the right for better view
+
+            if (!rideable_transform_)
+            {
+                aiming_offset += -0.05f * up_;
+            }
+            
             start_aim = start_noaim + glm::dvec3(aiming_offset);
         }
     
