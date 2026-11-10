@@ -75,3 +75,26 @@ inline glm::vec3 Slerp(const glm::vec3& a, const glm::vec3& b, float t)
 
     return (glm::sin((1.0f - t) * theta) * a + glm::sin(t * theta) * b) / sinTheta;
 }
+
+inline float SignedAngle(float a, float b)
+{
+    float diff = glm::mod(b - a + glm::pi<float>(), glm::two_pi<float>()) - glm::pi<float>();
+    return diff;
+}
+
+inline bool Turn(float& angle, float target, float step)
+{
+    angle = glm::mod(angle, glm::two_pi<float>());
+    target = glm::mod(target, glm::two_pi<float>());
+
+    auto diff = SignedAngle(angle, target);
+
+    if (glm::abs(diff) <= step)
+    {
+        angle = target;
+        return true;
+    }
+
+    angle = glm::mod(angle + glm::sign(diff) * step, glm::two_pi<float>());
+    return false;
+}

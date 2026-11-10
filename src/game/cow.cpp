@@ -13,7 +13,7 @@ static game::CharacterTuning GetCowTuning()
 game::Cow::Cow(World& world, const glm::vec3& position, float yaw) : Animal(world, GetCowTuning(), position, yaw)
 {
     walk_speed_ = 3.0f;
-    turn_speed_ = 3.0f;
+    turn_speed_ = 7.0f;
 
     SetUseMessage("vlízt na krávu");
 

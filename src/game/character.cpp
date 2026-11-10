@@ -20,26 +20,6 @@ game::Character::Character(World& world, const CharacterTuning& tuning)
     SetupHitBones();
 }
 
-static bool Turn(float& angle, float target, float step)
-{
-    constexpr float PI = glm::pi<float>();
-    constexpr float TWO_PI = glm::two_pi<float>();
-
-    angle = glm::mod(angle, TWO_PI);
-    target = glm::mod(target, TWO_PI);
-
-    float diff = glm::mod(target - angle + PI, TWO_PI) - PI;
-
-    if (glm::abs(diff) <= step)
-    {
-        angle = target;
-        return true;
-    }
-
-    angle = glm::mod(angle + glm::sign(diff) * step, TWO_PI);
-    return false;
-}
-
 void game::Character::Update()
 {
     Super::Update();
@@ -384,8 +364,12 @@ void game::Character::UpdateMovement()
 
         float relative_yaw = std::atan2(input_dir.x, input_dir.y);
         float turn_yaw = directional ? view_yaw_ : view_yaw_ + relative_yaw;
-        Turn(yaw_, turn_yaw, turn_speed_ * dt);
-        float move_yaw = directional ? yaw_ + relative_yaw : yaw_;
+
+        auto angle_diff = glm::abs(SignedAngle(yaw_, turn_yaw));
+        auto turn_speed = glm::mix(turn_speed_ * 0.5f, turn_speed_ * 2.5f, angle_diff / glm::pi<float>());
+        Turn(yaw_, turn_yaw, turn_speed * dt);
+        // float move_yaw = directional ? yaw_ + relative_yaw : yaw_;
+        float move_yaw = view_yaw_ + relative_yaw;
     
         move_dir = glm::vec3(-glm::sin(move_yaw), glm::cos(move_yaw), 0.0f) * walk_speed_ * dt * weight_speed_mult_;
        
