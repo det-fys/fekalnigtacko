@@ -65,17 +65,24 @@ inline void WriteFarPositionQ(OutMessage& msg, const FarPositionQ& posq)
 
 inline void EncodeRotation(const glm::quat& quat, QuatQ& out)
 {
-    auto q = glm::normalize(quat);
-    if (q.w < 0.0f)
-        q = -q;
+    const auto q = glm::normalize(quat);
+    // Use x/y/z/w order for the component index stored on the wire.
+    const float components[4] = {q.x, q.y, q.z, q.w};
+    uint8_t largest = 0;
+    for (uint8_t i = 1; i < 4; ++i)
+        if (glm::abs(components[i]) > glm::abs(components[largest]))
+            largest = i;
 
-    out.x.Encode(q.x);
-    out.y.Encode(q.y);
-    out.z.Encode(q.z);
+    out.i = largest | (components[largest] < 0.0f ? 0x4 : 0x0);
+    QuatElemQ* encoded[3] = {&out.x, &out.y, &out.z};
+    for (uint8_t i = 0, j = 0; i < 4; ++i)
+        if (i != largest)
+            encoded[j++]->Encode(components[i]);
 }
 
 inline void WriteRotationQ(OutMessage& msg, const QuatQ& rotq)
 {
+    msg.Write(rotq.i);
     msg.Write(rotq.x.value);
     msg.Write(rotq.y.value);
     msg.Write(rotq.z.value);
@@ -135,14 +142,25 @@ inline void DecodeFarPosition(const FarPositionQ& posq, glm::dvec3& out)
 
 inline bool ReadRotationQ(InMessage& msg, QuatQ& rotq)
 {
-    return msg.Read(rotq.x.value) && msg.Read(rotq.y.value) && msg.Read(rotq.z.value);
+    return msg.Read(rotq.i) && msg.Read(rotq.x.value) && msg.Read(rotq.y.value) && msg.Read(rotq.z.value);
 }
 
 inline void DecodeRotation(const QuatQ& rotq, glm::quat& out)
 {
-    glm::vec3 v(rotq.x.Decode(), rotq.y.Decode(), rotq.z.Decode());
-    float w = glm::sqrt(glm::max(0.0f, 1.0f - glm::dot(v, v)));
-    out = glm::quat(w, v.x, v.y, v.z);
+    const uint8_t largest = rotq.i & 0x3;
+    const bool largestNegative = (rotq.i & 0x4) != 0;
+    const float decoded[3] = {rotq.x.Decode(), rotq.y.Decode(), rotq.z.Decode()};
+    float components[4]{};
+    float sumSquares = 0.0f;
+    for (uint8_t i = 0, j = 0; i < 4; ++i)
+    {
+        if (i == largest)
+            continue;
+        components[i] = decoded[j++];
+        sumSquares += components[i] * components[i];
+    }
+    components[largest] = glm::sqrt(glm::max(0.0f, 1.0f - sumSquares)) * (largestNegative ? -1.0f : 1.0f);
+    out = glm::normalize(glm::quat(components[3], components[0], components[1], components[2]));
 }
 
 // inline bool ReadTransform(InMessage& msg, Transform& trans)

@@ -147,10 +147,14 @@ struct FarPositionQ
 using AngleQ = Quantized<uint16_t, -PI_N, PI_N, PI_D>;
 using PositiveAngleQ = Quantized<uint16_t, 0, PI_N * 2, PI_D>;
 
-using QuatElemQ = Quantized<uint16_t, -1, 1, 1>;
+// In smallest-three encoding, the three stored components are bounded by
+// 1/sqrt(2), since the omitted component is the largest by magnitude.
+using QuatElemQ = Quantized<uint16_t, -70710678, 70710678, 100000000>;
 struct QuatQ
 {
     QuatElemQ x, y, z;
+    // Low two bits identify the omitted component; bit 2 stores its sign.
+    uint8_t i{0};
 };
 
 using WheelZOffsetQ = Quantized<uint8_t, -1, 1, 1>;

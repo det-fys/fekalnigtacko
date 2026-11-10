@@ -256,7 +256,8 @@ bool game::view::VehicleView::ReadState(net::InMessage* msg)
         // rot
         if (fields & VSF_ROTATION)
         {
-            if (!net::ReadDelta(*msg, sync_.rot.x) ||
+            if (!net::ReadDelta(*msg, sync_.rot.i) ||
+                !net::ReadDelta(*msg, sync_.rot.x) ||
                 !net::ReadDelta(*msg, sync_.rot.y) ||
                 !net::ReadDelta(*msg, sync_.rot.z))
                 return false;

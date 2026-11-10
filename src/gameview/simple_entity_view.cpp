@@ -91,7 +91,9 @@ bool game::view::SimpleEntityView::ReadState(net::InMessage* msg)
         // rot
         if (fields & SESF_ROTATION)
         {
-            if (!net::ReadDelta(*msg, sync_.rot.x) || !net::ReadDelta(*msg, sync_.rot.y) || !net::ReadDelta(*msg, sync_.rot.z))
+            if (!net::ReadDelta(*msg, sync_.rot.i) ||
+                !net::ReadDelta(*msg, sync_.rot.x) || !net::ReadDelta(*msg, sync_.rot.y) ||
+                !net::ReadDelta(*msg, sync_.rot.z))
                 return false;
 
             net::DecodeRotation(sync_.rot, new_state.trans.rotation);

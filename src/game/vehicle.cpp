@@ -531,11 +531,13 @@ game::VehicleSyncFieldFlags game::Vehicle::WriteState(net::OutMessage& msg, cons
         net::WriteDelta(msg, curr.pos.z, base.pos.z);
     }
 
-    if (curr.rot.x.value != base.rot.x.value || curr.rot.y.value != base.rot.y.value ||
+    if (curr.rot.i != base.rot.i ||
+        curr.rot.x.value != base.rot.x.value || curr.rot.y.value != base.rot.y.value ||
         curr.rot.z.value != base.rot.z.value)
     {
         fields |= VSF_ROTATION;
 
+        net::WriteDelta(msg, curr.rot.i, base.rot.i);
         net::WriteDelta(msg, curr.rot.x, base.rot.x);
         net::WriteDelta(msg, curr.rot.y, base.rot.y);
         net::WriteDelta(msg, curr.rot.z, base.rot.z);
