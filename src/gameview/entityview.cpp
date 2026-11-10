@@ -112,7 +112,7 @@ bool game::view::EntityView::ProcessPlaySoundMsg(net::InMessage& msg)
 
 void game::view::EntityView::DrawNametag(const DrawArgs& args)
 {
-    if (args.ctx.pass != gfx::DRAW_PASS_MAIN || nametag_.empty())
+    if (args.ctx.pass != gfx::DRAW_PASS_MAIN || nametag_.empty() || !nametag_visible_)
         return;
 
     // calc screen position

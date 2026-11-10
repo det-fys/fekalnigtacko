@@ -48,6 +48,12 @@ public:
     void SetVisible(bool visible) { visible_ = visible; }
     bool IsVisible() const { return visible_; }
 
+    void SetEntNum(net::EntNum entnum) { entnum_ = entnum; }
+    net::EntNum GetEntNum() const { return entnum_; }
+
+    void SetNametagVisible(bool visible) { nametag_visible_ = visible; }
+    bool IsNametagVisible() const { return nametag_visible_; }
+
     virtual ~EntityView() = default;
 
 protected:
@@ -63,6 +69,7 @@ private:
 
 protected:
     WorldView& world_;
+    net::EntNum entnum_;
 
     FarTransformNode root_;
 
@@ -75,6 +82,7 @@ protected:
 
 private:
     std::string nametag_;
+    bool nametag_visible_ = true;
 
     net::EntNum parentnum_ = 0;
     float upd_time_ = 0.0f;

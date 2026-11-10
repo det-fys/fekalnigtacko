@@ -62,3 +62,16 @@ inline constexpr T AlignUp(T value, T alignment)
 
     return (value + alignment - 1) / alignment * alignment;
 }
+
+inline glm::vec3 Slerp(const glm::vec3& a, const glm::vec3& b, float t)
+{
+    float dot = glm::clamp(glm::dot(a, b), -1.0f, 1.0f);
+    float theta = glm::acos(dot);
+
+    if (theta < 0.001f)
+        return glm::normalize(glm::mix(a, b, t));
+
+    float sinTheta = glm::sin(theta);
+
+    return (glm::sin((1.0f - t) * theta) * a + glm::sin(t * theta) * b) / sinTheta;
+}

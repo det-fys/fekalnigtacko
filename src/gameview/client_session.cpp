@@ -150,6 +150,7 @@ gfx::CameraParams game::view::ClientSession::GetCameraParams() const
     gfx::CameraParams cam{};
     cam.eye = camera_controller_.GetEye();
     cam.dir = camera_controller_.GetForward();
+    cam.up = camera_controller_.GetUp();
     cam.fov = camera_controller_.GetFov();
     return cam;
 }
@@ -347,6 +348,7 @@ void game::view::ClientSession::UpdateCamera(const UpdateInfo& info)
     
     camera_controller_.SetAiming(camera_info_.flags & CAM_AIMING);
     camera_controller_.SetAimType(camera_info_.flags & CAM_AIM_CROSSHAIR, camera_info_.flags & CAM_AIM_SCOPE);
+    camera_controller_.SetFirstPerson(camera_info_.flags & CAM_FIRST_PERSON);
 
     camera_controller_.Update(info.delta_time);
     camera_controller_.Recalculate(world_.get());
@@ -361,7 +363,11 @@ void game::view::ClientSession::UpdateCamera(const UpdateInfo& info)
     }
 
     // update audio
-    auto basis = BasisFromDir(camera_controller_.GetForward());
+    // auto basis = BasisFromDir(camera_controller_.GetForward());
+    glm::mat3 basis;
+    basis[1] = glm::normalize(camera_controller_.GetForward());
+    basis[2] = glm::normalize(camera_controller_.GetUp());
+    basis[0] = glm::normalize(glm::cross(basis[1], basis[2]));
 
     auto camera_world = glm::mat4(
         glm::vec4(basis[0], 0.0f),

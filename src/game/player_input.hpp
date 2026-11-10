@@ -21,6 +21,7 @@ namespace game
 		IN_HOLSTER,
 		IN_RELOAD,
 		IN_AIM_MODE,
+		IN_CAMERA_MODE,
 		IN_WEAPON_1,
 		IN_WEAPON_2,
 		IN_WEAPON_3,

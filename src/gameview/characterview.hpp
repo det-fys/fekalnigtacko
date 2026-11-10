@@ -63,6 +63,8 @@ private:
     void DrawItem(const DrawArgs& args);
     void FireItem();
 
+    bool IsThisPlayersCharacter() const;
+
 private:
     float yaw_ = 0.0f;
 
@@ -74,6 +76,7 @@ private:
     CharacterAnimState animstate_;
 
     std::vector<CharacterViewClothes> clothes_;
+    SurfaceMask head_mask_ = 0;
 
     // sync
     CharacterSyncState sync_;

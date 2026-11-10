@@ -49,6 +49,7 @@ static const std::map<KeyCode, game::PlayerInputType> s_inputmap = {
     { KEY_Q, game::IN_HOLSTER },
     { KEY_R, game::IN_RELOAD },
     { KEY_LALT, game::IN_AIM_MODE },
+	{ KEY_V, game::IN_CAMERA_MODE },
     { KEY_1, game::IN_WEAPON_1 },
     { KEY_2, game::IN_WEAPON_2 },
     { KEY_3, game::IN_WEAPON_3 },

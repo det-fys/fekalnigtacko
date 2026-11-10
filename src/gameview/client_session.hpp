@@ -38,6 +38,8 @@ public:
     float GetMapChunkSize() const;
 
     gfx::CameraParams GetCameraParams() const;
+    net::EntNum GetCharacterEntNum() const { return camera_info_.character_entnum; }
+    bool IsFirstPerson() const { return (camera_info_.flags & CAM_FIRST_PERSON) != 0; }
 
     const WorldView* GetWorld() const { return world_.get(); } 
     audio::Master& GetAudioMaster() const;

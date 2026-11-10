@@ -3,6 +3,7 @@
 #include "assets/model.hpp"
 #include "net/utils.hpp"
 #include "worldview.hpp"
+#include "client_session.hpp"
 
 game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) : EntityView(world, msg)
 {
@@ -13,7 +14,8 @@ game::view::CharacterView::CharacterView(WorldView& world, net::InMessage& msg) 
 
     basemodel_ = assets::AssetManager::GetInstance().Get<ModelView>(std::string(model_name));
     sk_ = SkeletonInstance(basemodel_->GetModel()->GetSkeleton());
-    
+    head_mask_ = GetSurfaceMask("head");
+
     gfx::SkeletonPoseDescriptor pose_desc{};
     pose_desc.num_bones = sk_.GetSkeleton()->GetNumBones();
     skeleton_pose_.emplace(pose_desc);
@@ -73,6 +75,8 @@ bool game::view::CharacterView::ProcessUpdateMsg(net::InMessage* msg)
 void game::view::CharacterView::Update(const UpdateInfo& info)
 {
     Super::Update(info);
+
+    SetNametagVisible(!IsThisPlayersCharacter());
 
     // interpolate states
     float tps = 25.0f;
@@ -162,6 +166,12 @@ void game::view::CharacterView::Draw(const DrawArgs& args)
     {
         clothes.model->Draw(args.ctx, root_.matrix, {&clothes.color, 1}, skeleton_pose_->GetID(), 0);
         surfacemask &= ~clothes.surfacemask;
+    }
+
+    // hide head in main pass if this is the viewing players character in first person
+    if (IsThisPlayersCharacter() && world_.GetSession().IsFirstPerson() && args.ctx.pass == gfx::DRAW_PASS_MAIN)
+    {
+        surfacemask &= ~head_mask_;
     }
 
     // draw base
@@ -401,4 +411,9 @@ void game::view::CharacterView::FireItem()
     }
 
 
+}
+
+bool game::view::CharacterView::IsThisPlayersCharacter() const
+{
+    return world_.GetSession().GetCharacterEntNum() == GetEntNum();
 }

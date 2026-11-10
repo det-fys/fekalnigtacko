@@ -70,6 +70,8 @@ public:
 
     void GetChunkParams(mg::ChunkParams& out_params);
 
+    ClientSession& GetSession() const { return session_; }
+
 private:
     void UpdateEnv();
     void DrawEnv(const DrawArgs& args) const;

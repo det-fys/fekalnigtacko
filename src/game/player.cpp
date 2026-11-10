@@ -76,10 +76,15 @@ void game::Player::SetCamera(const CameraInfo& camera_info)
 {
     camera_info_ = camera_info;
 
+    if (first_person_desired_)
+        camera_info_.flags |= CAM_FIRST_PERSON;
+    else
+        camera_info_.flags &= ~CAM_FIRST_PERSON;
+    
     auto msg = BeginMsg(net::MSG_CAM);
-    msg.Write(camera_info.character_entnum);
-    msg.Write(camera_info.rideable_entnum);
-    msg.Write(camera_info.flags);
+    msg.Write(camera_info_.character_entnum);
+    msg.Write(camera_info_.rideable_entnum);
+    msg.Write(camera_info_.flags);
 }
 
 void game::Player::SendChat(const std::string& text)
@@ -638,7 +643,19 @@ void game::Player::Input(PlayerInputType type, bool enabled)
         in_ &= ~flag;
     }
 
-    game_.PlayerInput(*this, type, enabled);
+    switch (type)
+    {
+    case IN_CAMERA_MODE:
+        if (enabled)
+        {
+            first_person_desired_ = !first_person_desired_;
+            SetCamera(camera_info_);
+        }
+        break;
+    default:
+        game_.PlayerInput(*this, type, enabled);
+        break;
+    }
 }
 
 void game::Player::SendMenuMsgs()
@@ -662,6 +679,7 @@ void game::Player::UpdateCamera()
 {
     camera_controller_.SetAiming(camera_info_.flags & CAM_AIMING);
     camera_controller_.SetAimType(camera_info_.flags & CAM_AIM_CROSSHAIR, camera_info_.flags & CAM_AIM_SCOPE);
+    camera_controller_.SetFirstPerson(camera_info_.flags & CAM_FIRST_PERSON);
     camera_controller_.Update(1.0f / 25.0f);
 }
 

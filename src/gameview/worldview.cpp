@@ -290,6 +290,7 @@ bool game::view::WorldView::ProcessEntSpawnMsg(net::InMessage& msg)
             return false; // unknown type
         }
 
+        entslot->SetEntNum(entnum);
         return true;
 
     } catch (const EntityInitError& e) // failed

@@ -21,12 +21,14 @@ public:
 
     void SetAiming(bool aiming) { aiming_ = aiming; }
     void SetAimType(bool crosshair, bool scope) { aim_crosshair_ = crosshair; aim_scope_ = scope; }
+    void SetFirstPerson(bool first_person) { first_person_ = first_person; }
 
     void Update(float time);
     void Recalculate(collision::DynamicsWorld* world);
 
     const glm::dvec3& GetEye() const { return eye_; }
     const glm::vec3& GetForward() const { return forward_; }
+    const glm::vec3& GetUp() const { return up_; }
     // glm::mat4 GetViewMatrix() const;
     float GetAimFactor() const { return aim_factor_; }
 
@@ -48,9 +50,12 @@ private:
     bool aim_crosshair_ = false;
     bool aim_scope_ = false;
 
+    bool first_person_ = false;
+
     glm::dvec3 eye_;
     glm::vec3 forward_;
-
+    glm::vec3 up_{0.0f, 0.0f, 1.0f};
+    glm::vec3 target_up_{0.0f, 0.0f, 1.0f};
 };
 
 

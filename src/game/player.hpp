@@ -130,6 +130,7 @@ private:
     CameraInfo camera_info_;
     CameraController camera_controller_;
     glm::dvec3 cull_pos_{0.0};
+    bool first_person_desired_ = false;
 
     // menus
     // TODO: allow more menus
