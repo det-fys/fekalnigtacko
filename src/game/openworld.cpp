@@ -154,7 +154,8 @@ std::string GetSpzText(size_t num)
 
 game::OpenWorld::OpenWorld(Game& game) : EnterableWorld(GetOpenWorldDynamicsInfo(), GetOpenWorldInfo()), game_(game)
 {
-    auto spawn = ow_legacy_map.Get() ? glm::vec3(100.0f, 100.0f, 1.0f) : glm::vec3(0.0f, 0.0f, 5.0f);
+    // auto spawn = ow_legacy_map.Get() ? glm::vec3(100.0f, 100.0f, 1.0f) : glm::vec3(0.0f, 0.0f, 5.0f);
+    auto spawn = glm::vec3(100.0f, 100.0f, 1.0f);
     SetSpawnPoint(GetTerrainPos(spawn));
 
     // initial twingo
