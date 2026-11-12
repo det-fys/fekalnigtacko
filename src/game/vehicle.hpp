@@ -2,25 +2,18 @@
 
 #include <array>
 #include <cstddef>
+#include <vector>
 
 #include "assets/vehiclemdl.hpp"
-#include "collision/motionstate.hpp"
-#include "collision/raycastvehicle.hpp"
 #include "deform_grid.hpp"
 #include "entity.hpp"
 #include "vehicle_sync.hpp"
 #include "vehicle_tuning.hpp"
+#include "vehicle_sim.hpp"
 #include "world.hpp"
 
 namespace game
 {
-
-struct VehicleWheelState
-{
-    float rotation = 0.0f; // [rad]
-    float speed = 0.0f;    // [rad/s]
-    float z_offset = 0.0f; // [m] against model definition
-};
 
 using VehicleInputFlags = uint8_t;
 
@@ -31,36 +24,6 @@ enum VehicleInputType
     VIN_LEFT,
     VIN_RIGHT,
     VIN_HANDBRAKE,
-};
-
-class VehiclePhysics
-{
-public:
-    VehiclePhysics(collision::DynamicsWorld& world, FarTransform& transform, collision::ObjectCallback& obj_cb,
-                   const assets::VehicleModel& model, const VehicleTuningContext& tuning);
-
-    DELETE_COPY_MOVE(VehiclePhysics)
-
-    void Update();
-
-    btRigidBody& GetBtBody() { return *body_; }
-    collision::RaycastVehicle& GetBtVehicle() { return *vehicle_; }
-
-    void DisableAction();
-    bool IsActionEnabled() const { return action_enabled_; }
-
-    ~VehiclePhysics();
-
-private:
-    bool action_enabled_ = false;
-    void UpdateBulletHitboxTransform();
-
-private:
-    collision::DynamicsWorld& world_;
-    collision::MotionState motion_;
-    std::unique_ptr<btRigidBody> body_;
-    std::unique_ptr<collision::RaycastVehicle> vehicle_;
-    std::unique_ptr<btCollisionObject> bullet_hitbox_;
 };
 
 struct VehicleSpawnInfo
@@ -91,7 +54,8 @@ public:
     float GetSpeed() const;
 
     void SetSteering(bool analog, float value = 0.0f);
-    float GetSteering() const;
+    float GetSteering() const { return physics_->GetSteering(); }
+    const std::vector<VehicleWheelState>& GetWheelStates() const { return physics_->GetWheelStates(); }
 
     void SetLightsOn(bool lights_on) { lights_on_ = lights_on; }
     bool GetLightsOn() const { return lights_on_; }
@@ -111,11 +75,14 @@ public:
     float GetHealth() const { return health_; }
     float GetWindowHealth() const { return window_health_; }
 
+protected:
+    VehiclePhysics* GetPhysics() { return physics_.get(); }
+    virtual void OnPhysicsChanged() {}
+
 private:
     void UpdateDestruction();
     void ProcessInput();
     void UpdateCrash();
-    void UpdateWheels();
     void UpdateLights();
     void UpdateSyncState();
 
@@ -136,25 +103,16 @@ private:
     void Explode();
     void RandomizeDeform();
 
-protected:
-    VehiclePhysics* GetPhysics() { return physics_.get(); }
-    virtual void OnPhysicsChanged() {}
-
 private:
     VehicleTuning tuning_;
     std::shared_ptr<const assets::VehicleModel> model_;
     std::shared_ptr<const VehicleTuningList> tuninglist_;
 
     VehicleTuningContext tuning_ctx_{};
-
     std::unique_ptr<VehiclePhysics> physics_;
 
-    float steering_ = 0.0f;
     bool steering_analog_ = false;
     float target_steering_ = 0.0f;
-    float steering_speed_ = 5.0f;
-
-    std::vector<VehicleWheelState> wheels_;
 
     VehicleFlags flags_ = VF_NONE;
     VehicleSyncState sync_[2];
@@ -175,9 +133,6 @@ private:
     glm::vec3 prev_velocity_ = glm::vec3(0.0f);
 
     std::unique_ptr<DeformGrid> deformgrid_;
-
-    size_t wheels_on_ground_ = 0;
-    size_t can_roll_frames_ = 0;
 
     bool lights_on_ = false;
 

@@ -101,6 +101,7 @@ set(COMMON_SOURCES
     "src/game/tuning_world.cpp"
     "src/game/vehicle_tuning.cpp"
     "src/game/vehicle.cpp"
+    "src/game/vehicle_sim.cpp"
     "src/game/world.cpp"
     "src/mapgen/chunk_manager.cpp"
     "src/mapgen/chunk.cpp"

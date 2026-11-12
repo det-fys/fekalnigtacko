@@ -5,7 +5,6 @@
 #include "player.hpp"
 #include "player_input.hpp"
 #include "utils/random.hpp"
-#include "utils/math.hpp"
 #include "human_character.hpp"
 
 #include <iostream>
@@ -21,8 +20,6 @@ game::Vehicle::Vehicle(World& world, const VehicleSpawnInfo& info)
 {
     root_.local.position = info.position;
     root_.local.rotation = glm::angleAxis(info.yaw, glm::vec3(0.0f, 0.0f, 1.0f));
-
-    wheels_.resize(model_->GetWheels().size());
 
     ApplyTuning(info.tuning);
 
@@ -52,7 +49,10 @@ void game::Vehicle::Update()
     UpdateDestruction();
     UpdateCrash();
     ProcessInput();
-    UpdateWheels();
+
+    if (!physics_ || !physics_->IsActionEnabled())
+        flags_ |= VF_NO_WHEELS;
+    
     UpdateLights();
 
     sync_current_ = 1 - sync_current_;
@@ -104,11 +104,7 @@ void game::Vehicle::ReceiveDamage(const DamageInfo& damage)
 
     // TODO: adjust impulse
     auto impulse = damage.normal * -damage.impulse;
-    auto& bt_body = physics_->GetBtBody();
-    bt_body.activate();
-    bt_body.applyImpulse(btVector3(impulse.x, impulse.y, impulse.z),
-                         btVector3(damage.impact_pos.x, damage.impact_pos.y, damage.impact_pos.z) -
-                             bt_body.getCenterOfMassPosition());
+    physics_->ApplyImpulse(impulse, damage.impact_pos);
 
     auto dmg = damage.damage;
     if (damage.type == DAMAGE_BULLET)
@@ -131,11 +127,7 @@ void game::Vehicle::SetInput(VehicleInputType type, bool enable)
 
 void game::Vehicle::SetPosition(const glm::dvec3& pos)
 {
-    auto& body = physics_->GetBtBody();
-
-    auto t = body.getWorldTransform();
-    t.setOrigin(btVector3(pos.x, pos.y, pos.z));
-    body.setWorldTransform(t);
+    physics_->SetPosition(pos);
 }
 
 float game::Vehicle::GetSpeed() const
@@ -147,11 +139,6 @@ void game::Vehicle::SetSteering(bool analog, float value)
 {
     steering_analog_ = analog;
     target_steering_ = value;
-}
-
-float game::Vehicle::GetSteering() const
-{
-    return steering_;
 }
 
 void game::Vehicle::SetTuning(const VehicleTuning& tuning)
@@ -195,209 +182,21 @@ void game::Vehicle::UpdateDestruction()
 
 void game::Vehicle::ProcessInput()
 {
-    if (!physics_->IsActionEnabled())
-    {
-        return; // destroyed
-    }
-
-    // TODO: totally fix
-
-    // std::string nt = "";
-
-    if (in_)
-    {
-        // nt += "in ";
-        //  body_->setActivationState(ACTIVE_TAG);
-        physics_->GetBtBody().activate();
-    }
-    else
-    {
-        // nt += "no in";
-    }
-
-    // nt += std::to_string(body_->getActivationState());
-    // SetNametag(nt);
-
-    float t_delta = 1.0f / 25.0f;
-
-    // float steeringIncrement = .04 * 60;
-    // float steeringClamp = .5;
-    // float maxEngineForce = 7000;
-    float maxEngineForce = tuning_ctx_.engine_force;
-    float maxBreakingForce = tuning_ctx_.braking_force;
-
-    float speed = GetSpeed();
-    if (glm::abs(speed) > 200.0f)
-        maxEngineForce = 100.0f;
-
-    float engineForce = 0;
-    float breakingForce = 0;
-
-    float maxsc = .5f;
-    float minsc = .08f;
-    float sl = 130.f;
-
-    float steeringClamp = std::max(minsc, (1.f - (std::abs(speed) / sl)) * maxsc);
-    // steeringClamp = .5f;
-    float steeringSpeed = steeringClamp * steering_speed_;
-    if (steering_analog_)
-        steeringSpeed *= 3.0f;
-
-    float steeringInc = steeringSpeed * t_delta;
-    float steeringDec = steeringInc * 2.0f;
-
-    const bool in_forward = in_ & (1 << VIN_FORWARD);
-    const bool in_backward = in_ & (1 << VIN_BACKWARD);
-    const bool in_left = in_ & (1 << VIN_LEFT);
-    const bool in_right = in_ & (1 << VIN_RIGHT);
-
-    bool active_braking = false;
-    bool active_gas = false;
-
-    if (in_forward)
-    {
-        if (speed < -1)
-        {
-            breakingForce = maxBreakingForce;
-            active_braking = true;
-        }
-        else
-        {
-            engineForce = maxEngineForce;
-            active_gas = true;
-        }
-    }
-    if (in_backward)
-    {
-        if (speed > 1)
-        {
-            breakingForce = maxBreakingForce;
-            active_braking = true;
-        }
-        else
-        {
-            engineForce = -maxEngineForce / 2;
-            active_gas = true;
-        }
-    }
-
-    // idle breaking
-    if (!active_braking && !active_gas)
-    {
-        breakingForce = 20.0f;
-    }
-
-    if (!steering_analog_)
-    {
-        if (in_left)
-        {
-            if (steering_ < steeringClamp)
-                steering_ += steeringInc;
-        }
-        else
-        {
-            if (in_right)
-            {
-                if (steering_ > -steeringClamp)
-                    steering_ -= steeringInc;
-            }
-            else
-            {
-                if (steering_ < -steeringInc)
-                    steering_ += steeringInc;
-                else
-                {
-                    if (steering_ > steeringInc)
-                        steering_ -= steeringInc;
-                    else
-                    {
-                        steering_ = 0.0f;
-                    }
-                }
-            }
-        }
-    }
-    else
-    {
-        auto target_steering_clamped = glm::clamp(target_steering_, -steeringClamp, steeringClamp);
-        MoveToward(steering_, target_steering_clamped,
-                   glm::abs(target_steering_clamped) < glm::abs(steering_) ? steeringInc : steeringDec);
-    }
-
-    auto& vehicle = physics_->GetBtVehicle();
-
-    for (size_t i = 0; i < wheels_.size(); ++i)
-    {
-        float engine_factor = tuning_ctx_.wheels[i].engine_factor;
-        if (engine_factor > 0.0001f)
-        {
-            vehicle.applyEngineForce(engine_factor * engineForce, i);
-        }
-        
-        float braking_factor = tuning_ctx_.wheels[i].braking_factor;
-        if (braking_factor > 0.0001f)
-        {
-            vehicle.setBrake(braking_factor * breakingForce, i);
-        }
-
-        float steering_factor = tuning_ctx_.wheels[i].steering_factor;
-        if (std::abs(steering_factor) > 0.0001f)
-        {
-            vehicle.setSteeringValue(steering_factor * steering_, i);
-        }
-    }
-
-    if (active_gas)
+    VehicleSimulationInput input{};
+    input.any_input = in_ != 0;
+    input.forward = in_ & (1 << VIN_FORWARD);
+    input.backward = in_ & (1 << VIN_BACKWARD);
+    input.left = in_ & (1 << VIN_LEFT);
+    input.right = in_ & (1 << VIN_RIGHT);
+    input.analog_steering = steering_analog_;
+    input.target_steering = target_steering_;
+    physics_->ProcessInput(input);
+    if (physics_->IsAccelerating())
         flags_ |= VF_ACCELERATING;
-
-    if (active_braking)
+    if (physics_->IsBraking())
         flags_ |= VF_BRAKING;
-        
-    if (active_gas && engineForce < 0.0f)
+    if (physics_->IsReversing())
         flags_ |= VF_REVERSING;
-
-    const bool can_roll = wheels_on_ground_ <= (wheels_.size() / 2);
-
-    if (can_roll)
-        ++can_roll_frames_;
-    else
-        can_roll_frames_ = 0;
-
-
-    const bool roll_left = in_left || (steering_analog_ && target_steering_ < -0.1f);
-    const bool roll_right = in_right || (steering_analog_ && target_steering_ > 0.1f);
-
-    // check if airborne and apply roll if right/left pressed
-    if (can_roll_frames_ >= 50 && (roll_left || roll_right))
-    {
-        btVector3 ang_vel = physics_->GetBtBody().getAngularVelocity();
-
-        const float max_vel = 1.0f;
-
-        btTransform trans = physics_->GetBtBody().getWorldTransform();
-        btQuaternion quat = trans.getRotation();
-        glm::quat rot_quat(quat.getW(), quat.getX(), quat.getY(), quat.getZ());
-        glm::vec3 local_up_world = rot_quat * glm::vec3(0.0f, 0.0f, 1.0f);
-        float roll_factor = glm::clamp(1.0f - local_up_world.z, 0.0f, 1.0f);
-        glm::vec3 local_roll(0.0f, 0.5f * roll_factor, 0.0f);
-        glm::vec3 local_ang_vel = glm::inverse(rot_quat) * glm::vec3(ang_vel.x(), ang_vel.y(), ang_vel.z());
-
-        if (glm::abs(local_ang_vel.y) < max_vel)
-        {
-            glm::vec3 world_roll = rot_quat * local_roll;
-            glm::vec3 new_ang_vel = glm::vec3(ang_vel.x(), ang_vel.y(), ang_vel.z());
-
-            if (roll_left)
-                new_ang_vel -= world_roll;
-            
-                if (roll_right)
-                new_ang_vel += world_roll;
-
-            ang_vel = btVector3(new_ang_vel.x, new_ang_vel.y, new_ang_vel.z);
-            physics_->GetBtBody().setAngularVelocity(ang_vel);
-        }
-
-    }
 }
 
 void game::Vehicle::UpdateCrash()
@@ -410,8 +209,7 @@ void game::Vehicle::UpdateCrash()
     {
         if (physics_)
         {
-            auto bt_vel = physics_->GetBtBody().getLinearVelocity();
-            glm::vec3 velocity(bt_vel.x(), bt_vel.y(), bt_vel.z());
+            const glm::vec3 velocity = physics_->GetVelocity();
             float diff = glm::distance(velocity, prev_velocity_);
             prev_velocity_ = velocity;
 
@@ -453,31 +251,6 @@ void game::Vehicle::UpdateCrash()
     crash_intensity_ = 0.0f;
 }
 
-void game::Vehicle::UpdateWheels()
-{
-    wheels_on_ground_ = 0;
-
-    if (!physics_->IsActionEnabled())
-    {
-        flags_ |= VF_NO_WHEELS;
-        return;
-    }
-
-    auto& vehicle = physics_->GetBtVehicle();
-
-    for (size_t i = 0; i < wheels_.size(); ++i)
-    {
-        auto& bt_wheel = vehicle.getWheelInfo(i);
-        wheels_[i].speed = -(static_cast<float>(bt_wheel.m_rotation) - wheels_[i].rotation) * 25.0f;
-        bt_wheel.m_rotation = glm::mod(bt_wheel.m_rotation, glm::two_pi<btScalar>()); // prevent going too crazy
-        wheels_[i].rotation = bt_wheel.m_rotation;
-        wheels_[i].z_offset = tuning_ctx_.wheels[i].z_offset - bt_wheel.m_raycastInfo.m_suspensionLength;
-        
-        if (bt_wheel.m_raycastInfo.m_isInContact)
-            ++wheels_on_ground_;
-    }
-}
-
 void game::Vehicle::UpdateLights()
 {
     if (exploded_)
@@ -500,11 +273,12 @@ void game::Vehicle::UpdateSyncState()
     net::EncodeFarPosition(root_.local.position, state.pos);
     net::EncodeRotation(root_.local.rotation, state.rot);
 
-    state.steering.Encode(steering_);
+    state.steering.Encode(GetSteering());
 
-    for (size_t i = 0; i < wheels_.size(); ++i)
+    const auto& wheels = GetWheelStates();
+    for (size_t i = 0; i < wheels.size(); ++i)
     {
-        auto& wheel = wheels_[i];
+        const auto& wheel = wheels[i];
         state.wheels[i].z_offset.Encode(wheel.z_offset);
         state.wheels[i].speed.Encode(wheel.speed);
     }
@@ -550,8 +324,9 @@ game::VehicleSyncFieldFlags game::Vehicle::WriteState(net::OutMessage& msg, cons
         net::WriteDelta(msg, curr.steering, base.steering);
     }
 
+    const auto& wheels = GetWheelStates();
     bool wheels_changed = false;
-    for (size_t i = 0; i < wheels_.size(); ++i)
+    for (size_t i = 0; i < wheels.size(); ++i)
     {
         if (curr.wheels[i].z_offset.value != base.wheels[i].z_offset.value ||
             curr.wheels[i].speed.value != base.wheels[i].speed.value)
@@ -565,7 +340,7 @@ game::VehicleSyncFieldFlags game::Vehicle::WriteState(net::OutMessage& msg, cons
     {
         fields |= VSF_WHEELS;
 
-        for (size_t i = 0; i < wheels_.size(); ++i)
+        for (size_t i = 0; i < wheels.size(); ++i)
         {
             net::WriteDelta(msg, curr.wheels[i].z_offset, base.wheels[i].z_offset);
             net::WriteDelta(msg, curr.wheels[i].speed, base.wheels[i].speed);
@@ -771,18 +546,25 @@ void game::Vehicle::ApplyTuning(const VehicleTuning& tuning)
 
     health_ = tuning_ctx_.health;
     window_health_ = health_;
-    steering_speed_ = tuning_ctx_.steering;
 
     // (re)create physics
     if (recreate_physics)
     {
+        const float steering = physics_ ? physics_->GetSteering() : 0.0f;
         physics_.reset();
-        physics_ = std::make_unique<VehiclePhysics>(world_, root_.local, *this, *model_, tuning_ctx_);
+        physics_ = std::make_unique<VehiclePhysics>(world_, root_.local, *model_, tuning_ctx_, this);
+        physics_->SetSteering(steering);
+
         if (exploded_)
         {
             physics_->DisableAction();
         }
+
         OnPhysicsChanged();
+    }
+    else
+    {
+        physics_->SetTuning(tuning_ctx_);
     }
 }
 
@@ -849,139 +631,4 @@ void game::Vehicle::RandomizeDeform()
     }
 
     SendDeformSyncMsg();
-}
-
-// PHYSICS
-
-game::VehiclePhysics::VehiclePhysics(collision::DynamicsWorld& world, FarTransform& transform,
-                                     collision::ObjectCallback& obj_cb, const assets::VehicleModel& model,
-                                     const VehicleTuningContext& tuning)
-    : world_(world), motion_(transform)
-{
-    
-    // setup chassis rigidbody
-    btCollisionShape* shape = model.GetModel()->GetColShape();
-    if (!shape)
-        throw std::runtime_error("Making vehicle with no shape");
-
-    btVector3 local_inertia(0, 0, 0);
-    shape->calculateLocalInertia(tuning.mass, local_inertia);
-
-    btRigidBody::btRigidBodyConstructionInfo rb_info(tuning.mass, &motion_, shape, local_inertia);
-    body_ = std::make_unique<btRigidBody>(rb_info);
-    // body_->setActivationState(DISABLE_DEACTIVATION);
-
-    collision::SetObjectInfo(body_.get(), collision::OT_ENTITY,
-                             collision::OF_NOTIFY_CONTACT | collision::OF_DESTRUCTING | collision::OF_EXPLOSION_DAMAGE,
-                             &obj_cb);
-
-    // setup vehicle
-    btRaycastVehicle::btVehicleTuning bt_tuning;
-    vehicle_ = std::make_unique<collision::RaycastVehicle>(bt_tuning, body_.get(), &world_.GetVehicleRaycaster());
-    vehicle_->setCoordinateSystem(0, 2, 1);
-
-    // setup wheels
-    // btVector3 wheelDirectionCS0(0, -1, 0);
-    // btVector3 wheelAxleCS(-1, 0, 0);
-    btVector3 wheelDirectionCS0(0, 0, -1);
-    btVector3 wheelAxleCS(1, 0, 0);
-
-    const auto& model_wheels = model.GetWheels();
-
-    size_t num_wheels = model_wheels.size();
-
-    for (size_t i = 0; i < num_wheels; ++i)
-    {
-        const auto& wheel_mdl = model_wheels[i];
-        const auto& wheel_tun = tuning.wheels[i];
-
-        // float wheelRadius = wheel_tun.radius;
-
-        // float friction = wheel_tun.friction
-        // float suspensionStiffness = 50.0f;
-        // // float suspensionDamping = 2.3f;
-        // // float suspensionCompression = 4.4f;
-        // float suspensionRestLength = 0.3f;
-        // float rollInfluence = 0.3f;
-
-        // float maxSuspensionForce = 90000.0f;
-        // float maxSuspensionTravelCm = 15.0f;
-
-        float k = 0.2f;
-        
-        // if (!is_front)
-        //     friction *= 1.5f;
-
-        btVector3 wheel_pos(wheel_mdl.position.x, wheel_mdl.position.y, wheel_mdl.position.z + wheel_tun.z_offset);
-
-        auto& wi = vehicle_->addWheel(wheel_pos, wheelDirectionCS0, wheelAxleCS, wheel_tun.suspension_rest_length, wheel_tun.radius,
-                                      bt_tuning, wheel_tun.front);
-
-        wi.m_suspensionStiffness = wheel_tun.suspension_stiffness;
-
-        wi.m_wheelsDampingCompression = k * 2.0 * btSqrt(wi.m_suspensionStiffness); // vehicleTuning.suspensionCompression;
-        wi.m_wheelsDampingRelaxation = k * 3.3 * btSqrt(wi.m_suspensionStiffness);  // vehicleTuning.suspensionDamping;
-
-        wi.m_frictionSlip = wheel_tun.friction;
-
-        wi.m_rollInfluence = wheel_tun.roll_influence;
-        wi.m_maxSuspensionForce = wheel_tun.suspension_max_force;
-        wi.m_maxSuspensionTravelCm = wheel_tun.suspension_travel * 100.0f;
-    }
-
-
-    auto& bt_world = world_.GetBtWorld();
-    bt_world.addRigidBody(body_.get(), collision::OG_DEFAULT, ~collision::OG_PROJECTILE);
-    bt_world.addAction(vehicle_.get());
-    action_enabled_ = true;
-
-    // make bullet hitbox
-    auto col_mesh = model.GetModel()->GetColMesh();
-    if (col_mesh)
-    {
-        bullet_hitbox_ = std::make_unique<btCollisionObject>();
-        bullet_hitbox_->setCollisionShape(col_mesh->GetShape());
-        collision::SetObjectInfo(bullet_hitbox_.get(), collision::OT_ENTITY, 0, &obj_cb);
-    
-        bt_world.addCollisionObject(bullet_hitbox_.get(), collision::OG_DEFAULT, collision::OG_PROJECTILE);
-
-        UpdateBulletHitboxTransform();
-    }
-
-}
-
-void game::VehiclePhysics::Update()
-{
-    UpdateBulletHitboxTransform();
-}
-
-void game::VehiclePhysics::DisableAction()
-{
-    if (!action_enabled_)
-        return;
-
-    auto& bt_world = world_.GetBtWorld();
-    bt_world.removeAction(vehicle_.get());
-
-    action_enabled_ = false;
-}
-
-game::VehiclePhysics::~VehiclePhysics()
-{
-    auto& bt_world = world_.GetBtWorld();
-    bt_world.removeRigidBody(body_.get());
-    DisableAction();
-
-    if (bullet_hitbox_)
-    {
-        bt_world.removeCollisionObject(bullet_hitbox_.get());
-    }
-}
-
-void game::VehiclePhysics::UpdateBulletHitboxTransform()
-{
-    if (!bullet_hitbox_)
-        return;
-
-    bullet_hitbox_->setWorldTransform(body_->getWorldTransform());
 }

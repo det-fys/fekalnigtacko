@@ -38,7 +38,7 @@ void game::DrivableVehicle::SetTuning(const VehicleTuning& tuning)
 void game::DrivableVehicle::OnPhysicsChanged()
 {
     // make body usable
-    collision::AddObjectFlags(&GetPhysics()->GetBtBody(), collision::OF_USABLE);
+    GetPhysics()->AddBodyFlags(collision::OF_USABLE);
 }
 
 bool game::DrivableVehicle::QueryUseTarget(PlayerCharacter& character, uint32_t target_id, UseTargetQueryResult& res)
