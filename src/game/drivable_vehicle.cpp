@@ -22,6 +22,19 @@ void game::DrivableVehicle::Update()
     Super::Update();
 
     contact_ = false;
+
+    auto driver_player = dynamic_cast<PlayerCharacter*>(GetPassenger(0));
+    if (driver_player && driver_player->GetPlayer())
+    {
+        // send debug info
+        std::string msg =
+            "S=" + std::to_string(GetSpeed()) + " km/h, G=" + std::to_string(GetPhysics()->GetCurrentGear()) +
+            ", RPM=" + std::to_string(GetPhysics()->GetCurrentRPM()) +
+            ", T=" + std::to_string(GetPhysics()->GetThrottle()) + ", B=" + std::to_string(GetPhysics()->GetBrake());
+    
+        
+        driver_player->GetPlayer()->SendChat(msg);
+    }
 }
 
 game::HumanCharacter* game::DrivableVehicle::GetResponsibleCharacter()

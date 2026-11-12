@@ -24,6 +24,8 @@ enum VehicleInputType
     VIN_LEFT,
     VIN_RIGHT,
     VIN_HANDBRAKE,
+    VIN_SHIFT_UP,
+    VIN_SHIFT_DOWN,
 };
 
 struct VehicleSpawnInfo

@@ -73,8 +73,6 @@ VehiclePhysics::VehiclePhysics(collision::DynamicsWorld& world, FarTransform& tr
 
 void VehiclePhysics::SetTuning(const VehicleTuningContext& tuning)
 {
-    engine_force_ = tuning.engine_force;
-    braking_force_ = tuning.braking_force;
     steering_speed_ = tuning.steering;
 
     wheel_tuning_.clear();
@@ -84,12 +82,44 @@ void VehiclePhysics::SetTuning(const VehicleTuningContext& tuning)
     {
         wheel_tuning_.push_back({wheel.engine_factor, wheel.braking_factor, wheel.steering_factor, wheel.z_offset});
     }
+
+    max_braking_force_ = tuning.braking_force;
+
+    float torque_scale = 0.6f;
+
+    auto& tc = engine_.torque_curve;
+    tc[0] = {  800.f, 110.f * torque_scale };
+    tc[1] = { 1500.f, 160.f * torque_scale };
+    tc[2] = { 2500.f, 215.f * torque_scale };
+    tc[3] = { 3500.f, 245.f * torque_scale };
+    tc[4] = { 4500.f, 260.f * torque_scale };
+    tc[5] = { 5500.f, 250.f * torque_scale };
+    tc[6] = { 6500.f, 225.f * torque_scale };
+    tc[7] = { 7000.f, 190.f };
+    engine_.num_torque_curve_points = 9;
+
+    auto& gears = transmission_.gear_ratios;
+    gears[0] = -3.2f;
+    gears[1] = 0.0f;
+    gears[2] = 3.6f;
+    gears[3] = 2.19f;
+    gears[4] = 1.41f;
+    gears[5] = 1.0f;
+    gears[6] = 0.83f;
+    gears[7] = 0.69f;
+    transmission_.num_gears = 8;
+
+    transmission_.final_drive_ratio = 3.6f;
+
+
 }
 
-void VehiclePhysics::Update()
+void VehiclePhysics::Update(float dt)
 {
     UpdateBulletHitboxTransform();
-    UpdateWheels();
+    UpdateInput(dt);
+    UpdateDrivetrain(dt);
+    UpdateWheels(dt);
 }
 
 void VehiclePhysics::ApplyImpulse(const glm::vec3& impulse, const glm::dvec3& world_position)
@@ -111,151 +141,6 @@ glm::vec3 VehiclePhysics::GetVelocity() const
 {
     const auto velocity = body_->getLinearVelocity();
     return glm::vec3(velocity.x(), velocity.y(), velocity.z());
-}
-
-void VehiclePhysics::ProcessInput(const VehicleSimulationInput& input)
-{
-    accelerating_ = false;
-    braking_ = false;
-    reversing_ = false;
-
-    if (!action_enabled_)
-        return;
-
-    if (input.any_input)
-        body_->activate();
-
-    constexpr float t_delta = 1.0f / 25.0f;
-    float max_engine_force = engine_force_;
-    const float max_braking_force = braking_force_;
-    const float speed = vehicle_->getCurrentSpeedKmHour();
-    if (glm::abs(speed) > 200.0f)
-        max_engine_force = 100.0f;
-
-    float engine_force = 0.0f;
-    float braking_force = 0.0f;
-
-    constexpr float max_steering_clamp = 0.5f;
-    constexpr float min_steering_clamp = 0.08f;
-    constexpr float steering_limit_speed = 130.0f;
-    const float steering_clamp = std::max(min_steering_clamp,
-        (1.0f - (std::abs(speed) / steering_limit_speed)) * max_steering_clamp);
-    float steering_speed = steering_clamp * steering_speed_;
-    if (input.analog_steering)
-        steering_speed *= 3.0f;
-    const float steering_increment = steering_speed * t_delta;
-    const float steering_decrement = steering_increment * 2.0f;
-
-    bool active_braking = false;
-    bool active_gas = false;
-    if (input.forward)
-    {
-        if (speed < -1.0f)
-        {
-            braking_force = max_braking_force;
-            active_braking = true;
-        }
-        else
-        {
-            engine_force = max_engine_force;
-            active_gas = true;
-        }
-    }
-    if (input.backward)
-    {
-        if (speed > 1.0f)
-        {
-            braking_force = max_braking_force;
-            active_braking = true;
-        }
-        else
-        {
-            engine_force = -max_engine_force / 2.0f;
-            active_gas = true;
-        }
-    }
-
-    if (!active_braking && !active_gas)
-        braking_force = 20.0f;
-
-    if (!input.analog_steering)
-    {
-        if (input.left)
-        {
-            if (steering_ < steering_clamp)
-                steering_ += steering_increment;
-        }
-        else if (input.right)
-        {
-            if (steering_ > -steering_clamp)
-                steering_ -= steering_increment;
-        }
-        else if (steering_ < -steering_increment)
-        {
-            steering_ += steering_increment;
-        }
-        else if (steering_ > steering_increment)
-        {
-            steering_ -= steering_increment;
-        }
-        else
-        {
-            steering_ = 0.0f;
-        }
-    }
-    else
-    {
-        const float target_steering = glm::clamp(input.target_steering, -steering_clamp, steering_clamp);
-        MoveToward(steering_, target_steering,
-                   glm::abs(target_steering) < glm::abs(steering_) ? steering_increment : steering_decrement);
-    }
-
-    for (size_t i = 0; i < wheel_tuning_.size(); ++i)
-    {
-        const auto& wheel_tuning = wheel_tuning_[i];
-        if (wheel_tuning.engine_factor > 0.0001f)
-            vehicle_->applyEngineForce(wheel_tuning.engine_factor * engine_force, i);
-        if (wheel_tuning.braking_factor > 0.0001f)
-            vehicle_->setBrake(wheel_tuning.braking_factor * braking_force, i);
-        if (std::abs(wheel_tuning.steering_factor) > 0.0001f)
-            vehicle_->setSteeringValue(wheel_tuning.steering_factor * steering_, i);
-    }
-
-    accelerating_ = active_gas;
-    braking_ = active_braking;
-    reversing_ = active_gas && engine_force < 0.0f;
-
-    const bool can_roll = wheels_on_ground_ <= (wheel_tuning_.size() / 2);
-    if (can_roll)
-        ++can_roll_frames_;
-    else
-        can_roll_frames_ = 0;
-
-    const bool roll_left = input.left || (input.analog_steering && input.target_steering < -0.1f);
-    const bool roll_right = input.right || (input.analog_steering && input.target_steering > 0.1f);
-    if (can_roll_frames_ >= 50 && (roll_left || roll_right))
-    {
-        btVector3 angular_velocity = body_->getAngularVelocity();
-        constexpr float max_velocity = 1.0f;
-        const btQuaternion quat = body_->getWorldTransform().getRotation();
-        const glm::quat rotation(quat.getW(), quat.getX(), quat.getY(), quat.getZ());
-        const glm::vec3 local_up_world = rotation * glm::vec3(0.0f, 0.0f, 1.0f);
-        const float roll_factor = glm::clamp(1.0f - local_up_world.z, 0.0f, 1.0f);
-        const glm::vec3 local_roll(0.0f, 0.5f * roll_factor, 0.0f);
-        const glm::vec3 local_angular_velocity = glm::inverse(rotation) *
-            glm::vec3(angular_velocity.x(), angular_velocity.y(), angular_velocity.z());
-        if (glm::abs(local_angular_velocity.y) < max_velocity)
-        {
-            const glm::vec3 world_roll = rotation * local_roll;
-            glm::vec3 new_angular_velocity(angular_velocity.x(), angular_velocity.y(), angular_velocity.z());
-            if (roll_left)
-                new_angular_velocity -= world_roll;
-            if (roll_right)
-                new_angular_velocity += world_roll;
-            body_->setAngularVelocity(btVector3(new_angular_velocity.x, new_angular_velocity.y,
-                                                new_angular_velocity.z));
-        }
-    }
 }
 
 void VehiclePhysics::DisableAction()
@@ -281,10 +166,180 @@ void VehiclePhysics::UpdateBulletHitboxTransform()
         bullet_hitbox_->setWorldTransform(body_->getWorldTransform());
 }
 
-void VehiclePhysics::UpdateWheels()
+void VehiclePhysics::UpdateInput(float dt)
+{
+    accelerating_ = false;
+    braking_ = false;
+    reversing_ = false;
+
+    if (!action_enabled_)
+        return;
+
+    if (input_.any_input)
+        body_->activate();
+
+    constexpr float t_delta = 1.0f / 25.0f;
+    // float max_engine_force = engine_force_;
+    // const float max_braking_force = braking_force_;
+    const float speed = vehicle_->getCurrentSpeedKmHour();
+    current_speed_ = speed * (1000.0f / 3600.0f); // [m/s]
+    // if (glm::abs(speed) > 200.0f)
+        // max_engine_force = 100.0f;
+
+    // float engine_force = 0.0f;
+    // float braking_force = 0.0f;
+
+    constexpr float max_steering_clamp = 0.5f;
+    constexpr float min_steering_clamp = 0.08f;
+    constexpr float steering_limit_speed = 130.0f;
+    const float steering_clamp = std::max(min_steering_clamp,
+        (1.0f - (std::abs(speed) / steering_limit_speed)) * max_steering_clamp);
+    float steering_speed = steering_clamp * steering_speed_;
+    if (input_.analog_steering)
+        steering_speed *= 3.0f;
+    const float steering_increment = steering_speed * t_delta;
+    const float steering_decrement = steering_increment * 2.0f;
+
+    // bool active_braking = false;
+    // bool active_gas = false;
+
+    float target_throttle = 0.0f;
+    float target_brake = 0.0f;
+
+    if (input_.forward)
+    {
+        if (speed < -1.0f)
+            target_brake = 1.0f;
+        else
+            target_throttle = 1.0f;
+    }
+    if (input_.backward)
+    {
+        if (speed > 1.0f)
+            target_brake = 1.0f;
+        else
+            target_throttle = -1.0f;
+    }
+
+    const bool active_braking = target_brake > 0.0f;
+
+    if (target_throttle == 0.0f && target_brake == 0.0f)
+        target_brake = 0.3f;
+
+    if (!input_.analog_steering)
+    {
+        if (input_.left)
+        {
+            if (steering_ < steering_clamp)
+                steering_ += steering_increment;
+        }
+        else if (input_.right)
+        {
+            if (steering_ > -steering_clamp)
+                steering_ -= steering_increment;
+        }
+        else if (steering_ < -steering_increment)
+        {
+            steering_ += steering_increment;
+        }
+        else if (steering_ > steering_increment)
+        {
+            steering_ -= steering_increment;
+        }
+        else
+        {
+            steering_ = 0.0f;
+        }
+    }
+    else
+    {
+        const float target_steering = glm::clamp(input_.target_steering, -steering_clamp, steering_clamp);
+        MoveToward(steering_, target_steering,
+                   glm::abs(target_steering) < glm::abs(steering_) ? steering_increment : steering_decrement);
+    }
+
+    accelerating_ = target_throttle != 0.0f;
+    braking_ = active_braking;
+    reversing_ = target_throttle < 0.0f;
+
+    throttle_and_dir_ = target_throttle;
+    brake_ = target_brake;
+
+    const bool can_roll = wheels_on_ground_ <= (wheel_tuning_.size() / 2);
+    if (can_roll)
+        ++can_roll_frames_;
+    else
+        can_roll_frames_ = 0;
+
+    const bool roll_left = input_.left || (input_.analog_steering && input_.target_steering < -0.1f);
+    const bool roll_right = input_.right || (input_.analog_steering && input_.target_steering > 0.1f);
+    if (can_roll_frames_ >= 50 && (roll_left || roll_right))
+    {
+        btVector3 angular_velocity = body_->getAngularVelocity();
+        constexpr float max_velocity = 1.0f;
+        const btQuaternion quat = body_->getWorldTransform().getRotation();
+        const glm::quat rotation(quat.getW(), quat.getX(), quat.getY(), quat.getZ());
+        const glm::vec3 local_up_world = rotation * glm::vec3(0.0f, 0.0f, 1.0f);
+        const float roll_factor = glm::clamp(1.0f - local_up_world.z, 0.0f, 1.0f);
+        const glm::vec3 local_roll(0.0f, 0.5f * roll_factor, 0.0f);
+        const glm::vec3 local_angular_velocity = glm::inverse(rotation) *
+            glm::vec3(angular_velocity.x(), angular_velocity.y(), angular_velocity.z());
+        if (glm::abs(local_angular_velocity.y) < max_velocity)
+        {
+            const glm::vec3 world_roll = rotation * local_roll;
+            glm::vec3 new_angular_velocity(angular_velocity.x(), angular_velocity.y(), angular_velocity.z());
+            if (roll_left)
+                new_angular_velocity -= world_roll;
+            if (roll_right)
+                new_angular_velocity += world_roll;
+            body_->setAngularVelocity(btVector3(new_angular_velocity.x, new_angular_velocity.y,
+                                                new_angular_velocity.z));
+        }
+    }
+
+}
+
+void VehiclePhysics::UpdateDrivetrain(float dt)
+{
+    const bool reverse = throttle_and_dir_ < 0.0f;
+    const float throttle = glm::abs(throttle_and_dir_);
+
+    const auto speed_ms = current_speed_;
+
+    // calculate current rpm
+    const auto wheel_rpm = speed_ms / driven_wheel_radius_ * 60.0f / (2.0f * glm::pi<float>());
+    const auto transmission_ratio = transmission_.GetRatio(gear_);
+    const auto target_engine_rpm = wheel_rpm * transmission_ratio;
+
+    engine_rpm_ = glm::max(800.0f, target_engine_rpm);
+
+    const auto engine_torque = engine_.GetTorqueAtRPM(engine_rpm_);
+    const auto engine_force = engine_torque * transmission_ratio / driven_wheel_radius_ * throttle;
+
+    // apply forces
+
+    for (size_t i = 0; i < wheel_tuning_.size(); ++i)
+    {
+        const auto& wheel_tuning = wheel_tuning_[i];
+        auto& wheel = vehicle_->getWheelInfo(i);
+        
+        if (wheel_tuning.engine_factor > 0.0001f)
+            wheel.m_engineForce = wheel_tuning.engine_factor * engine_force;
+        
+        if (wheel_tuning.braking_factor > 0.0001f)
+            wheel.m_brake = wheel_tuning.braking_factor * braking_ * max_braking_force_;
+        
+        if (std::abs(wheel_tuning.steering_factor) > 0.0001f)
+            wheel.m_steering = wheel_tuning.steering_factor * steering_;
+    }
+
+
+}
+
+void VehiclePhysics::UpdateWheels(float dt)
 {
     wheels_on_ground_ = 0;
-    
+
     if (!action_enabled_)
     {
         for (auto& wheel : wheel_states_)
@@ -297,7 +352,7 @@ void VehiclePhysics::UpdateWheels()
         auto& bullet_wheel = vehicle_->getWheelInfo(i);
         auto& wheel = wheel_states_[i];
 
-        wheel.speed = -(static_cast<float>(bullet_wheel.m_rotation) - wheel.rotation) * 25.0f;
+        wheel.speed = -(static_cast<float>(bullet_wheel.m_rotation) - wheel.rotation) / dt;
         bullet_wheel.m_rotation = glm::mod(bullet_wheel.m_rotation, glm::two_pi<btScalar>());
         wheel.rotation = bullet_wheel.m_rotation;
         wheel.z_offset = wheel_tuning_[i].z_offset - bullet_wheel.m_raycastInfo.m_suspensionLength;
@@ -307,6 +362,5 @@ void VehiclePhysics::UpdateWheels()
             ++wheels_on_ground_;
     }
 }
-
 
 } // namespace game

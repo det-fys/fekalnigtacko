@@ -38,17 +38,25 @@ void game::Vehicle::Update()
 {
     Super::Update();
 
-    if (physics_)
-    {
-        physics_->Update();
-    }
-
     root_.UpdateMatrix();
-
+    
     flags_ = 0;
     UpdateDestruction();
     UpdateCrash();
+
     ProcessInput();
+
+    if (physics_)
+    {
+        physics_->Update(1.0f / 25.0f);
+
+        if (physics_->IsAccelerating())
+            flags_ |= VF_ACCELERATING;
+        if (physics_->IsBraking())
+            flags_ |= VF_BRAKING;
+        if (physics_->IsReversing())
+            flags_ |= VF_REVERSING;
+    }
 
     if (!physics_ || !physics_->IsActionEnabled())
         flags_ |= VF_NO_WHEELS;
@@ -190,13 +198,17 @@ void game::Vehicle::ProcessInput()
     input.right = in_ & (1 << VIN_RIGHT);
     input.analog_steering = steering_analog_;
     input.target_steering = target_steering_;
-    physics_->ProcessInput(input);
-    if (physics_->IsAccelerating())
-        flags_ |= VF_ACCELERATING;
-    if (physics_->IsBraking())
-        flags_ |= VF_BRAKING;
-    if (physics_->IsReversing())
-        flags_ |= VF_REVERSING;
+    
+    physics_->SetInput(input);
+
+    if (in_ & (1 << VIN_SHIFT_UP))
+    {
+        physics_->Shift(1);
+    }
+    else if (in_ & (1 << VIN_SHIFT_DOWN))
+    {
+        physics_->Shift(-1);
+    }
 }
 
 void game::Vehicle::UpdateCrash()

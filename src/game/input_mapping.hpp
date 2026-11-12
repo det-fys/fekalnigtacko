@@ -46,6 +46,12 @@ static game::VehicleInputFlags MapPlayerInputToVehicleInput(game::PlayerInputFla
     if (in & (1 << game::IN_RIGHT))
         vin |= 1 << game::VIN_RIGHT;
 
+    if (in & (1 << game::IN_SPRINT))
+        vin |= 1 << game::VIN_SHIFT_UP;
+
+    if (in & (1 << game::IN_CROUCH))
+        vin |= 1 << game::VIN_SHIFT_DOWN;
+
     return vin;
 }
 
