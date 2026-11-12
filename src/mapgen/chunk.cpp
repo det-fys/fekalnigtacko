@@ -1133,7 +1133,7 @@ struct ChunkGenerator
             // random vals
             auto cull = dist(rng);
             auto mesh_idx = grass_mesh_ids[static_cast<size_t>(rng() % grass_mesh_ids.size())];
-            auto scale = glm::mix(1.1f, 2.5f, dist(rng));
+            auto scale = glm::mix(1.1f, 1.5f, dist(rng));
             auto angle_z = glm::mix(0.0f, glm::two_pi<float>(), dist(rng));
             auto z_offset = glm::mix(0.0f, 0.1f, dist(rng));
             auto color_variation = glm::vec3(dist(rng), dist(rng), dist(rng)) * 0.1f + 0.95f;
@@ -1147,7 +1147,7 @@ struct ChunkGenerator
                 auto forest_factor = static_cast<float>(tile->forest_level) / 255.0f;
                 forest_factor = glm::clamp(UnMix(0.0f, 0.1f, forest_factor), 0.0f, 1.0f);
                 keep_chance = glm::max(keep_chance, forest_factor * 2.0f);
-                scale *= glm::mix(1.0f, 1.5f, forest_factor);
+                scale *= glm::mix(1.0f, 2.0f, forest_factor);
             }
             else
             {
