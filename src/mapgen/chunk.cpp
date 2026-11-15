@@ -429,6 +429,8 @@ struct ChunkGenerator
             chunk_vert.normal = glm::vec3(0.0f);
 
             auto far_pos = DeformJunctionVertex(mesh, junction, vert.pos, vert.link_weights);
+            far_pos.z += height_sampler.GetBump(far_pos);
+
             chunk_vert.pos = far_pos - glm::dvec3(chunk_center, 0.0);
         }
 
@@ -461,8 +463,10 @@ struct ChunkGenerator
             const auto& profile_vert = profile.verts[i];
             auto& chunk_vert = raw_verts[base_vertex + i];
 
-            chunk_vert.pos = spline.DeformVertex(glm::dvec3(profile_vert.pos.x, t, profile_vert.pos.z)) -
-                             glm::dvec3(chunk_center, 0.0);
+            auto far_pos = spline.DeformVertex(glm::dvec3(profile_vert.pos.x, t, profile_vert.pos.z));
+            far_pos.z += height_sampler.GetBump(far_pos);
+
+            chunk_vert.pos = far_pos - glm::dvec3(chunk_center, 0.0);
             chunk_vert.normal = glm::vec3(0.0f); // profile_vert.normal; // TODO: transform normal
             chunk_vert.uv = profile_vert.uv + profile_vert.uv_advance * uv_t;
             // chunk_vert.color = 0xFFFFFFFF; // TODO: color

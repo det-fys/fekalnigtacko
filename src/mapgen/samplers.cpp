@@ -55,6 +55,13 @@ mg::TerrainHeightSampler::TerrainHeightSampler(const MapConfig& cfg)
     noise2_.SetFractalType(FastNoiseLite::FractalType_FBm);
     noise2_.SetFractalLacunarity(2.0f);
     noise2_.SetFractalOctaves(5);
+
+    bump_noise_.SetSeed(seed ^ 0x3459);
+    bump_noise_.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    bump_noise_.SetFrequency(0.008f);
+    bump_noise_.SetFractalType(FastNoiseLite::FractalType_FBm);
+    bump_noise_.SetFractalLacunarity(1.75f);
+    bump_noise_.SetFractalOctaves(4);
 }
 
 namespace
@@ -339,6 +346,11 @@ float mg::TerrainHeightSampler::GetDetail(const glm::dvec2& pos) const
 {
     return SampleNoiseNormalized(noise2_, pos) * 20.0f; // add finer detail
     // return 0.0f;
+}
+
+float mg::TerrainHeightSampler::GetBump(const glm::dvec2& pos) const
+{
+    return bump_noise_.GetNoise(pos.x, pos.y) * 0.2f;
 }
 
 float mg::TerrainHeightSampler::Get(const glm::dvec2& pos) const

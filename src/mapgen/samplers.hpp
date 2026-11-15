@@ -18,6 +18,7 @@ public:
 
     float GetBase(const glm::dvec2& pos) const;
     float GetDetail(const glm::dvec2& pos) const;
+    float GetBump(const glm::dvec2& pos) const;
     float Get(const glm::dvec2& pos) const;
 
 private:
@@ -25,6 +26,7 @@ private:
 
     FastNoiseLite noise_;
     FastNoiseLite noise2_;
+    FastNoiseLite bump_noise_;
 };
 
 struct ForestSample
