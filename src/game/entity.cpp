@@ -40,7 +40,7 @@ void game::Entity::Update()
     root_.parent = parent_ ? &parent_->GetRoot() : nullptr;
 
     // load chunks under me
-    world_.RequestChunkArea(root_.GetGlobalPosition(), 150.0f);
+    world_.RequestChunkArea(root_.GetGlobalPosition(), 300.0f);
 
     RunTasks();
 }
