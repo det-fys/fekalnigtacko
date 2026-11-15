@@ -15,7 +15,7 @@
 #include "utils/cvars.hpp"
 #include "mapgen/map_layout_sync.hpp"
 
-CVAR_CL(uint8_t, wv_chunk_distance, CV_SAVE, 5, 0, 5);
+CVAR_CL(uint8_t, wv_chunk_distance, CV_SAVE, 5, 0, 7);
 
 game::view::WorldView::WorldView(ClientSession& session, net::InMessage& msg) : 
     session_(session), audiomaster_(session_.GetAudioMaster()), audioplayer_(audiomaster_), emitter_(&audioplayer_)
@@ -491,15 +491,17 @@ void game::view::WorldView::UpdateChunks()
     constexpr static std::array<double, 3> lod_distances4 = {250.0, 500.0, 1000.0};
     constexpr static std::array<double, 4> lod_distances5 = {250.0, 500.0, 750.0, 1500.0};
     constexpr static std::array<double, 4> lod_distances6 = {250.0, 500.0, 1000.0, 2000.0};
+    constexpr static std::array<double, 4> lod_distances7 = {250.0, 500.0, 1000.0, 3000.0};
 
-    constexpr static std::array<std::span<const double>, 7> lod_distances_arr = {
+    constexpr static std::array<std::span<const double>, 8> lod_distances_arr = {
         std::span<const double>(lod_distances0),
         std::span<const double>(lod_distances1),
         std::span<const double>(lod_distances2),
         std::span<const double>(lod_distances3),
         std::span<const double>(lod_distances4),
         std::span<const double>(lod_distances5),
-        std::span<const double>(lod_distances6)
+        std::span<const double>(lod_distances6),
+        std::span<const double>(lod_distances7),
     };
 
     const auto& lod_distances = lod_distances_arr[wv_chunk_distance.Get()];
