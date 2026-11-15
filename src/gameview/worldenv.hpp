@@ -18,6 +18,7 @@ struct WorldEnvKeyframe
     glm::vec4 moon_disc_color;
     glm::vec4 moon_halfsphere_color;
     glm::vec4 fog;
+    glm::vec4 gradient_color;
 };
 
 class WorldEnv
@@ -42,6 +43,7 @@ private:
     std::shared_ptr<const ModelView> sunmodel_;
     std::shared_ptr<const ModelView> moonmodel_;
     std::shared_ptr<const ModelView> halfspheremodel_;
+    std::shared_ptr<const ModelView> skygradientmodel_;
 
     FarMatrix sun_far_matrix_;
     glm::vec4 sun_color_;
@@ -54,6 +56,9 @@ private:
 
     FarMatrix moon_halfsphere_far_matrix_;
     glm::vec4 moon_halfsphere_color_;
+
+    FarMatrix gradient_far_matrix_;
+    glm::vec4 gradient_color_;
 
     gfx::Environment env_{};
 };
