@@ -32,6 +32,8 @@ struct VehicleViewState
     FarTransform trans;
 
     float steering = 0.0f;
+    float speed = 0.0f;
+    float engine_rpm = 0.0f;
 };
 
 struct VehicleDeformView
@@ -112,8 +114,8 @@ private:
 
     VehicleFlags flags_ = 0;
 
-    std::shared_ptr<const audio::Sound> snd_accel_;
-    audio::SoundSource* snd_accel_src_ = nullptr;
+    std::shared_ptr<const audio::Sound> snd_engine_;
+    audio::SoundSource* snd_engine_src_ = nullptr;
 
     std::optional<gfx::Material> broken_window_material_; // TODO: make this shared somehow?
     std::optional<VehicleDeformView> deform_;
@@ -149,6 +151,9 @@ private:
     std::shared_ptr<const ModelView> steerw_model_;
     FarTransform steerw_transform_;
     FarTransformNode steerw_node_;
+
+    float speed_ = 0.0f;
+    float engine_rpm_ = 0.0f;
 };
 
 }

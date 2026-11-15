@@ -17,8 +17,10 @@ game::DrivableVehicle::DrivableVehicle(World& world, const VehicleSpawnInfo& inf
 void game::DrivableVehicle::Update()
 {
     float daytime = world_.GetDayTime();
-    SetLightsOn(GetPassenger(0) && (daytime < 6.0f || daytime > 18.0f));
-
+    const auto has_driver = GetPassenger(0) != nullptr;
+    SetEngineOn(has_driver);
+    SetLightsOn(has_driver && (daytime < 6.0f || daytime > 18.0f));
+    
     Super::Update();
 
     contact_ = false;

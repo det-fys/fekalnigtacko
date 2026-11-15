@@ -68,7 +68,7 @@ public:
     void DisableAction();
     bool IsActionEnabled() const { return action_enabled_; }
 
-    void Shift(int dir) { gear_ = glm::clamp(gear_ + dir, transmission_.GetMinGear(), transmission_.GetMaxGear()); }
+    void Shift(int dir);
 
     float GetCurrentSpeedMs() const { return current_speed_; }
     float GetCurrentSpeedKmh() const { return current_speed_ * 3.6f; }
@@ -123,7 +123,10 @@ private:
     float throttle_and_dir_ = 0.0f; // [-1, 1] negative = reverse, positive = forward
     float brake_ = 0.0f; // [0, 1]
     int gear_ = 0;
+    float shift_cooldown_ = 0.0f;
     float engine_rpm_ = 0.0f;
+    float wheel_contact_factor_ = 0.0f;
+    float clutch_engagement_ = 0.0f;
 
     size_t can_roll_frames_ = 0;
     bool accelerating_ = false;

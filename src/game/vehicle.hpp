@@ -59,6 +59,9 @@ public:
     float GetSteering() const { return physics_->GetSteering(); }
     const std::vector<VehicleWheelState>& GetWheelStates() const { return physics_->GetWheelStates(); }
 
+    void SetEngineOn(bool engine_on) { engine_on_ = engine_on; }
+    bool GetEngineOn() const { return engine_on_; }
+
     void SetLightsOn(bool lights_on) { lights_on_ = lights_on; }
     bool GetLightsOn() const { return lights_on_; }
 
@@ -121,6 +124,7 @@ private:
     size_t sync_current_ = 0;
 
     VehicleInputFlags in_ = 0;
+    VehicleInputFlags prev_in_ = 0;
 
     float health_ = 100.0f;
     bool exploded_ = false;
@@ -136,6 +140,7 @@ private:
 
     std::unique_ptr<DeformGrid> deformgrid_;
 
+    bool engine_on_ = false;
     bool lights_on_ = false;
 
 };

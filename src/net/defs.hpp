@@ -157,6 +157,10 @@ struct QuatQ
     uint8_t i{0};
 };
 
+using VehicleSpeedQ = Quantized<uint16_t, -300, 300, 1>;
+using VehicleEngineRPMQ = Quantized<uint16_t, 0, 100000, 1>;
+using VehicleGear = int8_t;
+
 using WheelZOffsetQ = Quantized<uint8_t, -1, 1, 1>;
 using RotationSpeedQ = Quantized<uint16_t, -300, 300, 1>;
 
@@ -186,6 +190,7 @@ using NumTexels = uint16_t;
 // version
 //using Version = uint32_t; // not used any more
 using VersionStr = FixedStr<32>;
+
 
 // tuning
 using TuningPartIdx = uint8_t;

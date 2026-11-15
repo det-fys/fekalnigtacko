@@ -49,6 +49,7 @@ audio::Master::Master()
 
     //setup
     alDistanceModel(AL_INVERSE_DISTANCE_CLAMPED);
+    alDopplerFactor(0.0f);
 }
 
 void audio::Master::SetListenerOrientation(const glm::vec3& position, const glm::vec3& forward, const glm::vec3& up)

@@ -48,7 +48,7 @@ VehiclePhysics::VehiclePhysics(collision::DynamicsWorld& world, FarTransform& tr
         constexpr float damping_factor = 0.2f;
         wheel.m_suspensionStiffness = wheel_tuning.suspension_stiffness;
         wheel.m_wheelsDampingCompression = damping_factor * 2.0 * btSqrt(wheel.m_suspensionStiffness);
-        wheel.m_wheelsDampingRelaxation = damping_factor * 3.3 * btSqrt(wheel.m_suspensionStiffness);
+        wheel.m_wheelsDampingRelaxation = damping_factor * 3.3 * btSqrt(wheel.m_suspensionStiffness) * 2.0;
         wheel.m_frictionSlip = wheel_tuning.friction;
         wheel.m_rollInfluence = wheel_tuning.roll_influence;
         wheel.m_maxSuspensionForce = wheel_tuning.suspension_max_force;
@@ -69,6 +69,8 @@ VehiclePhysics::VehiclePhysics(collision::DynamicsWorld& world, FarTransform& tr
         bt_world.addCollisionObject(bullet_hitbox_.get(), collision::OG_DEFAULT, collision::OG_PROJECTILE);
         UpdateBulletHitboxTransform();
     }
+
+    body_->setAngularFactor(btVector3(1.0f, 0.8f, 1.0f));
 }
 
 void VehiclePhysics::SetTuning(const VehicleTuningContext& tuning)
@@ -85,33 +87,52 @@ void VehiclePhysics::SetTuning(const VehicleTuningContext& tuning)
 
     max_braking_force_ = tuning.braking_force;
 
-    float torque_scale = 0.6f;
-
     auto& tc = engine_.torque_curve;
-    tc[0] = {  800.f, 110.f * torque_scale };
-    tc[1] = { 1500.f, 160.f * torque_scale };
-    tc[2] = { 2500.f, 215.f * torque_scale };
-    tc[3] = { 3500.f, 245.f * torque_scale };
-    tc[4] = { 4500.f, 260.f * torque_scale };
-    tc[5] = { 5500.f, 250.f * torque_scale };
-    tc[6] = { 6500.f, 225.f * torque_scale };
-    tc[7] = { 7000.f, 190.f };
-    engine_.num_torque_curve_points = 9;
+    tc[0] = {850.0f, 65.0f};
+    tc[1] = {1500.0f, 115.0f};
+    tc[2] = {2000.0f, 185.0f};
+    tc[3] = {2500.0f, 210.0f};
+    tc[4] = {3500.0f, 210.0f};
+    tc[5] = {4500.0f, 205.0f};
+    tc[6] = {5000.0f, 195.4f};
+    tc[7] = {5500.0f, 165.0f};
+    tc[8] = {6000.0f, 130.0f};
+    tc[9] = {6500.0f, 0.0f};
+    engine_.num_torque_curve_points = 10;
+
+    engine_.idle_rpm = 800.0f;
+    engine_.max_rpm = 6000.0f;
+
+    engine_.inertia = 0.22f;
+
+    //for (auto& point : tc)
+    //{
+    //    constexpr float torque_scale = 0.6f;
+    //    point.torque *= torque_scale;
+    //}
 
     auto& gears = transmission_.gear_ratios;
-    gears[0] = -3.2f;
+    gears[0] = -3.55f;
     gears[1] = 0.0f;
-    gears[2] = 3.6f;
-    gears[3] = 2.19f;
-    gears[4] = 1.41f;
-    gears[5] = 1.0f;
-    gears[6] = 0.83f;
-    gears[7] = 0.69f;
-    transmission_.num_gears = 8;
+    gears[2] = 3.91f;
+    gears[3] = 2.16f;
+    gears[4] = 1.35f;
+    gears[5] = 0.97f;
+    gears[6] = 0.77f;
+    transmission_.num_gears = 7;
 
-    transmission_.final_drive_ratio = 3.6f;
+    // auto& gears = transmission_.gear_ratios;
+    //gears[0] = -3.2f;
+    //gears[1] = 0.0f;
+    //gears[2] = 3.6f;
+    //gears[3] = 2.19f;
+    //gears[4] = 1.41f;
+    //gears[5] = 1.0f;
+    //gears[6] = 0.83f;
+    //gears[7] = 0.69f;
+    //transmission_.num_gears = 8;
 
-
+    transmission_.final_drive_ratio = 3.56f;
 }
 
 void VehiclePhysics::Update(float dt)
@@ -149,6 +170,14 @@ void VehiclePhysics::DisableAction()
         return;
     world_.GetBtWorld().removeAction(vehicle_.get());
     action_enabled_ = false;
+}
+
+void VehiclePhysics::Shift(int dir)
+{
+    gear_ = glm::clamp(gear_ + dir, transmission_.GetMinGear(), transmission_.GetMaxGear());
+
+    // release clutch when shifting
+    clutch_engagement_ = 0.0f;
 }
 
 VehiclePhysics::~VehiclePhysics()
@@ -303,37 +332,133 @@ void VehiclePhysics::UpdateDrivetrain(float dt)
 {
     const bool reverse = throttle_and_dir_ < 0.0f;
     const float throttle = glm::abs(throttle_and_dir_);
+    
+    float effective_throttle = throttle;
+    if (clutch_engagement_ < 1.0f && engine_rpm_ > 3500.0f)
+    {
+        effective_throttle = 0.0f;
+    }
 
-    const auto speed_ms = current_speed_;
+    const float ratio = transmission_.GetRatio(gear_);
 
-    // calculate current rpm
-    const auto wheel_rpm = speed_ms / driven_wheel_radius_ * 60.0f / (2.0f * glm::pi<float>());
-    const auto transmission_ratio = transmission_.GetRatio(gear_);
-    const auto target_engine_rpm = wheel_rpm * transmission_ratio;
-
-    engine_rpm_ = glm::max(800.0f, target_engine_rpm);
-
-    const auto engine_torque = engine_.GetTorqueAtRPM(engine_rpm_);
-    const auto engine_force = engine_torque * transmission_ratio / driven_wheel_radius_ * throttle;
-
-    // apply forces
+    // 1. Determine driven wheel contact fraction.
+    float driven_wheels = 0.0f;
+    float grounded_wheels = 0.0f;
+    float total_engine_factor = 0.0f;
 
     for (size_t i = 0; i < wheel_tuning_.size(); ++i)
     {
-        const auto& wheel_tuning = wheel_tuning_[i];
-        auto& wheel = vehicle_->getWheelInfo(i);
+        if (wheel_tuning_[i].engine_factor <= 0.0001f)
+            continue;
+
+        driven_wheels += 1.0f;
         
-        if (wheel_tuning.engine_factor > 0.0001f)
-            wheel.m_engineForce = wheel_tuning.engine_factor * engine_force;
-        
-        if (wheel_tuning.braking_factor > 0.0001f)
-            wheel.m_brake = wheel_tuning.braking_factor * braking_ * max_braking_force_;
-        
-        if (std::abs(wheel_tuning.steering_factor) > 0.0001f)
-            wheel.m_steering = wheel_tuning.steering_factor * steering_;
+        total_engine_factor += wheel_tuning_[i].engine_factor;
+
+        if (vehicle_->getWheelInfo(i).m_raycastInfo.m_isInContact)
+        {
+            grounded_wheels += 1.0f;
+        }
     }
 
+    float target_contact = driven_wheels > 0.0f ? grounded_wheels / driven_wheels : 0.0f;
 
+    // 2. Smooth contact transitions.
+    float contact_response = target_contact > wheel_contact_factor_ ? 8.0f : 12.0f;
+    float contact_alpha = 1.0f - std::exp(-contact_response * dt);
+    wheel_contact_factor_ = glm::mix(wheel_contact_factor_, target_contact, contact_alpha);
+
+    // 3. Free-running engine simulation.
+    engine_.rpm = engine_rpm_;
+    engine_.UpdateFreeRunning(dt, effective_throttle);
+
+    float free_rpm = engine_.rpm;
+
+    // 4. Calculate transmission-coupled engine RPM.
+    const float speed_to_rpm = 60.0f / (2.0f * glm::pi<float>()) / driven_wheel_radius_;
+    const float wheel_rpm = current_speed_ * speed_to_rpm;
+    const float coupled_rpm = std::abs(wheel_rpm * ratio);
+
+    // Neutral has no clutch coupling.
+    const float engagement = std::abs(ratio) > 0.0001f ? clutch_engagement_ * wheel_contact_factor_ : 0.0f;
+
+    // 5. Synchronize the engine with the drivetrain.
+    constexpr float coupling_strength = 30.0f;
+
+    const float coupling_alpha = 1.0f - std::exp(-coupling_strength * engagement * dt);
+
+    engine_rpm_ = glm::mix(free_rpm, std::max(engine_.idle_rpm, coupled_rpm), coupling_alpha);
+
+    // 6. Calculate output torque.
+    float engine_torque = engine_.GetTorqueAtRPM(engine_rpm_) * effective_throttle;
+
+    // Simple rev limiter.
+    if (engine_rpm_ >= engine_.max_rpm)
+        engine_torque = 0.0f;
+
+    float wheel_torque = engine_torque * ratio * engagement;
+    float engine_force = wheel_torque / driven_wheel_radius_;
+
+    // 7. Apply forces.
+    for (size_t i = 0; i < wheel_tuning_.size(); ++i)
+    {
+        const auto& tuning = wheel_tuning_[i];
+        auto& wheel = vehicle_->getWheelInfo(i);
+
+        // Always write values, including zero.
+        wheel.m_engineForce = tuning.engine_factor * engine_force / total_engine_factor;
+        wheel.m_brake = tuning.braking_factor * braking_ * max_braking_force_;
+        wheel.m_steering = tuning.steering_factor * steering_;
+    }
+
+    // shift
+    bool throttle_active = throttle > 0.0f;
+    bool change_gear = grounded_wheels > 0.01f && shift_cooldown_ == 0.0f &&
+                       ((throttle_active && gear_ == 0) ||
+                        (engine_rpm_ < 2200.0f && !(throttle_active && (reverse ? gear_ == -1 : gear_ == 1))) ||
+                        (engine_rpm_ > 5200.0f &&
+                         !(reverse ? gear_ == transmission_.GetMinGear() : gear_ == transmission_.GetMaxGear())));
+
+    if (change_gear)
+    {
+        gear_ = 0;
+        shift_cooldown_ = 0.25f;
+        clutch_engagement_ = 0.0f;
+    }
+
+    MoveToward(shift_cooldown_, 0.0f, dt);
+
+    if (shift_cooldown_ == 0.0f && gear_ == 0 && throttle > 0.0f)
+    {
+        // find best gear for current speed
+        int best_gear = 0;
+
+        float target_rpm = (1500.0f + 5000.0f) * 0.5f;
+        float best_rpm_diff = std::numeric_limits<float>::max();
+
+        auto range = reverse ? glm::ivec2(transmission_.GetMinGear(), -1) : glm::ivec2(1, transmission_.GetMaxGear());
+
+        for (int i = range[0]; i <= range[1]; ++i)
+        {
+            float rpm = glm::abs(current_speed_ * speed_to_rpm * transmission_.GetRatio(i));
+            float rpm_diff = std::abs(rpm - target_rpm);
+
+            if (rpm_diff < best_rpm_diff)
+            {
+                best_rpm_diff = rpm_diff;
+                best_gear = i;
+            }
+        }
+
+        gear_ = best_gear;
+        clutch_engagement_ = 0.0f;
+    }
+
+    // engage clutch
+    if (gear_ != 0)
+    {
+        MoveToward(clutch_engagement_, 1.0f, dt * 3.0f);
+    }
 }
 
 void VehiclePhysics::UpdateWheels(float dt)

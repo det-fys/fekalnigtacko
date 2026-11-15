@@ -19,6 +19,13 @@ struct VehicleEngine
     std::array<VehicleEngineTorqueCurvePoint, 16> torque_curve;
     size_t num_torque_curve_points = 0;
 
+    float idle_rpm = 800.0f;
+    float max_rpm = 7000.0f;
+
+    float inertia = 0.1f; // kg*m^2
+
+    float rpm = 0.0f;
+
     float GetTorqueAtRPM(float rpm) const
     {
         for (int i = 1; i < num_torque_curve_points; ++i)
@@ -33,6 +40,38 @@ struct VehicleEngine
         }
 
         return 0.0f;
+    }
+
+    void UpdateFreeRunning(float dt, float throttle)
+    {
+        constexpr float rpm_to_rad = 2.0f * 3.14159265f / 60.0f;
+        constexpr float rad_to_rpm = 60.0f / (2.0f * 3.14159265f);
+
+        float omega = rpm * rpm_to_rad;
+
+        // Full-throttle torque curve.
+        float combustion_torque = GetTorqueAtRPM(rpm) * throttle;
+
+        // Basic internal friction model.
+        float friction_torque = 20.0f + 0.02f * omega;
+
+        // Idle speed controller.
+        // Adds enough torque to maintain idle.
+        float idle_error = idle_rpm - rpm;
+        float idle_torque = std::clamp(idle_error * 0.5f, 0.0f, 100.0f);
+
+        combustion_torque += idle_torque;
+
+        // Simple rev limiter.
+        if (rpm >= max_rpm)
+            combustion_torque = 0.0f;
+
+        float net_torque = combustion_torque - friction_torque;
+        float angular_acceleration = net_torque / inertia;
+        omega += angular_acceleration * dt;
+
+        omega = std::max(0.0f, omega);
+        rpm = omega * rad_to_rpm;
     }
 };
 

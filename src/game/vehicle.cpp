@@ -50,12 +50,13 @@ void game::Vehicle::Update()
     {
         physics_->Update(1.0f / 25.0f);
 
-        if (physics_->IsAccelerating())
-            flags_ |= VF_ACCELERATING;
         if (physics_->IsBraking())
             flags_ |= VF_BRAKING;
         if (physics_->IsReversing())
             flags_ |= VF_REVERSING;
+
+        if (engine_on_)
+            flags_ |= VF_ENGINE_ON;
     }
 
     if (!physics_ || !physics_->IsActionEnabled())
@@ -76,7 +77,7 @@ void game::Vehicle::SendInitData(Player& player, net::OutMessage& msg) const
     WriteTuning(msg);
 
     // write state against default
-    static const VehicleSyncState default_state;
+    static const VehicleSyncState default_state{};
     size_t fields_pos = msg.Reserve<VehicleSyncFieldFlags>();
     auto fields = WriteState(msg, default_state);
     msg.WriteAt(fields_pos, fields);
@@ -140,7 +141,7 @@ void game::Vehicle::SetPosition(const glm::dvec3& pos)
 
 float game::Vehicle::GetSpeed() const
 {
-    return physics_->GetBtVehicle().getCurrentSpeedKmHour();
+    return physics_->GetCurrentSpeedKmh();
 }
 
 void game::Vehicle::SetSteering(bool analog, float value)
@@ -190,6 +191,9 @@ void game::Vehicle::UpdateDestruction()
 
 void game::Vehicle::ProcessInput()
 {
+    auto new_in = in_ & ~prev_in_;
+    prev_in_ = in_;
+
     VehicleSimulationInput input{};
     input.any_input = in_ != 0;
     input.forward = in_ & (1 << VIN_FORWARD);
@@ -201,14 +205,15 @@ void game::Vehicle::ProcessInput()
     
     physics_->SetInput(input);
 
-    if (in_ & (1 << VIN_SHIFT_UP))
+    if (new_in & (1 << VIN_SHIFT_UP))
     {
         physics_->Shift(1);
     }
-    else if (in_ & (1 << VIN_SHIFT_DOWN))
+    else if (new_in & (1 << VIN_SHIFT_DOWN))
     {
         physics_->Shift(-1);
     }
+
 }
 
 void game::Vehicle::UpdateCrash()
@@ -286,6 +291,9 @@ void game::Vehicle::UpdateSyncState()
     net::EncodeRotation(root_.local.rotation, state.rot);
 
     state.steering.Encode(GetSteering());
+    state.speed.Encode(GetSpeed());
+    state.engine_rpm.Encode(physics_->GetCurrentRPM());
+    state.gear = physics_->GetCurrentGear();
 
     const auto& wheels = GetWheelStates();
     for (size_t i = 0; i < wheels.size(); ++i)
@@ -334,6 +342,19 @@ game::VehicleSyncFieldFlags game::Vehicle::WriteState(net::OutMessage& msg, cons
         fields |= VSF_STEERING;
 
         net::WriteDelta(msg, curr.steering, base.steering);
+    }
+
+    if (curr.speed.value != base.speed.value || curr.engine_rpm.value != base.engine_rpm.value)
+    {
+        fields |= VSF_SPEED_RPM;
+        net::WriteDelta(msg, curr.speed, base.speed);
+        net::WriteDelta(msg, curr.engine_rpm, base.engine_rpm);
+    }
+
+    if (curr.gear != base.gear)
+    {
+        fields |= VSF_GEAR;
+        msg.Write(curr.gear);
     }
 
     const auto& wheels = GetWheelStates();

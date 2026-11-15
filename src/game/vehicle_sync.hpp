@@ -14,7 +14,7 @@ using VehicleFlags = uint8_t;
 enum VehicleFlag : VehicleFlags
 {
     VF_NONE = 0,
-    VF_ACCELERATING = 1,
+    VF_ENGINE_ON = 1,
     VF_BRAKING = 2,
     VF_BROKENWINDOWS = 4,
     VF_LIGHTS_ON = 8,
@@ -32,6 +32,9 @@ struct VehicleSyncState
     net::QuatQ rot;
 
     net::AngleQ steering;
+    net::VehicleSpeedQ speed;
+    net::VehicleEngineRPMQ engine_rpm;
+    net::VehicleGear gear;
 
     struct
     {
@@ -41,14 +44,15 @@ struct VehicleSyncState
 };
 
 using VehicleSyncFieldFlags = uint8_t;
-
 enum VehicleSyncFieldFlag
 {
-    VSF_FLAGS = 0x01,
-    VSF_POSITION = 0x02,
-    VSF_ROTATION = 0x04,
-    VSF_STEERING = 0x08,
-    VSF_WHEELS = 0x10,
+    VSF_FLAGS = 1,
+    VSF_POSITION = 2,
+    VSF_ROTATION = 4,
+    VSF_STEERING = 8,
+    VSF_WHEELS = 16,
+    VSF_SPEED_RPM = 32,
+    VSF_GEAR = 64,
 };
 
 

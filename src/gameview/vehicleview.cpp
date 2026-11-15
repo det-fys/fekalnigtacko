@@ -37,7 +37,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
     state_[0] = state_[1];
     root_.local = state_[0].trans;
 
-    snd_accel_ = assets::AssetManager::GetInstance().Get<audio::Sound>("auto");
+    snd_engine_ = assets::AssetManager::GetInstance().Get<audio::Sound>("engine_loop1");
 
     radius_ = 20.0f;
     
@@ -74,7 +74,12 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
     auto t_clamped = glm::clamp(t, 0.0f, 1.0f);
     root_.local = FarTransform::Lerp(state_[0].trans, state_[1].trans, t);
     root_.UpdateMatrix();
+
+    // update steering/speed/rpm
     steering_ = glm::mix(state_[0].steering, state_[1].steering, t_clamped);
+    speed_ = glm::mix(state_[0].speed, state_[1].speed, t_clamped);
+    engine_rpm_ = glm::mix(state_[0].engine_rpm, state_[1].engine_rpm, t_clamped);
+
 
     const auto& wheels = model_->GetWheels();
     for (size_t i = 0; i < wheels.size(); ++i)
@@ -224,77 +229,96 @@ bool game::view::VehicleView::ReadState(net::InMessage* msg)
 
     old_state.trans = root_.local;
     old_state.steering = steering_;
+    old_state.speed = speed_;
+    old_state.engine_rpm = engine_rpm_;
 
     auto& root_trans = state_[1].trans;
     update_time_ = world_.GetTime();
 
-    if (msg)
+    if (!msg)
+        return true;
+
+    // parse state delta
+    VehicleSyncFieldFlags fields;
+    if (!msg->Read(fields))
+        return false;
+
+    // flags
+    if (fields & VSF_FLAGS)
     {
-        // parse state delta
-        VehicleSyncFieldFlags fields;
-        if (!msg->Read(fields))
+        if (!msg->Read(flags_))
+            return false;
+    }
+
+    // pos
+    if (fields & VSF_POSITION)
+    {
+        if (!net::ReadDelta(*msg, sync_.pos.x) ||
+            !net::ReadDelta(*msg, sync_.pos.y) ||
+            !net::ReadDelta(*msg, sync_.pos.z))
             return false;
 
-        // flags
-        if (fields & VSF_FLAGS)
-        {
-            if (!msg->Read(flags_))
-                return false;
-        }
+        net::DecodeFarPosition(sync_.pos, root_trans.position);
+    }
 
-        // pos
-        if (fields & VSF_POSITION)
-        {
-            if (!net::ReadDelta(*msg, sync_.pos.x) ||
-                !net::ReadDelta(*msg, sync_.pos.y) ||
-                !net::ReadDelta(*msg, sync_.pos.z))
-                return false;
+    // rot
+    if (fields & VSF_ROTATION)
+    {
+        if (!net::ReadDelta(*msg, sync_.rot.i) ||
+            !net::ReadDelta(*msg, sync_.rot.x) ||
+            !net::ReadDelta(*msg, sync_.rot.y) ||
+            !net::ReadDelta(*msg, sync_.rot.z))
+            return false;
 
-            net::DecodeFarPosition(sync_.pos, root_trans.position);
-        }
+        net::DecodeRotation(sync_.rot, root_trans.rotation);
+    }
 
-        // rot
-        if (fields & VSF_ROTATION)
-        {
-            if (!net::ReadDelta(*msg, sync_.rot.i) ||
-                !net::ReadDelta(*msg, sync_.rot.x) ||
-                !net::ReadDelta(*msg, sync_.rot.y) ||
-                !net::ReadDelta(*msg, sync_.rot.z))
-                return false;
+    // steering
+    if (fields & VSF_STEERING)
+    {
+        if (!net::ReadDelta(*msg, sync_.steering))
+            return false;
 
-            net::DecodeRotation(sync_.rot, root_trans.rotation);
-        }
+        new_state.steering = sync_.steering.Decode();
+    }
 
-        // steering
-        if (fields & VSF_STEERING)
-        {
-            if (!net::ReadDelta(*msg, sync_.steering))
-                return false;
+    // speed and rpm
+    if (fields & VSF_SPEED_RPM)
+    {
+        if (!net::ReadDelta(*msg, sync_.speed) || !net::ReadDelta(*msg, sync_.engine_rpm))
+            return false;
 
-            new_state.steering = sync_.steering.Decode();
-        }
+        new_state.speed = sync_.speed.Decode();
+        new_state.engine_rpm = sync_.engine_rpm.Decode();
+    }
 
-        // wheels
-        if (fields & VSF_WHEELS)
-        {
-            for (size_t i = 0; i < wheels_.size(); ++i)
-            {
-                if (!net::ReadDelta(*msg, sync_.wheels[i].z_offset) ||
-                    !net::ReadDelta(*msg, sync_.wheels[i].speed))
-                    return false;
-            }
-        }
+    // gear
+    if (fields & VSF_GEAR)
+    {
+        if (!msg->Read(sync_.gear))
+            return false;
+    }
 
-        const auto& wheels = model_->GetWheels();
+    // wheels
+    if (fields & VSF_WHEELS)
+    {
         for (size_t i = 0; i < wheels_.size(); ++i)
         {
-            auto& wheel = wheels_[i];
-            wheel.z_offset = sync_.wheels[i].z_offset.Decode();
-            wheel.speed = sync_.wheels[i].speed.Decode();
-
-            wheel.steering = i < 2 ? new_state.steering : 0.0f;
+            if (!net::ReadDelta(*msg, sync_.wheels[i].z_offset) || !net::ReadDelta(*msg, sync_.wheels[i].speed))
+                return false;
         }
     }
+
+    const auto& wheels = model_->GetWheels();
+    for (size_t i = 0; i < wheels_.size(); ++i)
+    {
+        auto& wheel = wheels_[i];
+        wheel.z_offset = sync_.wheels[i].z_offset.Decode();
+        wheel.speed = sync_.wheels[i].speed.Decode();
+
+        wheel.steering = i < 2 ? new_state.steering : 0.0f;
+    }
+
     return true;
 }
 
@@ -438,17 +462,25 @@ void game::view::VehicleView::UpdateSounds()
     if (!world_.IsLoaded())
         return;
 
-    bool accel = flags_ & VF_ACCELERATING;
+    bool engine_on = (flags_ & VF_ENGINE_ON) > 0;
 
-    if (accel && !snd_accel_src_)
+    if (engine_on && !snd_engine_src_)
     {
-        snd_accel_src_ = audioplayer_.PlaySound(snd_accel_, &root_);
-        snd_accel_src_->SetLooping(true);
+        snd_engine_src_ = audioplayer_.PlaySound(snd_engine_, &root_);
+        snd_engine_src_->SetLooping(true);
     }
-    else if (!accel && snd_accel_src_)
+    else if (!engine_on && snd_engine_src_)
     {
-        snd_accel_src_->Delete();
-        snd_accel_src_ = nullptr;
+        snd_engine_src_->Delete();
+        snd_engine_src_ = nullptr;
+    }
+
+    if (snd_engine_src_)
+    {
+        //float pitch = glm::mix(1.0f, 7.0f, UnMix(1000.0f, 7000.0f, glm::round(engine_rpm_)));
+        float pitch = engine_rpm_ / 1000.0f;
+        //std::cout << "engine rpm: " << engine_rpm_ << ", pitch: " << pitch << std::endl;
+        snd_engine_src_->SetPitch(pitch);
     }
 }
 
