@@ -27,6 +27,10 @@ gui::PlayerHud::PlayerHud(const float& time) : time_(time)
     crosshair_texture_ = assets::AssetManager::GetInstance().Get<gfx::Texture>("crosshair");
     scope_texture_ = assets::AssetManager::GetInstance().Get<gfx::Texture>("scope");
 
+    gauge_rpm_texture_ = assets::AssetManager::GetInstance().Get<gfx::Texture>("gauge_rpm");
+    gauge_kmh_texture_ = assets::AssetManager::GetInstance().Get<gfx::Texture>("gauge_kmh");
+    gauge_handle_texture_ = assets::AssetManager::GetInstance().Get<gfx::Texture>("gauge_handle");
+
     SetBalance(0);
 
     UpdateWeaponSlotsText();
@@ -91,6 +95,7 @@ void gui::PlayerHud::Draw(Context& ctx) const
     DrawItemInfo(ctx);
     DrawUseTarget(ctx);
     DrawDeathScreen(ctx);
+    DrawVehicleGauges(ctx);
 }
 
 void gui::PlayerHud::UpdateWeaponSlotsText()
@@ -327,4 +332,51 @@ void gui::PlayerHud::DrawDeathScreen(Context& ctx) const
         return;
 
     ctx.DrawTextAligned("si chcíp", ctx.GetViewportSize() * 0.5f, glm::vec2(-0.5f), 0xFFFFFFFF, 3.0f);
+}
+
+void gui::PlayerHud::DrawVehicleGauges(Context& ctx) const
+{
+    if (!display_vehicle_gauges_)
+        return;
+
+    constexpr float margin = 30.0f;
+    constexpr float gauge_size = 256.0f;
+
+    glm::vec2 p0(margin, ctx.GetViewportSize().y - margin - gauge_size - 20.0f);
+
+    constexpr std::array<std::string_view, 12> gear_texts = { "R3", "R2", "R", "N", "1", "2", "3", "4", "5", "6", "7", "8" };
+    auto gear_text = gear_texts[glm::clamp(vehicle_gear_ + 3, 0, static_cast<int>(gear_texts.size()) - 1)];
+
+    DrawGauge(ctx, *gauge_rpm_texture_, p0, gauge_size, vehicle_rpm_ / 8000.0f, gear_text);
+
+    p0.x += gauge_size + margin;
+    DrawGauge(ctx, *gauge_kmh_texture_, p0, gauge_size, glm::abs(vehicle_speed_) / 200.0f, {});
+
+}
+
+void gui::PlayerHud::DrawGauge(Context& ctx, const gfx::Texture& bg_texture, const glm::vec2& pos, float size,
+                               float value, std::string_view text) const
+{
+    const glm::vec2 p0 = pos;
+    const glm::vec2 p1 = pos + size;
+
+    ctx.DrawRect(p0, p1, 0xFFFFFFFF, bg_texture.GetID());
+
+    if (!text.empty())
+    {
+        glm::vec2 text_pos = pos + size * glm::vec2(0.5f, 0.7f);
+        ctx.DrawTextAligned(text, text_pos, glm::vec2(-0.5f, -0.5f), 0xFFFFFFFF);
+    }
+
+    const auto handle_center = pos + size * 0.5f;
+    const auto handle_angle = glm::radians(-135.0f + 270.0f * value);
+
+    constexpr float handle_half_width = 32.0f;
+    constexpr float handle_height = 128.0f;
+    constexpr float handle_center_y = 103.5f;
+    constexpr glm::vec2 handle_p0(-handle_half_width, -handle_center_y);
+    constexpr glm::vec2 handle_p1(handle_half_width, handle_height - handle_center_y);
+
+    ctx.DrawRectRotated(handle_p0, handle_p1, glm::vec2(0.0f), glm::vec2(1.0f), 0xFFFFFFFF,
+                          gauge_handle_texture_->GetID(), handle_center, handle_angle);
 }

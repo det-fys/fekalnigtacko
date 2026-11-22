@@ -64,6 +64,8 @@ private:
     bool ProcessMenuInput(game::PlayerInputType in);
     RemoteMenuView* FindMenu(net::MenuId id) const;
 
+    void UpdateHud(float dt);
+
 private:
     App& app_;
     

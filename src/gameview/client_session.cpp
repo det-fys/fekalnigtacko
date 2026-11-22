@@ -114,7 +114,7 @@ void game::view::ClientSession::Update(const UpdateInfo& info)
         UpdateCamera(info);
     }
 
-    hud_.Update(info.delta_time);
+    UpdateHud(info.delta_time);
 }
 
 void game::view::ClientSession::Draw(const gfx::DrawContext& ctx, gui::Context& gui)
@@ -450,3 +450,20 @@ game::view::RemoteMenuView* game::view::ClientSession::FindMenu(net::MenuId id) 
     return nullptr;
 }
 
+void game::view::ClientSession::UpdateHud(float dt)
+{
+    // update vehicle gauges
+    auto vehicle = (world_ && camera_info_.rideable_entnum != 0)
+                       ? dynamic_cast<VehicleView*>(world_->GetEntity(camera_info_.rideable_entnum))
+                       : nullptr;
+
+    hud_.SetDisplayVehicleGauges(vehicle != nullptr);
+    if (vehicle)
+    {
+        hud_.SetVehicleRPM(vehicle->GetEngineRpm());
+        hud_.SetVehicleSpeed(vehicle->GetSpeed());
+        hud_.SetVehicleGear(vehicle->GetGear());
+    }
+
+    hud_.Update(dt);
+}

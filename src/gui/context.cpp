@@ -71,6 +71,31 @@ void gui::Context::DrawRectUV(const glm::vec2& p0, const glm::vec2& p1, const gl
     PushRect(p0, uv0, p1, uv1, color);
 }
 
+void gui::Context::DrawRectMatrix(const glm::vec2& p0, const glm::vec2& p1, const glm::vec2& uv0, const glm::vec2& uv1,
+                                  uint32_t color, gfx::TextureID texture, const glm::mat3& matrix)
+{
+    BeginTexture(texture ? texture : white_tex_.get()->GetID());
+
+    glm::vec2 a = matrix * glm::vec3(p0.x, p0.y, 1.0f);
+    glm::vec2 b = matrix * glm::vec3(p1.x, p0.y, 1.0f);
+    glm::vec2 c = matrix * glm::vec3(p1.x, p1.y, 1.0f);
+    glm::vec2 d = matrix * glm::vec3(p0.x, p1.y, 1.0f);
+
+    PushRectNoClip(a, b, c, d, uv0, glm::vec2(uv1.x, uv0.y), uv1, glm::vec2(uv0.x, uv1.y), color);
+}
+
+void gui::Context::DrawRectRotated(const glm::vec2& p0, const glm::vec2& p1, const glm::vec2& uv0, const glm::vec2& uv1,
+                                   uint32_t color, gfx::TextureID texture, const glm::vec2& center, float angle)
+{
+    glm::mat3 matrix{        
+        glm::vec3{cos(angle), sin(angle), 0.0f},
+        glm::vec3{-sin(angle), cos(angle), 0.0f},
+        glm::vec3{center, 1.0f}
+    };
+
+    DrawRectMatrix(p0, p1, uv0, uv1, color, texture, matrix);
+}
+
 void gui::Context::BeginGlyphs(const Font* font)
 {
     if (!font)
@@ -371,22 +396,30 @@ void gui::Context::PushRect(const glm::vec2& p0, const glm::vec2& uv0, const glm
 void gui::Context::PushRectNoClip(const glm::vec2& p0, const glm::vec2& uv0, const glm::vec2& p1, const glm::vec2& uv1,
                                   uint32_t color)
 {
+    PushRectNoClip(p0, glm::vec2(p1.x, p0.y), p1, glm::vec2(p0.x, p1.y), uv0, glm::vec2(uv1.x, uv0.y), uv1,
+                   glm::vec2(uv0.x, uv1.y), color);
+}
+
+void gui::Context::PushRectNoClip(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c, const glm::vec2& d,
+                                  const glm::vec2& uv_a, const glm::vec2& uv_b, const glm::vec2& uv_c,
+                                  const glm::vec2& uv_d, uint32_t color)
+{
     uint32_t base_index = vert_pos_.size();
 
-    vert_pos_.emplace_back(p0.x, p0.y, 0.0f);
-    vert_pos_.emplace_back(p1.x, p0.y, 0.0f);
-    vert_pos_.emplace_back(p1.x, p1.y, 0.0f);
-    vert_pos_.emplace_back(p0.x, p1.y, 0.0f);
+    vert_pos_.emplace_back(a.x, a.y, 0.0f);
+    vert_pos_.emplace_back(b.x, b.y, 0.0f);
+    vert_pos_.emplace_back(c.x, c.y, 0.0f);
+    vert_pos_.emplace_back(d.x, d.y, 0.0f);
 
     vert_colors_.emplace_back(color);
     vert_colors_.emplace_back(color);
     vert_colors_.emplace_back(color);
     vert_colors_.emplace_back(color);
 
-    vert_uvs_.emplace_back(uv0);
-    vert_uvs_.emplace_back(uv1.x, uv0.y);
-    vert_uvs_.emplace_back(uv1);
-    vert_uvs_.emplace_back(uv0.x, uv1.y);
+    vert_uvs_.emplace_back(uv_a);
+    vert_uvs_.emplace_back(uv_b);
+    vert_uvs_.emplace_back(uv_c);
+    vert_uvs_.emplace_back(uv_d);
 
     tris_.emplace_back(base_index + 0, base_index + 1, base_index + 2);
     tris_.emplace_back(base_index + 0, base_index + 2, base_index + 3);

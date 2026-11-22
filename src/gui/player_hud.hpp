@@ -27,6 +27,11 @@ public:
     void ShowDamageReceived();
     void ShowDamageDealt(bool kill);
 
+    void SetDisplayVehicleGauges(bool show) { display_vehicle_gauges_ = show; }
+    void SetVehicleRPM(float rpm) { vehicle_rpm_ = rpm; }
+    void SetVehicleSpeed(float speed) { vehicle_speed_ = speed; }
+    void SetVehicleGear(int gear) { vehicle_gear_ = gear; }
+
     void SetDead(bool dead) { dead_ = dead; }
 
     void Update(float delta_time);
@@ -46,12 +51,19 @@ private:
     void DrawUseTarget(Context& ctx) const;
     void DrawDeathScreen(Context& ctx) const;
 
+    void DrawVehicleGauges(Context& ctx) const;
+    void DrawGauge(Context& ctx, const gfx::Texture& bg_texture, const glm::vec2& pos, float size, float value,
+                   std::string_view text) const;
+
 private:
     const float& time_; 
     
     // resources
     std::shared_ptr<const gfx::Texture> crosshair_texture_;
     std::shared_ptr<const gfx::Texture> scope_texture_;
+    std::shared_ptr<const gfx::Texture> gauge_rpm_texture_;
+    std::shared_ptr<const gfx::Texture> gauge_kmh_texture_;
+    std::shared_ptr<const gfx::Texture> gauge_handle_texture_;
 
     // non-character
     std::string balance_str_;
@@ -83,6 +95,12 @@ private:
     float damage_dealt_factor_ = 0.0f;
     float damage_dealt_kill_factor_ = 0.0f;
     
+    // vehicle gauges
+    bool display_vehicle_gauges_ = false;
+    float vehicle_rpm_ = 0.0f;
+    float vehicle_speed_ = 0.0f;
+    int vehicle_gear_ = 0;
+
     // death
     bool dead_ = false;
 

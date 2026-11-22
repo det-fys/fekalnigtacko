@@ -35,6 +35,10 @@ public:
     void DrawRect(const glm::vec2& p0, const glm::vec2& p1, uint32_t color, gfx::TextureID texture = 0);
     void DrawRectUV(const glm::vec2& p0, const glm::vec2& p1, const glm::vec2& uv0, const glm::vec2& uv1,
                     uint32_t color, gfx::TextureID texture);
+    void DrawRectMatrix(const glm::vec2& p0, const glm::vec2& p1, const glm::vec2& uv0, const glm::vec2& uv1,
+                        uint32_t color, gfx::TextureID texture, const glm::mat3& matrix);
+    void DrawRectRotated(const glm::vec2& p0, const glm::vec2& p1, const glm::vec2& uv0, const glm::vec2& uv1,
+                         uint32_t color, gfx::TextureID texture, const glm::vec2& center, float angle);
 
     void BeginGlyphs(const Font* font = nullptr);
     void DrawGlyph(glm::vec2& cursor, uint32_t cp, uint32_t color, float scale);
@@ -57,6 +61,9 @@ private:
     void BeginTexture(gfx::TextureID texture);
     void PushRect(const glm::vec2& p0, const glm::vec2& uv0, const glm::vec2& p1, const glm::vec2& uv1, uint32_t color);
     void PushRectNoClip(const glm::vec2& p0, const glm::vec2& uv0, const glm::vec2& p1, const glm::vec2& uv1,
+        uint32_t color);
+    void PushRectNoClip(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c, const glm::vec2& d,
+                        const glm::vec2& uv_a, const glm::vec2& uv_b, const glm::vec2& uv_c, const glm::vec2& uv_d,
                         uint32_t color);
 
 private:

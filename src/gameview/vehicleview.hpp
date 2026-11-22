@@ -74,6 +74,10 @@ public:
     virtual void Update(const UpdateInfo& info) override;
     virtual void Draw(const DrawArgs& args) override;
 
+    float GetSpeed() const { return speed_; }
+    float GetEngineRpm() const { return engine_rpm_; }
+    int GetGear() const { return sync_.gear; }
+    
 private:
     void InitMesh();
 
