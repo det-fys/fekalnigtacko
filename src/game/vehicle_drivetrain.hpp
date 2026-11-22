@@ -58,7 +58,7 @@ struct VehicleEngine
         // Idle speed controller.
         // Adds enough torque to maintain idle.
         float idle_error = idle_rpm - rpm;
-        float idle_torque = std::clamp(idle_error * 0.5f, 0.0f, 100.0f);
+        float idle_torque = glm::clamp(idle_error * 0.5f, 0.0f, 100.0f);
 
         combustion_torque += idle_torque;
 
