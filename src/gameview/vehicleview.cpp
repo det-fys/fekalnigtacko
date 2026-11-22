@@ -37,7 +37,7 @@ game::view::VehicleView::VehicleView(WorldView& world, net::InMessage& msg)
     state_[0] = state_[1];
     root_.local = state_[0].trans;
 
-    snd_engine_ = assets::AssetManager::GetInstance().Get<audio::Sound>("engine_loop1");
+    snd_engine_ = assets::AssetManager::GetInstance().Get<audio::Sound>("engine_rpm2000");
 
     radius_ = 20.0f;
     
@@ -104,7 +104,7 @@ void game::view::VehicleView::Update(const UpdateInfo& info)
         wheels_[i].node.UpdateMatrix();
     }
 
-    UpdateSounds();
+    UpdateSounds(info.delta_time);
     UpdateLights(info.delta_time);
     UpdateSteeringWheel();
 }
@@ -457,7 +457,7 @@ void game::view::VehicleView::InitSteeringWheel()
     has_steerw_ = true;
 }
 
-void game::view::VehicleView::UpdateSounds()
+void game::view::VehicleView::UpdateSounds(float dt)
 {
     if (!world_.IsLoaded())
         return;
@@ -475,18 +475,24 @@ void game::view::VehicleView::UpdateSounds()
         snd_engine_src_ = nullptr;
     }
 
+    MoveToward(throttle_, (flags_ & VF_ACCELERATING) ? 1.0f : 0.0f, dt / 0.1f);
+
     if (snd_engine_src_)
     {
         //float pitch = glm::mix(1.0f, 7.0f, UnMix(1000.0f, 7000.0f, glm::round(engine_rpm_)));
-        float pitch = engine_rpm_ / 1000.0f;
+        float pitch = engine_rpm_ / 2000.0f;
         //std::cout << "engine rpm: " << engine_rpm_ << ", pitch: " << pitch << std::endl;
+
+        float volume = glm::mix(0.7f, 1.0f, throttle_);
+
         snd_engine_src_->SetPitch(pitch);
+        snd_engine_src_->SetVolume(volume);
     }
 }
 
-void game::view::VehicleView::UpdateLights(float delta_t)
+void game::view::VehicleView::UpdateLights(float dt)
 {
-    float max_delta = delta_t * 10.0f;
+    float max_delta = dt * 10.0f;
 
     MoveToward(headlights_factor_, (flags_ & VF_LIGHTS_ON) ? 1.0f : 0.0f, max_delta);
     MoveToward(braking_lights_factor_, (flags_ & VF_BRAKING) ? 1.0f : 0.0f, max_delta);

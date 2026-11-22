@@ -62,6 +62,7 @@ public:
     bool IsAccelerating() const { return accelerating_; }
     bool IsBraking() const { return braking_; }
     bool IsReversing() const { return reversing_; }
+    bool IsOnGround() const { return wheels_on_ground_ > 0; }
 
     collision::RaycastVehicle& GetBtVehicle() { return *vehicle_; }
 

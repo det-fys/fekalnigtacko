@@ -87,8 +87,8 @@ private:
     void InitLights();
     void InitSteeringWheel();
 
-    void UpdateSounds();
-    void UpdateLights(float delta_t);
+    void UpdateSounds(float dt);
+    void UpdateLights(float dt);
     void UpdateSteeringWheel();
 
     void UpdateDestroyedColors();
@@ -154,6 +154,7 @@ private:
 
     float speed_ = 0.0f;
     float engine_rpm_ = 0.0f;
+    float throttle_ = 0.0f;
 };
 
 }

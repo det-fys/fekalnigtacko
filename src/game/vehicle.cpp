@@ -50,10 +50,17 @@ void game::Vehicle::Update()
     {
         physics_->Update(1.0f / 25.0f);
 
+        if (physics_->IsAccelerating())
+            flags_ |= VF_ACCELERATING;
+
         if (physics_->IsBraking())
             flags_ |= VF_BRAKING;
+        
         if (physics_->IsReversing())
             flags_ |= VF_REVERSING;
+        
+        if (physics_->IsOnGround())
+            flags_ |= VF_TIRES;
 
         if (engine_on_)
             flags_ |= VF_ENGINE_ON;

@@ -9,19 +9,21 @@ namespace game
 
 constexpr size_t MAX_WHEELS = 4;
 
-using VehicleFlags = uint8_t;
+using VehicleFlags = uint16_t;
 
 enum VehicleFlag : VehicleFlags
 {
     VF_NONE = 0,
     VF_ENGINE_ON = 1,
-    VF_BRAKING = 2,
-    VF_BROKENWINDOWS = 4,
-    VF_LIGHTS_ON = 8,
-    VF_REVERSING = 16,
-    VF_ORANGE_LIGHTS_ON = 32,
-    VF_NO_WHEELS = 64,
-    VF_EXPLODED = 128,
+    VF_ACCELERATING = 2,
+    VF_BRAKING = 4,
+    VF_BROKENWINDOWS = 8,
+    VF_LIGHTS_ON = 16,
+    VF_REVERSING = 32,
+    VF_ORANGE_LIGHTS_ON = 64,
+    VF_NO_WHEELS = 128,
+    VF_EXPLODED = 256,
+    VF_TIRES = 512,
 };
 
 struct VehicleSyncState

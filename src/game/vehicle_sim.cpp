@@ -88,17 +88,18 @@ void VehiclePhysics::SetTuning(const VehicleTuningContext& tuning)
     max_braking_force_ = tuning.braking_force;
 
     auto& tc = engine_.torque_curve;
-    tc[0] = {850.0f, 65.0f};
-    tc[1] = {1500.0f, 115.0f};
-    tc[2] = {2000.0f, 185.0f};
-    tc[3] = {2500.0f, 210.0f};
-    tc[4] = {3500.0f, 210.0f};
-    tc[5] = {4500.0f, 205.0f};
-    tc[6] = {5000.0f, 195.4f};
-    tc[7] = {5500.0f, 165.0f};
-    tc[8] = {6000.0f, 130.0f};
-    tc[9] = {6500.0f, 0.0f};
-    engine_.num_torque_curve_points = 10;
+    tc[0] = {0.0f, 40.0f};
+    tc[1] = {850.0f, 115.0f};
+    tc[2] = {1500.0f, 135.0f};
+    tc[3] = {2000.0f, 185.0f};
+    tc[4] = {2500.0f, 210.0f};
+    tc[5] = {3500.0f, 210.0f};
+    tc[6] = {4500.0f, 205.0f};
+    tc[7] = {5000.0f, 195.4f};
+    tc[8] = {5500.0f, 165.0f};
+    tc[9] = {6000.0f, 130.0f};
+    tc[10] = {6500.0f, 0.0f};
+    engine_.num_torque_curve_points = 11;
 
     engine_.idle_rpm = 800.0f;
     engine_.max_rpm = 6000.0f;
@@ -253,7 +254,9 @@ void VehiclePhysics::UpdateInput(float dt)
     const bool active_braking = target_brake > 0.0f;
 
     if (target_throttle == 0.0f && target_brake == 0.0f)
-        target_brake = 0.3f;
+    {
+        target_brake = speed > 1.0f ? 0.3f : 1.0f;
+    }
 
     if (!input_.analog_steering)
     {
@@ -334,7 +337,7 @@ void VehiclePhysics::UpdateDrivetrain(float dt)
     const float throttle = glm::abs(throttle_and_dir_);
     
     float effective_throttle = throttle;
-    if (clutch_engagement_ < 1.0f && engine_rpm_ > 3500.0f)
+    if (clutch_engagement_ < 1.0f && engine_rpm_ > 4500.0f)
     {
         effective_throttle = 0.0f;
     }
@@ -399,6 +402,8 @@ void VehiclePhysics::UpdateDrivetrain(float dt)
     float wheel_torque = engine_torque * ratio * engagement;
     float engine_force = wheel_torque / driven_wheel_radius_;
 
+    constexpr float fake_braking_ratio = 0.5f;
+
     // 7. Apply forces.
     for (size_t i = 0; i < wheel_tuning_.size(); ++i)
     {
@@ -407,8 +412,16 @@ void VehiclePhysics::UpdateDrivetrain(float dt)
 
         // Always write values, including zero.
         wheel.m_engineForce = tuning.engine_factor * engine_force / total_engine_factor;
-        wheel.m_brake = tuning.braking_factor * braking_ * max_braking_force_;
+        wheel.m_brake = tuning.braking_factor * brake_ * max_braking_force_ * (1.0f - fake_braking_ratio);
         wheel.m_steering = tuning.steering_factor * steering_;
+    }
+
+    // hack another braking force to the body to make it stop better
+    if (brake_ > 0.0f && wheels_on_ground_ > 0)
+    {
+        const float body_braking_force = brake_ * max_braking_force_ * fake_braking_ratio;
+        const btVector3 braking_impulse = -body_braking_force * dt * body_->getLinearVelocity();
+        body_->applyCentralImpulse(braking_impulse);
     }
 
     // shift
@@ -428,9 +441,9 @@ void VehiclePhysics::UpdateDrivetrain(float dt)
 
     MoveToward(shift_cooldown_, 0.0f, dt);
 
+    // find best gear for current speed
     if (shift_cooldown_ == 0.0f && gear_ == 0 && throttle > 0.0f)
     {
-        // find best gear for current speed
         int best_gear = 0;
 
         float target_rpm = (1500.0f + 5000.0f) * 0.5f;
@@ -457,7 +470,15 @@ void VehiclePhysics::UpdateDrivetrain(float dt)
     // engage clutch
     if (gear_ != 0)
     {
-        MoveToward(clutch_engagement_, 1.0f, dt * 3.0f);
+        auto clutch_target = 1.0f;
+        if (coupled_rpm < 3000.0f)
+        {
+            // make clutch engage partially
+            clutch_target = glm::mix(0.5f, 1.0f, glm::clamp(coupled_rpm / 3000.0f, 0.0f, 1.0f));
+            clutch_target *= clutch_target; // ^2
+        }
+
+        MoveToward(clutch_engagement_, clutch_target, dt * 3.0f);
     }
 }
 
