@@ -152,6 +152,9 @@ void edit::MapViewport::ShowContextMenuContent()
             ImGui::SeparatorText("selection");
         }
 
+        if (ContextMenuItem("Select All", "O", ImGuiKey_O))
+            project.SelectAll();
+
         if (ContextMenuItem("Delete", "Del", ImGuiKey_Delete, project.HasSelection()))
             project.DeleteSelection();
 

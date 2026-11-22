@@ -173,7 +173,33 @@ void edit::Project::MakeSelection(const glm::dvec3& start, const glm::dvec3& end
 
 void edit::Project::MakeSelection2D(const glm::dvec2& min, const glm::dvec2* max, bool additive)
 {
-    MakeSelection(glm::dvec3(min, 1000.0), glm::dvec3(min, 1000.0), additive);
+    if (!max)
+    {
+        MakeSelection(glm::dvec3(min, 1000.0), glm::dvec3(min, 1000.0), additive);
+        return;
+    }
+
+    const AABB3 selection_aabb{
+        glm::vec3(min, -1000.0),
+        glm::vec3(*max, 1000.0),
+    };
+
+    temp_objs_.clear();
+
+    for (auto& obj : all_objs_)
+    {
+        if (!selection_aabb.CollidesWith(obj->GetAABB()))
+            continue;
+
+        temp_objs_.push_back(obj);
+    }
+
+    SelectOrDeselect(temp_objs_, true, false);
+}
+
+void edit::Project::SelectAll()
+{
+    SelectOrDeselect(all_objs_, true, false);
 }
 
 bool edit::Project::HasSelection() const

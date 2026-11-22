@@ -73,6 +73,7 @@ public:
     void SetHover(const glm::dvec3& start, const glm::dvec3& end);
     void MakeSelection(const glm::dvec3& start, const glm::dvec3& end, bool additive);
     void MakeSelection2D(const glm::dvec2& min, const glm::dvec2* max, bool additive);
+    void SelectAll();
     bool HasSelection() const;
     const FarMatrix* GetSelectionMatrix() const;
     void ApplySelectionTransform(const FarMatrix& delta);
@@ -132,6 +133,7 @@ private:
     std::map<WaypointID, Waypoint> waypoints_;
     WaypointID last_waypoint_id_ = 0;
     std::vector<Object*> all_objs_; // pointers to all objects 4 ez iteration
+    std::vector<Object*> temp_objs_; // temp list for selection & manipulation
 
     // selection & manipulation
     std::vector<SelectionListEntry> selection_;
