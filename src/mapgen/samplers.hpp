@@ -22,10 +22,14 @@ public:
     float Get(const glm::dvec2& pos) const;
 
 private:
+    float GetMountainMask(const glm::dvec2& pos) const;
+
     const double world_size_m_;
 
-    FastNoiseLite noise_;
-    FastNoiseLite noise2_;
+    FastNoiseLite region_noise_;
+    FastNoiseLite lowland_noise_;
+    FastNoiseLite peak_noise_;
+    FastNoiseLite detail_noise_;
     FastNoiseLite bump_noise_;
 };
 

@@ -5,6 +5,36 @@
 namespace
 {
 
+// Overall feature width and height variation. Matching factors preserve the slope proportions.
+constexpr float TERRAIN_XY_SCALE = 1.0f;
+constexpr float TERRAIN_HEIGHT_SCALE = 0.5f;
+
+// World-space terrain controls. Heights and region sizes are in metres.
+constexpr double MOUNTAIN_SAMPLE_SCALE = 0.00015 / TERRAIN_XY_SCALE;
+constexpr float MOUNTAIN_REGION_SIZE = 6000.0f * TERRAIN_XY_SCALE;
+constexpr float LOWLAND_SIZE = 900.0f * TERRAIN_XY_SCALE;
+constexpr float PEAK_REGION_SIZE = 3000.0f * TERRAIN_XY_SCALE;
+constexpr float DETAIL_SIZE = 400.0f * TERRAIN_XY_SCALE;
+
+constexpr float MOUNTAIN_REGION_START = 0.40f;
+constexpr float MOUNTAIN_REGION_FULL = 0.72f;
+constexpr float PEAK_REGION_START = 0.62f;
+constexpr float PEAK_REGION_FULL = 0.78f;
+
+constexpr float LOWLAND_HEIGHT = 80.0f;
+constexpr float LOWLAND_ROLLING_RELIEF = 45.0f;
+constexpr float MOUNTAIN_UPLIFT = 100.0f;
+
+// Scale the shader's signed height variation directly; it is usually only a few hundredths.
+// Avoid normalizing it to [0, 1], which amplified slopes and flattened away the gullies.
+constexpr float LOWLAND_HEIGHT_SCALE = 400.0f;
+constexpr float MOUNTAIN_HEIGHT_SCALE = 2000.0f;
+constexpr float EXTRA_PEAK_HEIGHT_SCALE = 1000.0f;
+constexpr float LOWLAND_EROSION_SCALE = 400.0f;
+constexpr float MOUNTAIN_EROSION_SCALE = 1200.0f;
+constexpr float LOWLAND_DETAIL = 3.0f;
+constexpr float MOUNTAIN_DETAIL = 10.0f;
+
 float SampleNoiseNormalized(const FastNoiseLite& noise, const glm::dvec2& pos)
 {
     return noise.GetNoise(pos.x, pos.y) * 0.5f + 0.5f;
@@ -43,18 +73,34 @@ mg::TerrainHeightSampler::TerrainHeightSampler(const MapConfig& cfg)
 {
     auto seed = cfg.seed ^ 0x431647;
 
-    noise_.SetSeed(seed);
-    noise_.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    noise_.SetFrequency(0.00001f);
-    noise_.SetFractalType(FastNoiseLite::FractalType_FBm);
-    noise_.SetFractalOctaves(5);
+    region_noise_.SetSeed(seed);
+    region_noise_.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    region_noise_.SetFrequency(1.0f / MOUNTAIN_REGION_SIZE);
+    region_noise_.SetFractalType(FastNoiseLite::FractalType_FBm);
+    region_noise_.SetFractalOctaves(2);
+    region_noise_.SetFractalGain(0.35f);
 
-    noise2_.SetSeed(seed ^ 0xAAAAAAAA);
-    noise2_.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    noise2_.SetFrequency(0.001f);
-    noise2_.SetFractalType(FastNoiseLite::FractalType_FBm);
-    noise2_.SetFractalLacunarity(2.0f);
-    noise2_.SetFractalOctaves(5);
+    lowland_noise_.SetSeed(seed ^ 0x68BC21EB);
+    lowland_noise_.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    lowland_noise_.SetFrequency(1.0f / LOWLAND_SIZE);
+    lowland_noise_.SetFractalType(FastNoiseLite::FractalType_FBm);
+    lowland_noise_.SetFractalOctaves(4);
+    lowland_noise_.SetFractalGain(0.4f);
+
+    peak_noise_.SetSeed(seed ^ 0xB5297A4D);
+    peak_noise_.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    peak_noise_.SetFrequency(1.0f / PEAK_REGION_SIZE);
+    peak_noise_.SetFractalType(FastNoiseLite::FractalType_FBm);
+    peak_noise_.SetFractalOctaves(2);
+    peak_noise_.SetFractalGain(0.35f);
+
+    detail_noise_.SetSeed(seed ^ 0xAAAAAAAA);
+    detail_noise_.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    detail_noise_.SetFrequency(1.0f / DETAIL_SIZE);
+    detail_noise_.SetFractalType(FastNoiseLite::FractalType_FBm);
+    detail_noise_.SetFractalLacunarity(2.0f);
+    detail_noise_.SetFractalOctaves(4);
+    detail_noise_.SetFractalGain(0.45f);
 
     bump_noise_.SetSeed(seed ^ 0x3459);
     bump_noise_.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
@@ -187,7 +233,7 @@ glm::vec3 Erosion(const glm::vec2& p, glm::vec3& heightAndSlope, float scale, fl
         // Adjust the slope given to the Gullies function, without influencing the final slope.
         // The calculation is equivalent to raising the length of the slope to slopePower.
         auto heightAndSlopeYZ = glm::vec2(heightAndSlope.y, heightAndSlope.z);
-        float sqrLen = glm::dot(heightAndSlopeYZ, heightAndSlopeYZ);
+        float sqrLen = glm::max(glm::dot(heightAndSlopeYZ, heightAndSlopeYZ), 1e-12f);
         glm::vec2 inputSlope = heightAndSlopeYZ * glm::pow(sqrLen, 0.5f * (slopePower - 1.0f));
 
         // Calculate and add gullies to the height and slope.
@@ -248,13 +294,13 @@ float MagnitudeSum(int octaves, float gain)
 // filter to a height function. Try with the width of a mountain divided by five to ten.
 // Value changes can cause abrupt changes in output, especially far away from the origin,
 // so this parameter is not well suited for animation or for modulation by other functions.
-constexpr static float EROSION_SCALE = 0.08333f;
+constexpr static float EROSION_SCALE = 0.06f;
 //#define EROSION_SCALE (0.08*pow(2.0, 2.0*sin(iTime*0.25)))
 
 // The depth of the gullies created.
 // The erosion strength is relative to the erosion scale, and values between 0 and 0.5
 // usually produce good results.
-constexpr static float EROSION_STRENGTH = 0.16f;
+constexpr static float EROSION_STRENGTH = 0.22f;
 
 // The frequency of gullies is based on the slope length raised to the slope power.
 // Note that at sufficiently low gully frequencies, the depth decreases too, since cosine
@@ -263,7 +309,7 @@ constexpr static float EROSION_STRENGTH = 0.16f;
 //
 // 1.0 : Produces smooth mountain peaks and ridges.
 // 0.5 : Produces shaper mountain peaks and ridges.
-constexpr static float EROSION_SLOPE_POWER = 0.6f;
+constexpr static float EROSION_SLOPE_POWER = 1.0f;
 //#define EROSION_SLOPE_POWER (0.5 + 0.5 * sin(iTime*0.5))
 
 // Gullies are based on stripes within Voronoi-like cells. The cell scale is relative to
@@ -284,7 +330,8 @@ constexpr static float EROSION_CELL_SCALE = 1.0f;
 //  1.0 : Only raises the terrain.
 constexpr static float EROSION_HEIGHT_OFFSET = -0.5f;
 
-constexpr static int EROSION_OCTAVES = 5;
+// Keep the smallest gullies large enough to survive the 8 m base-height sampling.
+constexpr static int EROSION_OCTAVES = 4;
 
 constexpr static float EROSION_GAIN = 0.5f;
 //#define EROSION_GAIN (0.3 + 0.3 * sin(iTime*0.5))
@@ -294,13 +341,14 @@ constexpr static float EROSION_LACUNARITY = 2.0f;
 
 
 constexpr static float HEIGHT_TILES = 3.0f;
-constexpr static int HEIGHT_OCTAVES = 3;
+constexpr static int HEIGHT_OCTAVES = 4;
 constexpr static float HEIGHT_AMP = 0.25f;
-constexpr static float HEIGHT_GAIN = 0.1f;
+constexpr static float HEIGHT_GAIN = 0.3f;
 constexpr static float HEIGHT_LACUNARITY = 2.0f;
 
 constexpr static float WATER_HEIGHT = 0.465f;
 
+// Return the uneroded base height and the erosion delta separately so their relief can be tuned independently.
 glm::vec2 Heightmap(const glm::vec2 p) {
     // FBM terrain
     auto n = FractalNoise(p, HEIGHT_TILES, HEIGHT_OCTAVES, HEIGHT_LACUNARITY, HEIGHT_GAIN)
@@ -308,13 +356,13 @@ glm::vec2 Heightmap(const glm::vec2 p) {
     
     // [-1, 1] -> [0, 1]
     n = n * 0.5f + glm::vec3(0.5f, 0.0f, 0.0f);
+    const float base_height = n.x;
 
     float strength = EROSION_STRENGTH;
 
-    // Smooth valleys
-    //strength *= smoothstep(0.0, 1.0, n.x);
-
-    strength *= glm::smoothstep(WATER_HEIGHT - 0.1f, WATER_HEIGHT + 0.1f, n.x);
+    // Retain some gully detail in low terrain instead of fading it out completely.
+    strength *= glm::mix(0.35f, 1.0f,
+                         glm::smoothstep(WATER_HEIGHT - 0.1f, WATER_HEIGHT + 0.1f, base_height));
     
     int octaves = EROSION_OCTAVES;
 
@@ -327,25 +375,42 @@ glm::vec2 Heightmap(const glm::vec2 p) {
         * MagnitudeSum(octaves, EROSION_GAIN);
     float offset = erosionMagnitude * EROSION_HEIGHT_OFFSET;
 
-    return glm::vec2(n.x + h.x + offset, h.x / erosionMagnitude);
+    return glm::vec2(base_height, h.x + offset);
 }
 
+}
+
+float mg::TerrainHeightSampler::GetMountainMask(const glm::dvec2& pos) const
+{
+    return glm::smoothstep(MOUNTAIN_REGION_START, MOUNTAIN_REGION_FULL,
+                           SampleNoiseNormalized(region_noise_, pos));
 }
 
 float mg::TerrainHeightSampler::GetBase(const glm::dvec2& pos) const
-{   
-    auto height = Heightmap(pos * 0.00015).x * 500.0f;
-    // auto height = SampleNoiseNormalized(noise_, pos) * 500.0f;
-    height -= 100.0f;
-    height *= glm::mix(0.1f, 1.0f, GetHeightFalloff(pos, world_size_m_));
-    height -= 100.0f;
-    return height;
+{
+    const float mountains = GetMountainMask(pos);
+    const glm::vec2 terrain = Heightmap(glm::vec2(pos * MOUNTAIN_SAMPLE_SCALE));
+    const float taller_peaks = glm::smoothstep(PEAK_REGION_START, PEAK_REGION_FULL,
+                                             SampleNoiseNormalized(peak_noise_, pos));
+    const float height_scale = glm::mix(LOWLAND_HEIGHT_SCALE,
+                                       MOUNTAIN_HEIGHT_SCALE + taller_peaks * EXTRA_PEAK_HEIGHT_SCALE, mountains);
+    const float erosion_scale = glm::mix(LOWLAND_EROSION_SCALE, MOUNTAIN_EROSION_SCALE, mountains);
+
+    float relief = lowland_noise_.GetNoise(pos.x, pos.y) * LOWLAND_ROLLING_RELIEF;
+    relief += mountains * MOUNTAIN_UPLIFT;
+    // Keep rolling terrain and erosion in every region, with no clamping at valley floors or summits.
+    relief += (terrain.x - 0.5f) * height_scale;
+    relief += terrain.y * erosion_scale;
+    const float height = LOWLAND_HEIGHT + relief * TERRAIN_HEIGHT_SCALE;
+
+    // Retain the coastal falloff, with the composed height expressed above sea level.
+    return (height + 100.0f) * glm::mix(0.1f, 1.0f, GetHeightFalloff(pos, world_size_m_)) - 100.0f;
 }
 
 float mg::TerrainHeightSampler::GetDetail(const glm::dvec2& pos) const
 {
-    return SampleNoiseNormalized(noise2_, pos) * 20.0f; // add finer detail
-    // return 0.0f;
+    const float amplitude = glm::mix(LOWLAND_DETAIL, MOUNTAIN_DETAIL, GetMountainMask(pos));
+    return detail_noise_.GetNoise(pos.x, pos.y) * amplitude * TERRAIN_HEIGHT_SCALE;
 }
 
 float mg::TerrainHeightSampler::GetBump(const glm::dvec2& pos) const
@@ -400,7 +465,7 @@ float mg::ForestSampler::GetIntensity(const glm::dvec2& pos) const
     auto intensity = SampleNoiseNormalized(intensity_noise_, pos);
     //intensity = glm::pow(intensity, 1.5f); // make low values lower
 
-    return glm::clamp(UnMix(0.45f, 0.6f, intensity), 0.0f, 1.0f); 
+    return glm::clamp(UnMix(0.45f, 0.7f, intensity), 0.0f, 1.0f); 
 }
 
 float mg::ForestSampler::GetDensity(const glm::dvec2& pos) const
